@@ -1,0 +1,61 @@
+/**
+ * SABC Design System - Palette de couleurs officielle
+ * Basé sur les règles graphiques SABC
+ */
+
+:root {
+  /* Couleurs Primaires (OBLIGATOIRES) */
+  --sabc-red-primary: #E53E3E;    /* Rouge SABC principal */
+  --sabc-red-light: #FED7D7;      /* Rouge clair backgrounds */
+  --sabc-red-dark: #C53030;       /* Rouge foncé hover/active */
+  --sabc-accent: #FF9800;         /* Orange accent */
+  --sabc-accent-light: #FFE0B2;   /* Orange clair */
+
+  /* Nuances de Gris (COMPLÈTES) */
+  --sabc-gray-50: #F5F5F5;        /* Background app */
+  --sabc-gray-100: #F5F5F5;       /* Background cards */
+  --sabc-gray-200: #E0E0E0;       /* Bordures, séparateurs */
+  --sabc-gray-400: #9E9E9E;       /* Texte secondaire */
+  --sabc-gray-800: #424242;       /* Texte principal */
+  --sabc-gray-900: #1A202C;       /* Titres importants */
+
+  /* Couleurs Fonctionnelles */
+  --sabc-success: #48BB78;        /* Validations */
+  --sabc-warning: #D69E2E;        /* Alertes */
+  --sabc-error: #E53E3E;          /* Erreurs (rouge SABC) */
+  --sabc-info: #3182CE;           /* Informations */
+  
+  /* Palette pour graphiques */
+  --sabc-chart-1: var(--sabc-red-primary);
+  --sabc-chart-2: var(--sabc-accent);
+  --sabc-chart-3: var(--sabc-success);
+  --sabc-chart-4: var(--sabc-info);
+  --sabc-chart-5: var(--sabc-warning);
+  --sabc-chart-6: var(--sabc-gray-400);
+}
+
+/* Classes utilitaires pour les couleurs de fond */
+.bg-sabc-primary { background-color: var(--sabc-red-primary); }
+.bg-sabc-light { background-color: var(--sabc-red-light); }
+.bg-sabc-accent { background-color: var(--sabc-accent); }
+.bg-sabc-success { background-color: var(--sabc-success); }
+.bg-sabc-warning { background-color: var(--sabc-warning); }
+.bg-sabc-info { background-color: var(--sabc-info); }
+.bg-sabc-gray-50 { background-color: var(--sabc-gray-50); }
+.bg-sabc-gray-100 { background-color: var(--sabc-gray-100); }
+
+/* Classes utilitaires pour les couleurs de texte */
+.text-sabc-primary { color: var(--sabc-red-primary); }
+.text-sabc-dark { color: var(--sabc-red-dark); }
+.text-sabc-accent { color: var(--sabc-accent); }
+.text-sabc-success { color: var(--sabc-success); }
+.text-sabc-warning { color: var(--sabc-warning); }
+.text-sabc-info { color: var(--sabc-info); }
+.text-sabc-gray-400 { color: var(--sabc-gray-400); }
+.text-sabc-gray-800 { color: var(--sabc-gray-800); }
+.text-sabc-gray-900 { color: var(--sabc-gray-900); }
+
+/* Classes utilitaires pour les bordures */
+.border-sabc-primary { border-color: var(--sabc-red-primary); }
+.border-sabc-light { border-color: var(--sabc-red-light); }
+.border-sabc-gray-200 { border-color: var(--sabc-gray-200); }
