@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useAuthContext } from '@/Context/AuthContext';
+import { useAuthContext } from '@/Contexts/AuthContext';
 
 // Types pour les permissions
 export type Permission = 
@@ -64,8 +64,9 @@ export const usePermissions = () => {
       ],
       
       // Responsable Trade Marketing
+      // RTM ne peut pas évaluer ses pairs selon les règles métier SABC
       'RTM': [
-        'self_evaluation', 'peer_evaluation', 'evaluate_subordinates', 'validate_evaluations',
+        'self_evaluation', 'evaluate_subordinates', 'validate_evaluations',
         'view_analytics', 'view_service', 'manage_evaluations'
       ],
       
@@ -100,8 +101,10 @@ export const usePermissions = () => {
       ],
       
       // Superviseur Régional Marketing Opérationnel
+      // SRMO ne peut pas évaluer ses pairs selon les règles métier SABC
+      // SRMO peut évaluer ses subordonnés directs (TMO)
       'SRMO': [
-        'self_evaluation', 'peer_evaluation',
+        'self_evaluation', 'evaluate_subordinates', 'validate_evaluations',
         'view_analytics', 'view_team'
       ],
       
@@ -148,10 +151,11 @@ export const usePermissions = () => {
         canBeEvaluated: true
       },
       
-      // Responsable Trade Marketing - Peut s'auto-évaluer, évaluer ses pairs et ses subordonnés
+      // Responsable Trade Marketing - Peut s'auto-évaluer et évaluer ses subordonnés directs (TMO, SS)
+      // RTM ne peut pas évaluer ses pairs selon les règles métier SABC
       'RTM': {
         canSelfEvaluate: true,
-        canEvaluatePeers: true,
+        canEvaluatePeers: false,
         canEvaluateSubordinates: true,
         canCrossBranch: false,
         canBeEvaluated: true
@@ -202,11 +206,12 @@ export const usePermissions = () => {
         canBeEvaluated: true
       },
       
-      // Superviseur Régional Marketing Opérationnel - Peut s'auto-évaluer et évaluer ses pairs, mais pas de subordonnés
+      // Superviseur Régional Marketing Opérationnel - Peut s'auto-évaluer et évaluer ses subordonnés directs (TMO)
+      // SRMO ne peut pas évaluer ses pairs selon les règles métier SABC
       'SRMO': {
         canSelfEvaluate: true,
-        canEvaluatePeers: true,
-        canEvaluateSubordinates: false,
+        canEvaluatePeers: false,
+        canEvaluateSubordinates: true,
         canCrossBranch: false,
         canBeEvaluated: true
       }

@@ -1,4 +1,11 @@
-// Fichier d'index pour exporter les layouts de manière cohérente
-import AppLayout from '../Layouts/app-layout';
+/**
+ * Ce fichier est un point d'entrée pour les layouts de l'application.
+ * Il réexporte les composants de layout depuis leur emplacement réel dans Components/Layout/app
+ * pour maintenir la compatibilité avec le code existant.
+ */
 
-export { AppLayout };
+// Réexporter les composants de layout depuis leur emplacement réel
+export { AppLayout, Header, Sidebar } from '@/Components/Layout';
+
+// Exporter AppLayout comme composant par défaut
+export { AppLayout as default } from '@/Components/Layout';

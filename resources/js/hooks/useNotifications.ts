@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
-import { useNotificationContext, Notification } from '@/Context/NotificationContext';
+import { useCallback, useState, useEffect } from 'react';
+import { useNotificationContext, Notification } from '@/Contexts/NotificationContext';
+import { notificationService } from '../Services/{api}';
 
 // Type pour les métadonnées des notifications
 export interface NotificationMetadata {
@@ -16,20 +17,80 @@ export interface NotificationMetadata {
 export const useNotifications = () => {
   const notificationContext = useNotificationContext();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Charger les notifications depuis l'API
+  const loadNotifications = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await notificationService.getAll();
+      // Synchroniser avec le contexte local
+      data.forEach((notification: Notification) => {
+        if (!notificationExists(notification.message, notification.type)) {
+          notificationContext.addNotification(notification);
+        }
+      });
+    } catch (err: any) {
+      setError(err.message || 'Impossible de charger les notifications');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [notificationContext]);
+  
+  // Charger les notifications au montage du composant
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
   
   // Marquer une notification comme lue
-  const markAsRead = useCallback((id: string) => {
-    notificationContext.markAsRead(id);
+  const markAsRead = useCallback(async (id: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await notificationService.markAsRead(id);
+      notificationContext.markAsRead(id);
+    } catch (err: any) {
+      setError(err.message || 'Impossible de marquer la notification comme lue');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [notificationContext]);
   
   // Marquer toutes les notifications comme lues
-  const markAllAsRead = useCallback(() => {
-    notificationContext.markAllAsRead();
+  const markAllAsRead = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await notificationService.markAllAsRead();
+      notificationContext.markAllAsRead();
+    } catch (err: any) {
+      setError(err.message || 'Impossible de marquer toutes les notifications comme lues');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [notificationContext]);
   
   // Supprimer une notification
-  const removeNotification = useCallback((id: string) => {
-    notificationContext.removeNotification(id);
+  const removeNotification = useCallback(async (id: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await notificationService.delete(id);
+      notificationContext.removeNotification(id);
+    } catch (err: any) {
+      setError(err.message || 'Impossible de supprimer la notification');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [notificationContext]);
   
   // Supprimer toutes les notifications
@@ -105,6 +166,8 @@ export const useNotifications = () => {
     notifications: notificationContext.notifications,
     unreadCount: notificationContext.unreadCount,
     loading,
+    error,
+    loadNotifications,
     markAsRead,
     markAllAsRead,
     removeNotification,

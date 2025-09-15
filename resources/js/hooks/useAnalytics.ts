@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
+import { analyticsService } from '../Services/{api}';
 
 // Types pour les données d'analyse
 export interface AnalyticsData {
@@ -129,28 +130,88 @@ export const useAnalytics = () => {
     setLoading(true);
     setError(null);
     
-    // Construire les paramètres de requête
-    const queryParams = new URLSearchParams();
-    queryParams.append('period', period);
-    
-    // Ajouter les filtres sélectionnés
-    Object.entries(selectedFilters).forEach(([key, values]) => {
-      values.forEach(value => queryParams.append(key, value));
-    });
-    
-    // Ajouter la recherche
-    if (searchQuery) {
-      queryParams.append('search', searchQuery);
-    }
-    
     try {
-      const response = await fetch(`/api/analytics?${queryParams.toString()}`);
-      if (!response.ok) throw new Error('Erreur lors du chargement des données d\'analyse');
+      // Préparer les filtres pour les appels API
+      const filters: {
+        id_periode?: number;
+        id_region?: number;
+        id_role?: number;
+      } = {
+        id_periode: selectedFilters.timeframe ? parseInt(selectedFilters.timeframe[0]) : undefined,
+        id_region: selectedFilters.region ? parseInt(selectedFilters.region[0]) : (user?.id ? Number(user.id) : undefined),
+        id_role: selectedFilters.role ? parseInt(selectedFilters.role[0]) : undefined
+      };
       
-      const data = await response.json();
-      setAnalyticsData(data);
-    } catch (err) {
-      setError('Impossible de charger les données d\'analyse');
+      // Charger les données en parallèle pour optimiser les performances
+      const [
+        performanceByRegionData,
+        performanceByRoleData,
+        performanceByCompetencyData,
+        evaluationStatsData,
+        evaluationTrendsData
+      ] = await Promise.all([
+        analyticsService.getPerformanceByRegion(filters),
+        analyticsService.getPerformanceByRole(filters),
+        analyticsService.getPerformanceByCompetency(filters),
+        analyticsService.getEvaluationStats(filters),
+        analyticsService.getEvaluationTrends({
+          ...filters,
+          nb_periodes: 6 // Récupérer les 6 dernières périodes pour les tendances
+        })
+      ]);
+      
+      // Transformer les données reçues pour correspondre à l'interface AnalyticsData
+      const transformedData: AnalyticsData = {
+        performanceByRegion: performanceByRegionData.map((item: any) => ({
+          name: item.region_nom,
+          commercial: item.scores?.commercial || 0,
+          marketing: item.scores?.marketing || 0
+        })),
+        performanceTrends: evaluationTrendsData.map((item: any) => ({
+          month: item.periode_nom,
+          commercial: item.scores?.commercial || 0,
+          marketing: item.scores?.marketing || 0
+        })),
+        skillRadar: performanceByCompetencyData.map((item: any) => ({
+          skill: item.competence_nom,
+          value: item.score || 0,
+          fullMark: 5 // Note maximale
+        })),
+        evaluationCompletion: [
+          { status: 'Complétées', value: evaluationStatsData.completed || 0 },
+          { status: 'En attente', value: evaluationStatsData.pending || 0 },
+          { status: 'Rejetées', value: evaluationStatsData.rejected || 0 }
+        ],
+        topPerformers: evaluationStatsData.topPerformers?.map((user: any) => ({
+          id: user.id_utilisateur,
+          name: `${user.prenom} ${user.nom}`,
+          role: user.role_nom,
+          department: user.branche_nom,
+          performance: user.score || 0,
+          progress: user.completion_rate || 0
+        })) || [],
+        skillGaps: performanceByCompetencyData
+          .filter((item: any) => item.score < 3) // Identifier les compétences avec un score < 3
+          .map((item: any) => ({
+            skill: item.competence_nom,
+            current: item.score || 0,
+            target: 4 // Objectif cible
+          })),
+        performanceBySkill: performanceByCompetencyData.map((item: any) => ({
+          skill: item.competence_nom,
+          value: item.score || 0,
+          fullMark: 5
+        })),
+        evaluationCompletionByRegion: performanceByRegionData.map((item: any) => ({
+          name: item.region_nom,
+          completed: item.stats?.completed || 0,
+          total: (item.stats?.completed || 0) + (item.stats?.pending || 0)
+        }))
+      };
+      
+      setAnalyticsData(transformedData);
+    } catch (err: any) {
+      setError(err.message || 'Impossible de charger les données d\'analyse');
       console.error(err);
     } finally {
       setLoading(false);
@@ -193,28 +254,27 @@ export const useAnalytics = () => {
     setIsExporting(true);
     
     try {
-      // Construire les paramètres de requête
-      const queryParams = new URLSearchParams();
-      queryParams.append('period', period);
-      queryParams.append('format', format);
+      // Préparer les filtres pour l'exportation
+      const filters: {
+        id_periode?: number;
+        id_region?: number;
+        id_role?: number;
+        format: 'csv' | 'excel' | 'pdf';
+      } = {
+        id_periode: selectedFilters.timeframe ? parseInt(selectedFilters.timeframe[0]) : undefined,
+        id_region: selectedFilters.region ? parseInt(selectedFilters.region[0]) : (user?.id ? Number(user.id) : undefined),
+        id_role: selectedFilters.role ? parseInt(selectedFilters.role[0]) : undefined,
+        format: format
+      };
       
-      // Ajouter les filtres sélectionnés
-      Object.entries(selectedFilters).forEach(([key, values]) => {
-        values.forEach(value => queryParams.append(key, value));
-      });
+      // Générer le rapport via le service d'analytique
+      const response = await analyticsService.generateEvaluationReports(filters);
       
-      // Ajouter la recherche
-      if (searchQuery) {
-        queryParams.append('search', searchQuery);
-      }
-      
-      // Faire la requête d'exportation
-      const response = await fetch(`/api/analytics/export?${queryParams.toString()}`);
-      if (!response.ok) throw new Error('Erreur lors de l\'exportation des données');
+      // Créer un blob à partir de la réponse
+      const blob = new Blob([response], { type: getContentType(format) });
+      const url = window.URL.createObjectURL(blob);
       
       // Télécharger le fichier
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
@@ -222,13 +282,27 @@ export const useAnalytics = () => {
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError('Impossible d\'exporter les données');
+    } catch (err: any) {
+      setError(err.message || 'Impossible d\'exporter les données');
       console.error(err);
     } finally {
       setIsExporting(false);
     }
-  }, [analyticsData, period, selectedFilters, searchQuery]);
+  }, [analyticsData, period, selectedFilters, searchQuery, user?.id]);
+  
+  // Fonction utilitaire pour déterminer le type de contenu en fonction du format
+  const getContentType = (format: string): string => {
+    switch (format) {
+      case 'csv':
+        return 'text/csv;charset=utf-8';
+      case 'excel':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  };
 
   // Déterminer les analytics à afficher en fonction du rôle
   const getRoleSpecificAnalytics = useCallback(() => {

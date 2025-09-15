@@ -1,27 +1,10 @@
 import { useState, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { usePermissions } from './usePermissions';
+import { evaluationFormsService } from '../Services/{api}';
+import { Competency, EvaluationFormTemplate } from '../types';
 
-// Types pour les compétences d'évaluation
-export interface Competency {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  levels: Array<{
-    level: number;
-    description: string;
-  }>;
-}
-
-// Types pour les formulaires d'évaluation
-export interface EvaluationFormTemplate {
-  id: string;
-  role: string;
-  title: string;
-  description: string;
-  competencies: Competency[];
-}
+// Utilisation des types depuis le fichier types/index.ts
 
 /**
  * Hook personnalisé pour gérer les formulaires d'évaluation spécifiques à chaque rôle
@@ -41,14 +24,11 @@ export const useEvaluationForms = () => {
     setError(null);
     
     try {
-      const response = await fetch('/api/evaluation-forms/templates');
-      if (!response.ok) throw new Error('Erreur lors du chargement des modèles de formulaires');
-      
-      const data = await response.json();
+      const data = await evaluationFormsService.getAll();
       setFormTemplates(data);
       return data;
-    } catch (err) {
-      setError('Impossible de charger les modèles de formulaires');
+    } catch (err: any) {
+      setError(err.message || 'Impossible de charger les modèles de formulaires');
       console.error(err);
       return [];
     } finally {
@@ -62,14 +42,11 @@ export const useEvaluationForms = () => {
     setError(null);
     
     try {
-      const response = await fetch(`/api/evaluation-forms/templates/${role}`);
-      if (!response.ok) throw new Error(`Erreur lors du chargement du formulaire pour le rôle ${role}`);
-      
-      const data = await response.json();
+      const data = await evaluationFormsService.getByRole(role);
       setCurrentTemplate(data);
       return data;
-    } catch (err) {
-      setError(`Impossible de charger le formulaire pour le rôle ${role}`);
+    } catch (err: any) {
+      setError(err.message || `Impossible de charger le formulaire pour le rôle ${role}`);
       console.error(err);
       return null;
     } finally {
@@ -90,37 +67,51 @@ export const useEvaluationForms = () => {
   }, [getEvaluationRules]);
 
   // Obtenir les descriptions des niveaux d'évaluation (échelle 1-5)
-  const getEvaluationLevelDescriptions = useCallback(() => {
-    return {
-      1: 'Insuffisant - Compétence non maîtrisée, nécessite une formation approfondie',
-      2: 'Basique - Compétence partiellement maîtrisée, nécessite un accompagnement',
-      3: 'Satisfaisant - Compétence correctement maîtrisée, autonomie suffisante',
-      4: 'Bon - Compétence bien maîtrisée, peut former d\'autres collaborateurs',
-      5: 'Excellent - Compétence parfaitement maîtrisée, référent dans ce domaine'
-    };
+  const getEvaluationLevelDescriptions = useCallback(async () => {
+    try {
+      return await evaluationFormsService.getEvaluationLevels();
+    } catch (err) {
+      console.error("Erreur lors du chargement des niveaux d'évaluation:", err);
+      // Fallback aux valeurs par défaut en cas d'erreur
+      return {
+        1: 'Insuffisant - Compétence non maîtrisée, nécessite une formation approfondie',
+        2: 'Basique - Compétence partiellement maîtrisée, nécessite un accompagnement',
+        3: 'Satisfaisant - Compétence correctement maîtrisée, autonomie suffisante',
+        4: 'Bon - Compétence bien maîtrisée, peut former d\'autres collaborateurs',
+        5: 'Excellent - Compétence parfaitement maîtrisée, référent dans ce domaine'
+      };
+    }
   }, []);
 
   // Obtenir les catégories de compétences pour un rôle spécifique
-  const getCompetencyCategoriesForRole = useCallback((role: string): string[] => {
-    switch (role) {
-      case 'CSC':
-        return ['Compétences techniques', 'Compétences analytiques', 'Compétences managériales', 'Compétences métier', 'Compétences personnelles'];
-      case 'CDV':
-        return ['Compétences techniques', 'Compétences analytiques', 'Compétences organisationnelles', 'Compétences de leadership', 'Compétences relationnelles'];
-      case 'CDS':
-        return ['Compétences techniques', 'Compétences analytiques', 'Compétences organisationnelles', 'Compétences relationnelles'];
-      case 'RTM':
-        return ['Compétences techniques', 'Compétences analytiques', 'Compétences managériales', 'Compétences marketing', 'Compétences personnelles'];
-      case 'TMO':
-        return ['Compétences techniques', 'Compétences analytiques', 'Compétences marketing', 'Compétences organisationnelles', 'Compétences relationnelles'];
-      case 'SS':
-        return ['Compétences techniques', 'Compétences marketing', 'Compétences relationnelles', 'Compétences organisationnelles'];
-      case 'AS':
-        return ['Compétences techniques', 'Compétences administratives', 'Compétences relationnelles', 'Compétences organisationnelles'];
-      case 'SRMO':
-        return ['Compétences techniques', 'Compétences marketing', 'Compétences managériales', 'Compétences relationnelles'];
-      default:
-        return ['Compétences techniques', 'Compétences relationnelles', 'Compétences organisationnelles'];
+  const getCompetencyCategoriesForRole = useCallback(async (role: string): Promise<string[]> => {
+    try {
+      const competencies = await evaluationFormsService.getCompetenciesForRole(role);
+      // Extraire les catégories uniques des compétences
+      return [...new Set(competencies.map(comp => comp.category))] as string[];
+    } catch (err) {
+      console.error(`Erreur lors du chargement des compétences pour le rôle ${role}:`, err);
+      // Fallback aux valeurs par défaut en cas d'erreur
+      switch (role) {
+        case 'CSC':
+          return ['Compétences techniques', 'Compétences analytiques', 'Compétences managériales', 'Compétences métier', 'Compétences personnelles'];
+        case 'CDV':
+          return ['Compétences techniques', 'Compétences analytiques', 'Compétences organisationnelles', 'Compétences de leadership', 'Compétences relationnelles'];
+        case 'CDS':
+          return ['Compétences techniques', 'Compétences analytiques', 'Compétences organisationnelles', 'Compétences relationnelles'];
+        case 'RTM':
+          return ['Compétences techniques', 'Compétences analytiques', 'Compétences managériales', 'Compétences marketing', 'Compétences personnelles'];
+        case 'TMO':
+          return ['Compétences techniques', 'Compétences analytiques', 'Compétences marketing', 'Compétences organisationnelles', 'Compétences relationnelles'];
+        case 'SS':
+          return ['Compétences techniques', 'Compétences marketing', 'Compétences relationnelles', 'Compétences organisationnelles'];
+        case 'AS':
+          return ['Compétences techniques', 'Compétences administratives', 'Compétences relationnelles', 'Compétences organisationnelles'];
+        case 'SRMO':
+          return ['Compétences techniques', 'Compétences marketing', 'Compétences managériales', 'Compétences relationnelles'];
+        default:
+          return ['Compétences techniques', 'Compétences relationnelles', 'Compétences organisationnelles'];
+      }
     }
   }, []);
 
@@ -132,6 +123,52 @@ export const useEvaluationForms = () => {
     return `Le rôle ${role} ne peut pas être évalué actuellement.`;
   }, []);
 
+  // Méthode synchrone pour vérifier rapidement les catégories sans appel API
+  const getDefaultCompetencyCategoriesForRole = (role: string): string[] => {
+    switch (role) {
+      // Rôles de direction
+      case 'DR':
+        return ['Compétences stratégiques', 'Compétences de leadership', 'Compétences managériales', 'Compétences décisionnelles', 'Compétences relationnelles'];
+      case 'CDTT':
+        return ['Compétences stratégiques', 'Compétences de leadership', 'Compétences managériales', 'Compétences commerciales', 'Compétences relationnelles'];
+        
+      // Rôles commerciaux
+      case 'CSC':
+        return ['Compétences techniques', 'Compétences analytiques', 'Compétences managériales', 'Compétences métier', 'Compétences personnelles'];
+      case 'CDV':
+        return ['Compétences techniques', 'Compétences analytiques', 'Compétences organisationnelles', 'Compétences de leadership', 'Compétences relationnelles'];
+      case 'CDS':
+        return ['Compétences techniques', 'Compétences analytiques', 'Compétences organisationnelles', 'Compétences relationnelles'];
+        
+      // Rôles marketing
+      case 'RTM':
+        return ['Compétences techniques', 'Compétences analytiques', 'Compétences managériales', 'Compétences marketing', 'Compétences personnelles'];
+      case 'TMO':
+        return ['Compétences techniques', 'Compétences analytiques', 'Compétences marketing', 'Compétences organisationnelles', 'Compétences relationnelles'];
+      case 'SRMO':
+        return ['Compétences techniques', 'Compétences marketing', 'Compétences managériales', 'Compétences relationnelles'];
+      case 'SS':
+        return ['Compétences techniques', 'Compétences marketing', 'Compétences relationnelles', 'Compétences organisationnelles'];
+      case 'AS':
+        return ['Compétences techniques', 'Compétences administratives', 'Compétences relationnelles', 'Compétences organisationnelles'];
+        
+      // Fallback pour tout autre rôle
+      default:
+        return ['Compétences techniques', 'Compétences relationnelles', 'Compétences organisationnelles'];
+    }
+  };
+
+  // Méthode synchrone pour obtenir rapidement les niveaux sans appel API
+  const getDefaultEvaluationLevelDescriptions = () => {
+    return {
+      1: 'Insuffisant - Compétence non maîtrisée',
+      2: 'Basique - Compétence partiellement maîtrisée',
+      3: 'Satisfaisant - Compétence correctement maîtrisée',
+      4: 'Bon - Compétence bien maîtrisée',
+      5: 'Excellent - Compétence parfaitement maîtrisée'
+    };
+  };
+
   return {
     loading,
     error,
@@ -142,7 +179,10 @@ export const useEvaluationForms = () => {
     canRoleBeEvaluated,
     getEvaluationLevelDescriptions,
     getCompetencyCategoriesForRole,
-    getNonEvaluableRoleMessage
+    getNonEvaluableRoleMessage,
+    // Ajout des méthodes synchrones pour compatibilité avec le code existant
+    getDefaultCompetencyCategoriesForRole,
+    getDefaultEvaluationLevelDescriptions
   };
 };
 

@@ -1,0 +1,394 @@
+import React, { useState, useEffect } from 'react';
+import { Link } from '@inertiajs/react';
+import { 
+  Home, 
+  ClipboardList, 
+  BarChart2, 
+  Users, 
+  Settings, 
+  LogOut, 
+  ChevronDown,
+  ChevronRight,
+  AlignLeft,
+  Menu
+} from 'lucide-react';
+import { cn } from '@/utils/helpers';
+import { Button } from '@/Components/UI/Button/Button';
+import { Avatar } from '@/Components/UI/Avatar/Avatar';
+
+// Types pour les éléments de navigation
+export interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ReactNode;
+  isActive?: boolean;
+  children?: NavItem[];
+  roles?: string[];
+}
+
+// Types pour les propriétés du composant Sidebar
+export interface SidebarProps {
+  user: {
+    name: string;
+    email: string;
+    role: string;
+    avatar?: string;
+  };
+  isCollapsed: boolean;
+  onToggle: () => void;
+  onLogout?: () => void;
+  className?: string;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  user,
+  isCollapsed,
+  onToggle,
+  onLogout,
+  className,
+}) => {
+  // État pour suivre les éléments de navigation dépliés
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  
+  // État pour suivre l'élément actif
+  const [activePath, setActivePath] = useState<string>("");
+  
+  // Détecter le chemin actif
+  useEffect(() => {
+    // Récupérer le chemin actuel
+    const currentPath = window.location.pathname;
+    setActivePath(currentPath);
+  }, []);
+  
+  // Fonction pour basculer l'état déplié d'un élément
+  const toggleExpand = (title: string) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [title]: !prev[title]
+    }));
+  };
+  
+  // Initialiser les éléments dépliés par défaut selon le rôle
+  useEffect(() => {
+    if (user.role === 'ADMIN') {
+      setExpandedItems(prev => ({
+        ...prev,
+        'Évaluations': true,
+        'Analytics': true
+      }));
+    }
+  }, [user.role]);
+  
+  // Éléments de navigation en fonction du rôle de l'utilisateur
+  const navItems: NavItem[] = React.useMemo(() => {
+    // Menu spécifique pour les administrateurs
+    if (user.role === 'ADMIN') {
+      return [
+        {
+          title: 'Tableau de bord',
+          href: '/dashboard',
+          icon: <Home className="h-5 w-5" />,
+        },
+        {
+          title: 'Évaluations',
+          href: '/evaluations',
+          icon: <ClipboardList className="h-5 w-5" />,
+          children: [
+            {
+              title: 'Liste des évaluations',
+              href: '/admin/evaluations',
+              icon: <ChevronRight className="h-4 w-4" />,
+            },
+            {
+              title: 'Gestion des templates',
+              href: '/admin/evaluation/templates',
+              icon: <ChevronRight className="h-4 w-4" />,
+            },
+            {
+              title: 'Nouveau template',
+              href: '/admin/evaluation/templates/create',
+              icon: <ChevronRight className="h-4 w-4" />,
+            },
+            {
+              title: 'Comparaison',
+              href: '/admin/evaluation/compare',
+              icon: <ChevronRight className="h-4 w-4" />,
+            },
+            {
+              title: 'Évolution',
+              href: '/admin/evaluation/evolution',
+              icon: <ChevronRight className="h-4 w-4" />,
+            }
+          ]
+        },
+        {
+          title: 'Analytics',
+          href: '/analytics',
+          icon: <BarChart2 className="h-5 w-5" />,
+          children: [
+            {
+              title: 'Performance globale',
+              href: '/analytics/global',
+              icon: <ChevronRight className="h-4 w-4" />,
+            },
+            {
+              title: 'Par région',
+              href: '/analytics/regions',
+              icon: <ChevronRight className="h-4 w-4" />,
+            },
+            {
+              title: 'Par rôle',
+              href: '/analytics/roles',
+              icon: <ChevronRight className="h-4 w-4" />,
+            },
+            {
+              title: 'Performance par équipe',
+              href: '/analytics/teams',
+              icon: <ChevronRight className="h-4 w-4" />,
+            },
+          ],
+        },
+        {
+          title: 'Gestion utilisateurs',
+          href: '/admin/users',
+          icon: <Users className="h-5 w-5" />,
+        }
+      ];
+    } else {
+      // Menu pour les autres rôles (non-admin)
+      const commonItems = [
+        {
+          title: 'Tableau de bord',
+          href: '/dashboard',
+          icon: <Home className="h-5 w-5" />,
+        },
+        {
+          title: 'Évaluations',
+          href: '/evaluations',
+          icon: <ClipboardList className="h-5 w-5" />,
+          children: [
+            {
+              title: 'Mes évaluations',
+              href: '/evaluations/mine',
+              icon: <ChevronRight className="h-4 w-4" />,
+            },
+            {
+              title: 'À compléter',
+              href: '/evaluations/pending',
+              icon: <ChevronRight className="h-4 w-4" />,
+            },
+            {
+              title: 'Historique',
+              href: '/evaluations/history',
+              icon: <ChevronRight className="h-4 w-4" />,
+            }
+          ]
+        }
+      ];
+      
+      // Ajouter des éléments spécifiques selon le rôle
+      const roleSpecificItems: NavItem[] = [];
+      
+      // Managers (CSC, RTM, CDTT, DR)
+      if (['CSC', 'RTM', 'CDTT', 'DR'].includes(user.role)) {
+        roleSpecificItems.push({
+          title: 'Mon équipe',
+          href: '/team',
+          icon: <Users className="h-5 w-5" />,
+        });
+        
+        roleSpecificItems.push({
+          title: 'Analytics',
+          href: '/analytics/team',
+          icon: <BarChart2 className="h-5 w-5" />,
+        });
+      }
+      
+      // Ajouter les paramètres pour tous les utilisateurs non-admin
+      const settingsItem = {
+        title: 'Paramètres',
+        href: '/settings',
+        icon: <Settings className="h-5 w-5" />,
+        children: [
+          {
+            title: 'Mon profil',
+            href: '/settings/profile',
+            icon: <ChevronRight className="h-4 w-4" />,
+          },
+          {
+            title: 'Sécurité',
+            href: '/settings/security',
+            icon: <ChevronRight className="h-4 w-4" />,
+          }
+        ]
+      };
+      
+      return [...commonItems, ...roleSpecificItems, settingsItem];
+    }
+  }, [user.role]);
+  
+  // Fonction pour rendre un élément de navigation
+  const renderNavItem = (item: NavItem, level: number, collapsed: boolean) => {
+    const hasChildren = item.children && item.children.length > 0;
+    const isExpanded = expandedItems[item.title] || false;
+    
+    // Vérifier si l'élément est actif
+    const isActive = activePath === item.href || activePath.startsWith(item.href + "/");
+    // Vérifier si un enfant est actif
+    const hasActiveChild = hasChildren && item.children!.some(
+      child => activePath === child.href || activePath.startsWith(child.href + "/")
+    );
+    
+    return (
+      <li key={item.title} className={cn(
+        "rounded-md relative",
+        (isActive || hasActiveChild) && "bg-sabc-red-primary/10 dark:bg-sabc-red-primary/20"
+      )}>
+        {/* Indicateur visuel pour l'élément actif */}
+        {(isActive || hasActiveChild) && (
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-sabc-red-primary rounded-l-md" />
+        )}
+        
+        <Link
+          href={hasChildren ? "#" : item.href}
+          className={cn(
+            "flex items-center rounded-md px-3 py-2 text-sm font-medium",
+            collapsed ? "justify-center" : "justify-start",
+              isActive
+              ? "text-sabc-red-primary dark:text-sabc-red-light font-semibold"
+              : hasActiveChild
+                ? "text-sabc-gray-900 dark:text-sabc-gray-100"
+                : "text-sabc-gray-700 hover:bg-sabc-gray-100 hover:text-sabc-red-primary dark:text-sabc-gray-300 dark:hover:bg-transparent dark:hover:text-sabc-red-light menu-item-hover"
+          )}
+          onClick={(e) => {
+            if (hasChildren) {
+              e.preventDefault();
+              toggleExpand(item.title);
+            }
+          }}
+          title={collapsed ? item.title : undefined}
+          preserveState
+        >
+          <span className={cn(
+            collapsed ? "" : "mr-2",
+            (isActive || hasActiveChild) && "text-sabc-red-primary dark:text-sabc-red-light"
+          )}>
+            {item.icon}
+          </span>
+          {!collapsed && (
+            <>
+              <span className="flex-1 truncate">{item.title}</span>
+              {hasChildren && (
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    isExpanded && "rotate-180"
+                  )}
+                />
+              )}
+            </>
+          )}
+        </Link>
+        
+        {hasChildren && isExpanded && !collapsed && (
+          <ul className="mt-1 space-y-1 pl-2">
+            {item.children!.map(child => renderNavItem(child, level + 1, collapsed))}
+          </ul>
+        )}
+      </li>
+    );
+  };
+
+  return (
+    <aside
+      className={cn(
+        "flex h-screen flex-col border-r border-sabc-gray-200 bg-white transition-all dark:border-sabc-gray-800 dark:bg-sabc-gray-900 fixed top-0 left-0 z-40",
+        isCollapsed ? "w-16" : "w-64",
+        className
+      )}
+    >
+      {/* En-tête du sidebar avec logo et bouton toggle */}
+      <div className="flex h-16 items-center justify-between border-b border-sabc-gray-200 px-4 dark:border-sabc-gray-800">
+        {!isCollapsed && (
+          <div className="flex items-center">
+            <img 
+              src="/images/logos/sabc-logo.png" 
+              alt="SABC Logo" 
+              className="h-14 w-auto object-contain"
+            />
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggle}
+          className={`text-sabc-gray-500 hover:text-sabc-gray-900 dark:text-sabc-gray-400 dark:hover:text-white ${isCollapsed ? 'mx-auto' : ''}`}
+          aria-label={isCollapsed ? "Déployer la sidebar" : "Rétracter la sidebar"}
+        >
+          {isCollapsed ? <Menu className="h-5 w-5 text-sabc-gray-800" /> : <AlignLeft className="h-5 w-5 text-sabc-gray-800" />}
+        </Button>
+      </div>
+
+      {/* Contenu du sidebar */}
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        {/* Navigation */}
+        <nav className="flex-1 p-2">
+          <ul className="space-y-1">
+            {navItems && navItems.map((item) => renderNavItem(item, 0, isCollapsed))}
+          </ul>
+        </nav>
+
+        {/* Pied du sidebar */}
+        <div className="border-t border-sabc-gray-200 p-4 dark:border-sabc-gray-800">
+          {/* Bouton de déconnexion */}
+          <Button
+            variant="ghost"
+            className={cn(
+              "transition-colors",
+              isCollapsed 
+                ? "w-full justify-center p-2 bg-transparent hover:bg-transparent" 
+                : "w-full justify-start text-sabc-error hover:bg-sabc-gray-100 hover:text-sabc-red-primary dark:hover:bg-transparent dark:hover:text-sabc-red-light"
+            )}
+            onClick={() => {
+              // Appeler la fonction onLogout si elle est fournie
+              if (onLogout) onLogout();
+              
+              // Créer un formulaire pour soumettre une requête POST
+              const form = document.createElement('form');
+              form.method = 'POST';
+              form.action = '/logout';
+              
+              // Ajouter le token CSRF
+              const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+              if (csrfToken) {
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = '_token';
+                csrfInput.value = csrfToken;
+                form.appendChild(csrfInput);
+              }
+              
+              document.body.appendChild(form);
+              form.submit();
+            }}
+            type="button"
+            title={isCollapsed ? "Déconnexion" : undefined}
+          >
+            <LogOut 
+              className="h-5 w-5"
+              style={{
+                color: isCollapsed ? "#E53E3E" : "inherit",
+                stroke: isCollapsed ? "#E53E3E" : "currentColor", 
+                strokeWidth: isCollapsed ? 2.5 : 2,
+                filter: isCollapsed ? "drop-shadow(0 0 3px rgba(229, 62, 62, 0.7))" : "none"
+              }}
+            />
+            {!isCollapsed && <span className="ml-2">Déconnexion</span>}
+          </Button>
+        </div>
+      </div>
+    </aside>
+  );
+};
+
+export default Sidebar;

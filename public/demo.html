@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SABC Évaluation 360° - Démo</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
+    <style>
+        :root {
+            --sabc-red-primary: #E53E3E;
+            --sabc-red-light: #FED7D7;
+            --sabc-red-dark: #C53030;
+            --sabc-accent: #FF9800;
+            --sabc-accent-light: #FFE0B2;
+            --sabc-gray-50: #F5F5F5;
+            --sabc-gray-100: #F5F5F5;
+            --sabc-gray-200: #E0E0E0;
+            --sabc-gray-400: #9E9E9E;
+            --sabc-gray-800: #424242;
+            --sabc-gray-900: #1A202C;
+            --sabc-success: #48BB78;
+            --sabc-warning: #D69E2E;
+            --sabc-error: #E53E3E;
+            --sabc-info: #3182CE;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--sabc-gray-50);
+            color: var(--sabc-gray-800);
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        .demo-header {
+            background-color: var(--sabc-red-primary);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .demo-nav {
+            background-color: white;
+            padding: 1rem;
+            border-bottom: 1px solid var(--sabc-gray-200);
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .demo-nav-button {
+            background-color: white;
+            border: 1px solid var(--sabc-gray-200);
+            color: var(--sabc-gray-800);
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .demo-nav-button:hover {
+            background-color: var(--sabc-gray-50);
+            transform: translateY(-2px);
+        }
+        
+        .demo-nav-button.active {
+            background-color: var(--sabc-red-light);
+            color: var(--sabc-red-dark);
+            border-color: var(--sabc-red-primary);
+        }
+        
+        .demo-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        #app {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            min-height: 500px;
+            padding: 1rem;
+            overflow: auto;
+        }
+        
+        .demo-page-title {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 1.5rem;
+            color: var(--sabc-gray-900);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--sabc-gray-200);
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-header">
+        <h1>SABC Évaluation 360° - Démo</h1>
+        <p>Interface de démonstration pour tester les composants</p>
+    </div>
+    
+    <div class="demo-nav">
+        <button class="demo-nav-button active" data-path="login" onclick="navigateTo('/login')">Connexion</button>
+        <button class="demo-nav-button" data-path="forgot-password" onclick="navigateTo('/forgot-password')">Mot de passe oublié</button>
+        <button class="demo-nav-button" data-path="dashboard/csc" onclick="navigateTo('/dashboard/csc')">Dashboard CSC</button>
+        <button class="demo-nav-button" data-path="dashboard/cds" onclick="navigateTo('/dashboard/cds')">Dashboard CDS</button>
+        <button class="demo-nav-button" data-path="dashboard/cdv" onclick="navigateTo('/dashboard/cdv')">Dashboard CDV</button>
+    </div>
+    
+    <div class="demo-container">
+        <div id="app"></div>
+    </div>
+    
+    <script type="module" src="/resources/js/demo.tsx"></script>
+    
+    <script>
+        // Initialiser la page au chargement
+        document.addEventListener('DOMContentLoaded', function() {
+            // Simuler un clic sur le bouton actif par défaut
+            const path = window.location.pathname.substring(1) || 'login';
+            document.querySelectorAll('.demo-nav-button').forEach(button => {
+                if (button.dataset.path === path) {
+                    button.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,39 +1,35 @@
 import { useState, useCallback, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import { useAuth } from './useAuth';
+import { evaluationService } from '../Services/{api}';
+import { Evaluation, EvaluationNote, EvaluationStatus } from '../types';
 
-// Types pour les évaluations
-export interface Evaluation {
-  id: string;
-  evaluator_id: string;
-  evaluatee_id: string;
-  status: 'draft' | 'submitted' | 'validated' | 'rejected';
-  competencies: Array<{
-    id: string;
-    name: string;
-    score: number;
-    comment?: string;
+// Types pour le formulaire d'évaluation
+export interface EvaluationFormData {
+  id_evalue: number;
+  id_type_evaluation: number;
+  notes: Array<{
+    id_competence: number;
+    note: number;
+    commentaire?: string;
   }>;
-  created_at: string;
-  updated_at: string;
-  submitted_at?: string;
-  validated_at?: string;
-  rejected_at?: string;
-  rejection_reason?: string;
+  commentaire_global?: string;
 }
 
-export interface EvaluationFormData {
-  evaluatee_id: string;
-  competencies: Array<{
-    id: string;
-    score: number;
-    comment?: string;
+// Interface pour la mise à jour des notes d'évaluation
+export interface NotesUpdateData {
+  notes: Array<{
+    id_competence: number;
+    note: number;
+    commentaire?: string;
   }>;
+  commentaire_global?: string;
 }
 
 /**
  * Hook personnalisé pour la gestion des évaluations 360°
  * Conforme aux règles SABC pour les hooks et les évaluations
+ * Utilise le nouveau service d'évaluation
  */
 export const useEvaluations = () => {
   const { user, hasPermission } = useAuth();
@@ -43,17 +39,14 @@ export const useEvaluations = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Charger les évaluations de l'utilisateur
-  const loadEvaluations = useCallback(async () => {
+  const loadEvaluations = useCallback(async (filters?: { periode?: number, statut?: string }) => {
     if (!user) return;
     
     setLoading(true);
     setError(null);
     
     try {
-      const response = await fetch('/api/evaluations');
-      if (!response.ok) throw new Error('Erreur lors du chargement des évaluations');
-      
-      const data = await response.json();
+      const data = await evaluationService.getAll(filters);
       setEvaluations(data);
     } catch (err) {
       setError('Impossible de charger les évaluations');
@@ -64,15 +57,12 @@ export const useEvaluations = () => {
   }, [user]);
 
   // Charger une évaluation spécifique
-  const loadEvaluation = useCallback(async (id: string) => {
+  const loadEvaluation = useCallback(async (id: number) => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await fetch(`/api/evaluations/${id}`);
-      if (!response.ok) throw new Error('Erreur lors du chargement de l\'évaluation');
-      
-      const data = await response.json();
+      const data = await evaluationService.getById(id);
       setCurrentEvaluation(data);
       return data;
     } catch (err) {
@@ -90,21 +80,11 @@ export const useEvaluations = () => {
     setError(null);
     
     try {
-      const response = await fetch('/api/evaluations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-        },
-        body: JSON.stringify(formData)
+      const data = await evaluationService.create({
+        id_evalue: formData.id_evalue,
+        id_type_evaluation: formData.id_type_evaluation
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Erreur lors de la création de l\'évaluation');
-      }
-      
-      const data = await response.json();
       setEvaluations(prev => [...prev, data]);
       return data;
     } catch (err: any) {
@@ -116,34 +96,29 @@ export const useEvaluations = () => {
     }
   }, []);
 
-  // Mettre à jour une évaluation
-  const updateEvaluation = useCallback(async (id: string, formData: Partial<EvaluationFormData>) => {
+  // Mettre à jour les notes d'une évaluation
+  const updateEvaluationNotes = useCallback(async (id: number, notesData: NotesUpdateData) => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await fetch(`/api/evaluations/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-        },
-        body: JSON.stringify(formData)
-      });
+      // Transformer les notes pour qu'elles correspondent au type EvaluationNote
+      const evaluationNotes = notesData.notes.map(note => ({
+        id_evaluation: id,
+        id_competence: note.id_competence,
+        note: note.note,
+        commentaire: note.commentaire
+      }));
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Erreur lors de la mise à jour de l\'évaluation');
-      }
+      const data = await evaluationService.updateNotes(id, evaluationNotes);
       
-      const data = await response.json();
       setEvaluations(prev => prev.map(evaluation => evaluation.id === id ? data : evaluation));
       if (currentEvaluation?.id === id) {
         setCurrentEvaluation(data);
       }
       return data;
     } catch (err: any) {
-      setError(err.message || 'Impossible de mettre à jour l\'évaluation');
+      setError(err.message || 'Impossible de mettre à jour les notes de l\'évaluation');
       console.error(err);
       return null;
     } finally {
@@ -152,25 +127,13 @@ export const useEvaluations = () => {
   }, [currentEvaluation]);
 
   // Soumettre une évaluation
-  const submitEvaluation = useCallback(async (id: string) => {
+  const submitEvaluation = useCallback(async (id: number, commentaire?: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await fetch(`/api/evaluations/${id}/submit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-        }
-      });
+      const data = await evaluationService.submit(id, commentaire);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Erreur lors de la soumission de l\'évaluation');
-      }
-      
-      const data = await response.json();
       setEvaluations(prev => prev.map(evaluation => evaluation.id === id ? data : evaluation));
       if (currentEvaluation?.id === id) {
         setCurrentEvaluation(data);
@@ -186,7 +149,7 @@ export const useEvaluations = () => {
   }, [currentEvaluation]);
 
   // Valider une évaluation (pour les managers)
-  const validateEvaluation = useCallback(async (id: string) => {
+  const validateEvaluation = useCallback(async (id: number, commentaire?: string) => {
     if (!hasPermission('validate_evaluations')) {
       setError('Vous n\'avez pas les permissions nécessaires pour valider des évaluations');
       return null;
@@ -196,20 +159,8 @@ export const useEvaluations = () => {
     setError(null);
     
     try {
-      const response = await fetch(`/api/evaluations/${id}/validate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-        }
-      });
+      const data = await evaluationService.validate(id, commentaire);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Erreur lors de la validation de l\'évaluation');
-      }
-      
-      const data = await response.json();
       setEvaluations(prev => prev.map(evaluation => evaluation.id === id ? data : evaluation));
       if (currentEvaluation?.id === id) {
         setCurrentEvaluation(data);
@@ -225,7 +176,7 @@ export const useEvaluations = () => {
   }, [hasPermission, currentEvaluation]);
 
   // Rejeter une évaluation (pour les managers)
-  const rejectEvaluation = useCallback(async (id: string, reason: string) => {
+  const rejectEvaluation = useCallback(async (id: number, motif: string) => {
     if (!hasPermission('validate_evaluations')) {
       setError('Vous n\'avez pas les permissions nécessaires pour rejeter des évaluations');
       return null;
@@ -235,21 +186,8 @@ export const useEvaluations = () => {
     setError(null);
     
     try {
-      const response = await fetch(`/api/evaluations/${id}/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-        },
-        body: JSON.stringify({ reason })
-      });
+      const data = await evaluationService.reject(id, motif);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Erreur lors du rejet de l\'évaluation');
-      }
-      
-      const data = await response.json();
       setEvaluations(prev => prev.map(evaluation => evaluation.id === id ? data : evaluation));
       if (currentEvaluation?.id === id) {
         setCurrentEvaluation(data);
@@ -264,6 +202,57 @@ export const useEvaluations = () => {
     }
   }, [hasPermission, currentEvaluation]);
   
+  // Récupérer les évaluations en attente
+  const getPendingEvaluations = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await evaluationService.getPendingEvaluations();
+      return data;
+    } catch (err: any) {
+      setError(err.message || 'Impossible de récupérer les évaluations en attente');
+      console.error(err);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  // Récupérer les évaluations à valider
+  const getEvaluationsToValidate = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await evaluationService.getEvaluationsToValidate();
+      return data;
+    } catch (err: any) {
+      setError(err.message || 'Impossible de récupérer les évaluations à valider');
+      console.error(err);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  // Récupérer l'historique des évaluations d'un utilisateur
+  const getEvaluationHistory = useCallback(async (userId: number, filters?: { page?: number, periode?: number }) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await evaluationService.getEvaluationHistory(userId, filters);
+      return data;
+    } catch (err: any) {
+      setError(err.message || 'Impossible de récupérer l\'historique des évaluations');
+      console.error(err);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
   // Retourner les fonctions et états du hook
   return {
     evaluations,
@@ -273,10 +262,13 @@ export const useEvaluations = () => {
     loadEvaluations,
     loadEvaluation,
     createEvaluation,
-    updateEvaluation,
+    updateEvaluationNotes,
     submitEvaluation,
     validateEvaluation,
-    rejectEvaluation
+    rejectEvaluation,
+    getPendingEvaluations,
+    getEvaluationsToValidate,
+    getEvaluationHistory
   };
 };
 
