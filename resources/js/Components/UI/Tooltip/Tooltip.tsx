@@ -17,26 +17,107 @@ const Tooltip: React.FC<TooltipProps> = ({
   ...props
 }) => {
   const [visible, setVisible] = React.useState(false);
+  const tooltipRef = React.useRef<HTMLDivElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [tooltipPosition, setTooltipPosition] = React.useState({ top: 0, left: 0 });
   let timeoutId: NodeJS.Timeout;
+  let hideTimeoutId: NodeJS.Timeout;
 
   const showTooltip = () => {
-    timeoutId = setTimeout(() => setVisible(true), delay);
+    clearTimeout(hideTimeoutId);
+    timeoutId = setTimeout(() => {
+      setVisible(true);
+      // Calculer la position après que le tooltip soit visible
+      setTimeout(updatePosition, 0);
+      
+      // Masquer automatiquement le tooltip après 1000ms
+      hideTimeoutId = setTimeout(() => {
+        setVisible(false);
+      }, 1000);
+    }, delay);
   };
 
   const hideTooltip = () => {
     clearTimeout(timeoutId);
+    clearTimeout(hideTimeoutId);
     setVisible(false);
   };
 
-  const tooltipPositionClasses = {
-    top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
-    bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
-    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
-    right: 'left-full top-1/2 -translate-y-1/2 ml-2',
+  // Fonction pour calculer et mettre à jour la position du tooltip
+  const updatePosition = () => {
+    if (!tooltipRef.current || !containerRef.current) return;
+
+    const tooltipRect = tooltipRef.current.getBoundingClientRect();
+    const triggerRect = containerRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    let top = 0;
+    let left = 0;
+    
+    // Calculer la position en fonction du placement demandé
+    switch (position) {
+      case 'top':
+        // Positionner le tooltip au-dessus avec un décalage plus important (15px au lieu de 8px)
+        top = triggerRect.top - tooltipRect.height - 15;
+        left = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2);
+        break;
+      case 'bottom':
+        // Positionner le tooltip en dessous avec un décalage plus important
+        top = triggerRect.bottom + 15;
+        left = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2);
+        break;
+      case 'left':
+        // Positionner le tooltip à gauche avec un décalage plus important
+        top = triggerRect.top + (triggerRect.height / 2) - (tooltipRect.height / 2);
+        left = triggerRect.left - tooltipRect.width - 15;
+        break;
+      case 'right':
+        // Positionner le tooltip à droite avec un décalage plus important
+        top = triggerRect.top + (triggerRect.height / 2) - (tooltipRect.height / 2);
+        left = triggerRect.right + 15;
+        break;
+    }
+    
+    // Éviter que le tooltip soit coupé par les bords de l'écran
+    // Marge de sécurité de 10px par rapport aux bords
+    if (top < 10) {
+      top = 10;
+    } else if (top + tooltipRect.height > viewportHeight - 10) {
+      top = viewportHeight - tooltipRect.height - 10;
+    }
+    
+    if (left < 10) {
+      left = 10;
+    } else if (left + tooltipRect.width > viewportWidth - 10) {
+      left = viewportWidth - tooltipRect.width - 10;
+    }
+    
+    setTooltipPosition({ top, left });
   };
 
+  // Mettre à jour la position lors du scroll ou du redimensionnement
+  React.useEffect(() => {
+    if (visible) {
+      window.addEventListener('scroll', updatePosition);
+      window.addEventListener('resize', updatePosition);
+      
+      return () => {
+        window.removeEventListener('scroll', updatePosition);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [visible]);
+
+  // Utiliser React.useLayoutEffect pour obtenir la position du trigger après le rendu
+  React.useLayoutEffect(() => {
+    if (visible && containerRef.current) {
+      updatePosition();
+    }
+  }, [visible]);
+
   return (
-    <div className="relative inline-block" {...props}>
+    <div className="relative inline-block" ref={containerRef} {...props}>
       {React.cloneElement(children, {
         onMouseEnter: showTooltip,
         onMouseLeave: hideTooltip,
@@ -45,24 +126,20 @@ const Tooltip: React.FC<TooltipProps> = ({
       })}
       {visible && (
         <div
+          ref={tooltipRef}
           className={cn(
-            'absolute z-10 px-3 py-2 text-sm font-medium text-white bg-sabc-gray-900 rounded-md shadow-sm',
-            tooltipPositionClasses[position],
+            'fixed z-50 px-3 py-2 text-sm font-medium rounded-md shadow-md',
+            'text-white dark:text-gray-700',
+            'bg-sabc-gray-900 dark:bg-sabc-gray-800',
+            'border border-sabc-gray-700 dark:border-sabc-gray-600',
             className
           )}
+          style={{
+            top: `${tooltipPosition.top}px`,
+            left: `${tooltipPosition.left}px`,
+          }}
         >
           {tooltipContent}
-          <div
-            className={cn(
-              'absolute w-2 h-2 bg-sabc-gray-900 transform rotate-45',
-              {
-                'bottom-[-4px] left-1/2 -translate-x-1/2': position === 'top',
-                'top-[-4px] left-1/2 -translate-x-1/2': position === 'bottom',
-                'right-[-4px] top-1/2 -translate-y-1/2': position === 'left',
-                'left-[-4px] top-1/2 -translate-y-1/2': position === 'right',
-              }
-            )}
-          />
         </div>
       )}
     </div>

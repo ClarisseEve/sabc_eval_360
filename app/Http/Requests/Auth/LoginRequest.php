@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\Utilisateur;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -27,9 +28,18 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'identifier' => ['required', 'string'],
             'password' => ['required', 'string'],
         ];
+    }
+    
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        // Aucune préparation nécessaire car nous utiliserons l'identifiant directement
+        // pour rechercher l'utilisateur par username ou matricule
     }
 
     /**
@@ -40,12 +50,36 @@ class LoginRequest extends FormRequest
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
-
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        
+        // Rechercher l'utilisateur par matricule ou email
+        $user = Utilisateur::where('matricule', $this->identifier)
+                    ->orWhere('email', $this->identifier)
+                    ->first();
+        
+        // Si l'utilisateur n'est pas trouvé
+        if (!$user) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => __('auth.failed'),
+                'identifier' => __('auth.failed'),
+            ]);
+        }
+        
+        // Tentative d'authentification avec le matricule et le mot de passe
+        if (!Auth::attempt(['matricule' => $user->matricule, 'password' => $this->password], $this->boolean('remember'))) {
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'identifier' => __('auth.failed'),
+            ]);
+        }
+        
+        // Vérifier si l'utilisateur est actif
+        if (!$user->est_actif) {
+            Auth::logout();
+            
+            throw ValidationException::withMessages([
+                'identifier' => __('Votre compte est désactivé. Veuillez contacter l\'administrateur.'),
             ]);
         }
 
@@ -80,6 +114,6 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(Str::lower($this->string('identifier')).'|'.$this->ip());
     }
 }

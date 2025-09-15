@@ -2,163 +2,258 @@
 trigger: always_on
 ---
 
-# 🏢 Business Logic SABC - Règles Métier
+Logique Métier SABC - Règles d'Affaires
+1. Organisation Interne et Hiérarchie
+1.1. Structure Régionale
+La SABC opère avec deux typologies de régions, influençant directement la modélisation et la logique hiérarchique du système :
 
-## HIÉRARCHIE ORGANISATIONNELLE
+Régions Tanières (ex: Littoral, Centre) : Ces entités à forte densité commerciale intègrent une structure hiérarchique de 5 niveaux de profondeur. Le système est configuré pour adapter dynamiquement requêtes et validations à cette granularité.
 
-### Structure Régions Obligatoire
-- Tanières : Littoral & Centre (5 niveaux hiérarchiques)
-- Non-Tanières : Ouest & Nord (3 niveaux hiérarchiques)
+Régions Non-Tanières (ex: Ouest, Nord) : Moins denses, elles fonctionnent avec une structure simplifiée à 3 niveaux. La logique backend est conçue pour différencier et appliquer la hiérarchie correspondante de manière fluide.
 
-### Double Hiérarchie Stricte
-Commercial :
-- Tanière : DR → CDTT → CSC → CDV → CDS
-- Non-Tanière : DR → CSC → CDS
+1.2. Chaîne de Commandement par Branche
+La gestion des affectations et supervisions doit refléter ces chaînes de commandement clés :
 
-Marketing : 
-- Tanière : DR → CDTT → RTM → TMO
-dans certains cas tanière on a plutot: DR → CDTT → RTM → SS → AS
-- Non-Tanière : DR → SRMO → TMO
+Branche Commerciale :
 
-## Definition des abreviations:
+Tanière : Directeur Régional (DR) → Chef Département Trade (CDTT) → Chef Service Commercial (CSC) → Chef District Vente (CDV) → Chef de Secteur (CDS)
 
-DR: Directeur Regional
-CDTT: Chef Departement Trade(Commercial)
-CSC: Chef Service Commercial
-CDV: Chef District Vente
-CDS: Chef de Secteur
-RTM: Regional Trade Marketing
-TMO:Trade Marketing Operator
-SRMO:Superviseur Regional Marketing Operation
-SS: Superviseur Sponsoring
-AS: Assistant Supervieur Sponsoring
+Non-Tanière : Directeur Régional (DR) → Chef Service Commercial (CSC) → Chef de Secteur (CDS)
 
-### Règles Validation Hiérarchique
-- DR et CDTT peuvent superviser les 2 branches
-- Autres rôles : même branche uniquement
-- Validation niveau hiérarchique obligatoire
-- Restriction géographique stricte (même région)
+Branche Marketing :
 
-## RÈGLES ÉVALUATION 360°
+Tanière : Directeur Régional (DR) → Chef Département Trade (CDTT) → Regional Trade Marketing (RTM) → Trade Marketing Operator (TMO)
 
-### Types d'Évaluation Autorisés
-1. Auto-évaluation : Tous sauf DR et CDTT
-2. Évaluation pairs : Même niveau + même région/service  
-3. Évaluation descendante : Supérieur → Subordonnés directs
+Variante en tanière : DR → CDTT → RTM → Superviseur Sponsoring (SS) → Assistant Superviseur Sponsoring (AS)
 
-### Matrice Permissions Complète
-| Évaluateur | Auto | Pairs | Subordonnés | Cross-Branch |
-|------------|------|-------|-------------|--------------|
-| DR         | ❌   | ❌    | ✅          | ✅           |
-| CDTT       | ❌   | ❌    | ✅          | ✅           |
-| CSC/RTM    | ✅   | ✅    | ✅          | ❌           |
-| CDV/TMO    | ✅   | ✅    | ✅          | ❌           |
-| CDS/AS     | ✅   | ✅    | ❌          | ❌           |
+Précision : Le RTM est unique par région tanière et n'évalue que ses subordonnés directs (TMO, SS, AS).
 
-### Algorithme Validation Principal
-1. Même région obligatoire : Pas d'évaluation inter-régions
-2. Auto-évaluation DR/CDTT interdite : Exception rôles dirigeants  
-3. Cross-branch DR/CDTT : Privilège supervision duale
-4. Même catégorie : Commercial/Marketing séparés (sauf DR/CDTT)
-5. Validation par niveau : Pairs ou hiérarchie descendante
+Non-Tanière : Directeur Régional (DR) → Superviseur Régional Marketing Opérationnel (SRMO) → Trade Marketing Operator (TMO)
 
-## WORKFLOW ÉVALUATIONS
+Précision : Le SRMO est unique par région non-tanière et n'évalue que ses subordonnés directs (TMO).
 
-### États et Transitions
-- **Brouillon** → Soumis
-- **Soumis** → Validé/Rejeté/Brouillon
-- **Validé** : État final
-- **Rejeté** → Brouillon (correction)
+1.3. Glossaire des Abréviations Techniques et Fonctionnelles
+DR : Directeur Régional
 
-### Règles Validation Métier
-- Toutes compétences notées (minimum 5)
-- Notes entre 1 et 5 obligatoirement
-- Date évaluation cohérente (pas future)
-- Délai maximum 30 jours
-- Commentaires requis si note < 3
+CDTT : Chef Département Trade (Commercial)
 
-## **CALCULS PERFORMANCE**
+CSC : Chef Service Commercial
 
-### Index Performance Composite
-- Pondération sources : Auto (20%), Pairs (40%), Manager (40%)
-- Période considérée : 6 derniers mois
-- Normalisation : Échelle 0-100
-- Ajustement régional : Équité inter-régions
+CDV : Chef District Vente
 
-### Métriques par Rôle
-- DR : Vue stratégique région, comparaisons services
-- CDTT : Performance département, commercial vs marketing
-- Managers : Métriques équipe, développement talents
-- Opérationnels : Performance individuelle, progression
+CDS : Chef de Secteur
 
-## ANALYTICS & INSIGHTS
+RTM : Regional Trade Marketing
 
-### Détection Anomalies Automatique
-- Écart auto-évaluation vs autres > 1.5 points
-- Baisse performance > 1 point en 3 mois
-- Évaluations trop uniformes (variance < 0.5)
-- Biais évaluateur (systématiquement sévère/indulgent)
+TMO : Trade Marketing Operator
 
-### Recommandations IA
-- Formation : Basée sur compétences < 3/5
-- Mentorat : Matching experts/apprenants même région
-- Mobilité : Identification talents promotion
-- Plans développement : Objectifs SMART personnalisés
+SRMO : Superviseur Régional Marketing Opérationnel
 
-## **RÈGLES CONFIDENTIALITÉ**
+SS : Superviseur Sponsoring
 
-### Accès aux Données
-- Évaluateur : Peut voir ses évaluations données
-- Évalué : Peut voir évaluations reçues
-- Manager : Peut voir évaluations équipe directe
-- DR et CDTT : Peuventt voir toute la région
-- Anonymisation : Données agrégées sans identification
+AS : Assistant Superviseur Sponsoring
 
-### Restriction Géographique
-- Accès limité à sa région uniquement
-- Pas de comparaisons inter-régions nominatives
-- Benchmarks anonymisés seulement
-- Audit trail complet des accès
+1.4. Règles de Liens Hiérarchiques et Validation
+Les rôles DR et CDTT possèdent des privilèges d'inter-branche (peut_cross_branch = true).
 
-## **NOTIFICATIONS & WORKFLOW**
+Les autres rôles (CSC, RTM, CDV, TMO, CDS, AS, SRMO, SS) sont principalement restreints à leur propre branche_id.
 
-### Alertes Automatiques
-- Évaluation en retard (>7 jours échéance)
-- Validation en attente manager (>3 jours)
-- Performance en baisse significative
-- Évaluation incohérente détectée
+Le système intègre une validation de cohérence hiérarchique lors des opérations CRUD sur la table utilisateurs, assurant que manager_matricule et niveau_hierarchique sont alignés avec type_region.
 
-### Processus Escalade
-- Rappel évaluateur +3 jours
-- Notification manager +7 jours  
-- Alerte DR si blocage >10 jours
-- Mesures disciplinaires si nécessaire
+La supervision est géographiquement contrainte : l'id_region du manager doit correspondre à celui du subordonné.
 
-## **VALIDATION BUSINESS RULES**
+2. Règles d'Évaluation 360°
+2.1. Types d'Évaluations et Processus
+Auto-évaluation : Un utilisateur évalue sa propre performance. L'attribut peut_auto_evaluer sur le role détermine l'autorisation.
 
-### Tests Métier Obligatoires
-- Validation matrice permissions 360°
-- Test restriction géographique
-- Vérification workflow états
-- Contrôle calculs performance
-- Test anonymisation données
+Évaluation par les pairs : Un utilisateur évalue un collègue de même niveau_hierarchique, dans la même id_region et id_branche. L'attribut peut_evaluer_pairs est vérifié. Exception : Les rôles uniques par région (DR, CDTT, RTM, SRMO) ne peuvent pas évaluer leurs pairs.
 
-### Audit & Conformité
-- Log toutes tentatives non autorisées
-- Métriques conformité mensuelle
-- Rapport anomalies automatique
-- Validation règles métier continue
+Évaluation descendante : Un manager évalue ses subordonnes directs. L'attribut peut_evaluer_subordonnes est vérifié, couplé à la niveau_hierarchique et manager_matricule.
 
-## RÈGLES TEMPORELLES
+2.2. Matrice des Permissions (Regles_Evaluation & Roles)
+Les permissions sont gérées via la table regles_evaluation et les flags booléens sur la table roles.
 
-### Cycles Évaluation
-- Fréquence : Semestrielle obligatoire
-- Période ouverte : 3 semaines
-- Rappels : J-7, J-3, J-1, J+1
-- Clôture automatique : Fin période
+DR : Auto-évaluation: Non, Évaluation par les Pairs: Non, Évaluation des Subordonnés: Oui, Évaluation Inter-Branches: Oui.
 
-### Archivage & Rétention
-- Données actives : 2 ans
-- Archive historique : 5 ans
-- Purge anonymisée : 7 ans
-- Backup sécurisé : Quotidien
+CDTT : Auto-évaluation: Non, Évaluation par les Pairs: Non, Évaluation des Subordonnés: Oui, Évaluation Inter-Branches: Oui.
+
+CSC : Auto-évaluation: Oui, Évaluation par les Pairs: Oui, Évaluation des Subordonnés: Oui, Évaluation Inter-Branches: Non.
+
+RTM : Auto-évaluation: Oui, Évaluation par les Pairs: Non, Évaluation des Subordonnés: Oui, Évaluation Inter-Branches: Non. (N'évalue que ses subordonnés directs)
+
+CDV / TMO : Auto-évaluation: Oui, Évaluation par les Pairs: Oui, Évaluation des Subordonnés: Oui, Évaluation Inter-Branches: Non.
+
+CDS / AS : Auto-évaluation: Oui, Évaluation par les Pairs: Oui, Évaluation des Subordonnés: Non, Évaluation Inter-Branches: Non.
+
+SRMO : Auto-évaluation: Oui, Évaluation par les Pairs: Non, Évaluation des Subordonnés: Oui, Évaluation Inter-Branches: Non. (N'évalue que ses subordonnés directs)
+
+2.3. Principes de Validation des Évaluations (Logique Applicative)
+Restriction id_region : evaluateur.id_region == evalue.id_region.
+
+Exclusion DR/CDTT Auto-évaluation : role.peut_auto_evaluer est false pour ces rôles.
+
+Privilège Cross-branche DR/CDTT : Autorisé si role.peut_cross_branch est true et si l'évaluateur est un DR ou CDTT.
+
+Même catégorie (id_branche) : Pour les évaluations par les pairs (hors DR/CDTT), evaluateur.id_branche == evalue.id_branche.
+
+Validation par niveau : niveau_hierarchique de l'évaluateur supérieur (descendantes) ou égal (pairs) à celui de l'évalué.
+
+3. Déroulement des Évaluations (Workflow)
+3.1. États et Transitions (evaluations.statut)
+brouillon : Initial. → soumis.
+
+soumis : En attente validation. → validé, rejeté. Un rejeté → brouillon.
+
+validé : Terminal.
+
+rejeté : Refusé. → brouillon.
+
+3.2. Règles de Validation du Contenu (evaluations.notations_json)
+Le backend applique des validations strictes :
+
+Complétude : Tous critères de regles_evaluation.criteres_evaluation_json (min 5) doivent être notés dans evaluations.notations_json.
+
+Notes : Chaque note dans notations_json est un entier entre 1 et 5.
+
+Temps : date_soumission non postérieure à la date courante.
+
+Délai : Soumission attendue dans les 30 jours après periodes_evaluation.date_debut.
+
+Commentaires : Obligatoires si note associée < 3.
+
+4. Calcul et Analyse de la Performance
+4.1. Score de Performance Global (scores_utilisateurs.score_global)
+Calculé par tâche backend (Job asynchrone) en pondérant :
+
+Auto-évaluation : 20%
+
+Évaluation des pairs : 40%
+
+Évaluation du manager : 40%
+Basé sur les 6 derniers mois, normalisé 0-100, et ajusté régionalement pour équité.
+
+4.2. Indicateurs par Rôle (Dashboards & Reports)
+Vues agrégées sur scores_utilisateurs et evaluations pour indicateurs pertinents :
+
+DR : Tableaux de bord stratégiques basés sur score_global par region_nom et comparaisons services_commerciaux.
+
+CDTT : Performance départementale via scores_agreges pour branches Commerciale et Marketing.
+
+Managers : Métriques d'équipe (nb_evaluations_recues, nb_evaluations_donnees) et progression talents (progression_vs_precedente).
+
+Opérationnels : Performance individuelle et progression_vs_precedente.
+
+5. Détection et Recommandations (Analytics)
+5.1. Détection Automatique des Anomalies (logs_anomalies ou équivalent)
+Le système détecte des anomalies via heuristiques :
+
+Divergence Auto vs. Autres : Alerte si abs(score_auto - score_pairs/manager) > 1.5 pts.
+
+Baisse de Performance : Alerte si progression_vs_precedente < -1 pt sur 3 mois.
+
+Uniformité des Évaluations : Alerte si variance notations_json < 0.5 (manque de différenciation).
+
+Biais Évaluateur : Alerte si moyenne de notation systématiquement élevée/basse.
+
+5.2. Suggestions pour le Développement (Engine de Recommandations)
+Requêtes complexes ou microservice (AI Service) pour recommandations :
+
+Formations : Basées sur criteres_evaluation_json où note_globale pour axe_competence est < 3/5.
+
+Mentorat : Matching experts/apprenants (score global élevé vs faible) dans la même id_region.
+
+Mobilité : Identification de talents avec forte progression_vs_precedente et score_global élevé.
+
+Plans de développement : Génération d'objectifs SMART basés sur les faiblesses identifiées.
+
+6. Protection des Données (RBAC & Audit)
+6.1. Accès aux Données (Laravel Policies)
+Contrôlé strictement par des Policies Laravel :
+
+Évaluateur : Voit ses evaluations données (evaluateur_matricule).
+
+Évalué : Voit ses evaluations reçues (evalue_matricule).
+
+Manager : Accède aux evaluations et scores_utilisateurs de son équipe directe (manager_matricule).
+
+DR et CDTT : Accès à toutes les evaluations et scores_utilisateurs de leur id_region et branches supervisées (peut_cross_branch).
+
+Anonymisation : Vues et agrégations globales excluent identifiants directs (matricule, nom, prenom).
+
+6.2. Restriction Géographique (Filtrage des Requêtes)
+Requêtes de données filtrées par l'id_region de l'utilisateur authentifié.
+
+Comparaisons inter-régions nominatives bloquées au niveau API.
+
+Benchmarks entre régions limités aux vues anonymisées.
+
+logs_administration enregistre tentatives d'accès non autorisées (adresse_ip).
+
+7. Alertes et Suivi (Notifications & Planification)
+7.1. Alertes Automatiques (notifications table & Scheduled Jobs)
+Le système envoie notifications via la table notifications :
+
+Évaluation en retard : Détectée par Scheduled Job si date_soumission manquante et date_creation > 7 jours.
+
+Validation en attente manager : Si statut = 'soumis' et date_soumission > 3 jours.
+
+Performance en baisse : Détectée par Analytics Engine (score_global ou progression_vs_precedente chute).
+
+Évaluations incohérentes : Détectées par module d'anomalies.
+
+7.2. Processus d'Escalade (Workflow de Notifications)
+Processus d'escalade structuré :
+
+Rappel Évaluateur : Notification à evaluateur_matricule après 3 jours de retard.
+
+Notification Manager : manager_matricule de l'évaluateur informé après 7 jours de retard.
+
+Alerte DR : DR de la region alerté si blocage > 10 jours.
+
+Mesures : Cas non résolus gérés par Administrateur, traçabilité dans logs_administration.
+
+8. Validation et Conformité (Tests & Monitoring)
+8.1. Tests Métier Obligatoires (PHPUnit, Feature Tests)
+Tests automatisés rigoureux pour garantir :
+
+Matrice Permissions : Tests unitaires/fonctionnels sur Policies et EvaluationService.
+
+Restriction Géographique : Tests d'intégration des filtres id_region sur API.
+
+Workflow États : Tests de scénario sur transitions statut des evaluations.
+
+Calculs Performance : Tests unitaires sur algorithme score_global et progression_vs_precedente.
+
+Anonymisation : Vérification des vues et requêtes agrégées.
+
+8.2. Audit et Suivi (logs_administration & Monitoring Tools)
+Tentatives d'accès non autorisées loguées dans logs_administration (resultat: 'erreur').
+
+Rapports de conformité mensuels générés à partir de logs_administration.
+
+Anomalies signalées automatiquement par module d'analytics.
+
+Validation des règles métier continue via Scheduled Jobs vérifiant la cohérence des données.
+
+9. Calendrier des Évaluations (periodes_evaluation)
+9.1. Cycles d'Évaluation
+La table periodes_evaluation gère les cycles d'évaluation :
+
+Fréquence : semestrielles obligatoires (ex: '2025-S1').
+
+Durée d'ouverture : Période définie (date_debut à date_fin, typiquement 3 semaines). est_ouverte mis à jour par Scheduled Job.
+
+Rappels : Notifiés par notifications en fonction des dates clés (J-7, J-3, J-1, J+1).
+
+Clôture automatique : Scheduled Job ferme la période en fin de date_fin.
+
+9.2. Stratégie de Rétention des Données
+Politique de rétention pour le cycle de vie des données :
+
+Données actives : evaluations, scores_utilisateurs, utilisateurs accessibles pendant 2 ans.
+
+Archive historique : Données plus anciennes archivées pour 5 ans.
+
+Purge anonymisée : Données rendues anonymes après 7 ans (via ETL).
+
+Sauvegarde : Politique de backup quotidien sécurisée de la base de données.

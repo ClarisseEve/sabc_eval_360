@@ -1,127 +1,158 @@
-import { type BreadcrumbItem, type SharedData } from '@/types';
+import React, { FormEventHandler } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { Transition } from '@headlessui/react';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { Button } from '@/Components/UI/Button';
+import { Input } from '@/Components/UI/Input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
+import AppLayout from '@/Components/Layout/app/AppLayout';
+import { route } from '@/routes';
+import { User, Mail, Save, AlertTriangle } from 'lucide-react';
 
-import DeleteUser from '@/components/delete-user';
-import HeadingSmall from '@/components/heading-small';
-import InputError from '@/components/input-error';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import AppLayout from '@/Layouts/app-layout';
-import SettingsLayout from '@/layouts/settings/layout';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Profile settings',
-        href: '/settings/profile',
-    },
-];
+interface Props {
+  user: any;
+  pageTitle: string;
+  isAdmin?: boolean;
+  permissions?: string[];
+  mustVerifyEmail: boolean;
+  status?: string;
+}
 
 type ProfileForm = {
     name: string;
     email: string;
 }
 
-export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
-    const { auth } = usePage<SharedData>().props;
-
+export default function Profile({ user, pageTitle, isAdmin, permissions, mustVerifyEmail, status }: Props) {
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm<Required<ProfileForm>>({
-        name: auth.user.name,
-        email: auth.user.email,
+        name: user.name || '',
+        email: user.email || '',
     });
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        patch(route('profile.update'), {
+        patch(route('settings.profile.update'), {
             preserveScroll: true,
         });
     };
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Profile settings" />
+        <AppLayout 
+            user={user} 
+            pageTitle={pageTitle || "Paramètres - Profil"}
+            isAdmin={isAdmin}
+            permissions={permissions}
+        >
+            <Head title="Paramètres - Profil" />
 
-            <SettingsLayout>
-                <div className="space-y-6">
-                    <HeadingSmall title="Profile information" description="Update your name and email address" />
+            <div className="container mx-auto px-4 py-8">
+                <Card className="max-w-2xl mx-auto">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-sabc-red-primary">
+                            <User className="h-5 w-5" />
+                            Informations du profil
+                        </CardTitle>
+                        <p className="text-sabc-gray-400 text-sm">
+                            Modifiez vos informations personnelles et votre adresse email SABC.
+                        </p>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
 
-                    <form onSubmit={submit} className="space-y-6">
-                        <div className="grid gap-2">
-                            <Label htmlFor="name">Name</Label>
-
-                            <Input
-                                id="name"
-                                className="mt-1 block w-full"
-                                value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
-                                required
-                                autoComplete="name"
-                                placeholder="Full name"
-                            />
-
-                            <InputError className="mt-2" message={errors.name} />
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="email">Email address</Label>
-
-                            <Input
-                                id="email"
-                                type="email"
-                                className="mt-1 block w-full"
-                                value={data.email}
-                                onChange={(e) => setData('email', e.target.value)}
-                                required
-                                autoComplete="username"
-                                placeholder="Email address"
-                            />
-
-                            <InputError className="mt-2" message={errors.email} />
-                        </div>
-
-                        {mustVerifyEmail && auth.user.email_verified_at === null && (
-                            <div>
-                                <p className="text-muted-foreground -mt-4 text-sm">
-                                    Your email address is unverified.{' '}
-                                    <Link
-                                        href={route('verification.send')}
-                                        method="post"
-                                        as="button"
-                                        className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
-                                    >
-                                        Click here to resend the verification email.
-                                    </Link>
-                                </p>
-
-                                {status === 'verification-link-sent' && (
-                                    <div className="mt-2 text-sm font-medium text-green-600">
-                                        A new verification link has been sent to your email address.
-                                    </div>
+                        <form onSubmit={submit} className="space-y-6">
+                            <div className="space-y-2">
+                                <label htmlFor="name" className="text-sm font-medium text-sabc-gray-800">
+                                    Nom complet
+                                </label>
+                                <Input
+                                    id="name"
+                                    className="w-full"
+                                    value={data.name}
+                                    onChange={(e) => setData('name', e.target.value)}
+                                    required
+                                    autoComplete="name"
+                                    placeholder="Saisissez votre nom complet"
+                                />
+                                {errors.name && (
+                                    <p className="text-sm text-sabc-error mt-1">{errors.name}</p>
                                 )}
                             </div>
-                        )}
 
-                        <div className="flex items-center gap-4">
-                            <Button disabled={processing}>Save</Button>
+                            <div className="space-y-2">
+                                <label htmlFor="email" className="text-sm font-medium text-sabc-gray-800 flex items-center gap-2">
+                                    <Mail className="h-4 w-4" />
+                                    Adresse email
+                                </label>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    className="w-full"
+                                    value={data.email}
+                                    onChange={(e) => setData('email', e.target.value)}
+                                    required
+                                    autoComplete="username"
+                                    placeholder="Saisissez votre adresse email SABC"
+                                />
+                                {errors.email && (
+                                    <p className="text-sm text-sabc-error mt-1">{errors.email}</p>
+                                )}
+                            </div>
 
-                            <Transition
-                                show={recentlySuccessful}
-                                enter="transition ease-in-out"
-                                enterFrom="opacity-0"
-                                leave="transition ease-in-out"
-                                leaveTo="opacity-0"
-                            >
-                                <p className="text-sm text-neutral-600">Saved</p>
-                            </Transition>
-                        </div>
-                    </form>
-                </div>
+                            {mustVerifyEmail && user.email_verified_at === null && (
+                                <div className="bg-sabc-accent-light border border-sabc-accent rounded-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                        <AlertTriangle className="h-5 w-5 text-sabc-accent mt-0.5" />
+                                        <div>
+                                            <p className="text-sm text-sabc-gray-800 font-medium">
+                                                Adresse email non vérifiée
+                                            </p>
+                                            <p className="text-sm text-sabc-gray-400 mt-1">
+                                                Votre adresse email n'est pas encore vérifiée.{' '}
+                                                <Link
+                                                    href={route('verification.send')}
+                                                    method="post"
+                                                    as="button"
+                                                    className="text-sabc-red-primary underline hover:text-sabc-red-dark transition-colors"
+                                                >
+                                                    Cliquez ici pour renvoyer l'email de vérification.
+                                                </Link>
+                                            </p>
+                                            {status === 'verification-link-sent' && (
+                                                <div className="mt-2 text-sm font-medium text-sabc-success">
+                                                    ✓ Un nouveau lien de vérification a été envoyé à votre adresse email.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
-                <DeleteUser />
-            </SettingsLayout>
+                            <div className="flex items-center gap-4 pt-4">
+                                <Button 
+                                    type="submit"
+                                    disabled={processing}
+                                    className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white flex items-center gap-2"
+                                >
+                                    <Save className="h-4 w-4" />
+                                    {processing ? 'Enregistrement...' : 'Enregistrer les modifications'}
+                                </Button>
+
+                                <Transition
+                                    show={recentlySuccessful}
+                                    enter="transition ease-in-out duration-300"
+                                    enterFrom="opacity-0 translate-x-2"
+                                    enterTo="opacity-100 translate-x-0"
+                                    leave="transition ease-in-out duration-300"
+                                    leaveTo="opacity-0 translate-x-2"
+                                >
+                                    <p className="text-sm text-sabc-success font-medium">
+                                        ✓ Profil mis à jour avec succès
+                                    </p>
+                                </Transition>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
         </AppLayout>
     );
 }

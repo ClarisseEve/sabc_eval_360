@@ -76,5 +76,34 @@ const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(
 
 Avatar.displayName = 'Avatar';
 
-export { Avatar, avatarVariants };
+// Composant AvatarImage pour l'image de l'avatar
+const AvatarImage = React.forwardRef<HTMLImageElement, React.ImgHTMLAttributes<HTMLImageElement>>(
+  ({ className, alt, ...props }, ref) => (
+    <img
+      ref={ref}
+      className={cn('h-full w-full object-cover', className)}
+      alt={alt}
+      {...props}
+    />
+  )
+);
+
+AvatarImage.displayName = 'AvatarImage';
+
+// Composant AvatarFallback pour le fallback de l'avatar
+const AvatarFallback = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof avatarVariants>>(
+  ({ className, variant, size, children, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(avatarVariants({ variant, size }), className)}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+);
+
+AvatarFallback.displayName = 'AvatarFallback';
+
+export { Avatar, AvatarImage, AvatarFallback, avatarVariants };
 export default Avatar;

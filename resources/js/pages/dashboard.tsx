@@ -3,7 +3,11 @@ import { Head } from '@inertiajs/react';
 import { AlertCircle, CheckCircle, Clock, Users, TrendingUp } from 'lucide-react';
 
 // Layouts
-import { AppLayout } from '@/Components/Layout/AppLayout';
+import AppLayout from '@/Components/Layout/app/AppLayout';
+
+// Hooks
+import { useAuth } from '@/hooks/useAuth';
+import { route } from '@/routes';
 
 // Dashboards spécifiques aux rôles
 import { DirectorDashboard } from '@/Components/Dashboard/DirectorDashboard';
@@ -34,7 +38,9 @@ interface DashboardProps {
   notifications: any[];
 }
 
-export default function Dashboard({ user, pendingEvaluations = [], completedEvaluations = [], stats = {}, notifications = [] }: DashboardProps) {
+export default function Dashboard({ pendingEvaluations = [], completedEvaluations = [], stats = {}, notifications = [], auth }: Omit<DashboardProps, 'user'> & { auth: { user: User } }) {
+  // Utiliser l'utilisateur authentifié fourni par les props
+  const user = auth.user;
   // Fonction pour déterminer le tableau de bord à afficher en fonction du rôle
   const renderDashboardByRole = () => {
     // Selon les règles métier SABC, nous avons différents niveaux hiérarchiques
@@ -101,12 +107,7 @@ export default function Dashboard({ user, pendingEvaluations = [], completedEval
 
   return (
     <AppLayout 
-      user={{
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar
-      }}
+      user={user}
       notifications={notifications}
       onLogout={handleLogout}
     >

@@ -3,7 +3,7 @@ import { Head } from '@inertiajs/react';
 import { AlertCircle, CheckCircle, Clock, Filter, Search, Plus } from 'lucide-react';
 
 // Layouts
-import { AppLayout } from '@/Components/Layout/AppLayout';
+import { AppLayout } from '@/layouts';
 
 // Composants
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/Components/UI/Card/Card';

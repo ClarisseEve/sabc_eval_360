@@ -16,7 +16,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => env('DB_CONNECTION', 'mysql'),
 
     /*
     |--------------------------------------------------------------------------
@@ -33,13 +33,10 @@ return [
 
         'sqlite' => [
             'driver' => 'sqlite',
-            'url' => env('DB_URL'),
+            'url' => env('DATABASE_URL'),
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
         ],
 
         'mysql' => [
@@ -47,8 +44,8 @@ return [
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
+            'database' => env('DB_DATABASE', 'sabc_core'),
+            'username' => env('DB_USERNAME', 'sabc_user'),
             'password' => env('DB_PASSWORD', ''),
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
@@ -60,19 +57,23 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+            'pool' => [
+                'min' => 5,
+                'max' => 20,
+            ],
         ],
-
-        'mariadb' => [
-            'driver' => 'mariadb',
-            'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
-            'unix_socket' => env('DB_SOCKET', ''),
-            'charset' => env('DB_CHARSET', 'utf8mb4'),
-            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+        
+        'mysql_core' => [
+            'driver' => 'mysql',
+            'url' => env('MYSQL_URL'),
+            'host' => env('MYSQL_HOST', '127.0.0.1'),
+            'port' => env('MYSQL_PORT', '3306'),
+            'database' => env('MYSQL_DATABASE', 'sabc_core'),
+            'username' => env('MYSQL_USERNAME', 'sabc_user'),
+            'password' => env('MYSQL_PASSWORD', ''),
+            'unix_socket' => env('MYSQL_SOCKET', ''),
+            'charset' => env('MYSQL_CHARSET', 'utf8mb4'),
+            'collation' => env('MYSQL_COLLATION', 'utf8mb4_unicode_ci'),
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
@@ -80,21 +81,30 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+            'pool' => [
+                'min' => 5,
+                'max' => 20,
+            ],
         ],
 
         'pgsql' => [
             'driver' => 'pgsql',
-            'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '5432'),
-            'database' => env('DB_DATABASE', 'laravel'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
-            'charset' => env('DB_CHARSET', 'utf8'),
+            'url' => env('PGSQL_URL'),
+            'host' => env('PGSQL_HOST', '127.0.0.1'),
+            'port' => env('PGSQL_PORT', '5432'),
+            'database' => env('PGSQL_DATABASE', 'sabc_business'),
+            'username' => env('PGSQL_USERNAME', 'sabc_user'),
+            'password' => env('PGSQL_PASSWORD', ''),
+            'charset' => 'utf8',
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
+            'schema' => env('PGSQL_SCHEMA', 'public'),
             'sslmode' => 'prefer',
+            'pool' => [
+                'min' => 5,
+                'max' => 20,
+            ],
         ],
 
         'sqlsrv' => [
@@ -110,6 +120,22 @@ return [
             'prefix_indexes' => true,
             // 'encrypt' => env('DB_ENCRYPT', 'yes'),
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
+        ],
+        
+        'clickhouse' => [
+            'driver' => 'clickhouse',
+            'host' => env('CLICKHOUSE_HOST', '127.0.0.1'),
+            'port' => env('CLICKHOUSE_PORT', '8123'),
+            'database' => env('CLICKHOUSE_DATABASE', 'sabc_analytics'),
+            'username' => env('CLICKHOUSE_USERNAME', 'admin'),
+            'password' => env('CLICKHOUSE_PASSWORD', ''),
+            'timeout' => 10,
+            'connect_timeout' => 5,
+            'options' => [
+                'database' => env('CLICKHOUSE_DATABASE', 'sabc_analytics'),
+                'ssl' => false,
+                'verify' => false,
+            ],
         ],
 
     ],
@@ -147,8 +173,7 @@ return [
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
-            'persistent' => env('REDIS_PERSISTENT', false),
+            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'sabc_eval360'), '_').'_database_'),
         ],
 
         'default' => [
@@ -157,16 +182,25 @@ return [
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
-            'database' => env('REDIS_DB', '0'),
+            'database' => env('REDIS_CACHE_DB', '1'),
         ],
-
-        'cache' => [
+        
+        'queue' => [
             'url' => env('REDIS_URL'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
-            'database' => env('REDIS_CACHE_DB', '1'),
+            'database' => env('REDIS_QUEUE_DB', '2'),
+        ],
+        
+        'session' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_SESSION_DB', '3'),
         ],
 
     ],

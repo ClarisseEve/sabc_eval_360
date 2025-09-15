@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 
 // Layouts
-import { AppLayout } from '@/Components/Layout/AppLayout';
+import AppLayout from '@/Components/Layout/app/AppLayout';
+import { route } from '@/routes';
 
 // Composants
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/Components/UI/Card/Card';
@@ -39,7 +40,7 @@ interface AdminPageProps {
 }
 
 export default function AdminIndex({
-  user,
+  auth,
   users = [
     {
       id: '1',
@@ -92,7 +93,7 @@ export default function AdminIndex({
       lastLogin: '2025-05-10T11:05:00Z'
     }
   ]
-}: AdminPageProps) {
+}: Omit<AdminPageProps, 'user'> & { auth: { user: User } }) {
   // État pour la recherche et les filtres
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedFilters, setSelectedFilters] = React.useState<Record<string, string[]>>({});
@@ -241,12 +242,7 @@ export default function AdminIndex({
 
   return (
     <AppLayout 
-      user={{
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar
-      }}
+      user={auth.user}
       onLogout={handleLogout}
     >
       <Head title="Administration" />

@@ -1,63 +1,63 @@
-// Components
-import { Head, useForm } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
-import { FormEventHandler } from 'react';
+import * as React from 'react';
+import { Head, Link } from '@inertiajs/react';
+import AuthCardLayout from '@/Components/Layout/auth/auth-card-layout';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { Alert, AlertDescription } from '@/Components/UI/Alert/Alert';
+import { Button } from '@/Components/UI/Button/Button';
 
-import InputError from '@/components/input-error';
-import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import AuthLayout from '@/layouts/auth-layout';
-
-export default function ForgotPassword({ status }: { status?: string }) {
-    const { data, setData, post, processing, errors } = useForm<Required<{ email: string }>>({
-        email: '',
-    });
-
-    const submit: FormEventHandler = (e) => {
-        e.preventDefault();
-
-        post(route('password.email'));
-    };
-
+/**
+ * Page de réinitialisation de mot de passe simplifiée pour SABC Eval360
+ * Redirige les utilisateurs vers le service informatique interne
+ */
+export default function ForgotPassword() {
     return (
-        <AuthLayout title="Forgot password" description="Enter your email to receive a password reset link">
-            <Head title="Forgot password" />
-
-            {status && <div className="mb-4 text-center text-sm font-medium text-green-600">{status}</div>}
-
-            <div className="space-y-6">
-                <form onSubmit={submit}>
-                    <div className="grid gap-2">
-                        <Label htmlFor="email">Email address</Label>
-                        <Input
-                            id="email"
-                            type="email"
-                            name="email"
-                            autoComplete="off"
-                            value={data.email}
-                            autoFocus
-                            onChange={(e) => setData('email', e.target.value)}
-                            placeholder="email@example.com"
-                        />
-
-                        <InputError message={errors.email} />
+        <AuthCardLayout>
+            <Head title="Mot de passe oublié - SABC Évaluation 360°" />
+            
+            <Card className="w-full max-w-md">
+                <CardHeader className="text-center">
+                    <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-sabc-red-primary"></div>
+                    <CardTitle className="text-2xl font-bold">Mot de passe oublié</CardTitle>
+                    <CardDescription>
+                        Pour réinitialiser votre mot de passe, veuillez contacter le service informatique interne
+                    </CardDescription>
+                </CardHeader>
+                
+                <CardContent>
+                    <Alert className="mb-6 bg-sabc-info/10 border-sabc-info">
+                        <AlertDescription className="text-sabc-gray-800">
+                            Pour des raisons de sécurité, la réinitialisation des mots de passe pour SABC Évaluation 360° 
+                            est gérée par le service informatique interne. Veuillez contacter l'équipe IT au poste 1234 ou 
+                            par email à <span className="font-medium">support@sabc.cm</span>.
+                        </AlertDescription>
+                    </Alert>
+                    
+                    <div className="flex flex-col space-y-4">
+                        <div className="rounded-md border border-sabc-gray-200 p-4">
+                            <h3 className="font-medium text-sabc-gray-800 mb-2">Service Informatique SABC</h3>
+                            <ul className="text-sm text-sabc-gray-600 space-y-2">
+                                <li className="flex items-center">
+                                    <span className="mr-2">📞</span> Téléphone: +237 233 42 75 00 (poste 1234)
+                                </li>
+                                <li className="flex items-center">
+                                    <span className="mr-2">✉️</span> Email: support@sabc.cm
+                                </li>
+                                <li className="flex items-center">
+                                    <span className="mr-2">🕒</span> Horaires: Lun-Ven, 8h-17h
+                                </li>
+                            </ul>
+                        </div>
                     </div>
-
-                    <div className="my-6 flex items-center justify-start">
-                        <Button className="w-full" disabled={processing}>
-                            {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                            Email password reset link
+                </CardContent>
+                
+                <CardFooter className="flex justify-center border-t border-sabc-gray-200 p-4">
+                    <Link href="/login" className="text-sabc-red-primary hover:underline w-full">
+                        <Button className="w-full bg-white border border-sabc-gray-200 text-sabc-red-primary hover:bg-sabc-gray-50">
+                            Retour à la page de connexion
                         </Button>
-                    </div>
-                </form>
-
-                <div className="text-muted-foreground space-x-1 text-center text-sm">
-                    <span>Or, return to</span>
-                    <TextLink href={route('login')}>log in</TextLink>
-                </div>
-            </div>
-        </AuthLayout>
+                    </Link>
+                </CardFooter>
+            </Card>
+        </AuthCardLayout>
     );
 }

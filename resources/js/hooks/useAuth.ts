@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { useAuthContext } from '@/Context/AuthContext';
+import { useCallback, useState, useMemo } from 'react';
+import { useAuthContext } from '@/Contexts/AuthContext';
 import { router } from '@inertiajs/react';
 
 /**
@@ -77,18 +77,43 @@ export const useAuth = () => {
     return true; // Temporaire, à remplacer par la vraie logique
   }, [auth.user]);
 
+  // Formater les données utilisateur pour assurer la cohérence dans toute l'application
+  const standardizedUser = useMemo(() => {
+    if (!auth.user) return null;
+    
+    // Créer un nouvel objet avec les propriétés standardisées
+    const standardized = {
+      // Informations pour l'affichage dans le header/sidebar
+      name: auth.user.nom && auth.user.prenom 
+        ? `${auth.user.prenom} ${auth.user.nom}` 
+        : auth.user.name || 'Utilisateur SABC',
+      role: auth.user.role_nom || auth.user.role || 'Utilisateur',
+      avatar: auth.user.avatar,
+      
+      // Informations organisationnelles
+      region: auth.user.region_nom || auth.user.region || '',
+      department: auth.user.branche_nom || auth.user.department || ''
+    };
+    
+    // Fusionner avec les données originales
+    return {
+      ...auth.user,
+      ...standardized
+    };
+  }, [auth.user]);
+
   return {
-    user: auth.user,
+    user: standardizedUser,
     isAuthenticated: auth.isAuthenticated,
     isLoading: auth.isLoading || processing,
     login,
     logout,
     errors,
-    hasPermission,
-    canEvaluate,
     forgotPassword: auth.forgotPassword,
     resetPassword: auth.resetPassword,
-    updateProfile: auth.updateProfile
+    updateProfile: auth.updateProfile,
+    hasPermission,
+    canEvaluate
   };
 };
 

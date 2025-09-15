@@ -27,16 +27,16 @@ const Spinner = ({ className }: { className?: string }) => (
 );
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white dark:ring-offset-sabc-gray-900',
+  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white dark:ring-offset-sabc-gray-950 cursor-pointer",
   {
     variants: {
       variant: {
-        default: 'bg-sabc-red-primary text-white hover:bg-sabc-red-dark',
-        destructive: 'bg-sabc-error text-white hover:bg-sabc-error/90',
-        outline: 'border border-sabc-gray-200 bg-transparent hover:bg-sabc-gray-100 dark:border-sabc-gray-800 dark:hover:bg-sabc-gray-800',
-        secondary: 'bg-sabc-gray-100 text-sabc-gray-900 hover:bg-sabc-gray-200 dark:bg-sabc-gray-800 dark:text-sabc-gray-50 dark:hover:bg-sabc-gray-700',
-        ghost: 'hover:bg-sabc-gray-100 hover:text-sabc-gray-900 dark:hover:bg-sabc-gray-800 dark:hover:text-sabc-gray-50',
-        link: 'text-sabc-red-primary underline-offset-4 hover:underline',
+        default: 'bg-sabc-red-primary text-white hover:bg-sabc-red-dark dark:bg-sabc-red-primary dark:text-white dark:hover:bg-sabc-red-dark',
+        destructive: 'bg-red-500 text-white hover:bg-red-600 dark:bg-red-500 dark:text-white dark:hover:bg-red-600',
+        outline: 'border border-sabc-gray-200 bg-white hover:bg-sabc-gray-50 hover:text-sabc-red-primary hover:border-sabc-red-primary dark:border-sabc-gray-700 dark:bg-transparent dark:text-sabc-gray-200 dark:hover:bg-transparent dark:hover:text-sabc-red-light dark:hover:border-sabc-red-light',
+        secondary: 'bg-sabc-gray-100 text-sabc-gray-900 hover:bg-sabc-gray-200 hover:text-sabc-red-primary dark:bg-sabc-gray-800 dark:text-sabc-gray-200 dark:hover:bg-sabc-gray-700 dark:hover:text-sabc-red-light',
+        ghost: 'text-sabc-gray-800 hover:bg-sabc-gray-100 hover:text-sabc-red-primary dark:text-sabc-gray-200 dark:hover:bg-transparent dark:hover:text-sabc-red-light',
+        link: 'text-sabc-red-primary underline-offset-4 hover:underline hover:text-sabc-red-dark dark:text-sabc-red-light dark:hover:text-sabc-red-primary',
       },
       size: {
         default: 'h-10 py-2 px-4',
