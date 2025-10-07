@@ -35,7 +35,8 @@ class BusinessSeeder extends Seeder
     {
         $regles = [
             [
-                'id_regle' => (string) \Illuminate\Support\Str::uuid(),
+                // UUID fixé pour correspondre au mapping contrôleur
+                'id_regle' => '09ee8f71-5067-4d4f-995f-817f3eb44f8e',
                 'nom_regle' => 'Règle Évaluation DR vers CDTT',
                 'description' => 'Règle d\'évaluation descendante du Directeur Régional vers Chef Département Trade',
                 'criteres_evaluation_json' => json_encode([
@@ -80,7 +81,8 @@ class BusinessSeeder extends Seeder
                 ])
             ],
             [
-                'id_regle' => (string) \Illuminate\Support\Str::uuid(),
+                // UUID fixé pour correspondre au mapping contrôleur
+                'id_regle' => 'c491935b-2368-40b1-80fc-49e7dff4cd09',
                 'nom_regle' => 'Règle Évaluation CDTT vers CSC',
                 'description' => 'Règle d\'évaluation descendante du Chef Département Trade vers Chef Service Commercial',
                 'criteres_evaluation_json' => json_encode([
@@ -125,7 +127,8 @@ class BusinessSeeder extends Seeder
                 ])
             ],
             [
-                'id_regle' => (string) \Illuminate\Support\Str::uuid(),
+                // UUID fixé pour correspondre au mapping contrôleur
+                'id_regle' => '93032fd5-56d6-4e04-a10f-ddfa33c1b830',
                 'nom_regle' => 'Règle Évaluation CSC par pairs',
                 'description' => 'Règle d\'évaluation par les pairs entre Chefs Service Commercial',
                 'criteres_evaluation_json' => json_encode([
@@ -194,7 +197,8 @@ class BusinessSeeder extends Seeder
                 'description' => 'Première période d\'évaluation semestrielle pour l\'année en cours. Cette période couvre les performances du premier semestre.',
                 'date_debut' => now()->startOfYear(),
                 'date_fin' => now()->startOfYear()->addMonths(6)->subDay(),
-                'statut' => 'ouverte',
+                // Aligner avec EvaluationService qui vérifie 'active'
+                'statut' => 'active',
                 'id_regle' => null,
                 'parametres_json' => json_encode([
                     'code_periode' => '2025-S1',

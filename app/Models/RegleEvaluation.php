@@ -68,6 +68,7 @@ class RegleEvaluation extends Model
         'est_active' => 'boolean',
         'date_debut' => 'date',
         'date_fin' => 'date',
+        'parametres_json' => 'json',
     ];
     
     /**

@@ -24,6 +24,8 @@ class DatabaseSeeder extends Seeder
         $this->command->info('🔄 Seeding PostgreSQL (Business Database)...');
         $this->call([
             BusinessSeeder::class,
+            EvaluationPermissionsSeeder::class,
+            TemplateSeeder::class,
         ]);
         
         // 3. ClickHouse (Analytics) - Données analytiques

@@ -28,6 +28,9 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    // Tolérer un GET /logout pour éviter erreurs si JS ne soumet pas en POST
+    Route::get('logout', [AuthenticatedSessionController::class, 'destroy'])
+        ->name('logout.get');
     // Confirmation de mot de passe pour les actions sensibles
     Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])
         ->name('password.confirm');

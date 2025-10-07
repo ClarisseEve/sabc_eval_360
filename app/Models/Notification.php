@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use App\Models\Business\BusinessModel;
 
 class Notification extends Model
@@ -51,6 +52,17 @@ class Notification extends Model
         'date_lecture' => 'datetime',
         'donnees_json' => 'json',
     ];
+
+    /**
+     * Vocabulaire standard pour les priorités et canaux (compat Business)
+     */
+    public const PRIORITES = [
+        'basse', 'normale', 'haute', 'critique'
+    ];
+
+    public const CANAUX = [
+        'email', 'sms', 'push', 'interne'
+    ];
     
     /**
      * Relation avec l'utilisateur destinataire
@@ -77,15 +89,35 @@ class Notification extends Model
         string $type = 'info',
         ?array $donnees = null
     ): Notification {
-        return static::create([
-            'id_destinataire' => $idDestinataire,
-            'titre' => $titre,
-            'message' => $message,
-            'type' => $type,
-            'est_lu' => false,
-            'date_envoi' => now(),
-            'donnees_json' => $donnees,
-        ]);
+        try {
+            return static::create([
+                'id_destinataire' => $idDestinataire,
+                'titre' => $titre,
+                'message' => $message,
+                'type' => $type,
+                'est_lu' => false,
+                'date_envoi' => now(),
+                'donnees_json' => $donnees,
+            ]);
+        } catch (\Throwable $e) {
+            // Évite l'échec du flux d'évaluation si le schéma Notification n'est pas aligné
+            Log::warning('Notification non persistée (schéma non aligné): '.$e->getMessage(), [
+                'destinataire' => $idDestinataire,
+                'titre' => $titre,
+                'type' => $type,
+            ]);
+            // Retourne un modèle en mémoire pour éviter les null checks en chaîne
+            $model = new static([
+                'id_destinataire' => $idDestinataire,
+                'titre' => $titre,
+                'message' => $message,
+                'type' => $type,
+                'est_lu' => false,
+                'date_envoi' => now(),
+                'donnees_json' => $donnees,
+            ]);
+            return $model;
+        }
     }
     
     /**

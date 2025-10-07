@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialUse
     console.log('Vérification automatique d\'authentification activée');
     
     setIsLoading(true);
-    const authCheckUrl = `${window.location.origin}/api/auth/check`;
+    const authCheckUrl = `/auth/check`;
     console.log('Vérification de l\'authentification à:', authCheckUrl);
     
     fetch(authCheckUrl, {
