@@ -23,15 +23,15 @@ class EvaluationService
      * @param string $idRegle UUID de la règle d'évaluation (regles_evaluation.id_regle)
      * @return bool
      */
-    public function canCreateEvaluation(string $evaluateurMatricule, string $evalueMatricule, string $idRegle): bool
+    public function canCreateEvaluation(string $evaluateurMatricule, string $evalueMatricule, ?string $idRegle = null): bool
     {
         // Récupérer les utilisateurs et la règle
         $evaluateur = Utilisateur::where('matricule', $evaluateurMatricule)->first();
         $evalue = Utilisateur::where('matricule', $evalueMatricule)->first();
-        $regle = RegleEvaluation::find($idRegle);
+        $regle = $idRegle ? RegleEvaluation::find($idRegle) : null;
         
         // Vérifier que les entités existent
-        if (!$evaluateur || !$evalue || !$regle) {
+        if (!$evaluateur || !$evalue) {
             return false;
         }
         
@@ -54,24 +54,16 @@ class EvaluationService
             return false;
         }
         
-        // Utiliser les IDs internes si disponibles
-        $idEvaluateur = $evaluateur->id_utilisateur ?? null;
-        $idEvalue = $evalue->id_utilisateur ?? null;
-        
-        if (!$idEvaluateur || !$idEvalue) {
-            // Si les IDs numériques ne sont pas disponibles, refuser pour éviter incohérences
-            return false;
-        }
-        
         // Vérifier si une évaluation existe déjà pour cette période/règle
-        $evaluationExistante = Evaluation::where([
-            'id_evaluateur' => $idEvaluateur,
-            'id_evalue' => $idEvalue,
-            'id_periode' => $periodeActive->id_periode,
-            'id_regle' => $idRegle,
-        ])->first();
-        
-        if ($evaluationExistante) {
+        // Utiliser les matricules pour être compatible avec le schéma Business (PGSQL)
+        $exists = DB::connection('pgsql')
+            ->table('evaluations')
+            ->where('evaluateur_matricule', $evaluateur->matricule)
+            ->where('evalue_matricule', $evalue->matricule)
+            ->where('id_periode', $periodeActive->id_periode)
+            ->when($idRegle, function ($q) use ($idRegle) { $q->where('id_regle', $idRegle); })
+            ->exists();
+        if ($exists) {
             return false;
         }
         

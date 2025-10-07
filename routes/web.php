@@ -53,6 +53,12 @@ Route::get('/auth-debug', function () {
 })->middleware(['auth'])->name('auth.debug');
 
 Route::middleware(['auth'])->group(function () {
+    // Vérification d'authentification pour le frontend (session web)
+    Route::get('/auth/check', [App\Http\Controllers\Auth\AuthCheckController::class, 'check'])->name('auth.check.web');
+
+    // Templates applicables à l'évaluateur courant (JSON, guard web)
+    Route::get('/evaluations/templates/applicables', [App\Http\Controllers\TemplatesController::class, 'applicables'])
+        ->name('evaluations.templates.applicables');
     // Route principale du tableau de bord - redirection directe vers admin dashboard
     // Pour éviter les boucles de redirection, on ne passe plus par le middleware role.redirect
     // Routes pour les tableaux de bord - utilisation du DashboardController avec FormatsUserData
@@ -85,6 +91,9 @@ Route::middleware(['auth'])->group(function () {
         
         // Création d'une nouvelle évaluation
         Route::get('/create', 'create')->name('create');
+
+        // Détails JSON pour le modal
+        Route::get('/details', 'details')->name('details');
         
         // Affichage d'une évaluation spécifique
         Route::get('/{id}', 'show')->name('show');

@@ -10,6 +10,8 @@ use App\Models\Utilisateur;
 use App\Models\RegleEvaluation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -23,23 +25,78 @@ class EvaluationController extends Controller
     }
 
     /**
+     * Enregistre une évaluation (brouillon) dans la base Business (PGSQL)
+     */
+    public function store(Request $request)
+    {
+        $utilisateur = Auth::user();
+        if (!$utilisateur) {
+            abort(401);
+        }
+
+        $validated = $request->validate([
+            'id_regle' => 'nullable|string',
+            'target_matricule' => 'required|string|exists:utilisateurs,matricule',
+            'notes' => 'required|array',
+            'notes.*.note' => 'required|integer|min:1|max:5',
+            'notes.*.commentaire' => 'nullable|string',
+            'commentaire_general' => 'nullable|string'
+        ]);
+
+        // Vérifier l'autorisation via le service (règles/permissions/période)
+        $can = $this->evaluationService->canCreateEvaluation(
+            $utilisateur->matricule,
+            $validated['target_matricule'],
+            $validated['id_regle'] ?? null
+        );
+        if (!$can) {
+            abort(403, "Vous n'êtes pas autorisé à créer cette évaluation");
+        }
+
+        // Récupérer la période active (PGSQL)
+        $periode = PeriodeEvaluation::where('statut', 'active')->first();
+        if (!$periode) {
+            abort(422, 'Aucune période active');
+        }
+
+        // Calcul de la note globale simple (moyenne)
+        $sum = 0; $count = 0;
+        foreach ($validated['notes'] as $n) { $sum += (int)$n['note']; $count++; }
+        $noteGlobale = $count > 0 ? round($sum / $count, 2) : null;
+
+        // Insertion dans PGSQL (table business evaluations)
+        $payload = [
+            'id_evaluation' => (string) Str::uuid(),
+            'evaluateur_matricule' => $utilisateur->matricule,
+            'evalue_matricule' => $validated['target_matricule'],
+            'id_periode' => $periode->id_periode,
+            'id_regle' => $validated['id_regle'] ?? null,
+            'date_evaluation' => now()->toDateString(),
+            'date_soumission' => null,
+            'statut' => 'brouillon',
+            'notations_json' => json_encode($validated['notes']),
+            'commentaire_general' => $validated['commentaire_general'] ?? null,
+            'note_globale' => $noteGlobale,
+            'type_evaluation' => '360',
+            'source_system' => 'web',
+            'sync_status' => 'pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        DB::connection('pgsql')->table('evaluations')->insert($payload);
+
+        return redirect()->route('evaluations.index')
+            ->with('success', "Évaluation créée en brouillon");
+    }
+
+    /**
      * Page d'accueil des évaluations
      */
     public function index(): Response
     {
-        $utilisateur = Auth::user();
-        
-        // Récupérer les statistiques de base pour l'utilisateur
-        $stats = [
-            'total_evaluations' => $this->evaluationService->getTotalEvaluations($utilisateur->id_utilisateur),
-            'evaluations_en_attente' => $this->evaluationService->getEvaluationsEnAttente($utilisateur->id_utilisateur)->count(),
-            'evaluations_terminees' => $this->evaluationService->getEvaluationsTerminees($utilisateur->id_utilisateur)->count(),
-        ];
-        
-        return Inertia::render('Common/Evaluations/Index', [
-            'stats' => $stats,
-            'user' => $utilisateur
-        ]);
+        // Par défaut, rediriger vers "Mes évaluations" pour éviter la page vide
+        return redirect()->route('evaluations.mine');
     }
 
     /**
@@ -99,52 +156,83 @@ class EvaluationController extends Controller
      */
     public function create(Request $request): Response
     {
-        $utilisateur = Auth::user();
-        
-        // Récupérer les paramètres de la requête
-        // Front envoie actuellement ?template=...&target=... (matricule)
+        // Deep-link vers la page "Mes évaluations" qui ouvrira le modal directement
         $templateParam = $request->get('template') ?? $request->get('template_id') ?? $request->get('id_regle');
         $targetParam = $request->get('target') ?? $request->get('target_id') ?? $request->get('evalue');
-        
-        // Validation minimale des paramètres requis
         if (!$templateParam || !$targetParam) {
-            abort(422, 'Paramètres manquants: template et target sont requis');
+            return redirect()->route('evaluations.mine');
         }
-        
-        // Mapper l'index entier vers l'UUID de la règle
-        $regleUuid = $this->mapTemplateIdToUuid($templateParam);
-        $targetMatricule = (string) $targetParam;
-        
-        if (!$regleUuid) {
-            abort(404, 'Template d\'évaluation introuvable');
+        return redirect()->route('evaluations.mine', [
+            'template' => (string)$templateParam,
+            'target' => (string)$targetParam,
+        ]);
+    }
+
+    /**
+     * Détails JSON pour alimenter un modal côté front
+     */
+    public function details(Request $request)
+    {
+        $utilisateur = Auth::user();
+        if (!$utilisateur) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
         }
-        
-        // Valider que l'utilisateur peut créer cette évaluation
-        $canCreate = $this->evaluationService->canCreateEvaluation(
-            $utilisateur->matricule,
-            $targetMatricule,
-            $regleUuid
-        );
-        
-        if (!$canCreate) {
-            abort(403, 'Vous n\'êtes pas autorisé à créer cette évaluation');
+        $templateParam = $request->query('template');
+        $targetParam = $request->query('target');
+        if (!$templateParam || !$targetParam) {
+            return response()->json(['error' => 'Paramètres manquants'], 422);
         }
-        
-        // Récupérer la règle/"template" et les informations de la cible
-        $regle = RegleEvaluation::find($regleUuid);
-        $target = Utilisateur::where('matricule', $targetMatricule)->first();
-        
-        if (!$regle || !$target) {
-            abort(404, 'Ressources introuvables (règle ou utilisateur)');
+        $target = Utilisateur::where('matricule', $targetParam)->first();
+        if (!$target) {
+            return response()->json(['error' => 'Utilisateur cible introuvable'], 404);
         }
-        
-        return Inertia::render('Common/Evaluations/Create', [
-            // Garder la clé "template" pour compatibilité UI, bien qu'il s'agisse de la règle
-            'template' => $regle,
-            'template_id' => $templateParam, // Garder l'ID original pour le frontend
+        $periode = PeriodeEvaluation::where('statut', 'active')->first();
+        $regleUuid = $this->mapTemplateIdToUuid($templateParam) ?: null;
+        if ($regleUuid) {
+            $regle = RegleEvaluation::find($regleUuid);
+            return response()->json([
+                'template' => $regle,
+                'periode' => $periode,
+                'target' => $target,
+                'id_regle' => $regle?->id_regle,
+            ]);
+        }
+        $template = \App\Models\Business\Template::with(['items.competence'])->find($templateParam);
+        if (!$template) {
+            return response()->json(['error' => 'Template introuvable'], 404);
+        }
+        $regleSnap = RegleEvaluation::where('est_active', true)
+            ->whereRaw("parametres_json->>'template_id' = ?", [$templateParam])
+            ->first();
+        if ($regleSnap) {
+            return response()->json([
+                'template' => $regleSnap,
+                'periode' => $periode,
+                'target' => $target,
+                'id_regle' => $regleSnap->id_regle,
+            ]);
+        }
+        $criteres = [];
+        foreach ($template->items as $item) {
+            $criteres[] = [
+                'id' => (string) $item->id,
+                'libelle' => $item->competence?->libelle ?? 'Critère',
+                'description' => $item->competence?->description,
+                'poids' => $item->poids_critere,
+                'echelle' => $item->scale_min . '-' . $item->scale_max,
+                'section_label' => $item->section_label,
+                'section_order' => $item->section_order,
+            ];
+        }
+        return response()->json([
+            'template' => [
+                'id_regle' => null,
+                'nom_regle' => $template->nom,
+                'criteres_evaluation_json' => $criteres,
+            ],
+            'periode' => $periode,
             'target' => $target,
-            'target_matricule' => $targetMatricule,
-            'user' => $utilisateur
+            'id_regle' => null,
         ]);
     }
     

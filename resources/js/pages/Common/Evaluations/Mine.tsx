@@ -1,320 +1,182 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Head } from '@inertiajs/react';
+import AppLayout from '@/Components/Layout/app/AppLayout';
+import { adaptUserForLayout } from '@/utils/userAdapter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
-import { Button } from '@/Components/UI/Button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs';
+import { Button } from '@/Components/UI/Button';
 import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert';
 import { ClipboardList, AlertCircle, CheckCircle2 } from 'lucide-react';
+import EvaluationModal from '@/Components/Evaluation/EvaluationModal';
 import axios from 'axios';
-import AppLayout from '@/Components/Layout/app/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
 
 interface EvaluationTemplate {
   id: string;
-  title: string;
+  nom: string;
   description: string;
-  status: 'published' | 'draft';
-  created_at: string;
-  updated_at: string;
+  evaluated_role: string;
 }
 
 interface EvaluationTarget {
   matricule: string;
   name: string;
   role: string;
-  region: string;
-  branch: string;
+  region?: string;
   isAvailable: boolean;
 }
 
-const EvaluationMinePage = () => {
+const MinePage: React.FC = () => {
   const { user, isLoading: authLoading } = useAuth();
   const [templates, setTemplates] = useState<EvaluationTemplate[]>([]);
-  const [evaluationTargets, setEvaluationTargets] = useState<{
-    self: EvaluationTarget[];
-    peers: EvaluationTarget[];
-    subordinates: EvaluationTarget[];
-  }>({
-    self: [],
-    peers: [],
-    subordinates: [],
-  });
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<string>('self');
-  
-  // Si l'utilisateur n'est pas encore chargé ou n'est pas authentifié, afficher un indicateur de chargement
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTarget, setModalTarget] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [targets, setTargets] = useState<{ self: EvaluationTarget[]; peers: EvaluationTarget[]; subordinates: EvaluationTarget[] }>({ self: [], peers: [], subordinates: [] });
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const { data } = await axios.get('/evaluations/templates/applicables');
+        setTemplates(data as EvaluationTemplate[]);
+
+        const role = (user as any)?.role_nom || (user as any)?.role || '';
+        const fullName = user?.prenom && user?.nom ? `${user.prenom} ${user.nom}` : (user as any)?.name || 'Vous-même';
+        const me = { matricule: (user as any)?.matricule || '', name: fullName, role: role || '', isAvailable: true } as EvaluationTarget;
+
+        if (role === 'CDTT') {
+          setTargets({ self: [], peers: [], subordinates: [
+            { matricule: 'US-07', name: 'Sophie Atangana', role: 'CSC', isAvailable: true },
+            { matricule: 'US-08', name: 'Bruno Ndi', role: 'CSC', isAvailable: true },
+          ]});
+        } else if (role === 'CSC') {
+          setTargets({ self: [me], peers: [{ matricule: 'US-08', name: 'Bruno Ndi', role: 'CSC', isAvailable: true }], subordinates: [{ matricule: 'US-09', name: 'Martial Tchoua', role: 'CDV', isAvailable: true }] });
+        } else {
+          setTargets({ self: [me], peers: [], subordinates: [] });
+        }
+      } catch (e) {
+        setError("Erreur lors du chargement des templates");
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (!authLoading && user) load();
+  }, [authLoading, user]);
+
+  // Deep-link: si ?template=...&target=... présents, ouvrir le modal automatiquement
+  useEffect(() => {
+    if (!user) return;
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('template');
+    const trg = params.get('target');
+    if (t && trg) {
+      setSelectedTemplate(t);
+      setModalTarget(trg);
+      setModalOpen(true);
+      params.delete('template');
+      params.delete('target');
+      const qs = params.toString();
+      const newUrl = window.location.pathname + (qs ? `?${qs}` : '');
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [user]);
+
   if (authLoading || !user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-sabc-gray-50 dark:bg-sabc-gray-900">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-sabc-red-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-sabc-gray-800 dark:text-sabc-gray-100">Chargement...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-12 h-12 border-4 border-sabc-red-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  // Simuler le chargement des données depuis l'API
-  useEffect(() => {
-    // Dans une implémentation réelle, ces données viendraient de l'API
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Simulation de l'appel API pour les templates
-        // À remplacer par un vrai appel API
-        setTimeout(() => {
-          setTemplates([
-            {
-              id: '1',
-              title: 'Évaluation des compétences managériales',
-              description: 'Évaluation des compétences de leadership et de gestion d\'équipe',
-              status: 'published',
-              created_at: '2025-07-01',
-              updated_at: '2025-07-15',
-            },
-            {
-              id: '2',
-              title: 'Évaluation des compétences commerciales',
-              description: 'Évaluation des compétences de vente et de relation client',
-              status: 'published',
-              created_at: '2025-07-05',
-              updated_at: '2025-07-10',
-            },
-            {
-              id: '3',
-              title: 'Évaluation des compétences techniques',
-              description: 'Évaluation des compétences techniques spécifiques au poste',
-              status: 'published',
-              created_at: '2025-07-08',
-              updated_at: '2025-07-12',
-            },
-          ]);
-          
-          // Simulation de l'appel API pour les cibles d'évaluation
-          setEvaluationTargets({
-            self: [
-              {
-                matricule: 'US-01',
-                name: 'Vous-même',
-                role: 'CSC',
-                region: 'Littoral',
-                branch: 'Commercial',
-                isAvailable: true,
-              }
-            ],
-            peers: [
-              {
-                matricule: 'US-02',
-                name: 'Thomas Mbarga',
-                role: 'CSC',
-                region: 'Littoral',
-                branch: 'Commercial',
-                isAvailable: true,
-              },
-              {
-                matricule: 'US-03',
-                name: 'Marie Fouda',
-                role: 'CSC',
-                region: 'Littoral',
-                branch: 'Commercial',
-                isAvailable: false,
-              },
-            ],
-            subordinates: [
-              {
-                matricule: 'US-04',
-                name: 'Jean Ekambi',
-                role: 'CDV',
-                region: 'Littoral',
-                branch: 'Commercial',
-                isAvailable: true,
-              },
-              {
-                matricule: 'US-05',
-                name: 'Sophie Ndongo',
-                role: 'CDV',
-                region: 'Littoral',
-                branch: 'Commercial',
-                isAvailable: true,
-              },
-            ],
-          });
-          
-          setLoading(false);
-        }, 1000);
-        
-      } catch (err) {
-        setError('Erreur lors du chargement des données');
-        setLoading(false);
-        console.error(err);
-      }
-    };
-    
-    fetchData();
-  }, []);
-
-  const handleTemplateSelect = (templateId: string) => {
-    setSelectedTemplate(templateId);
+  const start = (matricule: string) => {
+    if (!selectedTemplate) return;
+    setModalTarget(matricule);
+    setModalOpen(true);
   };
 
-  const handleStartEvaluation = (targetMatricule: string) => {
-    // Rediriger vers la page de création d'évaluation avec les paramètres
-    window.location.href = `/common/evaluations/create?template=${selectedTemplate}&target=${targetMatricule}`;
-  };
-
-  const renderTargetList = (targets: EvaluationTarget[]) => {
-    if (targets.length === 0) {
+  const renderList = (list: EvaluationTarget[]) => {
+    if (!list.length) {
       return (
         <Alert className="mb-4 bg-sabc-gray-100">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Aucune personne disponible</AlertTitle>
-          <AlertDescription>
-            Aucune personne n'est disponible pour ce type d'évaluation.
-          </AlertDescription>
+          <AlertDescription>Rien à afficher pour ce type.</AlertDescription>
         </Alert>
       );
     }
-
-    return targets.map((target) => (
-      <Card key={target.matricule} className="mb-4 hover:shadow-md transition-shadow">
+    return list.map(p => (
+      <Card key={p.matricule} className="mb-3">
         <CardContent className="p-4 flex justify-between items-center">
           <div>
-            <h3 className="font-medium text-sabc-gray-900">{target.name}</h3>
-            <p className="text-sm text-sabc-gray-400">{target.role} - {target.region}</p>
+            <div className="font-medium">{p.name}</div>
+            <div className="text-xs text-sabc-gray-500">{p.role}</div>
           </div>
-          <Button
-            onClick={() => handleStartEvaluation(target.matricule)}
-            disabled={!target.isAvailable || !selectedTemplate}
-            className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white"
-          >
-            {target.isAvailable ? 'Évaluer' : 'Indisponible'}
-          </Button>
+          <Button disabled={!selectedTemplate || !p.isAvailable} onClick={() => start(p.matricule)} className="bg-sabc-red-primary text-white">Évaluer</Button>
         </CardContent>
       </Card>
     ));
   };
 
+  const layoutUser = adaptUserForLayout(user);
   return (
-    <AppLayout
-      user={user}
-      pageTitle="Mes Évaluations"
-      notifications={[]}
-    >
-      <Head title="Mes Évaluations - SABC Évaluation 360°" />
-      
-      <div className="container mx-auto py-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Mes Évaluations</h1>
+    <AppLayout user={layoutUser} pageTitle="Mes évaluations" notifications={[]}> 
+      <Head title="Mes évaluations" />
+      <div className="container mx-auto py-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center"><ClipboardList className="h-5 w-5 mr-2" />Templates</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? <p>Chargement…</p> : (
+                <>
+                  {!templates.length ? (
+                    <Alert className="bg-sabc-gray-100">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Aucun template</AlertTitle>
+                      <AlertDescription>Aucun template publié n’est disponible.</AlertDescription>
+                    </Alert>
+                  ) : templates.map(t => (
+                    <div key={t.id} onClick={() => setSelectedTemplate(t.id)} className={`p-3 mb-2 rounded border cursor-pointer ${selectedTemplate===t.id ? 'border-sabc-red-primary bg-sabc-red-light/20' : 'border-sabc-gray-200'}`}>
+                      <div className="flex justify-between items-center">
+                        <div className="font-medium">{t.nom}</div>
+                        {selectedTemplate===t.id && <CheckCircle2 className="h-4 w-4 text-sabc-red-primary" />}
+                      </div>
+                      <div className="text-xs text-sabc-gray-500">Cible: {t.evaluated_role}</div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
-
-        {error && (
-          <Alert className="mb-6 bg-sabc-red-light border-sabc-red-primary">
-            <AlertCircle className="h-4 w-4 text-sabc-red-primary" />
-            <AlertTitle>Erreur</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Sélection du template */}
-          <div className="md:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <ClipboardList className="mr-2 h-5 w-5 text-sabc-red-primary" />
-                  Templates d'évaluation
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <p className="text-center py-4">Chargement des templates...</p>
-                ) : (
-                  <>
-                    {templates.length === 0 ? (
-                      <Alert className="mb-4 bg-sabc-gray-100">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Aucun template</AlertTitle>
-                        <AlertDescription>
-                          Aucun template d'évaluation n'est disponible.
-                        </AlertDescription>
-                      </Alert>
-                    ) : (
-                      templates.map((template) => (
-                        <div
-                          key={template.id}
-                          className={`p-3 mb-2 rounded-md cursor-pointer border ${
-                            selectedTemplate === template.id
-                              ? 'border-sabc-red-primary bg-sabc-red-light/20'
-                              : 'border-sabc-gray-200 hover:border-sabc-red-primary/50'
-                          }`}
-                          onClick={() => handleTemplateSelect(template.id)}
-                        >
-                          <div className="flex justify-between items-center">
-                            <h3 className="font-medium">{template.title}</h3>
-                            {selectedTemplate === template.id && (
-                              <CheckCircle2 className="h-4 w-4 text-sabc-red-primary" />
-                            )}
-                          </div>
-                          <p className="text-sm text-sabc-gray-400 mt-1">{template.description}</p>
-                        </div>
-                      ))
-                    )}
-                    
-                    {selectedTemplate ? (
-                      <p className="text-sm text-sabc-gray-400 mt-4">
-                        Sélectionnez maintenant une personne à évaluer dans l'onglet correspondant.
-                      </p>
-                    ) : (
-                      <p className="text-sm text-sabc-gray-400 mt-4">
-                        Sélectionnez un template pour commencer l'évaluation.
-                      </p>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sélection de la personne à évaluer */}
-          <div className="md:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Personnes à évaluer</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <p className="text-center py-4">Chargement des données...</p>
-                ) : (
-                  <Tabs defaultValue="self" onValueChange={setSelectedTab}>
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="self">Auto-évaluation</TabsTrigger>
-                      <TabsTrigger value="peers">Pairs</TabsTrigger>
-                      <TabsTrigger value="subordinates">Subordonnés</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="self">
-                      {renderTargetList(evaluationTargets.self)}
-                    </TabsContent>
-                    
-                    <TabsContent value="peers">
-                      {renderTargetList(evaluationTargets.peers)}
-                    </TabsContent>
-                    
-                    <TabsContent value="subordinates">
-                      {renderTargetList(evaluationTargets.subordinates)}
-                    </TabsContent>
-                  </Tabs>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+        <div className="md:col-span-2">
+          <Card>
+            <CardHeader><CardTitle>Personnes à évaluer</CardTitle></CardHeader>
+            <CardContent>
+              {loading ? <p>Chargement…</p> : (
+                <Tabs defaultValue="self">
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="self">Auto</TabsTrigger>
+                    <TabsTrigger value="peers">Pairs</TabsTrigger>
+                    <TabsTrigger value="subs">Subordonnés</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="self">{renderList(targets.self)}</TabsContent>
+                  <TabsContent value="peers">{renderList(targets.peers)}</TabsContent>
+                  <TabsContent value="subs">{renderList(targets.subordinates)}</TabsContent>
+                </Tabs>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
+      <EvaluationModal open={modalOpen} onOpenChange={setModalOpen} templateId={selectedTemplate} targetMatricule={modalTarget} />
     </AppLayout>
   );
 };
 
-export default EvaluationMinePage;
+export default MinePage;

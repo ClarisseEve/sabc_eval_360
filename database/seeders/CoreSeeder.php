@@ -348,6 +348,42 @@ class CoreSeeder extends Seeder
                 'role_nom' => 'CSC',
                 'type_region' => 'taniere',
             ],
+            // CSC Littoral (pair) pour tests pairs/auto
+            [
+                'matricule' => 'US-08',
+                'nom' => 'Ndi',
+                'prenom' => 'Bruno',
+                'email' => 'bruno.ndi@sabc.cm',
+                'password' => Hash::make('***REMOVED***'),
+                'role' => 'CSC',
+                'manager_matricule' => 'US-06',
+                'niveau_hierarchique' => 3,
+                'id_region' => 'RG-01',
+                'id_branche' => 'BR-01',
+                'est_actif' => true,
+                'est_admin' => false,
+                'region_nom' => 'Littoral',
+                'role_nom' => 'CSC',
+                'type_region' => 'taniere',
+            ],
+            // CDV (subordonné de CSC US-07) pour tests descendante
+            [
+                'matricule' => 'US-09',
+                'nom' => 'Tchoua',
+                'prenom' => 'Martial',
+                'email' => 'martial.tchoua@sabc.cm',
+                'password' => Hash::make('***REMOVED***'),
+                'role' => 'CDV',
+                'manager_matricule' => 'US-07',
+                'niveau_hierarchique' => 4,
+                'id_region' => 'RG-01',
+                'id_branche' => 'BR-01',
+                'est_actif' => true,
+                'est_admin' => false,
+                'region_nom' => 'Littoral',
+                'role_nom' => 'CDV',
+                'type_region' => 'taniere',
+            ],
         ];
 
         foreach ($utilisateurs as $userData) {

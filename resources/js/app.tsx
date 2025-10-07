@@ -15,17 +15,29 @@ const appName = import.meta.env.VITE_APP_NAME || 'Evaluation Force Vente - SABC'
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: (name) => {
-        // Ajout de logs pour déboguer la résolution des composants
         console.log('Résolution du composant:', name);
-        
-        // Correction de la casse pour les routes admin selon règles SABC
+
+        // Normalisations simples (règles SABC)
         let correctedName = name.replace(/^admin\//, 'Admin/');
-        
-        // Correction des sous-dossiers selon règles SABC (majuscules)
         correctedName = correctedName.replace(/\/roles\//, '/Roles/');
         correctedName = correctedName.replace(/\/structure\//, '/Structure/');
-        
-        return resolvePageComponent(`./Pages/${correctedName}.tsx`, import.meta.glob('./Pages/**/*.tsx'));
+
+        const pages = import.meta.glob('./Pages/**/*.tsx');
+        const primaryPath = `./Pages/${correctedName}.tsx`;
+        if (pages[primaryPath]) {
+            return resolvePageComponent(primaryPath, pages);
+        }
+
+        // Fallback: dernière portion en minuscules (Index -> index)
+        const altName = correctedName.replace(/\/(\w+)$/, (_m, last) => `/${last.charAt(0).toLowerCase()}${last.slice(1)}`);
+        const altPath = `./Pages/${altName}.tsx`;
+        if (pages[altPath]) {
+            console.warn('Fallback composant:', altPath);
+            return resolvePageComponent(altPath, pages);
+        }
+
+        // Laisser l'erreur standard si rien trouvé
+        return resolvePageComponent(primaryPath, pages);
     },
     setup({ el, App, props }) {
         const root = createRoot(el);
