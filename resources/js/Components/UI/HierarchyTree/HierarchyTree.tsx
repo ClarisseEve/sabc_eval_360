@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
-import { Minus, Network, Plus, RotateCcw, Users, Maximize2, ZoomIn, ZoomOut, Move, X } from 'lucide-react';
+import { Minus, Network, Plus, RotateCcw, Maximize2, ZoomIn, ZoomOut, Move, X } from 'lucide-react';
 import { cn } from '@/utils/helpers';
 import './HierarchyTree.css';
 
@@ -88,63 +88,73 @@ const HierarchyTree: React.FC<HierarchyTreeProps> = ({
     return colorMaps[currentVariant]?.[niveau] || 'bg-sabc-red-primary';
   };
 
+  const getRoleInitials = (role?: string | null): string => {
+    if (!role) {
+      return 'NA';
+    }
+
+    const normalized = role.trim().toLowerCase();
+    const roleMap: Record<string, string> = {
+      'directeur régional': 'DR',
+      'directeur regional': 'DR',
+      'chef département trade': 'CDTT',
+      'chef departement trade': 'CDTT',
+      'chef service commercial': 'CSC',
+      'chef district vente': 'CDV',
+      'chef de secteur': 'CDS',
+      'regional trade marketing': 'RTM',
+      'trade marketing operator': 'TMO',
+      'superviseur régional marketing opérationnel': 'SRMO',
+      'superviseur regional marketing operationnel': 'SRMO',
+      'superviseur sponsoring': 'SS',
+      'assistant superviseur sponsoring': 'AS',
+    };
+
+    if (roleMap[normalized]) {
+      return roleMap[normalized];
+    }
+
+    const initials = normalized
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) => word[0])
+      .join('')
+      .toUpperCase();
+
+    return initials || role.toUpperCase().slice(0, 3);
+  };
+
   const renderNode = (node: HierarchyNode, depth = 0, path = 'root'): React.ReactElement => {
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     const accentClass = getNodeAccent(node.niveau, variant);
     const nodeKey = `${path}-${node.id}-${depth}`;
     const isRoot = depth === 0;
 
-    const metadataPills: React.ReactNode[] = [];
-    if (showMetadata && node.metadata) {
-      if (node.metadata.utilisateurs_count !== undefined) {
-        metadataPills.push(
-          <span key="utilisateurs" className="org-pill">
-            {node.metadata.utilisateurs_count} collaborateurs
-          </span>
-        );
-      }
-      if (node.metadata.region) {
-        metadataPills.push(
-          <span key="region" className="org-pill subtle">
-            {node.metadata.region}
-          </span>
-        );
-      }
-      if (node.metadata.statut) {
-        metadataPills.push(
-          <span key="statut" className="org-pill subtle">
-            {node.metadata.statut}
-          </span>
-        );
-      }
-    }
-
     const managerLabel = node.manager ? node.manager : 'Poste vacant';
     const managerRole = node.manager_role ? node.manager_role : undefined;
+    const roleInitials = getRoleInitials(managerRole);
 
     const nodeClasses = cn('org-node', {
       'org-node-root': isRoot,
       'org-node-region': isRoot,
     });
-
-    const roleLabel = managerRole ?? 'Rôle non défini';
+    const displayName = !isRoot ? node.nom : null;
+    const description = !isRoot ? node.description : undefined;
 
     const nodeCard = (
       <div className="org-card">
         <div className={cn('org-avatar', accentClass)}>
-          <Users className="h-4 w-4" />
+          <span className="org-avatar-initials">{roleInitials}</span>
         </div>
         <div className="org-info">
-          <span className="org-name">{node.nom}</span>
+          {displayName && <span className="org-name">{displayName}</span>}
           <div className="org-responsable">
-            <span className="org-role-label">{roleLabel}</span>
             <span className={cn('org-person', !node.manager && 'org-person-empty')}>
               {managerLabel}
             </span>
           </div>
-          {node.description && <span className="org-description">{node.description}</span>}
+          {description && <span className="org-description">{description}</span>}
         </div>
-        {metadataPills.length > 0 && <div className="org-meta">{metadataPills}</div>}
       </div>
     );
 
@@ -156,8 +166,29 @@ const HierarchyTree: React.FC<HierarchyTreeProps> = ({
       </ul>
     ) : null;
 
+    const statusLabel = node.metadata?.statut
+      ? node.metadata.statut.charAt(0).toUpperCase() + node.metadata.statut.slice(1)
+      : null;
+
+    const regionHeader = isRoot ? (
+      <header className="org-region-header">
+        <span className="org-region-title">{node.nom}</span>
+        {statusLabel && (
+          <span
+            className={cn('org-region-badge', {
+              'taniere': statusLabel.toLowerCase().includes('tani'),
+              'non-taniere': !statusLabel.toLowerCase().includes('tani'),
+            })}
+          >
+            {statusLabel}
+          </span>
+        )}
+      </header>
+    ) : null;
+
     const content = (
       <>
+        {regionHeader}
         {nodeCard}
         {childrenList}
       </>
@@ -347,7 +378,9 @@ const HierarchyTree: React.FC<HierarchyTreeProps> = ({
 
     const scaleX = availableWidth / contentWidth;
     const scaleY = availableHeight / contentHeight;
-    const targetScale = clampScale(Math.min(scaleX, scaleY, 1));
+    const baseScale = Math.min(scaleX, scaleY, 1);
+    const adjustedBase = baseScale * 0.9;
+    const targetScale = clampScale(adjustedBase);
 
     setScale((previousScale) =>
       Math.abs(previousScale - targetScale) > 0.001 ? targetScale : previousScale
