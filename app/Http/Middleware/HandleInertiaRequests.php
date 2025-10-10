@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
 
@@ -74,24 +75,26 @@ class HandleInertiaRequests extends Middleware
 
         // Ajouter des informations de débogage pour diagnostiquer les problèmes d'authentification
         $authDebug = [];
-        if (config('app.debug')) {
+        $includeDebug = app()->environment('local') && config('frontend.expose_auth_debug');
+        if ($includeDebug) {
             $authDebug = [
                 'is_authenticated' => \Illuminate\Support\Facades\Auth::check(),
-                'session_id' => session()->getId(),
-                'session_has_user' => session()->has('auth.user_id'),
-                'cookie_has_laravel' => $request->cookies->has(config('session.cookie')),
-                'cookie_has_remember' => $request->cookies->has(\Illuminate\Support\Facades\Auth::guard()->getRecallerName()),
+                'session_active' => session()->has('auth.user_id'),
+                'session_cookie_present' => $request->cookies->has(config('session.cookie')),
+                'remember_cookie_present' => $request->cookies->has(\Illuminate\Support\Facades\Auth::guard()->getRecallerName()),
                 'timestamp' => now()->toIso8601String()
             ];
         }
+
+        $sharedUser = $user ? $this->transformAuthenticatedUser($user) : null;
 
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $user,
-                'debug' => $authDebug
+                'user' => $sharedUser,
+                'debug' => $includeDebug ? $authDebug : null,
             ],
             'ziggy' => fn (): array => [
                 ...(new Ziggy)->toArray(),
@@ -103,5 +106,49 @@ class HandleInertiaRequests extends Middleware
             // Ajouter un timestamp pour éviter les problèmes de cache
             'timestamp' => now()->timestamp,
         ];
+    }
+
+    /**
+     * Limite les informations utilisateur partagées avec le frontend Inertia.
+     */
+    protected function transformAuthenticatedUser($user): array
+    {
+        $displayName = trim(($user->prenom ?? '') . ' ' . ($user->nom ?? ''));
+        $initials = strtoupper(substr($user->prenom ?? '', 0, 1) . substr($user->nom ?? '', 0, 1));
+
+        if (strlen($initials) === 0) {
+            $initials = strtoupper(substr($user->matricule ?? 'U', 0, 2));
+        }
+
+        return [
+            'matricule' => $user->matricule,
+            'name' => $displayName !== '' ? $displayName : $user->matricule,
+            'initials' => $initials,
+            'role' => $user->role_nom,
+            'role_display' => $this->formatRoleDisplay($user->role_nom),
+            'is_admin' => (bool) $user->est_admin,
+            'avatar' => $user->photo_url ?? null,
+        ];
+    }
+
+    private function formatRoleDisplay(?string $roleNom): string
+    {
+        if (!$roleNom) {
+            return '';
+        }
+
+        return [
+            'ADMIN' => 'Administrateur',
+            'DR' => 'Directeur Régional',
+            'CDTT' => 'Chef Département Trade',
+            'CSC' => 'Chef Service Commercial',
+            'RTM' => 'Regional Trade Marketing',
+            'CDV' => 'Chef District Vente',
+            'TMO' => 'Trade Marketing Operator',
+            'CDS' => 'Chef de Secteur',
+            'SRMO' => 'Superviseur Régional Marketing Opérationnel',
+            'SS' => 'Superviseur Sponsoring',
+            'AS' => 'Assistant Superviseur Sponsoring',
+        ][$roleNom] ?? $roleNom;
     }
 }

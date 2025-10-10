@@ -102,6 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const renderNavItem = (item: NavItem, level: number = 0): React.ReactElement => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedItems[item.title] || false;
+    const isSectionToggle = hasChildren && (!item.href || item.href === '#');
     
     // Vérifier si l'élément est actif
     const isActive = activePath === item.href || activePath.startsWith(item.href + "/");
@@ -121,34 +122,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
         
         {hasChildren ? (
-          <div
-            className={cn(
-              "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out cursor-pointer",
-              isCollapsed ? "justify-center" : "justify-start",
-              hasActiveChild
-                ? "text-sabc-red-primary/80 dark:text-sabc-red-light/80"
-                : "text-sabc-gray-800 dark:text-sabc-gray-200",
-              "hover:bg-sabc-gray-100/50 dark:hover:bg-sabc-gray-800/40 hover:text-sabc-red-primary dark:hover:text-sabc-red-light transition-all duration-300 ease-out"
-            )}
-            onClick={(e) => {
-              e.preventDefault();
-              toggleExpand(item.title);
-            }}
-          >
-            <span className="flex items-center">
+          isCollapsed ? (
+            <button
+              type="button"
+              className={cn(
+                "flex w-full items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out",
+                hasActiveChild
+                  ? "text-sabc-red-primary/80 dark:text-sabc-red-light/80"
+                  : "text-sabc-gray-800 dark:text-sabc-gray-200",
+                "hover:bg-sabc-gray-100/50 dark:hover:bg-sabc-gray-800/40 hover:text-sabc-red-primary dark:hover:text-sabc-red-light transition-all duration-300 ease-out"
+              )}
+              onClick={() => toggleExpand(item.title)}
+            >
               {item.icon}
-              {!isCollapsed && <span className="ml-2">{item.title}</span>}
-            </span>
-            {!isCollapsed && (
-              <span className="ml-auto">
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-              </span>
-            )}
-          </div>
+            </button>
+          ) : (
+            <div
+              className={cn(
+                "flex items-center rounded-md bg-transparent px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out",
+                hasActiveChild
+                  ? "text-sabc-red-primary/80 dark:text-sabc-red-light/80"
+                  : "text-sabc-gray-800 dark:text-sabc-gray-200",
+                "hover:bg-sabc-gray-100/50 dark:hover:bg-sabc-gray-800/40 hover:text-sabc-red-primary dark:hover:text-sabc-red-light transition-all duration-300 ease-out"
+              )}
+            >
+              {isSectionToggle ? (
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between bg-transparent text-inherit focus:outline-none"
+                  onClick={() => toggleExpand(item.title)}
+                  aria-expanded={isExpanded}
+                >
+                  <span className="flex items-center">
+                    {item.icon}
+                    <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
+                  </span>
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+              ) : (
+                <>
+                  <Link
+                    href={item.href}
+                    className="flex flex-1 items-center text-inherit transition-colors"
+                  >
+                    {item.icon}
+                    <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    className="ml-2 text-sabc-gray-500 transition-colors hover:text-sabc-red-primary"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      toggleExpand(item.title);
+                    }}
+                    aria-label={isExpanded ? `Replier ${item.title}` : `Déplier ${item.title}`}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          )
         ) : (
           <Link
             href={item.href}
@@ -163,7 +205,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <span className="flex items-center">
               {item.icon}
-              {!isCollapsed && <span className="ml-2">{item.title}</span>}
+              {!isCollapsed && (
+                <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
+              )}
             </span>
           </Link>
         )}

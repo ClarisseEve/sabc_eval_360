@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::connection('pgsql')->hasTable('scores_utilisateurs')) {
+            return;
+        }
+
         Schema::connection('pgsql')->create('scores_utilisateurs', function (Blueprint $table) {
             // Clé composite selon règles métier SABC
             $table->string('matricule', 5);

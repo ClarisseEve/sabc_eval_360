@@ -22,6 +22,179 @@ class StructureController extends Controller
         // Middleware applied at route level
     }
 
+    /**
+     * Vue d'ensemble de la structure organisationnelle sous forme d'arborescence.
+     */
+    public function overview(): InertiaResponse
+    {
+        $user = request()->user();
+
+        $regions = Region::withCount(['utilisateurs'])
+            ->with([
+                'servicesCommerciaux' => function ($query) {
+                    $query->withCount(['utilisateurs'])
+                        ->with([
+                            'districts' => function ($districtQuery) {
+                                $districtQuery->withCount(['utilisateurs'])
+                                    ->with([
+                                        'secteurs' => function ($secteurQuery) {
+                                            $secteurQuery->withCount(['utilisateurs']);
+                                        },
+                                    ]);
+                            },
+                            'secteurs' => function ($secteurQuery) {
+                                $secteurQuery->withCount(['utilisateurs']);
+                            },
+                        ]);
+                },
+            ])
+            ->get();
+
+        $tree = $regions->map(function (Region $region) {
+            $regionManager = $this->formatPersonName(
+                $this->findStructureLead('DR', ['id_region' => $region->id_region])
+            );
+
+            $serviceNodes = $region->servicesCommerciaux->map(function (ServiceCommercial $service) {
+                $serviceManager = $this->formatPersonName(
+                    $this->findStructureLead('CSC', ['id_service' => $service->id_service])
+                );
+
+                $districtNodes = $service->districts->map(function (District $district) {
+                    $districtManager = $this->formatPersonName(
+                        $this->findStructureLead('CDV', ['id_district' => $district->id_district])
+                    );
+
+                    $sectorNodes = $district->secteurs->map(function (Secteur $secteur) {
+                        $sectorManager = $this->formatPersonName(
+                            $this->findStructureLead('CDS', ['id_secteur' => $secteur->id_secteur])
+                        );
+
+                        return [
+                            'id' => (string) $secteur->id_secteur,
+                            'nom' => ucfirst(strtolower($secteur->nom_secteur)),
+                            'niveau' => 4,
+                            'type' => 'structure',
+                            'badge_variant' => 'outline',
+                            'manager' => $sectorManager,
+                            'manager_role' => 'Chef de secteur',
+                            'metadata' => [
+                                'utilisateurs_count' => $secteur->utilisateurs_count ?? 0,
+                            ],
+                        ];
+                    })->values();
+
+                    return [
+                        'id' => (string) $district->id_district,
+                        'nom' => ucfirst(strtolower($district->nom_district)),
+                        'niveau' => 3,
+                        'type' => 'structure',
+                        'badge_variant' => 'secondary',
+                        'manager' => $districtManager,
+                        'manager_role' => 'Chef district vente',
+                        'metadata' => [
+                            'utilisateurs_count' => $district->utilisateurs_count ?? 0,
+                        ],
+                        'children' => $sectorNodes,
+                    ];
+                })->values();
+
+                $directSectors = $service->secteurs
+                    ->filter(fn ($secteur) => empty($secteur->id_district))
+                    ->map(function (Secteur $secteur) {
+                        $sectorManager = $this->formatPersonName(
+                            $this->findStructureLead('CDS', ['id_secteur' => $secteur->id_secteur])
+                        );
+
+                        return [
+                            'id' => (string) $secteur->id_secteur,
+                            'nom' => ucfirst(strtolower($secteur->nom_secteur)),
+                            'niveau' => 3,
+                            'type' => 'structure',
+                            'badge_variant' => 'outline',
+                            'manager' => $sectorManager,
+                            'manager_role' => 'Chef de secteur',
+                            'metadata' => [
+                                'utilisateurs_count' => $secteur->utilisateurs_count ?? 0,
+                            ],
+                        ];
+                    })->values();
+
+                return [
+                    'id' => (string) $service->id_service,
+                    'nom' => ucfirst(strtolower($service->nom_service)),
+                    'niveau' => 2,
+                    'type' => 'structure',
+                    'badge_variant' => 'default',
+                    'manager' => $serviceManager,
+                    'manager_role' => 'Chef service commercial',
+                    'metadata' => [
+                        'utilisateurs_count' => $service->utilisateurs_count ?? 0,
+                    ],
+                    'children' => $districtNodes->merge($directSectors)->values(),
+                ];
+            })->values();
+
+            return [
+                'id' => (string) $region->id_region,
+                'nom' => strtoupper($region->nom_region),
+                'niveau' => 1,
+                'type' => 'structure',
+                'badge_variant' => $region->est_taniere ? 'default' : 'secondary',
+                'manager' => $regionManager,
+                'manager_role' => 'Directeur régional',
+                'description' => $region->est_taniere ? 'Région tanière' : 'Région non tanière',
+                'metadata' => [
+                    'utilisateurs_count' => $region->utilisateurs_count ?? 0,
+                    'statut' => $region->est_taniere ? 'tanière' : 'non tanière',
+                ],
+                'children' => $serviceNodes,
+            ];
+        })->values();
+
+        $statistics = [
+            'regions' => $regions->count(),
+            'taniere' => $regions->where('est_taniere', true)->count(),
+            'non_taniere' => $regions->where('est_taniere', false)->count(),
+            'services' => $regions->sum(fn (Region $region) => $region->servicesCommerciaux->count()),
+            'districts' => $regions->sum(fn (Region $region) => $region->servicesCommerciaux->sum(fn (ServiceCommercial $service) => $service->districts->count())),
+            'secteurs' => $regions->sum(fn (Region $region) => $region->servicesCommerciaux->sum(fn (ServiceCommercial $service) => $service->secteurs->count())),
+            'utilisateurs' => $regions->sum('utilisateurs_count'),
+        ];
+
+        return Inertia::render('admin/structure/index', [
+            'user' => $this->formatUserForUI($user),
+            'tree' => $tree->toArray(),
+            'statistics' => $statistics,
+        ]);
+    }
+
+    private function findStructureLead(string $role, array $criteria)
+    {
+        $query = Utilisateur::query()->where('role_nom', $role);
+
+        foreach ($criteria as $field => $value) {
+            if ($value !== null) {
+                $query->where($field, $value);
+            }
+        }
+
+        return $query->orderByDesc('est_actif')->orderByDesc('updated_at')->first();
+    }
+
+    private function formatPersonName($user): ?string
+    {
+        if (!$user) {
+            return null;
+        }
+
+        $prenom = $user->prenom ? ucfirst(strtolower($user->prenom)) : '';
+        $nom = $user->nom ? mb_strtoupper($user->nom) : '';
+        $fullName = trim($prenom . ' ' . $nom);
+
+        return $fullName !== '' ? $fullName : $user->matricule;
+    }
+
     // ==================== RÉGIONS ====================
 
     /**

@@ -32,6 +32,8 @@ const Login: React.FC<LoginProps> = ({ errors, status }) => {
     remember: false as const,
   });
 
+  const [showPassword, setShowPassword] = useState(false);
+
   // Inertia gère automatiquement le CSRF
 
   // Un seul compte administrateur pour la gestion initiale
@@ -167,14 +169,24 @@ const Login: React.FC<LoginProps> = ({ errors, status }) => {
                     Mot de passe oublié ?
                   </Link>
                 </div>
-                <Input
-                  id="password"
-                  type="password"
-                  value={data.password}
-                  onChange={(e) => setData('password', e.target.value)}
-                  required
-                  className={`h-11 rounded-lg ${errors.password ? 'border-sabc-error' : 'border-sabc-gray-200'}`}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={data.password}
+                    onChange={(e) => setData('password', e.target.value)}
+                    required
+                    className={`h-11 rounded-lg pr-12 ${errors.password ? 'border-sabc-error' : 'border-sabc-gray-200'}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-3 flex items-center text-sabc-gray-500 hover:text-sabc-gray-700"
+                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
                 {errors.password && (
                   <p className="text-sm text-sabc-error font-medium">{errors.password}</p>
                 )}

@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Business\BusinessModel;
-use App\Services\IdGeneratorService;
 
 class PeriodeEvaluation extends Model
 {
@@ -37,14 +36,14 @@ class PeriodeEvaluation extends Model
      *
      * @var bool
      */
-    public $incrementing = false;
+    public $incrementing = true;
     
     /**
      * Le type de données de la clé primaire.
      *
      * @var string
      */
-    protected $keyType = 'string';
+    protected $keyType = 'int';
     
     /**
      * Les attributs qui sont assignables en masse.
@@ -53,13 +52,27 @@ class PeriodeEvaluation extends Model
      */
     protected $fillable = [
         'id_periode',
+        'code_periode',
+        'nom_periode',
         'titre',
         'description',
         'date_debut',
         'date_fin',
         'statut',
         'id_regle',
-        'id_region',
+        'est_ouverte',
+        'est_cloturee',
+        'rappels_envoyes',
+        'derniere_notification',
+        'statistiques_json',
+        'nb_evaluations_attendues',
+        'nb_evaluations_completees',
+        'taux_completion',
+        'duree_rappels_jours',
+        'nb_max_rappels',
+        'escalade_automatique',
+        'validateur_dr_matricule',
+        'date_validation_dr',
         'parametres_json',
     ];
     
@@ -72,6 +85,17 @@ class PeriodeEvaluation extends Model
         'date_debut' => 'date',
         'date_fin' => 'date',
         'parametres_json' => 'json',
+        'est_ouverte' => 'boolean',
+        'est_cloturee' => 'boolean',
+        'rappels_envoyes' => 'json',
+        'statistiques_json' => 'json',
+        'nb_evaluations_attendues' => 'integer',
+        'nb_evaluations_completees' => 'integer',
+        'taux_completion' => 'float',
+        'duree_rappels_jours' => 'integer',
+        'nb_max_rappels' => 'integer',
+        'escalade_automatique' => 'boolean',
+        'date_validation_dr' => 'datetime',
     ];
     
     /**
@@ -80,13 +104,6 @@ class PeriodeEvaluation extends Model
     protected static function boot()
     {
         parent::boot();
-        
-        static::creating(function ($model) {
-            if (empty($model->id_periode)) {
-                $idGenerator = new IdGeneratorService();
-                $model->id_periode = $idGenerator->generateId('periodes_evaluation');
-            }
-        });
     }
     
     /**
@@ -100,11 +117,6 @@ class PeriodeEvaluation extends Model
     /**
      * Relation avec la région concernée
      */
-    public function region()
-    {
-        return $this->belongsTo(Region::class, 'id_region');
-    }
-    
     /**
      * Relation avec les évaluations de cette période
      */
@@ -121,9 +133,16 @@ class PeriodeEvaluation extends Model
     public function estActive(): bool
     {
         $now = now();
-        return $this->statut === 'active' && 
-               $now->greaterThanOrEqualTo($this->date_debut) && 
-               $now->lessThanOrEqualTo($this->date_fin);
+
+        if ($this->est_cloturee) {
+            return false;
+        }
+
+        if (! $this->est_ouverte) {
+            return false;
+        }
+
+        return $now->greaterThanOrEqualTo($this->date_debut) && $now->lessThanOrEqualTo($this->date_fin);
     }
     
     /**
@@ -133,7 +152,7 @@ class PeriodeEvaluation extends Model
      */
     public function estTerminee(): bool
     {
-        return $this->statut === 'terminee' || now()->greaterThan($this->date_fin);
+        return $this->est_cloturee || now()->greaterThan($this->date_fin);
     }
     
     /**

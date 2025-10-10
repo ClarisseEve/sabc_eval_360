@@ -1,7 +1,8 @@
-import React from 'react';
-import { Badge } from '@/Components/UI/Badge';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
-import { Network } from 'lucide-react';
+import { Minus, Network, Plus, RotateCcw, Users, Maximize2, ZoomIn, ZoomOut, Move, X } from 'lucide-react';
+import { cn } from '@/utils/helpers';
+import './HierarchyTree.css';
 
 export interface HierarchyNode {
   id: string;
@@ -17,6 +18,8 @@ export interface HierarchyNode {
     branche?: string;
     statut?: string;
   };
+  manager?: string | null;
+  manager_role?: string | null;
 }
 
 export interface HierarchyTreeProps {
@@ -38,7 +41,21 @@ const HierarchyTree: React.FC<HierarchyTreeProps> = ({
   variant = 'roles',
   className = ''
 }) => {
-  const getNodeColor = (niveau: number, variant: HierarchyVariant): string => {
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [scale, setScale] = useState(1);
+  const [isDragging, setDragging] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const dragOrigin = useRef({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const previousNodesRef = useRef<HierarchyNode[] | null>(null);
+
+  const MIN_SCALE = 0.3;
+  const MAX_SCALE = 2.5;
+  const ZOOM_STEP = 0.1;
+
+  const getNodeAccent = (niveau: number, currentVariant: HierarchyVariant): string => {
     const colorMaps: Record<HierarchyVariant, Partial<Record<number, string>>> = {
       taniere: {
         1: 'bg-sabc-red-primary',
@@ -68,142 +85,452 @@ const HierarchyTree: React.FC<HierarchyTreeProps> = ({
       }
     };
 
-    return colorMaps[variant]?.[niveau] || 'bg-sabc-gray-400';
+    return colorMaps[currentVariant]?.[niveau] || 'bg-sabc-red-primary';
   };
 
-  const getIndentation = (niveau: number): string => {
-    return `ml-${Math.max(0, (niveau - 1) * 5)}`;
-  };
+  const renderNode = (node: HierarchyNode, depth = 0, path = 'root'): React.ReactElement => {
+    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+    const accentClass = getNodeAccent(node.niveau, variant);
+    const nodeKey = `${path}-${node.id}-${depth}`;
+    const isRoot = depth === 0;
 
-  const renderNode = (node: HierarchyNode, depth: number = 0): React.ReactElement => {
-    const indentationClass = depth > 0 ? `ml-${Math.min(depth * 6, 24)}` : '';
-    const colorClass = getNodeColor(node.niveau, variant);
-    const hasChildren = node.children && node.children.length > 0;
+    const metadataPills: React.ReactNode[] = [];
+    if (showMetadata && node.metadata) {
+      if (node.metadata.utilisateurs_count !== undefined) {
+        metadataPills.push(
+          <span key="utilisateurs" className="org-pill">
+            {node.metadata.utilisateurs_count} collaborateurs
+          </span>
+        );
+      }
+      if (node.metadata.region) {
+        metadataPills.push(
+          <span key="region" className="org-pill subtle">
+            {node.metadata.region}
+          </span>
+        );
+      }
+      if (node.metadata.statut) {
+        metadataPills.push(
+          <span key="statut" className="org-pill subtle">
+            {node.metadata.statut}
+          </span>
+        );
+      }
+    }
+
+    const managerLabel = node.manager ? node.manager : 'Poste vacant';
+    const managerRole = node.manager_role ? node.manager_role : undefined;
+
+    const nodeClasses = cn('org-node', {
+      'org-node-root': isRoot,
+      'org-node-region': isRoot,
+    });
+
+    const roleLabel = managerRole ?? 'Rôle non défini';
+
+    const nodeCard = (
+      <div className="org-card">
+        <div className={cn('org-avatar', accentClass)}>
+          <Users className="h-4 w-4" />
+        </div>
+        <div className="org-info">
+          <span className="org-name">{node.nom}</span>
+          <div className="org-responsable">
+            <span className="org-role-label">{roleLabel}</span>
+            <span className={cn('org-person', !node.manager && 'org-person-empty')}>
+              {managerLabel}
+            </span>
+          </div>
+          {node.description && <span className="org-description">{node.description}</span>}
+        </div>
+        {metadataPills.length > 0 && <div className="org-meta">{metadataPills}</div>}
+      </div>
+    );
+
+    const childrenList = hasChildren ? (
+      <ul className="org-level">
+        {node.children!.map((child, index) =>
+          renderNode(child, depth + 1, `${nodeKey}-${index}`)
+        )}
+      </ul>
+    ) : null;
+
+    const content = (
+      <>
+        {nodeCard}
+        {childrenList}
+      </>
+    );
 
     return (
-      <div key={node.id} className="relative">
-        {/* Ligne de connexion verticale */}
-        {depth > 0 && (
-          <div className="absolute left-[-12px] top-0 bottom-0 w-px bg-sabc-gray-200"></div>
-        )}
-        
-        {/* Ligne de connexion horizontale */}
-        {depth > 0 && (
-          <div className="absolute left-[-12px] top-6 w-3 h-px bg-sabc-gray-200"></div>
-        )}
-
-        <div className={`relative ${indentationClass} mb-4`}>
-          {/* Card moderne pour chaque nœud */}
-          <div className="group relative bg-white rounded-xl border border-sabc-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-4">
-            {/* Indicateur de niveau avec gradient */}
-            <div className={`absolute left-0 top-0 bottom-0 w-1 ${colorClass} rounded-l-xl`}></div>
-            
-            {/* Contenu principal */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {/* Icône de niveau avec animation */}
-                <div className={`w-8 h-8 ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm group-hover:scale-110 transition-transform duration-200`}>
-                  {node.niveau}
-                </div>
-                
-                {/* Informations du rôle */}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={node.badge_variant || 'default'} className="font-medium">
-                      {node.nom}
-                    </Badge>
-                    {hasChildren && (
-                      <div className="flex items-center text-sabc-gray-400">
-                        <span className="text-xs">({node.children!.length} sous-rôles)</span>
-                      </div>
-                    )}
-                  </div>
-                  {node.description && (
-                    <p className="text-sm text-sabc-gray-600 mt-1">{node.description}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Métadonnées avec design amélioré */}
-              {showMetadata && node.metadata && (
-                <div className="flex items-center gap-2">
-                  {node.metadata.utilisateurs_count !== undefined && (
-                    <div className="bg-sabc-gray-50 px-3 py-1 rounded-full">
-                      <span className="text-xs font-medium text-sabc-gray-700">
-                        {node.metadata.utilisateurs_count} utilisateurs
-                      </span>
-                    </div>
-                  )}
-                  {node.metadata.statut && (
-                    <Badge 
-                      variant={node.metadata.statut === 'actif' ? 'default' : 'secondary'} 
-                      className="text-xs"
-                    >
-                      {node.metadata.statut}
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        
-        {/* Rendu récursif des enfants avec espacement amélioré */}
-        {hasChildren && (
-          <div className="ml-6 space-y-0">
-            {node.children!.map((child, index) => (
-              <div key={`${node.id}-child-${child.id}-${index}`}>
-                {renderNode(child, depth + 1)}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <li
+        key={nodeKey}
+        className={nodeClasses}
+      >
+        {isRoot ? <div className="org-region-frame">{content}</div> : content}
+      </li>
     );
   };
 
-  const getBackgroundClass = (): string => {
-    switch (variant) {
-      case 'taniere':
-        return 'bg-sabc-gray-50';
-      case 'non-taniere':
-        return 'bg-sabc-accent-light';
-      case 'roles':
-        return 'bg-sabc-gray-50';
-      case 'users':
-        return 'bg-sabc-red-light';
-      default:
-        return 'bg-sabc-gray-50';
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    setHasInteracted(true);
+    setDragging(true);
+    dragOrigin.current = {
+      x: event.clientX - pan.x,
+      y: event.clientY - pan.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    setHasInteracted(true);
+    setPan({
+      x: event.clientX - dragOrigin.current.x,
+      y: event.clientY - dragOrigin.current.y,
+    });
+  };
+
+  const stopDragging = (event: React.PointerEvent<HTMLDivElement>) => {
+    setDragging(false);
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch (error) {
+      // ignore
     }
   };
 
-  return (
-    <Card className={`${className} overflow-hidden`}>
-      <CardHeader className="bg-gradient-to-r from-sabc-red-primary to-sabc-accent text-white">
-        <CardTitle className="flex items-center gap-3">
-          <div className="p-2 bg-white/20 rounded-lg">
-            <Network className="h-6 w-6" />
-          </div>
+  const clampScale = useCallback(
+    (value: number) => Math.min(Math.max(value, MIN_SCALE), MAX_SCALE),
+    [MIN_SCALE, MAX_SCALE]
+  );
+
+  const adjustScale = useCallback(
+    (direction: number, anchor?: { x: number; y: number }) => {
+      setHasInteracted(true);
+      const scaleDelta = direction * ZOOM_STEP;
+      setScale((previousScale) => {
+        const nextScale = clampScale(previousScale + scaleDelta);
+        const scaleChanged = nextScale !== previousScale;
+
+        if (scaleChanged && containerRef.current) {
+          const fallbackAnchor = anchor
+            ? undefined
+            : {
+                x: containerRef.current.clientWidth / 2,
+                y: containerRef.current.clientHeight / 2,
+              };
+          const effectiveAnchor = anchor ?? fallbackAnchor;
+
+          if (effectiveAnchor) {
+            const { x, y } = effectiveAnchor;
+            setPan((previousPan) => {
+              const contentX = (x - previousPan.x) / previousScale;
+              const contentY = (y - previousPan.y) / previousScale;
+              return {
+                x: x - contentX * nextScale,
+                y: y - contentY * nextScale,
+              };
+            });
+          }
+        }
+
+        return nextScale;
+      });
+    },
+    [clampScale, ZOOM_STEP]
+  );
+
+  const handleWheel = useCallback(
+    (event: WheelEvent) => {
+      if (!containerRef.current) {
+        return;
+      }
+
+      if (!event.cancelable) {
+        return;
+      }
+
+      const isZoomGesture = event.ctrlKey || event.metaKey;
+      if (isZoomGesture) {
+        event.preventDefault();
+        const rect = containerRef.current.getBoundingClientRect();
+        const anchor = {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        };
+        const direction = event.deltaY < 0 ? 1 : -1;
+        const intensity = Math.min(Math.abs(event.deltaY) / 120, 4);
+        adjustScale(direction * (1 + intensity), anchor);
+        return;
+      }
+
+      event.preventDefault();
+      setHasInteracted(true);
+      setPan((previousPan) => ({
+        x: previousPan.x - event.deltaX,
+        y: previousPan.y - event.deltaY,
+      }));
+    },
+    [adjustScale]
+  );
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) {
+      return;
+    }
+
+    element.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      element.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel]);
+
+  const handleZoomIn = () => adjustScale(1);
+  const handleZoomOut = () => adjustScale(-1);
+  const handleResetView = () => {
+    setPan({ x: 0, y: 0 });
+    setScale(1);
+    setHasInteracted(false);
+  };
+
+  const wrapperClass = cn('org-tree-wrapper', { 
+    dragging: isDragging,
+    fullscreen: isFullscreen
+  });
+  const zoomPercentage = Math.round(scale * 100);
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+    setHasInteracted(false); // Reset pour recentrer
+  };
+
+  // Fermer avec Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        toggleFullscreen();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isFullscreen]);
+
+  const fitContentToContainer = useCallback(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+
+    if (!container || !content) {
+      return;
+    }
+
+    const contentWidth = content.offsetWidth;
+    const contentHeight = content.offsetHeight;
+
+    if (contentWidth === 0 || contentHeight === 0) {
+      return;
+    }
+
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+
+    const padding = 48;
+    const availableWidth = Math.max(containerWidth - padding, 0);
+    const availableHeight = Math.max(containerHeight - padding, 0);
+
+    const scaleX = availableWidth / contentWidth;
+    const scaleY = availableHeight / contentHeight;
+    const targetScale = clampScale(Math.min(scaleX, scaleY, 1));
+
+    setScale((previousScale) =>
+      Math.abs(previousScale - targetScale) > 0.001 ? targetScale : previousScale
+    );
+
+    const nextPan = {
+      x: (containerWidth - contentWidth * targetScale) / 2,
+      y: (containerHeight - contentHeight * targetScale) / 2,
+    };
+
+    setPan((previousPan) => {
+      const deltaX = Math.abs(previousPan.x - nextPan.x);
+      const deltaY = Math.abs(previousPan.y - nextPan.y);
+
+      if (deltaX > 0.5 || deltaY > 0.5) {
+        return nextPan;
+      }
+
+      return previousPan;
+    });
+  }, [clampScale]);
+
+  useLayoutEffect(() => {
+    if (previousNodesRef.current !== nodes) {
+      previousNodesRef.current = nodes;
+      setHasInteracted(false);
+    }
+  }, [nodes]);
+
+  useLayoutEffect(() => {
+    if (hasInteracted) {
+      return;
+    }
+
+    fitContentToContainer();
+  }, [fitContentToContainer, hasInteracted, nodes]);
+
+  useLayoutEffect(() => {
+    if (typeof ResizeObserver === 'undefined') {
+      if (!hasInteracted) {
+        fitContentToContainer();
+      }
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (!hasInteracted) {
+        fitContentToContainer();
+      }
+    });
+
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [fitContentToContainer, hasInteracted]);
+
+  const renderCanvas = () => (
+    <div
+      ref={containerRef}
+      className={wrapperClass}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={stopDragging}
+      onPointerLeave={stopDragging}
+      onPointerCancel={stopDragging}
+    >
+      {/* Titre flottant sticky */}
+      <div className="org-title">
+        <div className="flex items-center gap-2">
+          <Network className="h-5 w-5 text-sabc-red-primary" />
           <div>
-            <h3 className="text-lg font-bold">{title}</h3>
+            <h3 className="text-base font-bold text-sabc-gray-900 dark:text-white">{title}</h3>
             {subtitle && (
-              <p className="text-sm text-white/90 mt-1">{subtitle}</p>
+              <p className="text-xs text-sabc-gray-600 dark:text-sabc-gray-400">{subtitle}</p>
             )}
           </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className={`${getBackgroundClass()} p-6 min-h-[400px]`}>
-          <div className="space-y-0">
-            {nodes.map((node, index) => (
-              <div key={`root-${node.id}-${index}`}>
-                {renderNode(node)}
-              </div>
-            ))}
+        </div>
+      </div>
+
+      {/* Contrôles avec pointer-events */}
+      <div className="org-controls" onPointerDown={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="org-control-btn group relative"
+          onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label="Zoom arrière"
+          title="Zoom arrière"
+        >
+          <ZoomOut className="h-4 w-4" />
+          <span className="org-tooltip">Zoom arrière</span>
+        </button>
+        <span className="org-control-scale">{zoomPercentage}%</span>
+        <button
+          type="button"
+          className="org-control-btn group relative"
+          onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label="Zoom avant"
+          title="Zoom avant"
+        >
+          <ZoomIn className="h-4 w-4" />
+          <span className="org-tooltip">Zoom avant</span>
+        </button>
+        <button
+          type="button"
+          className="org-control-btn reset group relative"
+          onClick={(e) => { e.stopPropagation(); handleResetView(); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label="Réinitialiser"
+          title="Réinitialiser la vue"
+        >
+          <RotateCcw className="h-4 w-4" />
+          <span className="org-tooltip">Réinitialiser</span>
+        </button>
+        <button
+          type="button"
+          className={cn("org-control-btn group relative", isFullscreen && "bg-sabc-red-primary/10")}
+          onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label={isFullscreen ? "Fermer plein écran" : "Plein écran"}
+          title={isFullscreen ? "Fermer plein écran" : "Afficher en plein écran"}
+        >
+          {isFullscreen ? (
+            <>
+              <X className="h-4 w-4 text-sabc-red-primary" />
+              <span className="org-tooltip">Fermer</span>
+            </>
+          ) : (
+            <>
+              <Maximize2 className="h-4 w-4" />
+              <span className="org-tooltip">Plein écran</span>
+            </>
+          )}
+        </button>
+      </div>
+      <div className="org-instructions">
+        <Move className="h-4 w-4" />
+        <span>Glissez pour déplacer • Ctrl/Cmd + Molette pour zoomer</span>
+      </div>
+      <div
+        className="org-tree"
+        style={{ transform: `translate3d(${pan.x}px, ${pan.y}px, 0)` }}
+      >
+        <div
+          className="org-tree-content"
+          ref={contentRef}
+          style={{ transform: `scale(${scale})` }}
+        >
+          <ul className="org-level org-root">
+            {nodes.map((node, index) => renderNode(node, 0, `root-${index}`))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <Card className={cn('overflow-hidden max-w-full', className)}>
+        <CardContent className="p-0">
+          {renderCanvas()}
+        </CardContent>
+      </Card>
+
+      {/* Modal Plein écran */}
+      {isFullscreen && (
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md">
+          <div className="h-full w-full p-4">
+            <div className="h-full w-full bg-white dark:bg-sabc-gray-900 rounded-lg overflow-hidden">
+              {renderCanvas()}
+            </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </>
   );
 };
 
@@ -215,7 +542,9 @@ export const SABC_HIERARCHY_DATA = {
       nom: 'DR - Directeur Régional',
       niveau: 1,
       type: 'role' as const,
-      description: 'Niveau 1',
+      description: 'Structure pilote',
+      manager: 'Poste vacant',
+      manager_role: 'Directeur Régional',
       badge_variant: 'destructive' as const,
       children: [
         {
@@ -223,7 +552,9 @@ export const SABC_HIERARCHY_DATA = {
           nom: 'CDTT - Chef Département Trade',
           niveau: 2,
           type: 'role' as const,
-          description: 'Niveau 2',
+          description: 'Département',
+          manager: 'Poste vacant',
+          manager_role: 'Chef Département Trade',
           badge_variant: 'default' as const,
           children: [
             {
@@ -231,7 +562,9 @@ export const SABC_HIERARCHY_DATA = {
               nom: 'CSC - Chef Service Commercial',
               niveau: 3,
               type: 'role' as const,
-              description: 'Niveau 3',
+              description: 'Service',
+              manager: 'Poste vacant',
+              manager_role: 'Chef Service Commercial',
               badge_variant: 'outline' as const,
               children: [
                 {
@@ -239,7 +572,9 @@ export const SABC_HIERARCHY_DATA = {
                   nom: 'CDV - Chef District Vente',
                   niveau: 4,
                   type: 'role' as const,
-                  description: 'Niveau 4',
+                  description: 'District',
+                  manager: 'Poste vacant',
+                  manager_role: 'Chef District Vente',
                   badge_variant: 'secondary' as const,
                   children: [
                     {
@@ -247,7 +582,9 @@ export const SABC_HIERARCHY_DATA = {
                       nom: 'CDS - Chef de Secteur',
                       niveau: 5,
                       type: 'role' as const,
-                      description: 'Niveau 5',
+                      description: 'Secteur',
+                      manager: 'Poste vacant',
+                      manager_role: 'Chef de Secteur',
                       badge_variant: 'outline' as const
                     }
                   ]
@@ -259,7 +596,9 @@ export const SABC_HIERARCHY_DATA = {
               nom: 'RTM - Regional Trade Marketing',
               niveau: 3,
               type: 'role' as const,
-              description: 'Niveau 3',
+              description: 'Marketing régional',
+              manager: 'Poste vacant',
+              manager_role: 'Regional Trade Marketing',
               badge_variant: 'outline' as const,
               children: [
                 {
@@ -267,7 +606,9 @@ export const SABC_HIERARCHY_DATA = {
                   nom: 'TMO - Trade Marketing Operator',
                   niveau: 4,
                   type: 'role' as const,
-                  description: 'Niveau 4',
+                  description: 'Opérations terrain',
+                  manager: 'Poste vacant',
+                  manager_role: 'Trade Marketing Operator',
                   badge_variant: 'secondary' as const
                 }
               ]

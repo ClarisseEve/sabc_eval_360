@@ -41,16 +41,13 @@ trait FormatsUserData
         }
         
         return [
-            'name' => $this->getDisplayName($user),
-            'email' => $user->email ?? '',
-            'role' => $user->role_nom ?? '',
             'matricule' => $user->matricule,
-            'region' => $user->region_nom ?? '',
-            'branche' => $user->branche_nom ?? '',
-            'avatar' => $user->avatar ?? null,
-            'full_name' => trim(($user->prenom ?? '') . ' ' . ($user->nom ?? '')),
-            'display_name' => $this->getDisplayName($user),
+            'name' => $this->getDisplayName($user),
+            'initials' => $this->getInitials($user),
+            'role' => $user->role_nom,
             'role_display' => $this->getRoleDisplay($user->role_nom),
+            'avatar' => $user->avatar ?? null,
+            'is_admin' => (bool) $user->est_admin,
         ];
     }
     
@@ -109,6 +106,23 @@ trait FormatsUserData
         ];
         
         return $roleMapping[$roleNom] ?? $roleNom;
+    }
+
+    /**
+     * Retourne les initiales de l'utilisateur.
+     */
+    private function getInitials(Utilisateur $user): string
+    {
+        $parts = array_filter([
+            $user->prenom ? strtoupper(substr($user->prenom, 0, 1)) : null,
+            $user->nom ? strtoupper(substr($user->nom, 0, 1)) : null,
+        ]);
+
+        if (empty($parts)) {
+            return strtoupper(substr($user->matricule ?? 'U', 0, 2));
+        }
+
+        return implode('', $parts);
     }
     
     /**

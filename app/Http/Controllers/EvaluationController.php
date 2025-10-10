@@ -12,11 +12,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Traits\FormatsUserData;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Http\RedirectResponse;
 
 class EvaluationController extends Controller
 {
+    use FormatsUserData;
     protected EvaluationService $evaluationService;
 
     public function __construct(EvaluationService $evaluationService)
@@ -93,7 +96,7 @@ class EvaluationController extends Controller
     /**
      * Page d'accueil des évaluations
      */
-    public function index(): Response
+    public function index(): Response|RedirectResponse
     {
         // Par défaut, rediriger vers "Mes évaluations" pour éviter la page vide
         return redirect()->route('evaluations.mine');
@@ -131,7 +134,7 @@ class EvaluationController extends Controller
         return Inertia::render('Common/Evaluations/Mine', [
             'templates' => $templates,
             'evaluationTargets' => $evaluationTargets,
-            'user' => $utilisateur
+            'user' => $utilisateur ? $this->formatUserForUI($utilisateur) : null,
         ]);
     }
 
@@ -147,7 +150,7 @@ class EvaluationController extends Controller
         
         return Inertia::render('Common/Evaluations/Pending', [
             'evaluations' => $pendingEvaluations,
-            'user' => $utilisateur
+            'user' => $utilisateur ? $this->formatUserForUI($utilisateur) : null,
         ]);
     }
 
@@ -303,6 +306,80 @@ class EvaluationController extends Controller
             'evaluation' => $evaluation,
             'user' => $utilisateur
         ]);
+    }
+
+    /**
+     * Mise à jour d'un brouillon d'évaluation ou soumission finale.
+     */
+    public function update(Request $request, string $id)
+    {
+        $utilisateur = Auth::user();
+        if (!$utilisateur) {
+            abort(401);
+        }
+
+        $evaluation = DB::connection('pgsql')
+            ->table('evaluations')
+            ->where('id_evaluation', $id)
+            ->first();
+
+        if (!$evaluation) {
+            abort(404, 'Évaluation introuvable');
+        }
+
+        if (($evaluation->evaluateur_matricule ?? $evaluation->evaluateur_id ?? null) !== $utilisateur->matricule) {
+            abort(403, 'Vous n\'êtes pas autorisé à modifier cette évaluation');
+        }
+
+        if (($evaluation->statut ?? 'brouillon') !== 'brouillon') {
+            abort(403, "Seules les évaluations en brouillon peuvent être modifiées");
+        }
+
+        $validated = $request->validate([
+            'notes' => ['required', 'array', 'min:1'],
+            'notes.*.note' => ['required', 'integer', 'between:1,5'],
+            'notes.*.commentaire' => ['nullable', 'string'],
+            'commentaire_general' => ['nullable', 'string'],
+            'submit' => ['required', 'boolean'],
+        ]);
+
+        $notes = collect($validated['notes'])
+            ->map(function ($note) {
+                return [
+                    'id' => $note['id'] ?? null,
+                    'note' => (int) $note['note'],
+                    'commentaire' => $note['commentaire'] ?? null,
+                ];
+            })
+            ->values()
+            ->all();
+
+        $noteGlobale = count($notes) > 0
+            ? round(collect($notes)->avg(fn ($item) => (int) $item['note']), 2)
+            : null;
+
+        $statut = $validated['submit'] ? 'soumis' : 'brouillon';
+        $dateSoumission = $validated['submit'] ? now() : null;
+
+        DB::connection('pgsql')
+            ->table('evaluations')
+            ->where('id_evaluation', $id)
+            ->update([
+                'notations_json' => json_encode($notes),
+                'commentaire_general' => $validated['commentaire_general'] ?? null,
+                'note_globale' => $noteGlobale,
+                'statut' => $statut,
+                'date_soumission' => $dateSoumission,
+                'updated_at' => now(),
+            ]);
+
+        return $validated['submit']
+            ? redirect()
+                ->route('evaluations.show', ['id' => $id])
+                ->with('success', "Évaluation soumise pour validation")
+            : redirect()
+                ->route('evaluations.edit', ['id' => $id])
+                ->with('success', 'Brouillon enregistré');
     }
     
     /**

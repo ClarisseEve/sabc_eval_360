@@ -32,6 +32,7 @@ export type AppRoutes = {
   'settings.password': undefined;
   'settings.password.update': undefined;
   'settings.notifications': undefined;
+  'profile.destroy': undefined;
   'admin.remplacements.index': undefined;
   'admin.remplacements.create': undefined;
   'admin.remplacements.store': undefined;

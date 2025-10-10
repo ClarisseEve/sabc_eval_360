@@ -101,6 +101,10 @@ class IdGeneratorService
             'id_field' => 'id_type',
             'format' => 'XX'
         ],
+        'notifications_utilisateurs' => [
+            'id_field' => 'id_notification',
+            'format' => 'XXX'
+        ],
     ];
     
     /**
