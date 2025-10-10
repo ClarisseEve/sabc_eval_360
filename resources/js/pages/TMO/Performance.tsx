@@ -1,8 +1,8 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import AppLayout from '@/components/layout/app/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card/Card';
-import { BarChart } from '@/components/ui/charts/BarChart';
+import AppLayout from '@/Components/Layout/app/AppLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { BarChart } from '@/Components/UI/Charts/BarChart';
 
 interface PerformanceProps {
   auth: {
@@ -14,17 +14,15 @@ interface PerformanceProps {
  * Page de performance pour le Trade Marketing Operator (TMO)
  */
 export default function Performance({ auth }: PerformanceProps) {
-  // Données d'exemple pour le graphique
-  const performanceData = {
-    labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'],
-    datasets: [
-      {
-        label: 'Performance',
-        data: [65, 72, 78, 75, 82, 88],
-        backgroundColor: '#E53E3E',
-      }
-    ],
-  };
+  // Données d'exemple pour le graphique (format Recharts)
+  const performanceData = [
+    { name: 'Jan', performance: 65 },
+    { name: 'Fév', performance: 72 },
+    { name: 'Mar', performance: 78 },
+    { name: 'Avr', performance: 75 },
+    { name: 'Mai', performance: 82 },
+    { name: 'Juin', performance: 88 },
+  ];
 
   return (
     <AppLayout user={auth.user}>
@@ -36,7 +34,13 @@ export default function Performance({ auth }: PerformanceProps) {
         <CardContent>
           <p className="text-gray-600 mb-6">Suivi de vos performances d'évaluation.</p>
           <div className="h-80">
-            <BarChart data={performanceData} />
+            <BarChart 
+              data={performanceData}
+              xAxisDataKey="name"
+              bars={[
+                { dataKey: 'performance', name: 'Performance', color: '#E53E3E' }
+              ]}
+            />
           </div>
         </CardContent>
       </Card>

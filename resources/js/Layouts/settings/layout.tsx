@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { Card } from '@/components/ui/card/Card';
+import { Card } from '@/Components/UI/Card/Card';
 import { cn } from '@/lib/utils';
 
 interface SettingsLayoutProps {

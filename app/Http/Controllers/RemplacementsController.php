@@ -167,7 +167,7 @@ class RemplacementsController extends Controller
         return [
             'title' => $title,
             'breadcrumbs' => $breadcrumbs,
-            'user' => $this->formatUserData($user),
+            'user' => $this->formatUserForUI($user),
         ];
     }
 }

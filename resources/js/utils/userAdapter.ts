@@ -29,11 +29,25 @@ export const adaptUserForLayout = (user: AuthUser | null | undefined): {
     };
   }
 
+  const formattedName = `${user.prenom ?? ''} ${user.nom ?? ''}`.trim();
+  const displayName = formattedName
+    || user.name
+    || user.email
+    || user.matricule
+    || '';
+
+  const roleCandidates = [user.role_nom, user.role]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter((value) => value.length > 0);
+  const roleValue = roleCandidates.length > 0 ? roleCandidates.join(' / ') : '';
+
+  const avatar = user.avatar ?? (user as any).photo_url ?? undefined;
+
   return {
-    name: `${user.nom || ''} ${user.prenom || ''}`.trim(),
+    name: displayName,
     email: user.email || '',
-    role: user.role_nom || '',
-    avatar: user.avatar,
+    role: roleValue,
+    avatar,
   };
 };
 

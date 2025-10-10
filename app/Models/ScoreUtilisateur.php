@@ -3,19 +3,18 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Models\Analytics\AnalyticsModel;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Model;
 
-class ScoreUtilisateur extends AnalyticsModel
+class ScoreUtilisateur extends Model
 {
     use HasFactory;
     
     /**
-     * Spécifie la connexion ClickHouse (ANALYTICS) selon architecture SABC
+     * Spécifie la connexion principale (MySQL) pour les scores utilisateurs.
      *
      * @var string
      */
-    protected $connection = 'clickhouse';
+    protected $connection = 'mysql';
     
     /**
      * La table associée au modèle.
@@ -29,8 +28,9 @@ class ScoreUtilisateur extends AnalyticsModel
      *
      * @var array
      */
-    protected $primaryKey = ['matricule', 'periode_evaluation'];
+    protected $primaryKey = null;
     public $incrementing = false;
+    protected $keyType = 'string';
     
     /**
      * Les attributs assignables selon règles métier SABC
@@ -39,24 +39,17 @@ class ScoreUtilisateur extends AnalyticsModel
      */
     protected $fillable = [
         'matricule',
-        'periode_evaluation',
+        'id_periode',
         'score_global',
+        'score_auto',
         'score_auto_evaluation',
         'score_pairs',
         'score_manager',
         'progression_vs_precedente',
-        'score_precedent',
         'nb_evaluations_recues',
         'nb_evaluations_donnees',
-        'nb_auto_evaluations',
-        'scores_par_critere',
-        'evolution_par_critere',
-        'statut_calcul',
-        'date_calcul',
-        'id_region',
-        'score_normalise_region',
-        'percentile_region',
-        'derniere_mise_a_jour'
+        'position_equipe',
+        'derniere_maj'
     ];
     
     /**
@@ -65,12 +58,12 @@ class ScoreUtilisateur extends AnalyticsModel
      * @var array<string, string>
      */
     protected $casts = [
-        'score_auto_evaluation' => 'float',
+        'score_auto' => 'float',
         'score_pairs' => 'float',
         'score_manager' => 'float',
         'score_global' => 'float',
-        'details_scores_json' => 'json',
-        'date_calcul' => 'datetime',
+        'progression_vs_precedente' => 'float',
+        'derniere_maj' => 'datetime',
     ];
     
     /**
@@ -78,7 +71,7 @@ class ScoreUtilisateur extends AnalyticsModel
      */
     public function utilisateur()
     {
-        return $this->belongsTo(Utilisateur::class, 'id_utilisateur');
+        return $this->belongsTo(Utilisateur::class, 'matricule', 'matricule');
     }
     
     /**
@@ -86,7 +79,7 @@ class ScoreUtilisateur extends AnalyticsModel
      */
     public function periode()
     {
-        return $this->belongsTo(PeriodeEvaluation::class, 'id_periode');
+        return $this->belongsTo(PeriodeEvaluation::class, 'id_periode', 'id_periode');
     }
     
     /**
@@ -97,7 +90,7 @@ class ScoreUtilisateur extends AnalyticsModel
      */
     public function calculerScoreGlobal(): float
     {
-        $scoreAuto = $this->score_auto_evaluation ?? 0;
+        $scoreAuto = $this->score_auto ?? 0;
         $scorePairs = $this->score_pairs ?? 0;
         $scoreManager = $this->score_manager ?? 0;
         
@@ -113,7 +106,7 @@ class ScoreUtilisateur extends AnalyticsModel
     public function mettreAJourScoreGlobal(): void
     {
         $this->score_global = $this->calculerScoreGlobal();
-        $this->date_calcul = now();
+        $this->derniere_maj = now();
         $this->save();
     }
     
@@ -124,7 +117,7 @@ class ScoreUtilisateur extends AnalyticsModel
      */
     public function getDetailsScores(): array
     {
-        return $this->details_scores_json ?? [];
+        return [];
     }
     
     /**
@@ -146,7 +139,7 @@ class ScoreUtilisateur extends AnalyticsModel
      */
     public function getEvolutionScore(): ?float
     {
-        $scorePrecedent = static::where('id_utilisateur', $this->id_utilisateur)
+        $scorePrecedent = static::where('matricule', $this->matricule)
             ->where('id_periode', '<', $this->id_periode)
             ->orderBy('id_periode', 'desc')
             ->first();
@@ -163,7 +156,7 @@ class ScoreUtilisateur extends AnalyticsModel
      */
     public function scopeParUtilisateur($query, $idUtilisateur)
     {
-        return $query->where('id_utilisateur', $idUtilisateur);
+        return $query->where('matricule', $idUtilisateur);
     }
     
     /**
@@ -181,5 +174,48 @@ class ScoreUtilisateur extends AnalyticsModel
     {
         return $query->whereNotNull('score_manager')
                     ->where('score_manager', '>', 0);
+    }
+
+    /**
+     * Prépare la clé composite (matricule + id_periode) pour les mises à jour.
+     */
+    protected function setKeysForSaveQuery($query)
+    {
+        $query->where('matricule', $this->getAttribute('matricule'))
+              ->where('id_periode', $this->getAttribute('id_periode'));
+
+        return $query;
+    }
+
+    /**
+     * Accesseur compatible pour l'auto-évaluation.
+     */
+    public function getScoreAutoEvaluationAttribute(): ?float
+    {
+        return $this->score_auto;
+    }
+
+    /**
+     * Mutateur compatible pour l'auto-évaluation.
+     */
+    public function setScoreAutoEvaluationAttribute($value): void
+    {
+        $this->attributes['score_auto'] = $value;
+    }
+
+    /**
+     * Accesseur pour la période (compatibilité avec anciens attributs).
+     */
+    public function getPeriodeEvaluationAttribute(): ?string
+    {
+        return $this->id_periode;
+    }
+
+    /**
+     * Mutateur pour la période (compatibilité).
+     */
+    public function setPeriodeEvaluationAttribute($value): void
+    {
+        $this->attributes['id_periode'] = $value;
     }
 }

@@ -49,7 +49,10 @@ class EvaluationService
         }
         
         // Vérifier l'existence d'une période d'évaluation active
-        $periodeActive = PeriodeEvaluation::where('statut', 'active')->first();
+        $periodeActive = PeriodeEvaluation::where('est_ouverte', true)
+            ->where('est_cloturee', false)
+            ->orderByDesc('date_debut')
+            ->first();
         if (!$periodeActive) {
             return false;
         }
@@ -293,7 +296,9 @@ class EvaluationService
      */
     public function mettreAJourScores(int $idUtilisateur, int $idPeriode): void
     {
-        $evaluationsValidees = Evaluation::where('id_evalue', $idUtilisateur)
+        $matriculeUtilisateur = (string) $idUtilisateur;
+
+        $evaluationsValidees = Evaluation::where('id_evalue', $matriculeUtilisateur)
             ->where('id_periode', $idPeriode)
             ->where('statut', 'valide')
             ->with(['evaluateur.role'])
@@ -311,14 +316,13 @@ class EvaluationService
         // Créer ou mettre à jour le score utilisateur
         $scoreUtilisateur = ScoreUtilisateur::updateOrCreate(
             [
-                'id_utilisateur' => $idUtilisateur,
+                'matricule' => $matriculeUtilisateur,
                 'id_periode' => $idPeriode,
             ],
             [
                 'score_auto_evaluation' => $scoreAutoEvaluation,
                 'score_pairs' => $scorePairs,
                 'score_manager' => $scoreManager,
-                'details_scores_json' => $this->construireDetailsScores($evaluationsValidees),
             ]
         );
         
@@ -525,8 +529,10 @@ class EvaluationService
         $rappelsEnvoyes = 0;
         
         foreach ($evaluationsEnRetard as $evaluation) {
+            $matriculeEvaluateur = optional($evaluation->evaluateur)->matricule ?? (string) $evaluation->id_evaluateur;
+
             Notification::notifierRappelEvaluation(
-                $evaluation->id_evaluateur,
+                $matriculeEvaluateur,
                 $joursRestants
             );
             $rappelsEnvoyes++;

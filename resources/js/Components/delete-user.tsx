@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useForm } from '@inertiajs/react';
-import { Button } from '@/components/ui/button/Button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog/Dialog';
-import { Input } from '@/components/ui/input/Input';
-import { Label } from '@/components/ui/label/Label';
+import { route } from '@/routes';
+import { Button } from '@/Components/UI/Button/Button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/Components/UI/Dialog/Dialog';
+import { Input } from '@/Components/UI/Input/Input';
+import { Label } from '@/Components/UI/Label/Label';
 
 /**
  * Composant pour la suppression de compte utilisateur

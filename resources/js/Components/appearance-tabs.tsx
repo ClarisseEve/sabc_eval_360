@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs/Tabs';
-import { Card, CardContent } from '@/components/ui/card/Card';
-import { Label } from '@/components/ui/label/Label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group/RadioGroup';
-import { Button } from '@/components/ui/button/Button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs/Tabs';
+import { Card, CardContent } from '@/Components/UI/Card/Card';
+import { Label } from '@/Components/UI/Label/Label';
+import { RadioGroup, RadioGroupItem } from '@/Components/UI/radio-group/RadioGroup';
+import { Button } from '@/Components/UI/Button/Button';
 
 /**
  * Composant d'onglets pour les paramètres d'apparence

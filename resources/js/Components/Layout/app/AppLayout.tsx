@@ -44,7 +44,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   // Le titre de la page est maintenant passé directement en prop
 
   return (
-    <div className="flex min-h-screen bg-sabc-gray-50 dark:bg-sabc-gray-900">
+    <div className="flex h-screen max-w-full overflow-hidden bg-sabc-gray-50 dark:bg-sabc-gray-900">
       {/* Sidebar */}
       <Sidebar
         user={user}
@@ -54,7 +54,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       />
       
       {/* Contenu principal */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col max-w-full overflow-y-auto overflow-x-hidden">
         {/* Header flottant */}
         <Header
           user={user}
@@ -67,7 +67,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         
         {/* Contenu de la page */}
         <main className={cn(
-          "flex-1 overflow-auto p-2 md:p-4 lg:p-6",
+          "flex-1 p-2 md:p-4 lg:p-6",
           className
         )}>
           {children}

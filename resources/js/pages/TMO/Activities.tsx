@@ -1,7 +1,7 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import AppLayout from '@/components/layout/app/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card/Card';
+import AppLayout from '@/Components/Layout/app/AppLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 
 interface ActivitiesProps {
   auth: {

@@ -4,8 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
-use App\Models\Business\BusinessModel;
+use App\Services\IdGeneratorService;
+use App\Models\Utilisateur;
 
 class Notification extends Model
 {
@@ -16,14 +18,18 @@ class Notification extends Model
      *
      * @var string
      */
-    protected $connection = 'pgsql';
+    protected $connection = 'mysql';
     
     /**
      * La clé primaire associée à la table.
      *
      * @var string
      */
+    protected $table = 'notifications_utilisateurs';
+
     protected $primaryKey = 'id_notification';
+    public $incrementing = false;
+    protected $keyType = 'string';
     
     /**
      * Les attributs qui sont assignables en masse.
@@ -31,14 +37,19 @@ class Notification extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'id_destinataire',
+        'id_notification',
+        'destinataire_matricule',
         'titre',
         'message',
         'type',
         'est_lu',
-        'date_envoi',
+        'lien',
+        'date_creation',
         'date_lecture',
         'donnees_json',
+        'id_evaluation',
+        'id_remplacement',
+        'expediteur_matricule',
     ];
     
     /**
@@ -48,7 +59,7 @@ class Notification extends Model
      */
     protected $casts = [
         'est_lu' => 'boolean',
-        'date_envoi' => 'datetime',
+        'date_creation' => 'datetime',
         'date_lecture' => 'datetime',
         'donnees_json' => 'json',
     ];
@@ -69,13 +80,13 @@ class Notification extends Model
      */
     public function destinataire()
     {
-        return $this->belongsTo(Utilisateur::class, 'id_destinataire');
+        return $this->belongsTo(Utilisateur::class, 'destinataire_matricule', 'matricule');
     }
     
     /**
      * Crée une notification pour un utilisateur
      * 
-     * @param int $idDestinataire
+     * @param string $destinataireMatricule
      * @param string $titre
      * @param string $message
      * @param string $type
@@ -83,37 +94,43 @@ class Notification extends Model
      * @return Notification
      */
     public static function creer(
-        int $idDestinataire,
+        string $destinataireMatricule,
         string $titre,
         string $message,
         string $type = 'info',
         ?array $donnees = null
     ): Notification {
         try {
+            /** @var IdGeneratorService $idGenerator */
+            $idGenerator = App::make(IdGeneratorService::class);
+            $idNotification = $idGenerator->generateTableId('notifications_utilisateurs');
+
             return static::create([
-                'id_destinataire' => $idDestinataire,
+                'id_notification' => $idNotification,
+                'destinataire_matricule' => $destinataireMatricule,
                 'titre' => $titre,
                 'message' => $message,
                 'type' => $type,
                 'est_lu' => false,
-                'date_envoi' => now(),
+                'date_creation' => now(),
                 'donnees_json' => $donnees,
             ]);
         } catch (\Throwable $e) {
             // Évite l'échec du flux d'évaluation si le schéma Notification n'est pas aligné
             Log::warning('Notification non persistée (schéma non aligné): '.$e->getMessage(), [
-                'destinataire' => $idDestinataire,
+                'destinataire' => $destinataireMatricule,
                 'titre' => $titre,
                 'type' => $type,
             ]);
             // Retourne un modèle en mémoire pour éviter les null checks en chaîne
             $model = new static([
-                'id_destinataire' => $idDestinataire,
+                'id_notification' => $idNotification ?? null,
+                'destinataire_matricule' => $destinataireMatricule,
                 'titre' => $titre,
                 'message' => $message,
                 'type' => $type,
                 'est_lu' => false,
-                'date_envoi' => now(),
+                'date_creation' => now(),
                 'donnees_json' => $donnees,
             ]);
             return $model;
@@ -150,7 +167,7 @@ class Notification extends Model
      */
     public function estRecente(): bool
     {
-        return $this->date_envoi->greaterThan(now()->subDay());
+        return $this->date_creation->greaterThan(now()->subDay());
     }
     
     /**
@@ -166,7 +183,7 @@ class Notification extends Model
      */
     public function scopeParDestinataire($query, $idDestinataire)
     {
-        return $query->where('id_destinataire', $idDestinataire);
+        return $query->where('destinataire_matricule', $idDestinataire);
     }
     
     /**
@@ -182,29 +199,34 @@ class Notification extends Model
      */
     public function scopeRecentes($query, $heures = 24)
     {
-        return $query->where('date_envoi', '>=', now()->subHours($heures));
+        return $query->where('date_creation', '>=', now()->subHours($heures));
     }
-    
+
     /**
      * Notifications spécifiques pour les évaluations
      */
-    public static function notifierNouvelleEvaluation(int $idEvalue, int $idEvaluateur): void
+    public static function notifierNouvelleEvaluation(string $matriculeEvalue, string $matriculeEvaluateur): void
     {
-        $evaluateur = Utilisateur::find($idEvaluateur);
+        $matriculeEvalue = static::resolveMatricule($matriculeEvalue);
+        $matriculeEvaluateur = static::resolveMatricule($matriculeEvaluateur);
+
+        $evaluateur = Utilisateur::where('matricule', $matriculeEvaluateur)->first();
         
         static::creer(
-            $idEvalue,
+            $matriculeEvalue,
             'Nouvelle évaluation reçue',
-            "Vous avez reçu une nouvelle évaluation de {$evaluateur->prenom} {$evaluateur->nom}.",
+            $evaluateur
+                ? "Vous avez reçu une nouvelle évaluation de {$evaluateur->prenom} {$evaluateur->nom}."
+                : 'Vous avez reçu une nouvelle évaluation.',
             'evaluation',
-            ['id_evaluateur' => $idEvaluateur]
+            ['evaluateur' => $matriculeEvaluateur]
         );
     }
-    
+
     /**
      * Notification pour validation d'évaluation
      */
-    public static function notifierValidationEvaluation(int $idEvaluateur, bool $estValidee): void
+    public static function notifierValidationEvaluation(string $matriculeEvaluateur, bool $estValidee): void
     {
         $titre = $estValidee ? 'Évaluation validée' : 'Évaluation rejetée';
         $message = $estValidee 
@@ -212,23 +234,35 @@ class Notification extends Model
             : 'Votre évaluation a été rejetée. Veuillez la corriger et la soumettre à nouveau.';
         
         static::creer(
-            $idEvaluateur,
+            static::resolveMatricule($matriculeEvaluateur),
             $titre,
             $message,
             $estValidee ? 'success' : 'warning'
         );
     }
-    
+
     /**
      * Notification pour rappel d'évaluation
      */
-    public static function notifierRappelEvaluation(int $idUtilisateur, int $joursRestants): void
+    public static function notifierRappelEvaluation(string $matriculeUtilisateur, int $joursRestants): void
     {
         static::creer(
-            $idUtilisateur,
+            static::resolveMatricule($matriculeUtilisateur),
             'Rappel : Évaluation en attente',
             "Il vous reste {$joursRestants} jour(s) pour compléter vos évaluations en cours.",
             'reminder'
         );
+    }
+
+    /**
+     * Convertit un identifiant système en matricule (compatibilité anciens schémas).
+     */
+    protected static function resolveMatricule($identifiant): string
+    {
+        $identifiant = (string) $identifiant;
+
+        $utilisateur = Utilisateur::where('matricule', $identifiant)->first();
+
+        return $utilisateur ? $utilisateur->matricule : $identifiant;
     }
 }

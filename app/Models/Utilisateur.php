@@ -67,6 +67,7 @@ class Utilisateur extends Authenticatable
         'email',
         'telephone',
         'date_naissance',
+        'sexe',
         'password',
         'role',
         'manager_matricule',
@@ -185,7 +186,7 @@ class Utilisateur extends Authenticatable
      */
     public function scores()
     {
-        return $this->hasMany(ScoreUtilisateur::class, 'id_utilisateur');
+        return $this->hasMany(ScoreUtilisateur::class, 'matricule', 'matricule');
     }
     
     /**
@@ -193,7 +194,15 @@ class Utilisateur extends Authenticatable
      */
     public function notifications()
     {
-        return $this->hasMany(Notification::class, 'id_destinataire');
+        return $this->hasMany(Notification::class, 'destinataire_matricule', 'matricule');
+    }
+
+    /**
+     * Compatibilité avec l'ancien schéma (id_utilisateur numérique).
+     */
+    public function getIdUtilisateurAttribute(): string
+    {
+        return $this->matricule;
     }
     
     /**
@@ -361,18 +370,20 @@ class Utilisateur extends Authenticatable
             'nom' => 'required|string|max:100',
             'prenom' => 'required|string|max:100',
             'email' => 'required|email|max:255|unique:utilisateurs,email',
-            'telephone' => 'required|string|max:20',
-            'username' => 'required|string|max:50|unique:utilisateurs,username',
+            'telephone' => 'nullable|string|max:20',
+            'date_naissance' => 'nullable|date',
+            'sexe' => 'nullable|string|in:M,F,Autre',
             'password' => 'required|string|min:8',
-            'id_role' => 'required|exists:roles,id_role',
+            'role' => 'required|string|max:50',
+            'manager_matricule' => 'nullable|string|exists:utilisateurs,matricule',
             'id_region' => 'required|exists:regions,id_region',
-            'id_manager' => 'nullable|exists:utilisateurs,id_utilisateur',
+            'id_branche' => 'required|exists:branches,id_branche',
+            'niveau_hierarchique' => 'required|integer|min:0|max:5',
             'statut' => 'required|in:Actif,En_conge,Indisponible,Support_Actif',
-            'date_prise_poste' => 'required|date',
             'date_debut_indisponibilite' => 'nullable|date',
             'date_fin_indisponibilite' => 'nullable|date|after_or_equal:date_debut_indisponibilite',
             'motif_indisponibilite' => 'nullable|string|max:100',
-            'roles_support_json' => 'nullable|json',
+            'roles_support_json' => 'nullable|array',
         ];
     }
     

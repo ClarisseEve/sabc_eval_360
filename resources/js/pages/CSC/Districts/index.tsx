@@ -1,10 +1,10 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import AppLayout from '@/components/layout/app/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card/Card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table/Table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdownmenu/DropdownMenu';
-import { Badge } from '@/components/ui/badge/Badge';
+import AppLayout from '@/Components/Layout/app/AppLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/Components/UI/DropdownMenu/DropdownMenu';
+import { Badge } from '@/Components/UI/Badge/Badge';
 
 /**
  * Page des districts de vente pour le Chef Service Commercial (CSC)

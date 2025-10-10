@@ -32,7 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     title: 'Évaluations',
-    href: '/common/evaluations',
+    href: '#',
     icon: <ClipboardList className="h-5 w-5" />,
     children: [
       {
@@ -73,7 +73,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     title: 'Utilisateurs',
-    href: '/admin/utilisateurs',
+    href: '#',
     icon: <Users className="h-5 w-5" />,
     roles: ['ADMIN'],
     children: [
@@ -91,7 +91,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     title: 'Remplacements',
-    href: '/admin/remplacements',
+    href: '#',
     icon: <UserCheck className="h-5 w-5" />,
     roles: ['ADMIN'],
     children: [
@@ -114,7 +114,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     title: 'Rôles',
-    href: '/admin/roles',
+    href: '#',
     icon: <Shield className="h-5 w-5" />,
     roles: ['ADMIN'],
     children: [
@@ -136,6 +136,11 @@ export const NAV_ITEMS: NavItem[] = [
     icon: <Building className="h-5 w-5" />,
     roles: ['ADMIN'],
     children: [
+      {
+        title: 'Vue globale',
+        href: '/admin/structure',
+        icon: <ChevronRight className="h-4 w-4" />,
+      },
       {
         title: 'Régions',
         href: '/admin/structure/regions',
@@ -178,7 +183,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     title: 'Analytics',
-    href: '/admin/analytics',
+    href: '#',
     icon: <BarChart2 className="h-5 w-5" />,
     roles: ['ADMIN'],
     children: [

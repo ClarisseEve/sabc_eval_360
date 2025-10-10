@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\Utilisateur;
 use App\Traits\FormatsUserData;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -109,6 +110,113 @@ class RolesController extends Controller
     }
 
     /**
+     * Met à jour les règles et la matrice de permissions côté admin
+     */
+    public function updatePermissions(Request $request)
+    {
+        $validated = $request->validate([
+            'id_regle' => 'required|string',
+            'nom_regle' => 'required|string|max:255',
+            'description' => 'required|string',
+            'type_evaluation' => 'required|string|in:auto,pairs,descendante,ascendante',
+            'criteres_evaluation_json' => 'required|array|min:1',
+            'roles_autorises' => 'required|array|min:1',
+            'roles_autorises.*' => 'string',
+            'est_active' => 'boolean',
+            'roles_matrix' => 'sometimes|array',
+            'roles_matrix.*.id_role' => 'required_with:roles_matrix|string',
+            'roles_matrix.*.peut_auto_evaluer' => 'boolean',
+            'roles_matrix.*.peut_evaluer_pairs' => 'boolean',
+            'roles_matrix.*.peut_evaluer_subordonnes' => 'boolean',
+            'roles_matrix.*.peut_cross_branch' => 'boolean',
+        ]);
+
+        $regle = \DB::connection('pgsql')->table('regles_evaluation')
+            ->where('id_regle', $validated['id_regle'])
+            ->first();
+
+        if (!$regle) {
+            return redirect()->back()->withErrors([
+                'id_regle' => "Règle d'évaluation introuvable.",
+            ]);
+        }
+
+        $updates = [
+            'nom_regle' => $validated['nom_regle'],
+            'description' => $validated['description'],
+            'criteres_evaluation_json' => json_encode($validated['criteres_evaluation_json']),
+            'est_active' => $validated['est_active'] ?? true,
+            'updated_at' => now(),
+        ];
+
+        $schema = \Illuminate\Support\Facades\Schema::connection('pgsql');
+        $hasTypeColumn = $schema->hasColumn('regles_evaluation', 'type_evaluation');
+        $hasRolesColumn = $schema->hasColumn('regles_evaluation', 'roles_autorises');
+        $hasParamsColumn = $schema->hasColumn('regles_evaluation', 'parametres_json');
+
+        if ($hasTypeColumn) {
+            $updates['type_evaluation'] = $validated['type_evaluation'];
+        }
+
+        $parametresSupplementaires = [];
+
+        if ($hasRolesColumn) {
+            $updates['roles_autorises'] = json_encode($validated['roles_autorises']);
+        } elseif ($hasParamsColumn) {
+            $parametresSupplementaires['roles_autorises'] = $validated['roles_autorises'];
+        }
+
+        if (!$hasTypeColumn && $hasParamsColumn) {
+            $parametresSupplementaires['type_evaluation'] = $validated['type_evaluation'];
+        }
+
+        if (!empty($parametresSupplementaires) && $hasParamsColumn) {
+            $parametresExistants = [];
+
+            if (isset($regle->parametres_json)) {
+                $parametresExistants = is_array($regle->parametres_json)
+                    ? $regle->parametres_json
+                    : json_decode($regle->parametres_json, true) ?? [];
+            }
+
+            $updates['parametres_json'] = json_encode(array_merge($parametresExistants, $parametresSupplementaires));
+        }
+
+        try {
+            \DB::connection('pgsql')->table('regles_evaluation')
+                ->where('id_regle', $validated['id_regle'])
+                ->update($updates);
+        } catch (\Throwable $throwable) {
+            \Log::error('Impossible de mettre à jour la règle d\'évaluation', [
+                'id_regle' => $validated['id_regle'],
+                'exception' => $throwable->getMessage(),
+            ]);
+
+            return redirect()->back()->withErrors([
+                'update' => "La mise à jour de la règle a échoué. Veuillez réessayer.",
+            ]);
+        }
+
+        if (!empty($validated['roles_matrix'])) {
+            foreach ($validated['roles_matrix'] as $roleData) {
+                if (!isset($roleData['id_role'])) {
+                    continue;
+                }
+
+                Role::where('id_role', $roleData['id_role'])->update([
+                    'peut_auto_evaluer' => $roleData['peut_auto_evaluer'] ?? false,
+                    'peut_evaluer_pairs' => $roleData['peut_evaluer_pairs'] ?? false,
+                    'peut_evaluer_subalternes' => $roleData['peut_evaluer_subordonnes'] ?? false,
+                    'peut_evaluer_cross_branch' => $roleData['peut_cross_branch'] ?? false,
+                ]);
+            }
+        }
+
+        return redirect()->route('admin.roles.permissions')
+            ->with('success', "Permissions mises à jour avec succès.");
+    }
+
+    /**
      * Détermine le niveau hiérarchique selon les règles SABC
      */
     private function getNiveauHierarchique(Role $role): string
@@ -194,7 +302,7 @@ class RolesController extends Controller
      */
     public function create(): InertiaResponse
     {
-        return Inertia::render('admin/roles/create');
+        return Inertia::render('Admin/Roles/create');
     }
 
     /**
@@ -238,7 +346,7 @@ class RolesController extends Controller
         $role = Role::with(['utilisateurs.region', 'utilisateurs.branche'])
             ->findOrFail($id);
 
-        return Inertia::render('admin/roles/show', [
+        return Inertia::render('Admin/Roles/show', [
             'role' => $role,
         ]);
     }
@@ -250,7 +358,7 @@ class RolesController extends Controller
     {
         $role = Role::findOrFail($id);
 
-        return Inertia::render('admin/roles/edit', [
+        return Inertia::render('Admin/Roles/edit', [
             'role' => $role,
         ]);
     }
@@ -298,7 +406,7 @@ class RolesController extends Controller
         $role = Role::findOrFail($id);
 
         // Vérification des dépendances selon règles SABC
-        $utilisateursCount = Utilisateur::where('id_role', $id)->count();
+        $utilisateursCount = Utilisateur::where('role', $role->nom_role)->count();
         
         if ($utilisateursCount > 0) {
             return back()->withErrors([

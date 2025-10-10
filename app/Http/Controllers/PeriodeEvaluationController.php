@@ -4,88 +4,77 @@ namespace App\Http\Controllers;
 
 use App\Models\PeriodeEvaluation;
 use App\Models\RegleEvaluation;
-use App\Models\Region;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 use App\Traits\FormatsUserData;
-use Carbon\Carbon;
 
 class PeriodeEvaluationController extends Controller
 {
     use FormatsUserData;
-    /**
-     * Affiche la liste des périodes d'évaluation (ADMIN uniquement)
-     */
+
     public function index(): InertiaResponse
     {
         $user = Auth::user();
-        
-        // Récupérer toutes les périodes avec leurs relations
-        $periodes = PeriodeEvaluation::with(['regleEvaluation', 'region'])
-            ->orderBy('date_debut', 'desc')
+
+        $periodes = PeriodeEvaluation::with('regleEvaluation')
+            ->orderByDesc('date_debut')
             ->get()
-            ->map(function ($periode) {
+            ->map(function (PeriodeEvaluation $periode) {
+                $statut = $periode->statut ?? ($periode->est_cloturee ? 'terminee' : ($periode->est_ouverte ? 'active' : 'planifiee'));
+
                 return [
                     'id_periode' => $periode->id_periode,
-                    'titre' => $periode->titre,
+                    'code_periode' => $periode->code_periode,
+                    'nom_periode' => $periode->nom_periode,
+                    'titre' => $periode->titre ?? $periode->nom_periode,
                     'description' => $periode->description,
                     'date_debut' => $periode->date_debut,
                     'date_fin' => $periode->date_fin,
-                    'statut' => $periode->statut,
-                    'est_ouverte' => $periode->est_ouverte,
-                    'regle_nom' => $periode->regleEvaluation?->nom ?? 'N/A',
-                    'region_nom' => $periode->region?->nom ?? 'Toutes les régions',
+                    'statut' => $statut,
+                    'est_ouverte' => (bool) $periode->est_ouverte,
+                    'est_cloturee' => (bool) $periode->est_cloturee,
+                    'regle_nom' => $periode->regleEvaluation?->nom_regle ?? 'N/A',
                     'nb_evaluations' => $periode->evaluations()->count(),
-                    'nb_evaluations_completees' => $periode->evaluations()->where('statut', 'validé')->count(),
+                    'nb_evaluations_completees' => $periode->evaluations()->where('statut', 'valide')->count(),
                     'created_at' => $periode->created_at,
                     'updated_at' => $periode->updated_at,
                 ];
             });
 
-        // Statistiques globales
         $statistiques = [
             'total_periodes' => $periodes->count(),
             'periodes_actives' => $periodes->where('statut', 'active')->count(),
             'periodes_ouvertes' => $periodes->where('est_ouverte', true)->count(),
-            'periodes_terminees' => $periodes->where('statut', 'terminée')->count(),
+            'periodes_terminees' => $periodes->where('statut', 'terminee')->count(),
         ];
 
-        // Récupérer les données pour les formulaires
         $regles = RegleEvaluation::select('id_regle', 'nom_regle', 'criteres_evaluation_json')->get();
-        $regions = Region::select('id_region', 'nom_region')->get();
 
         return Inertia::render('Admin/Evaluations/Periodes', [
             'periodes' => $periodes,
             'statistiques' => $statistiques,
             'regles' => $regles,
-            'regions' => $regions,
-            ...$this->getAdminPageData('Gestion des Périodes d\'Évaluation', [], $user),
+            'regions' => collect(),
+            ...$this->getAdminPageData("Gestion des Périodes d'Évaluation", [], $user),
         ]);
     }
 
-    /**
-     * Affiche le formulaire de création d'une nouvelle période
-     */
     public function create(): InertiaResponse
     {
         $user = Auth::user();
         $regles = RegleEvaluation::select('id_regle', 'nom_regle', 'criteres_evaluation_json')->get();
-        $regions = Region::select('id_region', 'nom_region')->get();
 
         return Inertia::render('Admin/Evaluations/CreatePeriode', [
             'regles' => $regles,
-            'regions' => $regions,
-            ...$this->getAdminPageData('Créer une Période d\'Évaluation', [], $user),
+            'regions' => collect(),
+            ...$this->getAdminPageData("Créer une Période d'Évaluation", [], $user),
         ]);
     }
 
-    /**
-     * Stocke une nouvelle période d'évaluation
-     */
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -94,7 +83,6 @@ class PeriodeEvaluationController extends Controller
             'date_debut' => 'required|date|after_or_equal:today',
             'date_fin' => 'required|date|after:date_debut',
             'id_regle' => 'required|exists:regles_evaluation,id_regle',
-            'id_region' => 'nullable|exists:regions,id',
             'parametres_json' => 'nullable|json',
         ]);
 
@@ -103,85 +91,85 @@ class PeriodeEvaluationController extends Controller
         }
 
         try {
-            $periode = PeriodeEvaluation::create([
-                'titre' => $request->titre,
+            $nomPeriode = $request->titre;
+            $codePeriode = $this->generatePeriodeCode();
+
+            PeriodeEvaluation::create([
+                'code_periode' => $codePeriode,
+                'nom_periode' => $nomPeriode,
+                'titre' => $nomPeriode,
                 'description' => $request->description,
                 'date_debut' => $request->date_debut,
                 'date_fin' => $request->date_fin,
-                'statut' => 'planifiée', // Statut initial
-                'est_ouverte' => false, // Fermée par défaut
+                'statut' => 'planifiee',
+                'est_ouverte' => false,
+                'est_cloturee' => false,
                 'id_regle' => $request->id_regle,
-                'id_region' => $request->id_region,
                 'parametres_json' => $request->parametres_json ? json_decode($request->parametres_json, true) : null,
             ]);
 
             return redirect()->route('admin.evaluations.periodes.index')
-                ->with('success', 'Période d\'évaluation créée avec succès.');
-
+                ->with('success', "Période d'évaluation créée avec succès.");
         } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Erreur lors de la création de la période: ' . $e->getMessage()])
+            return back()
+                ->withErrors(['error' => "Erreur lors de la création de la période: {$e->getMessage()}"])
                 ->withInput();
         }
     }
 
-    /**
-     * Affiche une période spécifique
-     */
     public function show(string $id): InertiaResponse
     {
-        $periode = PeriodeEvaluation::with(['regleEvaluation', 'region', 'evaluations.evaluateur', 'evaluations.evalue'])
+        $periode = PeriodeEvaluation::with(['regleEvaluation', 'evaluations.evaluateur', 'evaluations.evalue'])
             ->findOrFail($id);
 
-        // Statistiques détaillées de la période
         $evaluations = $periode->evaluations;
-        $statistiques_detaillees = [
+        $statistiques = [
             'total_evaluations' => $evaluations->count(),
             'evaluations_brouillon' => $evaluations->where('statut', 'brouillon')->count(),
             'evaluations_soumises' => $evaluations->where('statut', 'soumis')->count(),
-            'evaluations_validees' => $evaluations->where('statut', 'validé')->count(),
-            'evaluations_rejetees' => $evaluations->where('statut', 'rejeté')->count(),
-            'taux_completion' => $evaluations->count() > 0 
-                ? round(($evaluations->where('statut', 'validé')->count() / $evaluations->count()) * 100, 2)
+            'evaluations_validees' => $evaluations->where('statut', 'valide')->count(),
+            'evaluations_rejetees' => $evaluations->where('statut', 'rejete')->count(),
+            'taux_completion' => $evaluations->count() > 0
+                ? round(($evaluations->where('statut', 'valide')->count() / $evaluations->count()) * 100, 2)
                 : 0,
         ];
 
         return Inertia::render('Admin/Evaluations/ShowPeriode', [
             'periode' => [
                 'id_periode' => $periode->id_periode,
-                'titre' => $periode->titre,
+                'code_periode' => $periode->code_periode,
+                'nom_periode' => $periode->nom_periode,
+                'titre' => $periode->titre ?? $periode->nom_periode,
                 'description' => $periode->description,
                 'date_debut' => $periode->date_debut,
                 'date_fin' => $periode->date_fin,
                 'statut' => $periode->statut,
                 'est_ouverte' => $periode->est_ouverte,
+                'est_cloturee' => $periode->est_cloturee,
                 'regle' => $periode->regleEvaluation,
-                'region' => $periode->region,
                 'parametres_json' => $periode->parametres_json,
                 'created_at' => $periode->created_at,
                 'updated_at' => $periode->updated_at,
             ],
-            'statistiques' => $statistiques_detaillees,
-            'evaluations' => $evaluations->map(function ($eval) {
+            'statistiques' => $statistiques,
+            'evaluations' => $evaluations->map(function ($evaluation) {
                 return [
-                    'id' => $eval->id,
-                    'statut' => $eval->statut,
-                    'evaluateur' => $eval->evaluateur?->nom . ' ' . $eval->evaluateur?->prenom,
-                    'evalue' => $eval->evalue?->nom . ' ' . $eval->evalue?->prenom,
-                    'date_soumission' => $eval->date_soumission,
-                    'score_global' => $eval->score_global,
+                    'id' => $evaluation->id,
+                    'statut' => $evaluation->statut,
+                    'evaluateur' => trim(($evaluation->evaluateur?->nom ?? '') . ' ' . ($evaluation->evaluateur?->prenom ?? '')),
+                    'evalue' => trim(($evaluation->evalue?->nom ?? '') . ' ' . ($evaluation->evalue?->prenom ?? '')),
+                    'date_soumission' => $evaluation->date_soumission,
+                    'score_global' => $evaluation->note_globale,
                 ];
             }),
-            ...$this->getAdminPageData('Détails de la Période d\'Évaluation', [], Auth::user()),
+            ...$this->getAdminPageData("Détails de la Période d'Évaluation", [], Auth::user()),
         ]);
     }
 
-    /**
-     * Active/désactive une période d'évaluation
-     */
     public function toggleStatus(Request $request, string $id)
     {
         $periode = PeriodeEvaluation::findOrFail($id);
-        
+
         $validator = Validator::make($request->all(), [
             'action' => 'required|in:ouvrir,fermer,activer,terminer',
         ]);
@@ -195,46 +183,55 @@ class PeriodeEvaluationController extends Controller
                 case 'ouvrir':
                     $periode->update([
                         'est_ouverte' => true,
-                        'statut' => 'active'
+                        'est_cloturee' => false,
+                        'statut' => 'active',
                     ]);
                     $message = 'Période ouverte aux évaluations.';
                     break;
-                    
+
                 case 'fermer':
-                    $periode->update(['est_ouverte' => false]);
+                    $periode->update([
+                        'est_ouverte' => false,
+                        'est_cloturee' => true,
+                        'statut' => 'fermee',
+                    ]);
                     $message = 'Période fermée aux nouvelles évaluations.';
                     break;
-                    
+
                 case 'activer':
-                    $periode->update(['statut' => 'active']);
+                    $periode->update([
+                        'est_ouverte' => true,
+                        'est_cloturee' => false,
+                        'statut' => 'active',
+                    ]);
                     $message = 'Période activée.';
                     break;
-                    
+
                 case 'terminer':
                     $periode->update([
-                        'statut' => 'terminée',
-                        'est_ouverte' => false
+                        'est_ouverte' => false,
+                        'est_cloturee' => true,
+                        'statut' => 'terminee',
                     ]);
                     $message = 'Période terminée.';
+                    break;
+
+                default:
+                    $message = 'Action effectuée sur la période.';
                     break;
             }
 
             return back()->with('success', $message);
-
         } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Erreur lors de la mise à jour: ' . $e->getMessage()]);
+            return back()->withErrors(['error' => "Erreur lors de la mise à jour: {$e->getMessage()}"]); 
         }
     }
 
-    /**
-     * Supprime une période d'évaluation
-     */
     public function destroy(string $id)
     {
         try {
             $periode = PeriodeEvaluation::findOrFail($id);
-            
-            // Vérifier s'il y a des évaluations liées
+
             if ($periode->evaluations()->count() > 0) {
                 return back()->withErrors(['error' => 'Impossible de supprimer une période contenant des évaluations.']);
             }
@@ -242,10 +239,24 @@ class PeriodeEvaluationController extends Controller
             $periode->delete();
 
             return redirect()->route('admin.evaluations.periodes.index')
-                ->with('success', 'Période d\'évaluation supprimée avec succès.');
-
+                ->with('success', "Période d'évaluation supprimée avec succès.");
         } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Erreur lors de la suppression: ' . $e->getMessage()]);
+            return back()->withErrors(['error' => "Erreur lors de la suppression: {$e->getMessage()}"]); 
         }
+    }
+
+    private function generatePeriodeCode(): string
+    {
+        $connection = DB::connection('pgsql');
+
+        $next = (int) $connection->table('periodes_evaluation')->max('id_periode') + 1;
+        $code = 'L' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+
+        while ($connection->table('periodes_evaluation')->where('code_periode', $code)->exists()) {
+            $next++;
+            $code = 'L' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+        }
+
+        return $code;
     }
 }

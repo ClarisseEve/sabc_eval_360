@@ -142,6 +142,7 @@ Route::middleware(['auth'])->group(function () {
         
         // Routes pour la structure organisationnelle
         Route::prefix('structure')->name('structure.')->controller(\App\Http\Controllers\Admin\StructureController::class)->group(function () {
+            Route::get('/', 'overview')->name('overview');
             // Gestion des régions
             Route::get('/regions', 'regions')->name('regions');
             Route::post('/regions', 'storeRegion')->name('regions.store');

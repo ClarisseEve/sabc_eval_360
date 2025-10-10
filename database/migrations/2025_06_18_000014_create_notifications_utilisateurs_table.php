@@ -28,6 +28,7 @@ return new class extends Migration
             $table->string('id_evaluation', 8)->nullable()->comment('Référence à evaluations.id_evaluation au format EV-PP-XX');
             $table->string('id_remplacement', 5)->nullable()->comment('Référence à remplacements_temporaires.id_remplacement au format RT-XX');
             $table->string('expediteur_matricule', 5)->nullable();
+            $table->json('donnees_json')->nullable();
             
             // Index pour optimiser les recherches
             $table->index('destinataire_matricule', 'idx_notif_destinataire');

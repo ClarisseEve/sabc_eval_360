@@ -1,10 +1,10 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import AppLayout from '@/components/layout/app/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card/Card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table/Table';
-import { Badge } from '@/components/ui/badge/Badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar/Avatar';
+import AppLayout from '@/Components/Layout/app/AppLayout';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/Components/UI/Card/Card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
+import { Badge } from '@/Components/UI/Badge/Badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/Components/UI/Avatar/Avatar';
 
 interface TeamsProps {
   auth: {
