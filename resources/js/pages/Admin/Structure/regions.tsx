@@ -100,7 +100,7 @@ export default function RegionsIndex({ regions, auth, pageTitle }: RegionsProps)
   };
 
   return (
-    <RoleGuard allowedRoles={['ADMIN']}>
+    <RoleGuard allowed={['ADMIN']} userRoleName={auth?.user?.role ?? auth?.user?.role_display}>
       <AppLayout user={auth.user}>
         <Head title={pageTitle} />
         

@@ -26,6 +26,19 @@ class PeriodeEvaluationController extends Controller
             ->map(function (PeriodeEvaluation $periode) {
                 $statut = $periode->statut ?? ($periode->est_cloturee ? 'terminee' : ($periode->est_ouverte ? 'active' : 'planifiee'));
 
+                $nbEvaluations = 0;
+                $nbValidees = 0;
+
+                try {
+                    $nbEvaluations = $periode->evaluations()->count();
+                    $nbValidees = $periode->evaluations()->where('statut', 'valide')->count();
+                } catch (\Throwable $exception) {
+                    \Log::warning('Unable to count evaluations for période', [
+                        'periode' => $periode->id_periode,
+                        'message' => $exception->getMessage(),
+                    ]);
+                }
+
                 return [
                     'id_periode' => $periode->id_periode,
                     'code_periode' => $periode->code_periode,
@@ -38,8 +51,8 @@ class PeriodeEvaluationController extends Controller
                     'est_ouverte' => (bool) $periode->est_ouverte,
                     'est_cloturee' => (bool) $periode->est_cloturee,
                     'regle_nom' => $periode->regleEvaluation?->nom_regle ?? 'N/A',
-                    'nb_evaluations' => $periode->evaluations()->count(),
-                    'nb_evaluations_completees' => $periode->evaluations()->where('statut', 'valide')->count(),
+                    'nb_evaluations' => $nbEvaluations,
+                    'nb_evaluations_completees' => $nbValidees,
                     'created_at' => $periode->created_at,
                     'updated_at' => $periode->updated_at,
                 ];

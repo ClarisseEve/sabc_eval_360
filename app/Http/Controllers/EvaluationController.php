@@ -37,6 +37,10 @@ class EvaluationController extends Controller
             abort(401);
         }
 
+        if ($this->isAdmin($utilisateur)) {
+            abort(403, "Les administrateurs ne peuvent pas créer d'évaluation");
+        }
+
         $validated = $request->validate([
             'id_regle' => 'nullable|string',
             'target_matricule' => 'required|string|exists:utilisateurs,matricule',
@@ -98,6 +102,9 @@ class EvaluationController extends Controller
      */
     public function index(): Response|RedirectResponse
     {
+        if ($this->isAdmin(Auth::user())) {
+            return redirect()->route('admin.evaluations.management');
+        }
         // Par défaut, rediriger vers "Mes évaluations" pour éviter la page vide
         return redirect()->route('evaluations.mine');
     }
@@ -108,6 +115,10 @@ class EvaluationController extends Controller
     public function mine(): Response
     {
         $utilisateur = Auth::user();
+
+        if ($this->isAdmin($utilisateur)) {
+            abort(403);
+        }
         
         // Pour l'instant, utiliser des données simulées
         $templates = [
@@ -144,6 +155,10 @@ class EvaluationController extends Controller
     public function pending(): Response
     {
         $utilisateur = Auth::user();
+
+        if ($this->isAdmin($utilisateur)) {
+            abort(403);
+        }
         
         // Pour l'instant, utiliser des données simulées
         $pendingEvaluations = [];
@@ -159,6 +174,9 @@ class EvaluationController extends Controller
      */
     public function create(Request $request): Response
     {
+        if ($this->isAdmin(Auth::user())) {
+            abort(403);
+        }
         // Deep-link vers la page "Mes évaluations" qui ouvrira le modal directement
         $templateParam = $request->get('template') ?? $request->get('template_id') ?? $request->get('id_regle');
         $targetParam = $request->get('target') ?? $request->get('target_id') ?? $request->get('evalue');
@@ -179,6 +197,10 @@ class EvaluationController extends Controller
         $utilisateur = Auth::user();
         if (!$utilisateur) {
             return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        if ($this->isAdmin($utilisateur)) {
+            return response()->json(['error' => 'Forbidden'], 403);
         }
         $templateParam = $request->query('template');
         $targetParam = $request->query('target');
@@ -409,5 +431,19 @@ class EvaluationController extends Controller
         }
         
         return false;
+    }
+
+    /**
+     * Détecte si l'utilisateur est identifié comme administrateur.
+     */
+    protected function isAdmin($user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $role = strtoupper(trim($user->role_nom ?? $user->role ?? ''));
+
+        return str_contains($role, 'ADMIN');
     }
 }

@@ -187,7 +187,7 @@ class UtilisateursController extends Controller
                     'score_global' => $user->score_global ?? 0,
                     'progression' => $user->progression_vs_precedente ?? 0,
                     'nb_evaluations' => $user->evaluationsRecues()->count(),
-                    'gaps_identifies' => $this->getGapsUtilisateur($user),
+                    'gaps_detectes' => $this->getGapsUtilisateur($user),
                 ];
             });
         
@@ -210,6 +210,7 @@ class UtilisateursController extends Controller
                 'type' => 'score_faible',
                 'description' => 'Score global inférieur à 60%',
                 'priorite' => 'haute',
+                'severite' => 'elevee',
                 'recommandation' => 'Formation intensive recommandée'
             ];
         }
@@ -220,6 +221,7 @@ class UtilisateursController extends Controller
                 'type' => 'regression',
                 'description' => 'Régression de performance significative',
                 'priorite' => 'haute',
+                'severite' => 'elevee',
                 'recommandation' => 'Accompagnement personnalisé requis'
             ];
         }
@@ -231,6 +233,7 @@ class UtilisateursController extends Controller
                 'type' => 'evaluations_insuffisantes',
                 'description' => 'Nombre d\'évaluations insuffisant',
                 'priorite' => 'moyenne',
+                'severite' => 'moyenne',
                 'recommandation' => 'Solliciter plus d\'évaluations'
             ];
         }

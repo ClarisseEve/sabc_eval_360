@@ -71,6 +71,8 @@ export function BarChart({
   
   // Rendu des barres du graphique
   const renderBars = () => {
+    const radius = layout === 'vertical' ? [0, 4, 4, 0] : [4, 4, 0, 0];
+
     if (!bars || bars.length === 0) {
       // Si aucune barre n'est spécifiée, créer une barre par défaut basée sur la première propriété non-xAxis
       const firstDataItem = data[0] || {};
@@ -82,7 +84,7 @@ export function BarChart({
           dataKey={firstDataKey}
           name={firstDataKey}
           fill={defaultColors[0]}
-          radius={[4, 4, 0, 0]}
+          radius={radius}
           barSize={barSize}
           animationDuration={500}
         />
@@ -96,7 +98,7 @@ export function BarChart({
         name={bar.name || bar.dataKey}
         fill={bar.color || defaultColors[index % defaultColors.length]}
         stackId={bar.stackId}
-        radius={[4, 4, 0, 0]}
+        radius={radius}
         barSize={barSize}
         animationDuration={500}
       />
@@ -113,14 +115,21 @@ export function BarChart({
           data={data}
           layout={layout}
           margin={{
-            top: 5,
-            right: 30,
-            left: 20,
-            bottom: 5,
+            top: 12,
+            right: 24,
+            left: layout === 'vertical' ? 48 : 16,
+            bottom: 24,
           }}
           barSize={barSize}
         >
-          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />}
+          {showGrid && (
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#E0E0E0"
+              horizontal={true}
+              vertical={layout !== 'vertical'}
+            />
+          )}
           
           {layout === 'horizontal' ? (
             <>
@@ -145,6 +154,7 @@ export function BarChart({
                 dataKey={xAxisDataKey}
                 type="category"
                 tick={{ fill: '#424242', fontSize: 12 }}
+                width={140}
                 axisLine={{ stroke: '#E0E0E0' }}
               />
             </>

@@ -17,11 +17,11 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  Building,
-  ChevronDown,
-  ChevronRight
+  Building
 } from 'lucide-react';
 import AppLayout from '@/Components/Layout/app/AppLayout';
+import { HierarchyTree, SABC_HIERARCHY_DATA } from '@/Components/UI/HierarchyTree';
+import type { HierarchyNode } from '@/Components/UI/HierarchyTree/HierarchyTree';
 
 interface Utilisateur {
   matricule: string;
@@ -39,18 +39,8 @@ interface Utilisateur {
   derniere_connexion?: string;
 }
 
-interface UtilisateurHierarchique extends Utilisateur {
-  subordonnes?: UtilisateurHierarchique[];
-  gap_analysis?: {
-    evaluations_manquantes: number;
-    pairs_non_evalues: number;
-    superieurs_non_evalues: number;
-  };
-}
-
 interface PageProps {
   utilisateurs: Utilisateur[];
-  hierarchie: UtilisateurHierarchique[];
   regions: Array<{ id: string; nom: string }>;
   roles: Array<{ nom: string; libelle: string }>;
   branches: Array<{ id: string; nom: string }>;
@@ -63,9 +53,62 @@ interface PageProps {
   user: any;
 }
 
+const TANIERE_REGIONS = new Set(['littoral', 'centre']);
+
+const ROLE_BY_NODE_ID: Record<string, string> = {
+  dr: 'DR',
+  cdtt: 'CDTT',
+  csc: 'CSC',
+  cdv: 'CDV',
+  cds: 'CDS',
+  rtm: 'RTM',
+  tmo: 'TMO',
+  'dr-nt': 'DR',
+  'csc-nt': 'CSC',
+  'cds-nt': 'CDS',
+  srmo: 'SRMO',
+  'tmo-nt': 'TMO',
+};
+
+const normalizeRegionName = (value?: string | null): string => {
+  if (!value) {
+    return 'non-definie';
+  }
+
+  return value.trim().toLowerCase();
+};
+
+const formatUserName = (user: Pick<Utilisateur, 'prenom' | 'nom'>): string => {
+  const prenom = user.prenom ? `${user.prenom.charAt(0).toUpperCase()}${user.prenom.slice(1).toLowerCase()}` : '';
+  const nom = user.nom ? user.nom.toUpperCase() : '';
+  return [prenom, nom].filter(Boolean).join(' ').trim() || 'Profil inconnu';
+};
+
+const hydrateNodesForRegion = (
+  templateNodes: HierarchyNode[],
+  usersInRegion: Utilisateur[]
+): HierarchyNode[] => {
+  return templateNodes.map((node) => {
+    const roleKey = ROLE_BY_NODE_ID[node.id] ?? ROLE_BY_NODE_ID[node.id.replace('-nt', '')] ?? node.id.toUpperCase();
+    const assignedUsers = usersInRegion.filter((user) => user.role === roleKey);
+    const managerLabel = assignedUsers.length > 0
+      ? assignedUsers.map((user) => formatUserName(user)).join(' • ')
+      : 'Poste vacant';
+
+    return {
+      ...node,
+      manager: managerLabel,
+      metadata: {
+        ...node.metadata,
+        utilisateurs_count: assignedUsers.length,
+      },
+      children: node.children ? hydrateNodesForRegion(node.children, usersInRegion) : [],
+    };
+  });
+};
+
 const AdminUsersPage = ({ 
   utilisateurs, 
-  hierarchie, 
   regions, 
   roles, 
   branches, 
@@ -145,155 +188,6 @@ const AdminUsersPage = ({
   const handleCreateUser = () => {
     window.location.href = '/admin/utilisateurs/create';
   };
-
-  const renderHierarchicalTree = (users: any[], regionNom: string) => {
-    // Filtrer les utilisateurs pour exclure l'admin (niveau 0)
-    const nonAdminUsers = users.filter(user => {
-      const level = user.niveau_hierarchique || 0;
-      return level > 0; // Exclure niveau 0 (ADMIN)
-    });
-
-    // Organiser par hiérarchie manager-subordonné
-    const buildHierarchy = (users: any[], managerId: string | null = null): any[] => {
-      return users
-        .filter(user => user.manager_matricule === managerId)
-        .map(user => ({
-          ...user,
-          children: buildHierarchy(users, user.matricule)
-        }))
-        .sort((a, b) => (a.niveau_hierarchique || 0) - (b.niveau_hierarchique || 0));
-    };
-
-    const hierarchy = buildHierarchy(nonAdminUsers);
-
-    const renderUserNode = (user: any, level: number = 0): React.ReactElement => (
-      <div key={user.matricule} className={`ml-${level * 4}`}>
-        <div className="bg-white border border-sabc-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow mb-2">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex-1">
-              <h5 className="font-semibold text-sabc-gray-900 text-sm">
-                {user.prenom} {user.nom}
-              </h5>
-              <p className="text-xs text-sabc-gray-600">{user.matricule}</p>
-            </div>
-            <Badge className={`text-xs ${getRoleColor(user.role)}`}>
-              {user.role}
-            </Badge>
-          </div>
-          
-          <div className="space-y-2 text-xs text-sabc-gray-600">
-            <div className="flex items-center">
-              <Building className="w-3 h-3 mr-1" />
-              {user.branche_nom || 'Non définie'}
-            </div>
-            <div className="flex items-center justify-between">
-              {getStatutBadge(user.statut || 'actif')}
-              <div className="flex gap-1">
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                  <Eye className="w-3 h-3" />
-                </Button>
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                  <Edit className="w-3 h-3" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Render children with proper indentation */}
-        {user.children && user.children.length > 0 && (
-          <div className="ml-4 border-l-2 border-sabc-gray-200 pl-4">
-            {user.children.map((child: any) => renderUserNode(child, level + 1))}
-          </div>
-        )}
-      </div>
-    );
-
-    return (
-      <div className="space-y-4">
-        {hierarchy.length > 0 ? (
-          hierarchy.map((user: any) => renderUserNode(user, 0))
-        ) : (
-          <div className="text-center py-8 text-sabc-gray-500">
-            <p>Aucun utilisateur dans cette région pour le moment</p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Helper function to get level name based on region type
-  const getLevelName = (level: number, regionNom: string): string => {
-    const isRegionTaniere = ['Littoral', 'Centre'].includes(regionNom);
-    
-    if (isRegionTaniere) {
-      const levelNames: Record<number, string> = {
-        1: 'Directeur Régional (DR)',
-        2: 'Chef Département Trade (CDTT)',
-        3: 'Chef Service Commercial (CSC) / Regional Trade Marketing (RTM)',
-        4: 'Chef District Vente (CDV) / Trade Marketing Operator (TMO)',
-        5: 'Chef de Secteur (CDS) / Assistant Superviseur Sponsoring (AS)'
-      };
-      return levelNames[level] || `Niveau ${level}`;
-    } else {
-      const levelNames: Record<number, string> = {
-        1: 'Directeur Régional (DR)',
-        2: 'Chef Service Commercial (CSC) / Superviseur Régional Marketing Opérationnel (SRMO)',
-        3: 'Chef de Secteur (CDS) / Trade Marketing Operator (TMO)'
-      };
-      return levelNames[level] || `Niveau ${level}`;
-    }
-  };
-
-
-
-  const renderHierarchyNode = (node: UtilisateurHierarchique, level: number = 0) => (
-    <div key={node.matricule} className={`ml-${level * 4}`}>
-      <div className="flex items-center justify-between p-3 border rounded-lg mb-2 hover:bg-sabc-gray-50">
-        <div className="flex items-center gap-3">
-          <div className="flex-shrink-0">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${getRoleColor(node.role)}`}>
-              {node.prenom.charAt(0)}{node.nom.charAt(0)}
-            </div>
-          </div>
-          <div>
-            <h4 className="font-medium text-sabc-gray-900">
-              {node.prenom} {node.nom}
-            </h4>
-            <p className="text-sm text-sabc-gray-600">
-              {node.role} • {node.region_nom}
-            </p>
-          </div>
-          {getStatutBadge(node.statut)}
-          {node.gap_analysis && node.gap_analysis.evaluations_manquantes > 0 && (
-            <Badge variant="destructive" className="ml-2">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              {node.gap_analysis.evaluations_manquantes} gaps
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => handleViewUser(node.matricule)}
-            variant="ghost"
-            size="sm"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            onClick={() => handleEditUser(node.matricule)}
-            variant="ghost"
-            size="sm"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-      {node.subordonnes && node.subordonnes.map(child => 
-        renderHierarchyNode(child, level + 1)
-      )}
-    </div>
-  );
 
   return (
     <AppLayout user={user} pageTitle="Gestion des utilisateurs">
@@ -536,89 +430,99 @@ const AdminUsersPage = ({
               </CardHeader>
               <CardContent>
                 {(() => {
-                  // Pour la vue hiérarchique, utiliser tous les utilisateurs si aucun filtre n'est appliqué
-                  // ou utiliser les utilisateurs filtrés si des filtres sont actifs
-                  const hasActiveFilters = selectedRegion !== 'all' || selectedRole !== 'all' || 
-                                          selectedBranche !== 'all' || selectedStatut !== 'all' || searchTerm.trim() !== '';
-                  
-                  const usersToDisplay = hasActiveFilters ? filteredUsers : (utilisateurs || []);
-                  
-                  // Si aucun filtre actif, grouper par région réelle des utilisateurs
-                  // Sinon utiliser les régions SABC standards
-                  if (!hasActiveFilters) {
-                    // Grouper par région réelle des utilisateurs
-                    const regionGroups = usersToDisplay.reduce((acc, user) => {
-                      const region = user.region_nom || 'Non définie';
-                      if (!acc[region]) acc[region] = [];
-                      acc[region].push(user);
-                      return acc;
-                    }, {} as Record<string, typeof usersToDisplay>);
-                    
+                  const hasActiveFilters =
+                    (selectedRegion && selectedRegion !== 'all') ||
+                    (selectedRole && selectedRole !== 'all') ||
+                    (selectedBranche && selectedBranche !== 'all') ||
+                    (selectedStatut && selectedStatut !== 'all') ||
+                    searchTerm.trim() !== '';
+
+                  const baseUsers = hasActiveFilters ? filteredUsers : utilisateurs;
+
+                  if (!baseUsers || baseUsers.length === 0) {
                     return (
-                      <div className="space-y-8">
-                        {Object.entries(regionGroups).map(([regionNom, usersInRegion]) => (
-                          <div key={regionNom} className="border border-sabc-gray-200 rounded-lg p-6 bg-sabc-gray-50">
-                            <h3 className="text-lg font-semibold text-sabc-red-primary mb-4 flex items-center">
-                              <Building className="w-5 h-5 mr-2" />
-                              Région {regionNom}
-                            </h3>
-                            <div className="space-y-4">
-                              {renderHierarchicalTree(usersInRegion, regionNom)}
-                            </div>
-                          </div>
-                        ))}
+                      <div className="text-center py-8">
+                        <Building className="w-12 h-12 text-sabc-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-sabc-gray-900 mb-2">
+                          Aucun utilisateur trouvé
+                        </h3>
+                        <p className="text-sabc-gray-600">
+                          Ajustez vos filtres pour visualiser les responsables par région.
+                        </p>
                       </div>
                     );
                   }
-                  
-                  // Avec filtres : utiliser les régions SABC standards
-                  const sabcRegions = ['Littoral', 'Centre', 'Nord', 'Ouest'];
-                  
-                  return usersToDisplay && usersToDisplay.length > 0 ? (
-                    <div className="space-y-8">
-                      {/* Afficher chaque région SABC avec son organigramme */}
-                      {sabcRegions.map(regionNom => {
-                        // Mapping flexible pour les noms de régions (majuscules/minuscules)
-                        const usersInRegion = usersToDisplay.filter(user => {
-                          if (!user.region_nom) return false;
-                          const userRegion = user.region_nom.toLowerCase().trim();
-                          const targetRegion = regionNom.toLowerCase().trim();
-                          return userRegion === targetRegion;
-                        });
-                        
-                        // Afficher la région même si elle n'a pas d'utilisateurs (pour montrer la structure complète)
-                        return (
-                      <div key={regionNom} className="border border-sabc-gray-200 rounded-lg p-6 bg-sabc-gray-50">
-                        <h3 className="text-lg font-semibold text-sabc-red-primary mb-4 flex items-center">
-                          <Building className="w-5 h-5 mr-2" />
-                          Région {regionNom}
+
+                  const usersForHierarchy = baseUsers.filter((user) => user.role !== 'ADMIN');
+
+                  const regionEntriesMap = new Map<string, { key: string; name: string }>();
+
+                  regions.forEach((region) => {
+                    const key = normalizeRegionName(region.nom);
+                    regionEntriesMap.set(key, { key, name: region.nom });
+                  });
+
+                  baseUsers.forEach((user) => {
+                    const key = normalizeRegionName(user.region_nom);
+                    const displayName = user.region_nom && user.region_nom.trim() !== '' ? user.region_nom : 'Non définie';
+                    if (!regionEntriesMap.has(key)) {
+                      regionEntriesMap.set(key, { key, name: displayName });
+                    }
+                  });
+
+                  const selectedRegionKey =
+                    selectedRegion && selectedRegion !== 'all' ? normalizeRegionName(selectedRegion) : null;
+
+                  const regionsToRender = Array.from(regionEntriesMap.values())
+                    .filter((region) => (selectedRegionKey ? region.key === selectedRegionKey : true))
+                    .sort((a, b) => a.name.localeCompare(b.name));
+
+                  if (regionsToRender.length === 0) {
+                    return (
+                      <div className="text-center py-8">
+                        <Building className="w-12 h-12 text-sabc-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-sabc-gray-900 mb-2">
+                          Aucune région correspondante
                         </h3>
-                        
-                        {/* Arbre hiérarchique pour cette région */}
-                         <div className="space-y-4">
-                           {usersInRegion.length > 0 ? (
-                             renderHierarchicalTree(usersInRegion, regionNom)
-                           ) : (
-                             <div className="text-center py-4 text-sabc-gray-500">
-                               <p>Aucun utilisateur dans cette région pour le moment</p>
-                             </div>
-                           )}
-                         </div>
-                       </div>
+                        <p className="text-sabc-gray-600">
+                          Sélectionnez une autre région ou réinitialisez les filtres.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  const usersGroupedByRegion = usersForHierarchy.reduce((acc, user) => {
+                    const key = normalizeRegionName(user.region_nom);
+                    if (!acc.has(key)) {
+                      acc.set(key, []);
+                    }
+                    acc.get(key)!.push(user);
+                    return acc;
+                  }, new Map<string, Utilisateur[]>());
+
+                  return (
+                    <div className="space-y-8">
+                      {regionsToRender.map((region) => {
+                        const normalizedRegion = region.key;
+                        const usersInRegion = usersGroupedByRegion.get(normalizedRegion) ?? [];
+                        const isTaniere = TANIERE_REGIONS.has(normalizedRegion);
+                        const templateNodes = isTaniere
+                          ? SABC_HIERARCHY_DATA.roles_taniere
+                          : SABC_HIERARCHY_DATA.roles_non_taniere;
+                        const nodes = hydrateNodesForRegion(templateNodes, usersInRegion);
+
+                        return (
+                          <HierarchyTree
+                            key={region.key}
+                            title={`Région ${region.name}`}
+                            subtitle={isTaniere ? 'Structure Tanière (5 niveaux)' : 'Structure Non-Tanière (3 niveaux)'}
+                            nodes={nodes}
+                            variant={isTaniere ? 'taniere' : 'non-taniere'}
+                          />
                         );
                       })}
                     </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Building className="w-12 h-12 text-sabc-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-sabc-gray-900 mb-2">
-                      Aucun utilisateur trouvé
-                    </h3>
-                    <p className="text-sabc-gray-600">
-                      Ajustez vos filtres pour voir la structure hiérarchique.
-                    </p>
-                  </div>
-                );
+                  );
                 })()}
               </CardContent>
             </Card>

@@ -6,6 +6,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { router } from '@inertiajs/react';
 import { initializeTheme, ThemeProvider } from './hooks/useTheme';
+import { DisplayScaleProvider } from './hooks/useDisplayScale';
 import { AuthProvider } from './Contexts/AuthContext';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Evaluation Force Vente - SABC';
@@ -23,21 +24,23 @@ createInertiaApp({
         correctedName = correctedName.replace(/\/structure\//, '/Structure/');
 
         const pages = import.meta.glob('./Pages/**/*.tsx');
-        const primaryPath = `./Pages/${correctedName}.tsx`;
-        if (pages[primaryPath]) {
-            return resolvePageComponent(primaryPath, pages);
-        }
+        const candidates = [
+            `./Pages/${correctedName}.tsx`,
+            `./Pages/${correctedName.replace(/\/(\w+)$/, (_m, last) => `/${last.charAt(0).toLowerCase()}${last.slice(1)}`)}.tsx`,
+            `./Pages/${correctedName.replace(/\/(\w+)$/, (_m, last) => `/${last.charAt(0).toUpperCase()}${last.slice(1)}`)}.tsx`,
+        ];
 
-        // Fallback: dernière portion en minuscules (Index -> index)
-        const altName = correctedName.replace(/\/(\w+)$/, (_m, last) => `/${last.charAt(0).toLowerCase()}${last.slice(1)}`);
-        const altPath = `./Pages/${altName}.tsx`;
-        if (pages[altPath]) {
-            console.warn('Fallback composant:', altPath);
-            return resolvePageComponent(altPath, pages);
+        for (const path of candidates) {
+            if (pages[path]) {
+                if (path !== candidates[0]) {
+                    console.warn('Fallback composant:', path);
+                }
+                return resolvePageComponent(path, pages);
+            }
         }
 
         // Laisser l'erreur standard si rien trouvé
-        return resolvePageComponent(primaryPath, pages);
+        return resolvePageComponent(candidates[0], pages);
     },
     setup({ el, App, props }) {
         const root = createRoot(el);
@@ -48,9 +51,11 @@ createInertiaApp({
 
         root.render(
             <ThemeProvider>
-                <AuthProvider initialUser={user}>
-                    <App {...props} />
-                </AuthProvider>
+                <DisplayScaleProvider>
+                    <AuthProvider initialUser={user}>
+                        <App {...props} />
+                    </AuthProvider>
+                </DisplayScaleProvider>
             </ThemeProvider>
         );
     },

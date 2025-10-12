@@ -191,63 +191,6 @@ export default function RolesPermissions({ roles = [], regles_evaluation = [], a
         </div>
         
         <div className="space-y-6 p-6">
-          {/* Statistiques */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Shield className="h-8 w-8 text-sabc-red-primary" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-sabc-gray-600">Règles Actives</p>
-                    <p className="text-2xl font-bold text-sabc-gray-900">
-                      {regles_evaluation?.filter(r => r.est_active).length || 0}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Users className="h-8 w-8 text-sabc-accent" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-sabc-gray-600">Rôles Configurés</p>
-                    <p className="text-2xl font-bold text-sabc-gray-900">{safeRoles.length}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <CheckCircle className="h-8 w-8 text-sabc-success" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-sabc-gray-600">Auto-évaluations</p>
-                    <p className="text-2xl font-bold text-sabc-gray-900">
-                      {getPermissionMatrix().filter(r => r.auto_eval).length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center">
-                  <Lock className="h-8 w-8 text-sabc-info" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-sabc-gray-600">Inter-branches</p>
-                    <p className="text-2xl font-bold text-sabc-gray-900">
-                      {getPermissionMatrix().filter(r => r.cross_branch).length}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Onglets */}
           <Tabs defaultValue="matrix" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
