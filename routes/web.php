@@ -79,6 +79,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('as/dashboard', [App\Http\Controllers\DashboardController::class, 'as'])->name('dashboard.as')->middleware('role:AS');
     
     // Routes pour les évaluations (communes à tous les rôles)
+    Route::get('common/settings', function () {
+        return Inertia::render('Common/Settings');
+    })->name('common.settings');
+
+    Route::get('common/profile', function () {
+        return Inertia::render('Common/Profile');
+    })->name('common.profile');
+
     Route::prefix('common/evaluations')->name('evaluations.')->controller(\App\Http\Controllers\EvaluationController::class)->group(function () {
         // Page d'accueil des évaluations
         Route::get('/', 'index')->name('index');
@@ -108,7 +116,12 @@ Route::middleware(['auth'])->group(function () {
     
     // Routes pour l'administration (accessibles uniquement par l'admin)
     Route::middleware(['role:ADMIN'])->prefix('admin')->name('admin.')->group(function () {
-        
+        Route::get('analytics/{section?}', function ($section = null) {
+            return Inertia::render('Admin/Analytics/Index', [
+                'section' => $section,
+            ]);
+        })->where('section', '.*')->name('analytics');
+
         // Routes pour les remplacements temporaires
         Route::prefix('remplacements')->name('remplacements.')->controller(\App\Http\Controllers\Admin\ReplacementController::class)->group(function () {
             Route::get('/', 'index')->name('index');

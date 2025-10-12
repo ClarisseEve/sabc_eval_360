@@ -1,27 +1,47 @@
 import React from 'react';
 import { normalizeRole, type Role } from '@/config/rbac';
+import AccessDenied from '@/Components/Errors/AccessDenied';
 
 interface RoleGuardProps {
-  allowed: Role[];
+  allowed?: Role[];
+  /**
+   * @deprecated Utiliser `allowed`.
+   */
+  allowedRoles?: Role[];
   userRoleName?: string | null; // e.g. user.role_nom
   fallback?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function RoleGuard({ allowed, userRoleName, fallback, children }: RoleGuardProps) {
+export function RoleGuard({ allowed, allowedRoles, userRoleName, fallback, children }: RoleGuardProps) {
+  const activeAllowed = React.useMemo<Role[]>(() => {
+    const roles = allowed ?? allowedRoles ?? [];
+    return roles.filter(Boolean);
+  }, [allowed, allowedRoles]);
+
+  const hasWarnedLegacy = React.useRef(false);
+  const hasWarnedEmpty = React.useRef(false);
+
+  if (!allowed && allowedRoles && !hasWarnedLegacy.current) {
+    console.warn('[RoleGuard] La prop `allowedRoles` est obsolète. Merci d\'utiliser `allowed`.');
+    hasWarnedLegacy.current = true;
+  }
+
+  if (activeAllowed.length === 0) {
+    if (!hasWarnedEmpty.current) {
+      console.warn('[RoleGuard] Aucun rôle autorisé fourni, rendu complet autorisé par défaut.');
+      hasWarnedEmpty.current = true;
+    }
+    return <>{children}</>;
+  }
+
   const code = normalizeRole(userRoleName);
-  const isAllowed = allowed.includes(code);
+  const isAllowed = activeAllowed.includes(code);
   if (!isAllowed) {
-    return (
-      <div className="p-6">
-        {fallback ?? (
-          <div className="rounded-md border border-sabc-gray-200 bg-white p-6 text-sabc-gray-800">
-            <h2 className="text-lg font-semibold mb-2">Accès non autorisé</h2>
-            <p className="text-sm text-sabc-gray-600">Vous n'avez pas les permissions nécessaires pour accéder à cette page.</p>
-          </div>
-        )}
-      </div>
-    );
+    if (fallback) {
+      return <>{fallback}</>;
+    }
+    return <AccessDenied />;
   }
   return <>{children}</>;
 }

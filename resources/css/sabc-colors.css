@@ -146,7 +146,8 @@
 }
 
 /* Garantir que les boutons du design system sont toujours visibles */
-button[class*="text-white"] {
+/* Conserve la lisibilité des boutons explicitement forcés en blanc sans casser les variantes data-state */
+button.text-white {
   color: white !important;
 }
 
@@ -261,4 +262,3 @@ button[class*="text-sabc-error"] {
   background-color: var(--sabc-red-primary) !important;
   color: white !important;
 }
-

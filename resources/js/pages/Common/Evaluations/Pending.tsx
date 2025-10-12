@@ -299,17 +299,17 @@ const Pending: React.FC<Props> = ({ user, evaluations = {}, statistiques, role_p
       <Head title="Évaluations à compléter" />
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-none bg-gradient-to-br from-sabc-red-primary to-sabc-red-dark text-white shadow-lg">
+          <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold">Actions à planifier</CardTitle>
+              <CardTitle className="text-sm font-semibold text-sabc-gray-900 dark:text-white">Actions à planifier</CardTitle>
             </CardHeader>
             <CardContent className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15">
-                <ClipboardList className="h-6 w-6" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sabc-red-primary/10 text-sabc-red-primary dark:bg-sabc-red-primary/20">
+                <ClipboardList className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-2xl font-bold">{summaryStats.total}</div>
-                <div className="text-xs text-white/80">Évaluations prévues sur la période active</div>
+                <div className="text-xl font-semibold text-sabc-gray-900 dark:text-white">{summaryStats.total}</div>
+                <div className="text-xs text-sabc-gray-500">Évaluations prévues sur la période active</div>
               </div>
             </CardContent>
           </Card>

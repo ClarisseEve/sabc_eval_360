@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  Home, 
-  ClipboardList, 
-  BarChart2, 
-  ChevronRight, 
-  Users, 
+import {
+  Home,
+  ClipboardList,
+  BarChart2,
+  ChevronRight,
+  Users,
   Settings,
   UserCheck,
   Shield,
@@ -12,7 +12,7 @@ import {
   MapPin,
   Briefcase,
   Map,
-  Target
+  Target,
 } from 'lucide-react';
 import type { Role } from './rbac';
 
@@ -39,17 +39,13 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Mes évaluations',
         href: '/common/evaluations/mine',
         icon: <ChevronRight className="h-4 w-4" />,
+        roles: ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'CDS', 'SS', 'AS'],
       },
       {
         title: 'À compléter',
         href: '/common/evaluations/pending',
         icon: <ChevronRight className="h-4 w-4" />,
-      },
-      {
-        title: 'Historique',
-        href: '/admin/evaluations/history',
-        icon: <ChevronRight className="h-4 w-4" />,
-        roles: ['ADMIN'],
+        roles: ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'CDS', 'SS', 'AS'],
       },
       {
         title: 'Gestion globale',
@@ -66,6 +62,12 @@ export const NAV_ITEMS: NavItem[] = [
       {
         title: 'Périodes d\'évaluation',
         href: '/admin/evaluations/periodes',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ['ADMIN'],
+      },
+      {
+        title: 'Historique',
+        href: '/admin/evaluations/history',
         icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN'],
       },
@@ -101,13 +103,8 @@ export const NAV_ITEMS: NavItem[] = [
         icon: <ChevronRight className="h-4 w-4" />,
       },
       {
-        title: 'Historique',
-        href: '/admin/remplacements/history',
-        icon: <ChevronRight className="h-4 w-4" />,
-      },
-      {
-        title: 'Planification',
-        href: '/admin/remplacements/planning',
+        title: 'Créer un remplacement',
+        href: '/admin/remplacements/create',
         icon: <ChevronRight className="h-4 w-4" />,
       },
     ],
@@ -183,14 +180,9 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     title: 'Analytics',
-    href: '#',
+    href: '/admin/analytics',
     icon: <BarChart2 className="h-5 w-5" />,
     roles: ['ADMIN'],
-    children: [
-      { title: 'Performance globale', href: '/admin/analytics/global', icon: <ChevronRight className="h-4 w-4" /> },
-      { title: 'Par région', href: '/admin/analytics/regions', icon: <ChevronRight className="h-4 w-4" /> },
-      { title: 'Par rôle', href: '/admin/analytics/roles', icon: <ChevronRight className="h-4 w-4" /> },
-    ],
   },
 ];
 

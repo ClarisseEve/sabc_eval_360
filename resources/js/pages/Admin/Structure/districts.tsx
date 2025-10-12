@@ -83,7 +83,7 @@ export default function DistrictsIndex({ districts, services, auth, pageTitle }:
   };
 
   return (
-    <RoleGuard allowed={['ADMIN']}>
+    <RoleGuard allowed={['ADMIN']} userRoleName={auth?.user?.role ?? auth?.user?.role_display}>
       <AppLayout user={auth.user}>
         <Head title={pageTitle} />
         

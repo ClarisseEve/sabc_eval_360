@@ -27,7 +27,7 @@ const Spinner = ({ className }: { className?: string }) => (
 );
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white dark:ring-offset-sabc-gray-950 cursor-pointer",
+  "inline-flex items-center justify-center rounded-md text-[0.95rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white dark:ring-offset-sabc-gray-950 cursor-pointer",
   {
     variants: {
       variant: {
@@ -39,10 +39,10 @@ const buttonVariants = cva(
         link: 'text-sabc-red-primary underline-offset-4 hover:underline hover:text-sabc-red-dark dark:text-sabc-red-light dark:hover:text-sabc-red-primary',
       },
       size: {
-        default: 'h-10 py-2 px-4',
-        sm: 'h-9 px-3 rounded-md',
-        lg: 'h-11 px-8 rounded-md',
-        icon: 'h-10 w-10',
+        default: 'h-9 px-3.5',
+        sm: 'h-8 px-3 rounded-md text-sm',
+        lg: 'h-10 px-6 rounded-md text-base',
+        icon: 'h-9 w-9',
       },
     },
     defaultVariants: {

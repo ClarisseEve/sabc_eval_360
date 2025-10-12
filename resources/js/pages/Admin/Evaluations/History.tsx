@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Head } from '@inertiajs/react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Head, usePage } from '@inertiajs/react';
 import { useAuth } from '@/hooks/useAuth';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
@@ -48,6 +48,9 @@ interface HistoryEvaluation {
 
 const EvaluationHistoryPage = () => {
   const { user, isLoading } = useAuth();
+  const page = usePage<{ auth?: { user?: any } }>();
+  const inertiaUser = page.props.auth?.user;
+  const effectiveUser = useMemo(() => user ?? inertiaUser ?? null, [user, inertiaUser]);
   const [evaluations, setEvaluations] = useState<HistoryEvaluation[]>([]);
   const [filteredEvaluations, setFilteredEvaluations] = useState<HistoryEvaluation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -172,6 +175,12 @@ const EvaluationHistoryPage = () => {
     return 'text-sabc-success';
   };
 
+  const loadingFallback = (
+    <div className="flex w-full justify-center py-10">
+      <div className="h-10 w-10 animate-spin rounded-full border-2 border-sabc-red-primary border-t-transparent" aria-label="Chargement" />
+    </div>
+  );
+
   const handleViewEvaluation = (id: string) => {
     // Rediriger vers la page de visualisation de l'évaluation
     window.location.href = `/admin/evaluations/${id}`;
@@ -282,11 +291,11 @@ const EvaluationHistoryPage = () => {
   }
 
   // Adapter l'utilisateur au format attendu par AppLayout
-  const adaptedUser = user ? {
-    name: `${user.prenom} ${user.nom}`,
-    email: user.email,
-    role: user.role_nom,
-    avatar: user.avatar
+  const adaptedUser = effectiveUser ? {
+    name: `${effectiveUser.prenom ?? ''} ${effectiveUser.nom ?? ''}`.trim() || effectiveUser.name || 'Administrateur',
+    email: effectiveUser.email,
+    role: effectiveUser.role_nom ?? effectiveUser.role,
+    avatar: effectiveUser.avatar
   } : {
     name: 'Utilisateur',
     email: 'utilisateur@sabc.cm',
@@ -296,7 +305,11 @@ const EvaluationHistoryPage = () => {
   return (
     <AppLayout user={adaptedUser}>
       <Head title="Historique des Évaluations" />
-      <RoleGuard allowed={["ADMIN"]} userRoleName={user?.role_nom}>
+      <RoleGuard
+        allowed={["ADMIN"]}
+        userRoleName={effectiveUser?.role_nom ?? effectiveUser?.role}
+        fallback={isLoading ? loadingFallback : undefined}
+      >
       <div className="container mx-auto py-6 px-4 md:px-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-sabc-gray-900">Historique des Évaluations</h1>

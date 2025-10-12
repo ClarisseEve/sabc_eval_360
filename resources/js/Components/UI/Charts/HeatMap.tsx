@@ -32,6 +32,7 @@ export interface HeatMapProps {
   cellSize?: number;
   tooltip?: boolean;
   onCellClick?: (x: string, y: string, value: number) => void;
+  formatValue?: (value: number) => string;
 }
 
 /**
@@ -50,6 +51,7 @@ export function HeatMap({
   cellSize = 40,
   tooltip = true,
   onCellClick,
+  formatValue,
 }: HeatMapProps) {
   // Échelle de couleurs par défaut basée sur la palette SABC
   const defaultColorScale = [
@@ -140,7 +142,7 @@ export function HeatMap({
                     onClick={() => handleCellClick(xLabel, yLabel, cellData.value)}
                     title={tooltip ? `${xLabel} / ${yLabel}: ${cellData.value}` : undefined}
                   >
-                    {cellData.value.toFixed(1)}
+                    {formatValue ? formatValue(cellData.value) : cellData.value.toFixed(1)}
                   </div>
                 );
               })}

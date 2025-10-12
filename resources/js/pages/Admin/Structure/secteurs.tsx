@@ -100,7 +100,7 @@ export default function SecteursIndex({ secteurs, services, districts, auth, pag
   const availableDistricts = districts.filter(d => d.id_service === selectedService);
 
   return (
-    <RoleGuard allowedRoles={['ADMIN']}>
+    <RoleGuard allowed={['ADMIN']} userRoleName={auth?.user?.role ?? auth?.user?.role_display}>
       <AppLayout user={auth.user}>
         <Head title={pageTitle} />
         

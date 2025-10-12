@@ -414,13 +414,16 @@ class StructureController extends Controller
             ->withCount(['utilisateurs', 'secteurs'])
             ->get()
             ->map(function ($district) {
+                $service = $district->serviceCommercial;
+                $region = $service?->region;
+
                 return [
                     'id_district' => $district->id_district,
                     'nom_district' => $district->nom_district,
                     'id_service' => $district->id_service,
-                    'service_nom' => $district->serviceCommercial->nom_service,
-                    'region_nom' => $district->serviceCommercial->region->nom_region,
-                    'est_taniere' => $district->serviceCommercial->region->est_taniere,
+                    'service_nom' => $service?->nom_service ?? 'Service non défini',
+                    'region_nom' => $region?->nom_region ?? 'Région non définie',
+                    'est_taniere' => $region?->est_taniere ?? false,
                     'utilisateurs_count' => $district->utilisateurs_count,
                     'secteurs_count' => $district->secteurs_count,
                 ];
@@ -530,15 +533,18 @@ class StructureController extends Controller
             ->withCount('utilisateurs')
             ->get()
             ->map(function ($secteur) {
+                $service = $secteur->serviceCommercial;
+                $region = $service?->region;
+
                 return [
                     'id_secteur' => $secteur->id_secteur,
                     'nom_secteur' => $secteur->nom_secteur,
                     'id_service' => $secteur->id_service,
                     'id_district' => $secteur->id_district,
-                    'service_nom' => $secteur->serviceCommercial->nom_service,
+                    'service_nom' => $service?->nom_service ?? 'Service non défini',
                     'district_nom' => $secteur->district ? $secteur->district->nom_district : null,
-                    'region_nom' => $secteur->serviceCommercial->region->nom_region,
-                    'est_taniere' => $secteur->serviceCommercial->region->est_taniere,
+                    'region_nom' => $region?->nom_region ?? 'Région non définie',
+                    'est_taniere' => $region?->est_taniere ?? false,
                     'utilisateurs_count' => $secteur->utilisateurs_count,
                 ];
             });

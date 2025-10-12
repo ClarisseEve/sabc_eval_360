@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use App\Models\Utilisateur;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -130,16 +131,32 @@ class RoleBasedAccess
         }
         
         // Vérifier si l'utilisateur a l'un des rôles requis
-        $userRole = strtolower($user->role_nom);
-        
-        if (in_array($userRole, array_map('strtolower', $roles)) || in_array('*', $roles)) {
+        $userRoleRaw = $user->role_nom ?? $user->role ?? '';
+        $userRole = strtolower($userRoleRaw);
+        $normalizedUserRole = $this->normalizeRoleName($userRoleRaw);
+
+        $normalizedRequiredRoles = array_map(function ($role) {
+            if ($role === '*') {
+                return '*';
+            }
+
+            return $this->normalizeRoleName($role);
+        }, $roles);
+
+        if (
+            in_array('*', $roles, true) ||
+            in_array($userRole, array_map('strtolower', $roles), true) ||
+            in_array($normalizedUserRole, $normalizedRequiredRoles, true)
+        ) {
             return $next($request);
         }
         
         // Rediriger vers le dashboard approprié si l'utilisateur n'a pas le bon rôle
         Log::notice("RoleBasedAccess: Accès refusé - rôle non autorisé", [
             'user_role' => $userRole,
+            'normalized_user_role' => $normalizedUserRole,
             'required_roles' => $roles,
+            'normalized_required_roles' => $normalizedRequiredRoles,
             'url' => $request->url()
         ]);
         
@@ -285,5 +302,60 @@ class RoleBasedAccess
             'role_non_reconnu' => $roleName,
             'region_type' => $regionKey
         ]);
+    }
+
+    private function normalizeRoleName(?string $role): string
+    {
+        if (!$role) {
+            return '';
+        }
+
+        $normalized = Str::upper(Str::ascii(trim($role)));
+
+        if (str_contains($normalized, 'ADMIN')) {
+            return 'ADMIN';
+        }
+
+        if ($normalized === 'DR' || str_contains($normalized, 'DIRECTEUR REGIONAL')) {
+            return 'DR';
+        }
+
+        if (str_contains($normalized, 'CDTT') || str_contains($normalized, 'CHEF DEPARTEMENT TRADE')) {
+            return 'CDTT';
+        }
+
+        if ($normalized === 'CSC' || str_contains($normalized, 'CHEF SERVICE COMMERCIAL')) {
+            return 'CSC';
+        }
+
+        if ($normalized === 'CDV' || str_contains($normalized, 'CHEF DISTRICT VENTE')) {
+            return 'CDV';
+        }
+
+        if ($normalized === 'CDS' || str_contains($normalized, 'CHEF DE SECTEUR')) {
+            return 'CDS';
+        }
+
+        if ($normalized === 'RTM' || str_contains($normalized, 'REGIONAL TRADE MARKETING')) {
+            return 'RTM';
+        }
+
+        if ($normalized === 'TMO' || str_contains($normalized, 'TRADE MARKETING OPERATOR')) {
+            return 'TMO';
+        }
+
+        if ($normalized === 'SRMO' || str_contains($normalized, 'SUPERVISEUR REGIONAL MARKETING OPERATIONNEL')) {
+            return 'SRMO';
+        }
+
+        if ($normalized === 'SS' || str_contains($normalized, 'SUPERVISEUR SPONSORING')) {
+            return 'SS';
+        }
+
+        if ($normalized === 'AS' || str_contains($normalized, 'ASSISTANT SUPERVISEUR SPONSORING')) {
+            return 'AS';
+        }
+
+        return 'CSC';
     }
 }

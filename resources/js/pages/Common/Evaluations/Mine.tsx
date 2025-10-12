@@ -21,6 +21,7 @@ import {
   Target,
   Users2,
 } from 'lucide-react';
+import { normalizeRole } from '@/config/rbac';
 
 interface TemplatePayload {
   id?: string | number;
@@ -151,7 +152,11 @@ const normaliseTargets = (targets?: EvaluationTargetsPayload): Record<TargetGrou
 
   Object.entries(payload).forEach(([key, list]) => {
     if (!Array.isArray(list) || list.length === 0) return;
-    result[key as TargetGroupKey] = list;
+    const eligibleTargets = list.filter(
+      (item) => normalizeRole(item.role_nom ?? item.role ?? '') !== 'ADMIN'
+    );
+    if (eligibleTargets.length === 0) return;
+    result[key as TargetGroupKey] = eligibleTargets;
   });
 
   return result;
@@ -222,6 +227,19 @@ const Mine: React.FC<Props> = ({ user, templates, evaluationTargets, stats }) =>
     [targetGroups]
   );
 
+  const availableTargetDefinitions = useMemo(
+    () =>
+      TARGET_DEFINITIONS.filter(
+        (definition) => (targetGroups[definition.key] ?? []).length > 0
+      ),
+    [targetGroups]
+  );
+
+  const defaultTargetTab = useMemo(
+    () => availableTargetDefinitions[0]?.key ?? 'auto',
+    [availableTargetDefinitions]
+  );
+
   const startEvaluation = (targetMatricule: string) => {
     if (!selectedTemplateData) return;
     setModalTarget(targetMatricule);
@@ -287,35 +305,41 @@ const Mine: React.FC<Props> = ({ user, templates, evaluationTargets, stats }) =>
     <AppLayout user={layoutUser} pageTitle="Mes évaluations" notifications={[]}> 
       <Head title="Mes évaluations" />
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <Card className="border-none bg-gradient-to-br from-sabc-red-primary/90 via-sabc-red-primary to-sabc-red-dark text-white shadow-lg">
-          <CardContent className="flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between">
+        <Card className="relative overflow-hidden border-none bg-white text-sabc-gray-900 shadow-lg">
+          <Sparkles
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-12 -right-16 h-72 w-72 text-sabc-red-primary opacity-10"
+          />
+          <CardContent className="relative flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2">
-              <Badge variant="outline" className="border-white/40 bg-white/10 text-white backdrop-blur">
+              <Badge variant="outline" className="border-sabc-red-primary bg-sabc-red-primary/10 text-sabc-red-primary">
                 {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
               </Badge>
-              <h1 className="text-2xl font-semibold md:text-3xl">Préparez vos évaluations 360°</h1>
-              <p className="max-w-xl text-sm text-white/80">
+              <h1 className="text-2xl font-semibold text-sabc-gray-900 md:text-3xl">Préparez vos évaluations 360°</h1>
+              <p className="max-w-xl text-sm text-sabc-gray-600">
                 Sélectionnez un template, choisissez votre collaborateur et démarrez l'évaluation en quelques secondes. Toutes les règles SABC sont automatiquement appliquées.
               </p>
               <div className="flex flex-wrap gap-3">
                 {heroStats.map((stat) => (
-                  <div key={stat.label} className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm text-white/80">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white">
+                  <div
+                    key={stat.label}
+                    className="flex items-center gap-2 rounded-full bg-sabc-red-primary/10 px-3 py-1 text-sm text-sabc-red-primary"
+                  >
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sabc-red-primary/20 text-sabc-red-primary">
                       {stat.icon}
                     </span>
                     <div className="flex flex-col leading-4">
-                      <span className="text-xs uppercase tracking-wide text-white/60">{stat.label}</span>
-                      <span className="font-semibold text-white">{stat.value}</span>
+                      <span className="text-xs uppercase tracking-wide text-sabc-red-primary/70">{stat.label}</span>
+                      <span className="font-semibold">{stat.value}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="relative hidden overflow-hidden rounded-2xl bg-white/10 p-6 text-sm text-white/80 backdrop-blur md:block">
-              <Sparkles className="absolute -top-6 -right-6 h-24 w-24 text-white/20" />
+            <div className="relative hidden overflow-hidden rounded-2xl bg-sabc-red-primary/5 p-6 text-sm text-sabc-gray-700 md:block">
               <div className="space-y-2">
-                <p className="font-semibold text-white">Conseils rapides</p>
-                <ul className="space-y-1 text-xs">
+                <p className="font-semibold text-sabc-gray-900">Conseils rapides</p>
+                <ul className="space-y-1 text-xs text-sabc-gray-600">
                   <li>• Choisissez un template pour activer les actions.</li>
                   <li>• Justifiez toute note inférieure à 3.</li>
                   <li>• Enregistrez un brouillon à tout moment.</li>
@@ -407,33 +431,37 @@ const Mine: React.FC<Props> = ({ user, templates, evaluationTargets, stats }) =>
 
           <div className="space-y-4">
             <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
-              <CardHeader className="flex flex-col gap-2">
-                <CardTitle className="flex items-center justify-between text-base">
-                  <span>Personnes à évaluer</span>
-                  {selectedTemplateData ? (
-                    <Badge variant="secondary" className="text-xs">
-                      {selectedTemplateData.name}
-                    </Badge>
-                  ) : (
-                    <span className="text-xs text-sabc-gray-400">Sélectionnez un template pour activer l'évaluation</span>
-                  )}
-                </CardTitle>
-                <TabsList className="w-full justify-start overflow-x-auto">
-                  {TARGET_DEFINITIONS.filter((definition) => (targetGroups[definition.key] ?? []).length > 0).map((definition) => (
-                    <TabsTrigger key={definition.key} value={definition.key} className="flex items-center gap-2 text-xs">
-                      {definition.icon}
-                      {definition.label}
-                      <span className="rounded-full bg-sabc-gray-100 px-1.5 py-0.5 text-[10px] text-sabc-gray-600 dark:bg-sabc-gray-800 dark:text-sabc-gray-300">
-                        {(targetGroups[definition.key] ?? []).length}
+              <Tabs defaultValue={defaultTargetTab} className="space-y-4">
+                <CardHeader className="flex flex-col gap-2">
+                  <CardTitle className="flex items-center justify-between text-base">
+                    <span>Personnes à évaluer</span>
+                    {selectedTemplateData ? (
+                      <Badge variant="secondary" className="text-xs">
+                        {selectedTemplateData.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-sabc-gray-400">
+                        Sélectionnez un template pour activer l'évaluation
                       </span>
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue={
-                  TARGET_DEFINITIONS.find((definition) => (targetGroups[definition.key] ?? []).length > 0)?.key ?? 'auto'
-                } className="space-y-4">
+                    )}
+                  </CardTitle>
+                  <TabsList className="w-full justify-start overflow-x-auto">
+                    {availableTargetDefinitions.map((definition) => (
+                      <TabsTrigger
+                        key={definition.key}
+                        value={definition.key}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        {definition.icon}
+                        {definition.label}
+                        <span className="rounded-full bg-sabc-gray-100 px-1.5 py-0.5 text-[10px] text-sabc-gray-600 dark:bg-sabc-gray-800 dark:text-sabc-gray-300">
+                          {(targetGroups[definition.key] ?? []).length}
+                        </span>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </CardHeader>
+                <CardContent>
                   {TARGET_DEFINITIONS.map((definition) => {
                     const targets = targetGroups[definition.key] ?? [];
                     return (
@@ -449,8 +477,8 @@ const Mine: React.FC<Props> = ({ user, templates, evaluationTargets, stats }) =>
                       </TabsContent>
                     );
                   })}
-                </Tabs>
-              </CardContent>
+                </CardContent>
+              </Tabs>
             </Card>
 
             <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">

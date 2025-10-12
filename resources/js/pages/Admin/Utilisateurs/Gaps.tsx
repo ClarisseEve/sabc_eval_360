@@ -31,14 +31,30 @@ interface Props {
   }>;
 }
 
-export default function Gaps({ user, pageTitle, isAdmin, permissions, utilisateurs }: Props) {
+export default function Gaps({ user, pageTitle, isAdmin, permissions, utilisateurs = [] }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedSeverite, setSelectedSeverite] = useState('');
 
   // Filtrer les utilisateurs selon les critères
-  const filteredUtilisateurs = utilisateurs.filter(utilisateur => {
+  const preparedUtilisateurs = React.useMemo(() => {
+    if (!Array.isArray(utilisateurs)) {
+      return [] as Props['utilisateurs'];
+    }
+
+    return utilisateurs.map(utilisateur => ({
+      ...utilisateur,
+      region: utilisateur.region || 'Non définie',
+      role: utilisateur.role || 'N/A',
+      gaps_detectes: utilisateur.gaps_detectes || (utilisateur as any).gaps_identifies || [],
+      nb_evaluations: utilisateur.nb_evaluations ?? 0,
+      score_global: utilisateur.score_global ?? 0,
+      progression: utilisateur.progression ?? 0,
+    }));
+  }, [utilisateurs]);
+
+  const filteredUtilisateurs = preparedUtilisateurs.filter(utilisateur => {
     const matchesSearch = utilisateur.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          utilisateur.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          utilisateur.matricule.toLowerCase().includes(searchTerm.toLowerCase());
@@ -53,12 +69,14 @@ export default function Gaps({ user, pageTitle, isAdmin, permissions, utilisateu
   });
 
   // Calculer les statistiques
-  const totalUtilisateurs = utilisateurs.length;
-  const utilisateursAvecGaps = utilisateurs.filter(u => u.gaps_detectes.length > 0).length;
-  const gapsEleves = utilisateurs.filter(u => 
+  const totalUtilisateurs = preparedUtilisateurs.length;
+  const utilisateursAvecGaps = preparedUtilisateurs.filter(u => u.gaps_detectes.length > 0).length;
+  const gapsEleves = preparedUtilisateurs.filter(u => 
     u.gaps_detectes.some(gap => gap.severite === 'elevee')
   ).length;
-  const scoreGlobalMoyen = utilisateurs.reduce((sum, u) => sum + u.score_global, 0) / totalUtilisateurs;
+  const scoreGlobalMoyen = totalUtilisateurs > 0
+    ? preparedUtilisateurs.reduce((sum, u) => sum + (u.score_global ?? 0), 0) / totalUtilisateurs
+    : 0;
 
   const getSeveriteBadge = (severite: string) => {
     switch (severite) {

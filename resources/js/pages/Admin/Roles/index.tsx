@@ -8,10 +8,8 @@ import { Input } from '@/Components/UI/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/Components/UI/DropdownMenu';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs';
-import { Users, Shield, Eye, Edit, Trash2, MoreHorizontal, Search, Filter, Plus, List, Network } from 'lucide-react';
+import { Users, Shield, Eye, Edit, Trash2, MoreHorizontal, Search, Filter, Plus, Network } from 'lucide-react';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
-import { HierarchyTree, SABC_HIERARCHY_DATA } from '@/Components/UI/HierarchyTree';
 
 interface Role {
   id_role: string;
@@ -44,7 +42,6 @@ interface Props {
 export default function RolesIndex({ roles, auth, pageTitle }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
-  const [activeTab, setActiveTab] = useState('list');
   const [deletingRole, setDeletingRole] = useState<string | null>(null);
 
   const handleDelete = (roleId: string) => {
@@ -156,126 +153,91 @@ export default function RolesIndex({ roles, auth, pageTitle }: Props) {
         
         <div className="space-y-6 p-6">
 
-          {/* Onglets Liste/Graphique */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="list" className="flex items-center gap-2">
-                <List className="h-4 w-4" />
-                Vue Liste
-              </TabsTrigger>
-              <TabsTrigger value="hierarchy" className="flex items-center gap-2">
-                <Network className="h-4 w-4" />
-                Arborescence Hiérarchique
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="list" className="space-y-4">
-              {/* Table des rôles */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-sabc-red-primary" />
-                    Liste des Rôles
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Rôle</TableHead>
-                        <TableHead>Niveau</TableHead>
-                        <TableHead>Permissions</TableHead>
-                        <TableHead>Utilisateurs</TableHead>
-                        <TableHead>Portée Géographique</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+          <div className="space-y-4">
+            {/* Table des rôles */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-sabc-red-primary" />
+                  Liste des Rôles
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Rôle</TableHead>
+                      <TableHead>Niveau</TableHead>
+                      <TableHead>Permissions</TableHead>
+                      <TableHead>Utilisateurs</TableHead>
+                      <TableHead>Portée Géographique</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {roles.map((role, roleIndex) => (
+                      <TableRow key={`role-${role.id_role || roleIndex}`}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-sabc-gray-900">{role.nom_role}</div>
+                            <div className="text-sm text-sabc-gray-500">{role.description}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getBadgeVariant(role)}>
+                            {getNiveauDisplay(role)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {getPermissionsBadges(role).map((permission, index) => (
+                              <Badge key={`role-${role.id_role || roleIndex}-permission-${permission}-${index}`} variant="outline" className="text-xs">
+                                {permission}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <Users className="w-4 h-4 mr-1 text-sabc-gray-400" />
+                            <span className="text-sm">{role.utilisateurs_count}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {getPorteeGeographique(role)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Voir
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Modifier
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Supprimer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {roles.map((role, roleIndex) => (
-                        <TableRow key={`role-${role.id_role || roleIndex}`}>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium text-sabc-gray-900">{role.nom_role}</div>
-                              <div className="text-sm text-sabc-gray-500">{role.description}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getBadgeVariant(role)}>
-                              {getNiveauDisplay(role)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {getPermissionsBadges(role).map((permission, index) => (
-                                <Badge key={`role-${role.id_role || roleIndex}-permission-${permission}-${index}`} variant="outline" className="text-xs">
-                                  {permission}
-                                </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              <Users className="w-4 h-4 mr-1 text-sabc-gray-400" />
-                              <span className="text-sm">{role.utilisateurs_count}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {getPorteeGeographique(role)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  Voir
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Modifier
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600">
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Supprimer
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="hierarchy" className="space-y-4">
-              {/* Vue hiérarchique des rôles avec composant réutilisable */}
-              <div className="space-y-6">
-                <HierarchyTree
-                  title="Régions Tanières (5 niveaux)"
-                  subtitle="Structure hiérarchique complète pour les régions à forte densité commerciale"
-                  nodes={SABC_HIERARCHY_DATA.roles_taniere}
-                  variant="taniere"
-                  showMetadata={false}
-                />
-
-                <HierarchyTree
-                  title="Régions Non-Tanières (3 niveaux)"
-                  subtitle="Structure simplifiée pour les régions moins denses"
-                  nodes={SABC_HIERARCHY_DATA.roles_non_taniere}
-                  variant="non-taniere"
-                  showMetadata={false}
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </AppLayout>
     </RoleGuard>

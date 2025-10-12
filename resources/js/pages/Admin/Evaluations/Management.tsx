@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Head } from '@inertiajs/react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Head, usePage } from '@inertiajs/react';
 import { useAuth } from '@/hooks/useAuth';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/Components/UI/Card/Card';
@@ -41,12 +41,16 @@ interface RegionStats {
 
 const EvaluationManagementPage = () => {
   const { user, isLoading } = useAuth();
+  const page = usePage<{ auth?: { user?: any } }>();
+  const inertiaUser = page.props.auth?.user;
+  const effectiveUser = useMemo(() => user ?? inertiaUser ?? null, [user, inertiaUser]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [regionStats, setRegionStats] = useState<RegionStats[]>([]);
   const [globalStats, setGlobalStats] = useState<StatItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('overview');
+
 
   // Simuler le chargement des données depuis l'API
   useEffect(() => {
@@ -209,11 +213,11 @@ const EvaluationManagementPage = () => {
   }
 
   // Adapter l'utilisateur au format attendu par AppLayout
-  const adaptedUser = user ? {
-    name: `${user.prenom} ${user.nom}`,
-    email: user.email,
-    role: user.role_nom,
-    avatar: user.avatar
+  const adaptedUser = effectiveUser ? {
+    name: `${effectiveUser.prenom ?? ''} ${effectiveUser.nom ?? ''}`.trim() || effectiveUser.name || 'Administrateur',
+    email: effectiveUser.email,
+    role: effectiveUser.role_nom ?? effectiveUser.role,
+    avatar: effectiveUser.avatar
   } : {
     name: 'Utilisateur',
     email: 'utilisateur@sabc.cm',
@@ -221,7 +225,11 @@ const EvaluationManagementPage = () => {
   };
 
   return (
-    <RoleGuard allowed={["ADMIN"]} userRoleName={user?.role_nom}>
+    <RoleGuard
+      allowed={["ADMIN"]}
+      userRoleName={effectiveUser?.role_nom ?? effectiveUser?.role}
+      fallback={isLoading ? <div className="py-10 text-center text-sm text-sabc-gray-500">Chargement…</div> : undefined}
+    >
     <AppLayout user={adaptedUser}>
       <Head title="Gestion Globale des Évaluations" />
       
@@ -398,55 +406,41 @@ const EvaluationManagementPage = () => {
             )}
           </TabsContent>
           
-          <TabsContent value="regions" className="mt-6">
+          <TabsContent value="regions" className="mt-6 space-y-6">
             {loading ? (
               <p className="text-center py-4">Chargement des données régionales...</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {regionStats.map((region) => (
-                  <Card key={region.region_name}>
-                    <CardHeader>
-                      <CardTitle>{region.region_name}</CardTitle>
-                      <CardDescription>
-                        {region.total_evaluations} évaluations au total
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm">Taux de complétion</span>
-                            <span className="text-sm font-medium">{region.completion_rate}%</span>
-                          </div>
-                          <Progress 
-                            value={region.completion_rate} 
-                            className={getProgressColor(region.completion_rate)}
-                          />
+              <>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {regionStats.map((region) => (
+                    <Card key={region.region_name} className="border-sabc-gray-200">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">{region.region_name}</CardTitle>
+                        <CardDescription>{region.total_evaluations} évaluations suivies</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3 text-sm">
+                        <div className="flex justify-between">
+                          <span>Complétion</span>
+                          <span className="font-semibold">{region.completion_rate}%</span>
                         </div>
-                        
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm">Score moyen</span>
-                            <span className="text-sm font-medium">{region.average_score}/100</span>
-                          </div>
-                          <Progress 
-                            value={region.average_score} 
-                            className={getProgressColor(region.average_score)}
-                          />
+                        <Progress value={region.completion_rate} className={getProgressColor(region.completion_rate)} />
+                        <div className="flex justify-between">
+                          <span>Score moyen</span>
+                          <span className="font-semibold">{region.average_score}/100</span>
                         </div>
-                        
-                        <Button 
-                          variant="outline" 
-                          className="w-full"
+                        <Progress value={region.average_score} className={getProgressColor(region.average_score)} />
+                        <Button
+                          variant="outline"
+                          className="w-full text-xs"
                           onClick={() => window.location.href = `/admin/regions/${region.region_name.toLowerCase()}/evaluations`}
                         >
-                          Détails pour {region.region_name}
+                          Explorer les détails
                         </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </>
             )}
           </TabsContent>
         </Tabs>

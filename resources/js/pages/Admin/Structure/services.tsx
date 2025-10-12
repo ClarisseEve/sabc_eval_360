@@ -92,7 +92,7 @@ export default function ServicesIndex({ services, regions, auth, pageTitle }: Se
   };
 
   return (
-    <RoleGuard allowed={['ADMIN']}>
+    <RoleGuard allowed={['ADMIN']} userRoleName={auth?.user?.role ?? auth?.user?.role_display}>
       <AppLayout user={auth.user}>
         <Head title={pageTitle} />
         
@@ -237,8 +237,8 @@ export default function ServicesIndex({ services, regions, auth, pageTitle }: Se
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {services.map((service) => (
-                    <TableRow key={service.id_service}>
+                  {services.map((service, index) => (
+                    <TableRow key={`${service.id_service}-${index}`}>
                       <TableCell>
                         <div className="font-medium text-sabc-gray-900">{service.nom_service}</div>
                         <div className="text-sm text-sabc-gray-500">{service.id_service}</div>

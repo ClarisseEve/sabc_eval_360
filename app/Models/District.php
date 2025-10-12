@@ -50,11 +50,19 @@ class District extends Model
     ];
     
     /**
-     * Relation avec le service commercial
+     * Relation avec le service commercial (alias historique `service`)
      */
     public function service()
     {
         return $this->belongsTo(ServiceCommercial::class, 'id_service', 'id_service');
+    }
+
+    /**
+     * Relation explicite pour compatibilité avec les contrôleurs
+     */
+    public function serviceCommercial()
+    {
+        return $this->service();
     }
     
     /**

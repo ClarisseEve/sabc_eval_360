@@ -59,11 +59,19 @@ class Secteur extends Model
     }
     
     /**
-     * Relation avec le service commercial
+     * Relation avec le service commercial (alias historique `service`)
      */
     public function service()
     {
         return $this->belongsTo(ServiceCommercial::class, 'id_service', 'id_service');
+    }
+
+    /**
+     * Alias explicite utilisé par les contrôleurs/admin
+     */
+    public function serviceCommercial()
+    {
+        return $this->service();
     }
     
     /**

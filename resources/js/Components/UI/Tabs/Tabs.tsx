@@ -16,7 +16,7 @@ const tabsRootVariants = cva('', {
 });
 
 const tabsListVariants = cva(
-  'inline-flex items-center justify-center rounded-md bg-sabc-gray-100 p-1 dark:bg-sabc-gray-800',
+  'inline-flex items-center justify-center rounded-md bg-sabc-gray-100 p-0.5 dark:bg-sabc-gray-800',
   {
     variants: {
       variant: {
@@ -32,7 +32,7 @@ const tabsListVariants = cva(
 );
 
 const tabsTriggerVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-sabc-gray-900',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1.5 text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-sabc-gray-900',
   {
     variants: {
       variant: {
