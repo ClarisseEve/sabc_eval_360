@@ -10,6 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import type { TooltipProps as RechartsTooltipProps } from 'recharts';
 import { cn } from '@/utils/helpers';
 
 const COLORS = [
@@ -31,6 +32,8 @@ export interface ScatterSeries {
   lineType?: 'joint' | 'fitting';
 }
 
+type ScatterTooltipProps = RechartsTooltipProps<any, any>;
+
 export interface ScatterChartProps {
   data?: Array<Record<string, any>>;
   series?: ScatterSeries[];
@@ -49,7 +52,7 @@ export interface ScatterChartProps {
   className?: string;
   showLegend?: boolean;
   showGrid?: boolean;
-  tooltip?: React.ReactNode;
+  tooltip?: React.ReactNode | ((props: ScatterTooltipProps) => React.ReactNode);
   zAxisRange?: [number, number];
   children?: React.ReactNode;
 }
@@ -88,6 +91,40 @@ export function ScatterChart({
     })
   );
 
+  const renderTooltip = () => {
+    if (!tooltip) {
+      return (
+        <Tooltip
+          cursor={{ strokeDasharray: '3 3' }}
+          contentStyle={{
+            backgroundColor: '#ffffff',
+            border: '1px solid var(--sabc-gray-200)',
+            borderRadius: 4,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
+          }}
+          formatter={(value: number | string, name: string) => [value, name]}
+        />
+      );
+    }
+
+    if (typeof tooltip === 'function') {
+      return (
+        <Tooltip
+          cursor={{ strokeDasharray: '3 3' }}
+          contentStyle={{
+            backgroundColor: '#ffffff',
+            border: '1px solid var(--sabc-gray-200)',
+            borderRadius: 4,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
+          }}
+          content={tooltip}
+        />
+      );
+    }
+
+    return tooltip;
+  };
+
   return (
     <div className={cn('w-full', className)}>
       {title && <h3 className="text-lg font-semibold text-sabc-gray-800">{title}</h3>}
@@ -124,20 +161,7 @@ export function ScatterChart({
               unit={zAxisUnit}
             />
           )}
-          {tooltip ? (
-            <Tooltip content={tooltip} />
-          ) : (
-            <Tooltip
-              cursor={{ strokeDasharray: '3 3' }}
-              contentStyle={{
-                backgroundColor: '#ffffff',
-                border: '1px solid var(--sabc-gray-200)',
-                borderRadius: 4,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-              }}
-              formatter={(value: number | string, name: string) => [value, name]}
-            />
-          )}
+          {renderTooltip()}
           {showLegend && <Legend wrapperStyle={{ fontSize: '12px' }} />}
           {datasets.map((item, index) => (
             <Scatter
