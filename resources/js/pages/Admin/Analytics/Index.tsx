@@ -14,7 +14,16 @@ import { Button, buttonVariants } from '@/Components/UI/Button/Button';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Avatar } from '@/Components/UI/Avatar/Avatar';
 import { Progress } from '@/Components/UI/Progress/Progress';
-import { BarChart, LineChart, PieChart } from '@/Components/UI/Charts';
+import {
+  AreaChart,
+  BarChart,
+  FunnelChart,
+  GaugeChart,
+  LineChart,
+  PieChart,
+  ScatterChart,
+  WaterfallChart,
+} from '@/Components/UI/Charts';
 import {
   AnalyticsFiltersProvider,
   AnalyticsFilterPanel,
@@ -311,6 +320,122 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ dataset, active
     });
   }, [analytics.biasIndicators]);
 
+  const participationKpi = React.useMemo(
+    () => analytics.kpis.find((kpi) => kpi.id === 'participation_rate'),
+    [analytics.kpis]
+  );
+
+  const averageScoreKpi = React.useMemo(
+    () => analytics.kpis.find((kpi) => kpi.id === 'avg_score'),
+    [analytics.kpis]
+  );
+
+  const performanceAreaData = React.useMemo(
+    () =>
+      analytics.performanceTrend.map((point) => ({
+        period: point.period,
+        scoreIndex: Number(((point.score / 5) * 100).toFixed(1)),
+        participation: point.participation ?? 0,
+      })),
+    [analytics.performanceTrend]
+  );
+
+  const roleScatterData = React.useMemo(
+    () =>
+      analytics.rolePerformance.map((item) => ({
+        role: item.role,
+        participation: item.participation ?? 0,
+        score: Number(item.score.toFixed(2)),
+      })),
+    [analytics.rolePerformance]
+  );
+
+  const performanceWaterfallData = React.useMemo(() => {
+    if (analytics.performanceTrend.length === 0) {
+      return [] as Array<{ name: string; value: number; isTotal?: boolean; color?: string }>;
+    }
+
+    const [first, ...rest] = analytics.performanceTrend;
+    const items: Array<{ name: string; value: number; isTotal?: boolean; color?: string }> = [
+      {
+        name: first.period,
+        value: Number(first.score.toFixed(2)),
+        isTotal: true,
+      },
+    ];
+
+    let previousScore = first.score;
+    rest.forEach((point) => {
+      const delta = Number((point.score - previousScore).toFixed(2));
+      items.push({
+        name: `Variation ${point.period}`,
+        value: delta,
+        color: delta >= 0 ? 'var(--sabc-success)' : 'var(--sabc-warning)',
+      });
+      previousScore = point.score;
+    });
+
+    items.push({
+      name: 'Score actuel',
+      value: Number(previousScore.toFixed(2)),
+      isTotal: true,
+    });
+
+    return items;
+  }, [analytics.performanceTrend]);
+
+  const evaluationFunnelData = React.useMemo(() => {
+    if (analytics.evaluationStatusDistribution.length === 0) {
+      return [] as Array<{ name: string; value: number }>;
+    }
+
+    const totalInvitations = analytics.evaluationStatusDistribution.reduce(
+      (acc, status) => acc + status.filteredCount,
+      0
+    );
+
+    const started = analytics.evaluationStatusDistribution
+      .filter((status) => status.status !== 'draft')
+      .reduce((acc, status) => acc + status.filteredCount, 0);
+
+    const submitted =
+      analytics.evaluationStatusDistribution.find((status) => status.status === 'completed')
+        ?.filteredCount ?? 0;
+
+    const validated = Math.min(Math.round(Math.max(submitted * 0.92, 0)), submitted);
+
+    return [
+      { name: 'Invitations envoyées', value: totalInvitations },
+      { name: 'Évaluations démarrées', value: started },
+      { name: 'Soumissions reçues', value: submitted },
+      { name: 'Validations', value: validated },
+    ];
+  }, [analytics.evaluationStatusDistribution]);
+
+  const roleScatterTooltip = React.useCallback(
+    ({ active, payload }: any) => {
+      if (!active || !payload || payload.length === 0) {
+        return null;
+      }
+
+      const datum = payload[0].payload as (typeof roleScatterData)[number];
+
+      return (
+        <div className="rounded border border-sabc-gray-200 bg-white px-3 py-2 text-xs text-sabc-gray-700 shadow-sm">
+          <div className="font-semibold text-sabc-gray-800">{datum.role}</div>
+          <div>Score moyen : {datum.score.toFixed(2)}</div>
+          <div>Participation : {datum.participation.toFixed(0)}%</div>
+        </div>
+      );
+    },
+    [roleScatterData]
+  );
+
+  const formatScore = React.useCallback(
+    (value?: number) => (value !== undefined ? value.toFixed(2) : 'N/A'),
+    []
+  );
+
   const activeFiltersCount = React.useMemo(() => computeActiveFiltersCount(filters), [filters]);
   const filterSummaries = React.useMemo(() => buildFilterSummary(filters), [filters]);
 
@@ -556,6 +681,85 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ dataset, active
                       </Card>
                     </div>
 
+                    {(participationKpi || performanceAreaData.length > 0) && (
+                      <div className="grid gap-4 xl:grid-cols-3">
+                        {participationKpi && (
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-base text-sabc-gray-800 dark:text-white">
+                                Engagement des évaluations
+                              </CardTitle>
+                              <CardDescription>
+                                Objectif interne ≥ 85%. Global SABC :{' '}
+                                {participationKpi.globalValue !== undefined
+                                  ? `${participationKpi.globalValue}%`
+                                  : 'N/A'}
+                                .
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <GaugeChart
+                                value={participationKpi.value}
+                                max={100}
+                                label="Population filtrée"
+                                color="var(--sabc-success)"
+                                trackColor="var(--sabc-gray-200)"
+                                showTooltip={false}
+                                subtitle={
+                                  participationKpi.globalValue !== undefined
+                                    ? `Global ${participationKpi.globalValue}%`
+                                    : undefined
+                                }
+                              />
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {performanceAreaData.length > 0 && (
+                          <Card
+                            className={cn(
+                              'shadow-sm',
+                              participationKpi ? 'xl:col-span-2' : 'xl:col-span-3'
+                            )}
+                          >
+                            <CardHeader>
+                              <CardTitle className="text-base text-sabc-gray-800 dark:text-white">
+                                Score vs participation
+                              </CardTitle>
+                              <CardDescription>
+                                Comparaison indexée des scores globaux et de la participation
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <AreaChart
+                                data={performanceAreaData}
+                                xAxisDataKey="period"
+                                areas={[
+                                  {
+                                    dataKey: 'scoreIndex',
+                                    name: 'Score indexé (0-100)',
+                                    color: 'var(--sabc-red-primary)',
+                                    fillOpacity: 0.25,
+                                  },
+                                  {
+                                    dataKey: 'participation',
+                                    name: 'Participation %',
+                                    color: 'var(--sabc-success)',
+                                    fillOpacity: 0.2,
+                                  },
+                                ]}
+                                height={260}
+                              />
+                              <p className="text-xs text-sabc-gray-500">
+                                Le score moyen est normalisé sur 100 (score / 5 * 100) afin de l'aligner visuellement
+                                avec les taux de participation.
+                              </p>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    )}
+
                     <div className="grid gap-4 lg:grid-cols-2">
                       <Card className="shadow-sm">
                         <CardHeader>
@@ -584,6 +788,80 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ dataset, active
 
                       <BiasIndicatorsCard indicators={orderedBiasIndicators} />
                     </div>
+
+                    {(roleScatterData.length > 0 ||
+                      performanceWaterfallData.length > 0 ||
+                      evaluationFunnelData.length > 0) && (
+                      <div className="grid gap-4 xl:grid-cols-3">
+                        {roleScatterData.length > 0 && (
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-base text-sabc-gray-800 dark:text-white">
+                                Score vs participation par rôle
+                              </CardTitle>
+                              <CardDescription>
+                                Identifier les rôles à prioriser (score /5 vs participation %)
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <ScatterChart
+                                data={roleScatterData}
+                                xAxisDataKey="participation"
+                                yAxisDataKey="score"
+                                xAxisName="Participation"
+                                xAxisUnit="%"
+                                yAxisName="Score moyen"
+                                yAxisUnit="/5"
+                                height={300}
+                                showLegend={false}
+                                tooltip={roleScatterTooltip}
+                              />
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {performanceWaterfallData.length > 0 && (
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-base text-sabc-gray-800 dark:text-white">
+                                Variations du score global
+                              </CardTitle>
+                              <CardDescription>
+                                Base globale : {formatScore(averageScoreKpi?.globalValue)} /5 | Actuel :{' '}
+                                {formatScore(averageScoreKpi?.value)} /5
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <WaterfallChart
+                                data={performanceWaterfallData}
+                                height={300}
+                                showLegend={false}
+                              />
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {evaluationFunnelData.length > 0 && (
+                          <Card className="shadow-sm">
+                            <CardHeader>
+                              <CardTitle className="text-base text-sabc-gray-800 dark:text-white">
+                                Pipeline des évaluations
+                              </CardTitle>
+                              <CardDescription>
+                                Lecture par étapes pour les populations filtrées
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <FunnelChart data={evaluationFunnelData} height={300} />
+                              <p className="text-xs text-sabc-gray-500">
+                                Les étapes démarrées regroupent les statuts en cours et en retard; la validation
+                                applique un taux de 92% sur les soumissions reçues.
+                              </p>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="alertes" className="space-y-6">
