@@ -162,7 +162,7 @@ class StructureController extends Controller
             'utilisateurs' => $regions->sum('utilisateurs_count'),
         ];
 
-        return Inertia::render('admin/structure/index', [
+        return Inertia::render('Admin/structure/index', [
             'user' => $this->formatUserForUI($user),
             'tree' => $tree->toArray(),
             'statistics' => $statistics,
@@ -221,7 +221,7 @@ class StructureController extends Controller
             'total_utilisateurs' => $regions->sum('utilisateurs_count'),
         ];
 
-        return Inertia::render('admin/structure/regions', [
+        return Inertia::render('Admin/structure/regions', [
             'regions' => $regions,
             'statistics' => $statistics,
         ]);
@@ -327,7 +327,7 @@ class StructureController extends Controller
             'total_utilisateurs' => $services->sum('utilisateurs_count'),
         ];
 
-        return Inertia::render('admin/structure/services', [
+        return Inertia::render('Admin/structure/services', [
             'services' => $services,
             'regions' => $regions,
             'statistics' => $statistics,
@@ -447,7 +447,7 @@ class StructureController extends Controller
             'total_utilisateurs' => $districts->sum('utilisateurs_count'),
         ];
 
-        return Inertia::render('admin/structure/districts', [
+        return Inertia::render('Admin/structure/districts', [
             'districts' => $districts,
             'services' => $services,
             'statistics' => $statistics,
@@ -572,7 +572,7 @@ class StructureController extends Controller
             'total_utilisateurs' => $secteurs->sum('utilisateurs_count'),
         ];
 
-        return Inertia::render('admin/structure/secteurs', [
+        return Inertia::render('Admin/structure/secteurs', [
             'secteurs' => $secteurs,
             'services' => $services,
             'statistics' => $statistics,

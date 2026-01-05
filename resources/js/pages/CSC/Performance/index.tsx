@@ -1,9 +1,9 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import AppLayout from '@/components/layout/app/AppLayout';
+import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent } from '@/Components/UI/Card/Card';
 import { BarChart } from '@/Components/UI/Charts/BarChart';
-import useAuth from '@/hooks/useAuth';
+import useAuth from '@/Hooks/useAuth';
 
 /**
  * Page de performance pour le Chef Service Commercial (CSC)

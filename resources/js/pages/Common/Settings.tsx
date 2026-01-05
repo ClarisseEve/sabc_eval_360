@@ -1,13 +1,13 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import { useAuth } from '@/hooks/useAuth';
-import { useAuthBridge } from '@/hooks/useAuthBridge';
+import { useAuth } from '@/Hooks/useAuth';
+import { useAuthBridge } from '@/Hooks/useAuthBridge';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { adaptUserForLayout } from '@/utils/userAdapter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
 import { Slider } from '@/Components/UI/Slider/Slider';
-import { DISPLAY_SCALE_DEFAULT, useDisplayScale } from '@/hooks/useDisplayScale';
+import { DISPLAY_SCALE_DEFAULT, useDisplayScale } from '@/Hooks/useDisplayScale';
 
 /**
  * Page des paramètres commune à tous les rôles

@@ -1,0 +1,58 @@
+# Prometheus Configuration for SABC Eval360
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'sabc-eval360'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Traefik Gateway metrics
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['gateway:8080']
+
+  # Laravel Application (via custom metrics endpoint)
+  - job_name: 'laravel-app'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['core-app:80']
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  # MySQL metrics (requires mysqld_exporter)
+  # - job_name: 'mysql'
+  #   static_configs:
+  #     - targets: ['mysql-exporter:9104']
+
+  # ClickHouse metrics
+  - job_name: 'clickhouse'
+    static_configs:
+      - targets: ['clickhouse:8123']
+    metrics_path: '/metrics'
+
+  # Future microservices
+  # - job_name: 'evaluation-service'
+  #   static_configs:
+  #     - targets: ['evaluation-service:8080']
+  #   metrics_path: '/actuator/prometheus'
+
+  # - job_name: 'analytics-service'
+  #   static_configs:
+  #     - targets: ['analytics-service:8080']
+  #   metrics_path: '/actuator/prometheus'

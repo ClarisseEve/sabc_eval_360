@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Head } from '@inertiajs/react';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
@@ -43,9 +43,12 @@ interface UserEditPageProps {
     date_embauche: string;
     is_active: boolean;
   };
+  regions?: Array<{ id_region: string; nom_region: string; est_taniere?: boolean | null }>;
+  roles?: Array<{ nom_role: string; description?: string | null }>;
+  branches?: Array<{ id_branche: string; nom_branche: string }>;
 }
 
-const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser }) => {
+const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser, regions, roles, branches }) => {
   // Données de démonstration pour l'utilisateur à éditer si non fourni par les props
   const initialUserData = initialUser || {
     id: '2',
@@ -67,7 +70,7 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser }) 
   const [formData, setFormData] = useState(initialUserData);
   
   // Données de démonstration pour les listes déroulantes
-  const roles = [
+  const fallbackRoles = [
     { id: 'ADMIN', name: 'Administrateur' },
     { id: 'DR', name: 'Directeur Régional' },
     { id: 'CDTT', name: 'Chef Département Trade' },
@@ -81,7 +84,7 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser }) 
     { id: 'AS', name: 'Assistant Superviseur Sponsoring' }
   ];
   
-  const regions = [
+  const fallbackRegions = [
     { id: '1', name: 'Littoral', type: 'taniere' },
     { id: '2', name: 'Centre', type: 'taniere' },
     { id: '3', name: 'Ouest', type: 'non-taniere' },
@@ -92,7 +95,7 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser }) 
     { id: '8', name: 'Sud-Ouest', type: 'non-taniere' }
   ];
   
-  const branches = [
+  const fallbackBranches = [
     { id: '1', name: 'Commercial' },
     { id: '2', name: 'Marketing' }
   ];
@@ -105,6 +108,40 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser }) 
     { matricule: 'M56789', name: 'Pierre Kamto', role: 'DR' },
     { matricule: 'M67890', name: 'Alice Ndom', role: 'CDTT' }
   ];
+
+  const roleOptions = useMemo(() => {
+    if (!roles || roles.length === 0) {
+      return fallbackRoles;
+    }
+
+    return roles.map((role) => ({
+      id: role.nom_role,
+      name: role.description || role.nom_role,
+    }));
+  }, [roles]);
+
+  const regionOptions = useMemo(() => {
+    if (!regions || regions.length === 0) {
+      return fallbackRegions;
+    }
+
+    return regions.map((region) => ({
+      id: region.id_region,
+      name: region.nom_region,
+      type: region.est_taniere ? 'taniere' : 'non-taniere',
+    }));
+  }, [regions]);
+
+  const branchOptions = useMemo(() => {
+    if (!branches || branches.length === 0) {
+      return fallbackBranches;
+    }
+
+    return branches.map((branche) => ({
+      id: branche.id_branche,
+      name: branche.nom_branche,
+    }));
+  }, [branches]);
   
   // Gérer les changements dans le formulaire
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,7 +171,7 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser }) 
       
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center mb-6">
-          <Link href={`/admin/users/${formData.id}`}>
+          <Link href={route('admin.utilisateurs.show', { matricule: formData.matricule })}>
             <Button variant="ghost" className="mr-4">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Retour
@@ -251,7 +288,7 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser }) 
                         <SelectValue placeholder="Sélectionner un rôle" />
                       </SelectTrigger>
                       <SelectContent>
-                        {roles.map(role => (
+                        {roleOptions.map(role => (
                           <SelectItem key={role.id} value={role.id}>
                             {role.name}
                           </SelectItem>
@@ -269,7 +306,7 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser }) 
                         <SelectValue placeholder="Sélectionner une région" />
                       </SelectTrigger>
                       <SelectContent>
-                        {regions.map(region => (
+                        {regionOptions.map(region => (
                           <SelectItem key={region.id} value={region.id}>
                             {region.name} ({region.type})
                           </SelectItem>
@@ -287,7 +324,7 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser }) 
                         <SelectValue placeholder="Sélectionner une branche" />
                       </SelectTrigger>
                       <SelectContent>
-                        {branches.map(branch => (
+                        {branchOptions.map(branch => (
                           <SelectItem key={branch.id} value={branch.id}>
                             {branch.name}
                           </SelectItem>
@@ -371,7 +408,7 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser }) 
             
             {/* Boutons d'action */}
             <div className="flex justify-end space-x-2">
-              <Link href={route('admin.users.show', { id: formData.id })}>
+              <Link href={route('admin.utilisateurs.show', { matricule: formData.matricule })}>
                 <Button variant="outline">Annuler</Button>
               </Link>
               <Button type="submit" className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white">

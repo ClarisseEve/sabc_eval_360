@@ -35,6 +35,9 @@ interface RoleCompetencyScore {
 ```
 
 ## API Laravel (à implémenter)
+**Note** : ces endpoints sont planifiés et ne sont pas encore exposés dans `routes/api.php`.
+Le frontend reste alimenté par `MOCK_ANALYTICS_DATA` tant que l'API n'est pas branchée.
+
 - `GET /admin/api/analytics` → retourne `AnalyticsDataset` filtré selon query params (période, rôles, hiérarchie, etc.). S'appuie sur vues/materialized tables `analytics_metrics`, `analytics_demographics`, `analytics_competencies` (ClickHouse recommandé pour agrégations volumétriques).
 - `GET /admin/api/analytics/users` → pagination des `UserAnalyticsSummary` pour alimenter la tuile « utilisateurs mis en avant » et la heatmap (filtrable même jeu de paramètres).
 - `GET /admin/api/analytics/users/{matricule}` → détail exhaustif pour le tiroir (scores historiques, recommandations dynamiques, positionnement démographique).

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/Hooks/useAuth';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/Components/UI/Card/Card';

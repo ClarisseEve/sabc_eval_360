@@ -1,13 +1,15 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/react-starter-kit",
+    "name": "sabc/eval360",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Application d'évaluation 360° pour SABC.",
     "keywords": [
+        "sabc",
+        "evaluation-360",
         "laravel",
-        "framework"
+        "inertia"
     ],
-    "license": "MIT",
+    "license": "proprietary",
     "require": {
         "php": "^8.2",
         "bavix/laravel-clickhouse": "^3.0",

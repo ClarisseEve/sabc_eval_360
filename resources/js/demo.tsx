@@ -1,10 +1,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import Login from './Pages/auth/Login';
-import ForgotPassword from './Pages/auth/ForgotPassword';
-import CSC from './Pages/Dashboard/CSC/Index';
-import CDS from './Pages/Dashboard/CDS/Index';
-import CDV from './Pages/Dashboard/CDV/Index';
+import Login from './pages/Auth/Login';
+import ForgotPassword from './pages/Auth/ForgotPassword';
+import CSC from './pages/CSC/Dashboard/index';
+import CDS from './pages/CDS/Dashboard/index';
+import CDV from './pages/CDV/Dashboard/index';
 import { FC } from 'react';
 
 // Déclaration des types pour TypeScript

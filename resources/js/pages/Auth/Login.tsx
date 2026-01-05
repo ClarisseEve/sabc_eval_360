@@ -82,9 +82,8 @@ const Login: React.FC<LoginProps> = ({ errors, status }) => {
         }
       },
       onSuccess: () => {
-        console.log('Connexion réussie! Laissons le serveur gérer la redirection...');
-        // Ne pas faire de redirection côté client
-        // Le serveur va gérer la redirection via redirect()->route('dashboard.admin')
+        console.log('Connexion réussie! Le serveur retourne la page du tableau de bord...');
+        // Pas de redirection côté client: Inertia reçoit directement la page cible
       }
     });
   };

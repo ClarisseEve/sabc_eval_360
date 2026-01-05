@@ -6,7 +6,7 @@ import { Avatar } from '@/Components/UI/Avatar/Avatar';
 import { StatusBadge } from '@/Components/UI/Status/StatusBadge';
 import { Tooltip } from '@/Components/UI/Tooltip/Tooltip';
 import { Badge } from '@/Components/UI/Badge/Badge';
-import { useTheme } from '@/hooks/useTheme';
+import { useTheme } from '@/Hooks/useTheme';
 
 interface HeaderProps {
   user?: {

@@ -10,7 +10,7 @@
     },
     "techStack": {
       "backend": {
-        "framework": "Laravel 11",
+        "framework": "Laravel 12",
         "language": "PHP 8.3+",
         "database": "MySQL 8.0",
         "cache": "Redis",
@@ -18,10 +18,10 @@
         "packageManager": "Composer"
       },
       "frontend": {
-        "framework": "React 18",
+        "framework": "React 19",
         "language": "TypeScript strict",
         "bridge": "Inertia.js",
-        "packageManager": "PNPM",
+        "packageManager": "PNPM 10",
         "styling": "Tailwind CSS + Headless UI",
         "charts": "Recharts (priority) + Chart.js (fallback)",
         "animations": "Framer Motion",
@@ -30,13 +30,13 @@
       "development": {
         "environment": "Docker + Laravel Sail",
         "bundler": "Vite",
-        "testing": "Pest (PHP) + Vitest (JS)",
+        "testing": "Pest (PHP) - tests de pages + services",
         "linting": "ESLint + Prettier + TypeScript strict",
         "codeQuality": "PHP CS Fixer + ESLint"
       },
       "dataPipelines": {
         "language": "Python 3.9+",
-        "libraries": "pandas, scikit-learn, numpy",
+        "libraries": "pandas, numpy, sqlalchemy, clickhouse-connect, psycopg2-binary, pymysql, python-dotenv",
         "purpose": "ETL, ML predictions, analytics"
       }
     },

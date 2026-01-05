@@ -1,18 +1,9 @@
 import * as React from 'react';
 import { Head } from '@inertiajs/react';
-import { useForm } from '@inertiajs/react';
-// Utilisation d'une notification alternative car react-hot-toast n'est pas installé
 import { AlertCircle } from 'lucide-react';
 import { User } from '@/types';
-import { AppLayout } from '@/layouts';
-import { CSCEvaluationForm } from '@/Components/Forms/CSCEvaluationForm';
-import { CDVEvaluationForm } from '@/Components/Forms/CDVEvaluationForm';
-import { CDSEvaluationForm } from '@/Components/Forms/CDSEvaluationForm';
-import { RTMEvaluationForm } from '@/Components/Forms/RTMEvaluationForm';
-import { TMOEvaluationForm } from '@/Components/Forms/TMOEvaluationForm';
-import { ASEvaluationForm } from '@/Components/Forms/ASEvaluationForm';
-import { SRMOEvaluationForm } from '@/Components/Forms/SRMOEvaluationForm';
-import { SSEvaluationForm } from '@/Components/Forms/SSEvaluationForm';
+import { AppLayout } from '@/Layouts';
+import { RoleEvaluationForm, EvaluationRole } from '@/Components/Forms/RoleEvaluationForm';
 import { EvaluationFormData } from '@/Components/Forms/EvaluationForm';
 
 interface RoleSpecificEvaluationProps {
@@ -100,12 +91,15 @@ const RoleSpecificEvaluation: React.FC<RoleSpecificEvaluationProps> = ({
     return !nonEvaluableRoles.includes(role.toLowerCase());
   };
 
+  // Liste des rôles supportés pour l'évaluation
+  const supportedRoles: EvaluationRole[] = ['CDS', 'CDV', 'CSC', 'CDTT', 'RTM', 'TMO', 'SRMO', 'SS', 'AS'];
+
   // Sélectionner le formulaire approprié en fonction du rôle de l'utilisateur évalué
   const renderEvaluationForm = () => {
-    const role = evaluatedUser.role?.toLowerCase() || '';
-    
+    const role = evaluatedUser.role?.toUpperCase() || '';
+
     // Vérifier si l'utilisateur peut être évalué
-    if (!canBeEvaluated(role)) {
+    if (!canBeEvaluated(role.toLowerCase())) {
       return (
         <div className="rounded-md bg-sabc-red-light/10 border border-sabc-red-light p-4 text-sabc-red-primary">
           <div className="flex items-start">
@@ -121,72 +115,25 @@ const RoleSpecificEvaluation: React.FC<RoleSpecificEvaluationProps> = ({
       );
     }
 
-    switch (role) {
-      case 'csc':
-        return (
-          <CSCEvaluationForm
-            evaluation={evaluation}
-            onSaveDraft={handleSaveDraft}
-            onSubmit={handleSubmit}
-          />
-        );
-      case 'cdv':
-        return (
-          <CDVEvaluationForm
-            evaluation={evaluation}
-            onSaveDraft={handleSaveDraft}
-            onSubmit={handleSubmit}
-          />
-        );
-      case 'cds':
-        return (
-          <CDSEvaluationForm
-            evaluation={evaluation}
-            onSaveDraft={handleSaveDraft}
-            onSubmit={handleSubmit}
-          />
-        );
-      case 'rtm':
-        return (
-          <RTMEvaluationForm
-            evaluation={evaluation}
-            onSaveDraft={handleSaveDraft}
-            onSubmit={handleSubmit}
-          />
-        );
-      case 'tmo':
-      case 'ss': // Superviseur Sponsoring utilise le même formulaire que TMO
-        return (
-          <TMOEvaluationForm
-            evaluation={evaluation}
-            onSaveDraft={handleSaveDraft}
-            onSubmit={handleSubmit}
-          />
-        );
-      case 'as':
-        return (
-          <ASEvaluationForm
-            evaluation={evaluation}
-            onSaveDraft={handleSaveDraft}
-            onSubmit={handleSubmit}
-          />
-        );
-      case 'srmo':
-        return (
-          <SRMOEvaluationForm
-            evaluation={evaluation}
-            onSaveDraft={handleSaveDraft}
-            onSubmit={handleSubmit}
-          />
-        );
-      default:
-        return (
-          <div className="rounded-md bg-sabc-accent-light/10 border border-sabc-accent-light p-4 text-sabc-accent">
-            <p>Formulaire d'évaluation non disponible pour ce rôle: {evaluatedUser.role}.</p>
-            <p className="mt-2 text-sm">Veuillez contacter l'administrateur pour ajouter ce rôle au système d'évaluation.</p>
-          </div>
-        );
+    // Vérifier si le rôle est supporté
+    if (supportedRoles.includes(role as EvaluationRole)) {
+      return (
+        <RoleEvaluationForm
+          role={role as EvaluationRole}
+          evaluation={evaluation}
+          onSaveDraft={handleSaveDraft}
+          onSubmit={handleSubmit}
+        />
+      );
     }
+
+    // Rôle non supporté
+    return (
+      <div className="rounded-md bg-sabc-accent-light/10 border border-sabc-accent-light p-4 text-sabc-accent">
+        <p>Formulaire d'évaluation non disponible pour ce rôle: {evaluatedUser.role}.</p>
+        <p className="mt-2 text-sm">Veuillez contacter l'administrateur pour ajouter ce rôle au système d'évaluation.</p>
+      </div>
+    );
   };
 
   // Rendu du composant de notification

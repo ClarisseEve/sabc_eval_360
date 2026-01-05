@@ -25,7 +25,7 @@ class RegisteredUserController extends Controller
         // Récupérer tous les rôles disponibles pour le formulaire d'inscription
         $roles = Role::all(['id', 'nom_role']);
         
-        return Inertia::render('auth/Register', [
+        return Inertia::render('Auth/Register', [
             'roles' => $roles
         ]);
     }

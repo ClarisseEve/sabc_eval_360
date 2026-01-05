@@ -1,0 +1,9 @@
+# Dépendances minimales pour les pipelines SABC Eval360
+pandas>=2.2.0
+numpy>=2.0.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
+pymysql>=1.1.0
+clickhouse-connect>=0.7.0
+python-dotenv>=1.0.1
+requests>=2.32.0

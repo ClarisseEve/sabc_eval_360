@@ -1,5 +1,5 @@
 import React, { FormEventHandler } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import { Transition } from '@headlessui/react';
 import { Button } from '@/Components/UI/Button';
 import { Input } from '@/Components/UI/Input';
@@ -31,7 +31,7 @@ export default function Profile({ user, pageTitle, isAdmin, permissions, mustVer
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        patch(route('settings.profile.update'), {
+        patch(route('profile.update'), {
             preserveScroll: true,
         });
     };
@@ -106,15 +106,7 @@ export default function Profile({ user, pageTitle, isAdmin, permissions, mustVer
                                                 Adresse email non vérifiée
                                             </p>
                                             <p className="text-sm text-sabc-gray-400 mt-1">
-                                                Votre adresse email n'est pas encore vérifiée.{' '}
-                                                <Link
-                                                    href={route('verification.send')}
-                                                    method="post"
-                                                    as="button"
-                                                    className="text-sabc-red-primary underline hover:text-sabc-red-dark transition-colors"
-                                                >
-                                                    Cliquez ici pour renvoyer l'email de vérification.
-                                                </Link>
+                                                La vérification est gérée par l'équipe IT. Contactez le support si nécessaire.
                                             </p>
                                             {status === 'verification-link-sent' && (
                                                 <div className="mt-2 text-sm font-medium text-sabc-success">

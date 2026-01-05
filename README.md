@@ -4,8 +4,8 @@ Application d'évaluation 360° pour SABC (Sucreries et Aliments du Bénin et du
 
 ## 🚀 Technologies
 
-- **Backend**: Laravel 11
-- **Frontend**: React 18 + TypeScript + Inertia.js
+- **Backend**: Laravel 12
+- **Frontend**: React 19 + TypeScript + Inertia.js
 - **Base de données**: MySQL/PostgreSQL
 - **CSS**: Tailwind CSS
 - **Outils**: Vite, ESLint, Prettier
@@ -15,7 +15,7 @@ Application d'évaluation 360° pour SABC (Sucreries et Aliments du Bénin et du
 - PHP 8.2+
 - Node.js 18+
 - Composer 2.5+
-- PNPM 8+
+- PNPM 10+
 - MySQL 8.0+ ou PostgreSQL 15+
 
 ## 🛠️ Installation

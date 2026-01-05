@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { Button } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Badge } from '@/Components/UI/Badge';
@@ -22,6 +22,7 @@ import {
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { HierarchyTree, SABC_HIERARCHY_DATA } from '@/Components/UI/HierarchyTree';
 import type { HierarchyNode } from '@/Components/UI/HierarchyTree/HierarchyTree';
+import { route } from '@/routes';
 
 interface Utilisateur {
   matricule: string;
@@ -178,15 +179,15 @@ const AdminUsersPage = ({
   };
 
   const handleViewUser = (matricule: string) => {
-    window.location.href = `/admin/utilisateurs/${matricule}`;
+    router.visit(route('admin.utilisateurs.show', { matricule }));
   };
 
   const handleEditUser = (matricule: string) => {
-    window.location.href = `/admin/utilisateurs/${matricule}/edit`;
+    router.visit(route('admin.utilisateurs.edit', { matricule }));
   };
 
   const handleCreateUser = () => {
-    window.location.href = '/admin/utilisateurs/create';
+    router.visit(route('admin.utilisateurs.create'));
   };
 
   return (

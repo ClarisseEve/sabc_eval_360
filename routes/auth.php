@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 // Note: Les contrôleurs suivants ont été supprimés car ils ne sont plus nécessaires
 // dans le système d'authentification simplifié de SABC où l'administrateur crée les utilisateurs:
@@ -19,6 +20,16 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+
+    // Inscription désactivée (création via admin)
+    Route::get('register', function () {
+        return Inertia::render('Auth/Register');
+    })->name('register');
+    
+    // Mot de passe oublié (redirige vers le support interne)
+    Route::get('forgot-password', function () {
+        return Inertia::render('Auth/ForgotPassword');
+    })->name('password.request');
     
     // Réinitialisation de mot de passe
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])

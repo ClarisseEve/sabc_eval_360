@@ -9,7 +9,7 @@ import { Input } from '@/Components/UI/Input/Input';
 import { SearchFilter } from '@/Components/UI/SearchFilter';
 import { Link } from '@inertiajs/react';
 
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/Hooks/useAuth';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
 /**
  * Page de gestion des templates d'évaluation pour l'administrateur
