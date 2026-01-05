@@ -47,11 +47,6 @@ Route::get('/test-auth', function () {
     ]);
 })->name('test.auth');
 
-// Route de diagnostic d'authentification frontend (page Inertia)
-Route::get('/auth-debug', function () {
-    return Inertia::render('common/auth-debug');
-})->middleware(['auth'])->name('auth.debug');
-
 Route::middleware(['auth'])->group(function () {
     // Vérification d'authentification pour le frontend (session web)
     Route::get('/auth/check', [App\Http\Controllers\Auth\AuthCheckController::class, 'check'])->name('auth.check.web');
@@ -231,11 +226,6 @@ Route::middleware(['auth'])->group(function () {
                 
                 // Suppression d'une période
                 Route::delete('/{id}', 'destroy')->name('destroy');
-                
-                // Affichage d'un template
-                Route::get('/{id}', function ($id) {
-                    return Inertia::render('Admin/Evaluations/Templates/Show', ['id' => $id]);
-                })->name('show');
             });
         });
         

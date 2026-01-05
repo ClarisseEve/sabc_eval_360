@@ -9,7 +9,7 @@ import { Textarea } from '@/Components/UI/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import { Link } from '@inertiajs/react';
 import SectionsCompetencesEditor from '@/Components/Evaluation/Admin/SectionsCompetencesEditor';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/Hooks/useAuth';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
 
 // Page d'édition de template d'évaluation

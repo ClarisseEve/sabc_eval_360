@@ -63,30 +63,6 @@ return [
             ],
         ],
         
-        'mysql_core' => [
-            'driver' => 'mysql',
-            'url' => env('MYSQL_URL'),
-            'host' => env('MYSQL_HOST', '127.0.0.1'),
-            'port' => env('MYSQL_PORT', '3306'),
-            'database' => env('MYSQL_DATABASE', 'sabc_core'),
-            'username' => env('MYSQL_USERNAME', 'sabc_user'),
-            'password' => env('MYSQL_PASSWORD', ''),
-            'unix_socket' => env('MYSQL_SOCKET', ''),
-            'charset' => env('MYSQL_CHARSET', 'utf8mb4'),
-            'collation' => env('MYSQL_COLLATION', 'utf8mb4_unicode_ci'),
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'strict' => true,
-            'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
-            'pool' => [
-                'min' => 5,
-                'max' => 20,
-            ],
-        ],
-
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('PGSQL_URL'),

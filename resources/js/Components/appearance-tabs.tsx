@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs/Tabs';
 import { Card, CardContent } from '@/Components/UI/Card/Card';
 import { Label } from '@/Components/UI/Label/Label';
-import { RadioGroup, RadioGroupItem } from '@/Components/UI/radio-group/RadioGroup';
+import { RadioGroup, RadioGroupItem } from '@/Components/UI/RadioGroup/RadioGroup';
 import { Button } from '@/Components/UI/Button/Button';
 
 /**

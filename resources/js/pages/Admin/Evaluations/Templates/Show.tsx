@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link } from '@inertiajs/react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/Hooks/useAuth';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';

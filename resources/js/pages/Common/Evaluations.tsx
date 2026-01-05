@@ -1,7 +1,7 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import { useAuth } from '@/hooks/useAuth';
-import { useAuthBridge } from '@/hooks/useAuthBridge';
+import { useAuth } from '@/Hooks/useAuth';
+import { useAuthBridge } from '@/Hooks/useAuthBridge';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { adaptUserForLayout } from '@/utils/userAdapter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';

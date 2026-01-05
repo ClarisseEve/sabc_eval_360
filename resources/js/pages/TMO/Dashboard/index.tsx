@@ -1,6 +1,6 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import { AppLayout } from '@/layouts';
+import { AppLayout } from '@/Layouts';
 import { MarketingSupervisorDashboard } from '@/Components/Dashboard/MarketingSupervisorDashboard';
 import { usePage } from '@inertiajs/react';
 import { SharedData } from '@/types';

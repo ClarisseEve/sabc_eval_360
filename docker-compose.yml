@@ -1,0 +1,487 @@
+# SABC Eval360 - Docker Compose Architecture Microservices
+# Version: Phase 1 - Foundation + Strangler Pattern
+#
+# Architecture:
+#   ┌─────────────────────────────────────────────────────────────┐
+#   │                      Traefik Gateway                        │
+#   │                    (Routing + Load Balancing)               │
+#   └──────────────────────────┬──────────────────────────────────┘
+#                              │
+#         ┌────────────────────┼────────────────────┐
+#         │                    │                    │
+#   ┌─────▼─────┐       ┌─────▼─────┐       ┌─────▼─────┐
+#   │ Core App  │       │ Analytics │       │ Evaluation│
+#   │ (Laravel) │       │ Service   │       │ Service   │
+#   │ Monolithe │       │ (Future)  │       │ (Future)  │
+#   └─────┬─────┘       └─────┬─────┘       └─────┬─────┘
+#         │                   │                   │
+#   ┌─────▼─────┐       ┌─────▼─────┐       ┌─────▼─────┐
+#   │  MySQL    │       │ClickHouse │       │PostgreSQL │
+#   │  (CORE)   │       │(ANALYTICS)│       │ (BUSINESS)│
+#   └───────────┘       └───────────┘       └───────────┘
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # API GATEWAY - Point d'entrée unique
+  # =============================================================================
+  gateway:
+    image: traefik:v3.0
+    container_name: sabc-gateway
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--metrics.prometheus=true"
+      - "--tracing.jaeger=true"
+      - "--tracing.jaeger.samplingServerURL=http://jaeger:5778/sampling"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Dashboard Traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+    networks:
+      - sabc-network
+    depends_on:
+      - core-app
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+
+  # =============================================================================
+  # CORE APPLICATION - Monolithe Laravel (Strangler Pattern)
+  # =============================================================================
+  core-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: app
+    container_name: sabc-core-app
+    restart: unless-stopped
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_KEY=${APP_KEY}
+      - APP_URL=http://localhost
+      # MySQL (CORE)
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=sabc_core
+      - DB_USERNAME=sabc_user
+      - DB_PASSWORD=${DB_PASSWORD:-***REMOVED***}
+      # PostgreSQL (BUSINESS)
+      - DB_PGSQL_HOST=postgres
+      - DB_PGSQL_PORT=5432
+      - DB_PGSQL_DATABASE=sabc_business
+      - DB_PGSQL_USERNAME=sabc_user
+      - DB_PGSQL_PASSWORD=${DB_PASSWORD:-***REMOVED***}
+      # ClickHouse (ANALYTICS)
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DATABASE=sabc_analytics
+      - CLICKHOUSE_USERNAME=default
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+      # Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+      # Queue
+      - QUEUE_CONNECTION=redis
+      # Session
+      - SESSION_DRIVER=redis
+      # Cache
+      - CACHE_DRIVER=redis
+      # Logging
+      - LOG_CHANNEL=stack
+      - LOG_LEVEL=debug
+      # Service Discovery
+      - SERVICE_NAME=core-app
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
+    volumes:
+      - .:/var/www/html
+      - ./storage:/var/www/html/storage
+      - ./bootstrap/cache:/var/www/html/bootstrap/cache
+    networks:
+      - sabc-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.core-app.rule=Host(`localhost`) || Host(`sabc.localhost`)"
+      - "traefik.http.routers.core-app.entrypoints=web"
+      - "traefik.http.services.core-app.loadbalancer.server.port=80"
+      # Middleware pour rate limiting
+      - "traefik.http.middlewares.core-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.core-ratelimit.ratelimit.burst=50"
+      - "traefik.http.routers.core-app.middlewares=core-ratelimit"
+
+  # =============================================================================
+  # QUEUE WORKERS - Traitement asynchrone par domaine
+  # =============================================================================
+  queue-worker-default:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: app
+    container_name: sabc-queue-default
+    restart: unless-stopped
+    command: php artisan queue:work redis --queue=default,notifications --sleep=3 --tries=3 --max-time=3600
+    environment:
+      - APP_ENV=local
+      - DB_HOST=mysql
+      - DB_PGSQL_HOST=postgres
+      - REDIS_HOST=redis
+      - QUEUE_CONNECTION=redis
+    volumes:
+      - .:/var/www/html
+    networks:
+      - sabc-network
+    depends_on:
+      - core-app
+      - redis
+
+  queue-worker-evaluations:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: app
+    container_name: sabc-queue-evaluations
+    restart: unless-stopped
+    command: php artisan queue:work redis --queue=evaluations,scores --sleep=3 --tries=3 --max-time=3600
+    environment:
+      - APP_ENV=local
+      - DB_HOST=mysql
+      - DB_PGSQL_HOST=postgres
+      - REDIS_HOST=redis
+      - QUEUE_CONNECTION=redis
+    volumes:
+      - .:/var/www/html
+    networks:
+      - sabc-network
+    depends_on:
+      - core-app
+      - redis
+
+  queue-worker-analytics:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: app
+    container_name: sabc-queue-analytics
+    restart: unless-stopped
+    command: php artisan queue:work redis --queue=analytics,sync --sleep=3 --tries=3 --max-time=3600
+    environment:
+      - APP_ENV=local
+      - DB_HOST=mysql
+      - DB_PGSQL_HOST=postgres
+      - CLICKHOUSE_HOST=clickhouse
+      - REDIS_HOST=redis
+      - QUEUE_CONNECTION=redis
+    volumes:
+      - .:/var/www/html
+    networks:
+      - sabc-network
+    depends_on:
+      - core-app
+      - redis
+      - clickhouse
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: app
+    container_name: sabc-scheduler
+    restart: unless-stopped
+    command: >
+      sh -c "while true; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"
+    environment:
+      - APP_ENV=local
+      - DB_HOST=mysql
+      - REDIS_HOST=redis
+    volumes:
+      - .:/var/www/html
+    networks:
+      - sabc-network
+    depends_on:
+      - core-app
+
+  # =============================================================================
+  # DATABASES
+  # =============================================================================
+  mysql:
+    image: mysql:8.0
+    container_name: sabc-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-***REMOVED***}
+      - MYSQL_DATABASE=sabc_core
+      - MYSQL_USER=sabc_user
+      - MYSQL_PASSWORD=${DB_PASSWORD:-***REMOVED***}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - sabc-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-***REMOVED***}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: sabc-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=sabc_business
+      - POSTGRES_USER=sabc_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-***REMOVED***}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - sabc-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sabc_user -d sabc_business"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.1
+    container_name: sabc-clickhouse
+    restart: unless-stopped
+    environment:
+      - CLICKHOUSE_DB=sabc_analytics
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    ports:
+      - "8123:8123"  # HTTP
+      - "9000:9000"  # Native
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+      - ./docker/clickhouse/config.xml:/etc/clickhouse-server/config.d/config.xml:ro
+      - ./docker/clickhouse/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+    networks:
+      - sabc-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  # =============================================================================
+  # CACHE & MESSAGING
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: sabc-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sabc-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # PYTHON DATA PIPELINE (basé sur data_pipelines/requirements.txt)
+  # =============================================================================
+  python-pipeline:
+    build:
+      context: ./data_pipelines
+      dockerfile: Dockerfile
+    container_name: sabc-python-pipeline
+    restart: unless-stopped
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=sabc_core
+      - MYSQL_USER=sabc_user
+      - MYSQL_PASSWORD=${DB_PASSWORD:-***REMOVED***}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=sabc_business
+      - POSTGRES_USER=sabc_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-***REMOVED***}
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DATABASE=sabc_analytics
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./data_pipelines:/app
+    networks:
+      - sabc-network
+    depends_on:
+      - mysql
+      - postgres
+      - clickhouse
+      - redis
+
+  # =============================================================================
+  # OBSERVABILITY STACK
+  # =============================================================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.53
+    container_name: sabc-jaeger
+    restart: unless-stopped
+    ports:
+      - "5775:5775/udp"   # Zipkin compact thrift
+      - "6831:6831/udp"   # Thrift compact
+      - "6832:6832/udp"   # Thrift binary
+      - "5778:5778"       # Config
+      - "16686:16686"     # Web UI
+      - "14268:14268"     # Collector HTTP
+      - "14250:14250"     # gRPC
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - sabc-network
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: sabc-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - sabc-network
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: sabc-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - sabc-network
+    depends_on:
+      - prometheus
+
+  # =============================================================================
+  # FUTURE MICROSERVICES (Phase 2+)
+  # Décommenter quand prêts à extraire
+  # =============================================================================
+
+  # evaluation-service:
+  #   build:
+  #     context: ./services/evaluation
+  #     dockerfile: Dockerfile
+  #   container_name: sabc-evaluation-service
+  #   restart: unless-stopped
+  #   environment:
+  #     - DATABASE_URL=postgres://sabc_user:secret@postgres:5432/sabc_business
+  #     - REDIS_URL=redis://redis:6379
+  #     - HIERARCHY_SERVICE_URL=http://hierarchy-service:8080
+  #     - JAEGER_AGENT_HOST=jaeger
+  #   ports:
+  #     - "8081:8080"
+  #   networks:
+  #     - sabc-network
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.evaluation.rule=Host(`localhost`) && PathPrefix(`/api/v2/evaluations`)"
+  #     - "traefik.http.services.evaluation.loadbalancer.server.port=8080"
+  #   depends_on:
+  #     - postgres
+  #     - redis
+
+  # analytics-service:
+  #   build:
+  #     context: ./services/analytics
+  #     dockerfile: Dockerfile
+  #   container_name: sabc-analytics-service
+  #   restart: unless-stopped
+  #   environment:
+  #     - CLICKHOUSE_URL=http://clickhouse:8123
+  #     - REDIS_URL=redis://redis:6379
+  #     - JAEGER_AGENT_HOST=jaeger
+  #   ports:
+  #     - "8082:8080"
+  #   networks:
+  #     - sabc-network
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.analytics.rule=Host(`localhost`) && PathPrefix(`/api/v2/analytics`)"
+  #     - "traefik.http.services.analytics.loadbalancer.server.port=8080"
+  #   depends_on:
+  #     - clickhouse
+  #     - redis
+
+# =============================================================================
+# NETWORKS & VOLUMES
+# =============================================================================
+networks:
+  sabc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  mysql_data:
+    driver: local
+  postgres_data:
+    driver: local
+  clickhouse_data:
+    driver: local
+  clickhouse_logs:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

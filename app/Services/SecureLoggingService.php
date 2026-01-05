@@ -26,7 +26,7 @@ class SecureLoggingService
     public static function secureLog(string $level, string $message, array $context = []): void
     {
         // En production, ne pas logger les tentatives d'authentification échouées
-        if (app()->environment('production') && str_contains($message, 'auth')) {
+        if (self::isProduction() && str_contains($message, 'auth')) {
             return;
         }
 
@@ -111,10 +111,21 @@ class SecureLoggingService
     public static function logAuthAction(string $action, array $context = []): void
     {
         // En production, ne pas logger les actions d'authentification
-        if (app()->environment('production')) {
+        if (self::isProduction()) {
             return;
         }
 
         self::secureLog('info', "Action d'authentification: {$action}", $context);
+    }
+
+    private static function isProduction(): bool
+    {
+        if (!function_exists('app')) {
+            return false;
+        }
+
+        $app = app();
+
+        return method_exists($app, 'environment') && $app->environment('production');
     }
 }

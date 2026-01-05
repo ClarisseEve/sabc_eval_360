@@ -25,7 +25,7 @@ class AuthenticatedSessionController extends Controller
             return Inertia::render('Common/RoleRedirector');
         }
         
-        return Inertia::render('auth/Login');
+        return Inertia::render('Auth/Login');
     }
 
     /**

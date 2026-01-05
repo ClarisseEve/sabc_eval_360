@@ -194,8 +194,8 @@ export const NAV_BOTTOM_ITEMS: NavItem[] = [
     icon: <Settings className="h-5 w-5" />,
     roles: ['ADMIN'],
     children: [
-      { title: 'Utilisateurs', href: '/admin/users', icon: <ChevronRight className="h-4 w-4" /> },
-      { title: 'Régions', href: '/admin/regions', icon: <ChevronRight className="h-4 w-4" /> },
+      { title: 'Utilisateurs', href: '/admin/utilisateurs', icon: <ChevronRight className="h-4 w-4" /> },
+      { title: 'Régions', href: '/admin/structure/regions', icon: <ChevronRight className="h-4 w-4" /> },
       { title: 'Rôles', href: '/admin/roles', icon: <ChevronRight className="h-4 w-4" /> },
       { title: 'Remplacements', href: '/admin/remplacements', icon: <ChevronRight className="h-4 w-4" /> },
     ],

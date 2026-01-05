@@ -10,8 +10,11 @@ use App\Models\Evaluation;
 use App\Services\EvaluationService;
 use App\Traits\FormatsUserData;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -33,10 +36,7 @@ class UtilisateursController extends Controller
     {
         $utilisateur = Auth::user();
         
-        // Vérifier que l'utilisateur est ADMIN
-        if ($utilisateur->role !== 'ADMIN') {
-            abort(403, 'Accès réservé aux administrateurs');
-        }
+        $this->assertAdmin($utilisateur);
         
         // Récupérer tous les utilisateurs avec leurs relations
         $utilisateurs = Utilisateur::with(['regionEntity', 'branche', 'roleModel'])
@@ -112,24 +112,33 @@ class UtilisateursController extends Controller
     {
         $utilisateur = Auth::user();
         
-        // Vérifier que l'utilisateur est ADMIN
-        if ($utilisateur->role !== 'ADMIN') {
-            abort(403, 'Accès réservé aux administrateurs');
-        }
+        $this->assertAdmin($utilisateur);
         
         $utilisateurCible = Utilisateur::where('matricule', $matricule)->firstOrFail();
+        $region = $utilisateurCible->regionEntity;
+        $branche = $utilisateurCible->branche;
+        $manager = $utilisateurCible->manager;
         
         return Inertia::render('Admin/Utilisateurs/Show', [
-            'utilisateur_cible' => [
+            'user' => [
+                'id' => $utilisateurCible->matricule,
+                'name' => trim($utilisateurCible->prenom . ' ' . $utilisateurCible->nom),
+                'username' => $utilisateurCible->matricule,
                 'matricule' => $utilisateurCible->matricule,
-                'nom' => $utilisateurCible->nom,
-                'prenom' => $utilisateurCible->prenom,
                 'email' => $utilisateurCible->email,
-                'telephone' => $utilisateurCible->telephone,
-                'role' => $utilisateurCible->role,
-                'region' => $utilisateurCible->region?->nom_region ?? 'Non définie',
-                'branche' => $utilisateurCible->branche?->nom_branche ?? 'Non définie',
-                'statut' => $utilisateurCible->statut ?? 'actif',
+                'phone' => $utilisateurCible->telephone,
+                'role' => $utilisateurCible->role_nom ?? $utilisateurCible->role,
+                'region' => $region?->nom_region ?? 'Non définie',
+                'branche' => $branche?->nom_branche ?? 'Non définie',
+                'manager' => $manager ? trim($manager->prenom . ' ' . $manager->nom) : 'Non défini',
+                'manager_matricule' => $utilisateurCible->manager_matricule,
+                'date_embauche' => $utilisateurCible->created_at?->format('Y-m-d'),
+                'niveau_hierarchique' => $utilisateurCible->niveau_hierarchique ?? 0,
+                'status' => $utilisateurCible->statut ?? ($utilisateurCible->est_actif ? 'actif' : 'inactif'),
+                'derniere_connexion' => $utilisateurCible->last_login_at?->format('Y-m-d H:i:s'),
+                'evaluations_recues' => 0,
+                'evaluations_donnees' => 0,
+                'score_moyen' => $utilisateurCible->score_global ?? 0,
             ],
             ...$this->getAdminPageData('Détails Utilisateur', [], $utilisateur),
         ]);
@@ -142,10 +151,7 @@ class UtilisateursController extends Controller
     {
         $utilisateur = Auth::user();
         
-        // Vérifier que l'utilisateur est ADMIN
-        if ($utilisateur->role !== 'ADMIN') {
-            abort(403, 'Accès réservé aux administrateurs');
-        }
+        $this->assertAdmin($utilisateur);
         
         // Récupérer les données nécessaires pour le formulaire
         $regions = Region::select('id_region', 'nom_region')->orderBy('nom_region')->get();
@@ -159,6 +165,143 @@ class UtilisateursController extends Controller
             ...$this->getAdminPageData('Créer un Utilisateur', [], $utilisateur),
         ]);
     }
+
+    /**
+     * Enregistre un nouvel utilisateur (ADMIN uniquement)
+     */
+    public function store(Request $request): RedirectResponse
+    {
+        $utilisateur = Auth::user();
+        $this->assertAdmin($utilisateur);
+
+        $validated = $request->validate([
+            'matricule' => ['required', 'string', 'max:5', 'unique:utilisateurs,matricule'],
+            'nom' => ['required', 'string', 'max:100'],
+            'prenom' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:100', 'unique:utilisateurs,email'],
+            'telephone' => ['nullable', 'string', 'max:20'],
+            'role' => ['required', 'string', 'max:50'],
+            'region' => ['required', 'string', 'max:5'],
+            'branche' => ['required', 'string', 'max:5'],
+            'manager_matricule' => ['nullable', 'string', 'max:5'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $region = Region::where('id_region', $validated['region'])->first();
+        $branche = Branche::where('id_branche', $validated['branche'])->first();
+        $role = Role::where('nom_role', $validated['role'])->first();
+
+        $nouvelUtilisateur = new Utilisateur();
+        $nouvelUtilisateur->matricule = $validated['matricule'];
+        $nouvelUtilisateur->nom = $validated['nom'];
+        $nouvelUtilisateur->prenom = $validated['prenom'];
+        $nouvelUtilisateur->email = $validated['email'];
+        $nouvelUtilisateur->telephone = $validated['telephone'] ?? null;
+        $nouvelUtilisateur->password = Hash::make($validated['password']);
+        $nouvelUtilisateur->role = $validated['role'];
+        $nouvelUtilisateur->role_nom = $role?->nom_role ?? $validated['role'];
+        $nouvelUtilisateur->manager_matricule = $validated['manager_matricule'] ?? null;
+        $nouvelUtilisateur->id_region = $validated['region'];
+        $nouvelUtilisateur->id_branche = $validated['branche'];
+        $nouvelUtilisateur->region_nom = $region?->nom_region ?? 'Non définie';
+        $nouvelUtilisateur->type_region = $region?->est_taniere ? 'Tanière' : 'Non-Tanière';
+        $nouvelUtilisateur->est_actif = $validated['is_active'] ?? true;
+        $nouvelUtilisateur->statut = $nouvelUtilisateur->est_actif ? 'actif' : 'inactif';
+        $nouvelUtilisateur->est_admin = strtoupper($nouvelUtilisateur->role) === 'ADMIN';
+        $nouvelUtilisateur->save();
+
+        return redirect()->route('admin.utilisateurs.show', ['matricule' => $nouvelUtilisateur->matricule]);
+    }
+
+    /**
+     * Affiche le formulaire d'édition d'un utilisateur
+     */
+    public function edit(string $matricule): InertiaResponse
+    {
+        $utilisateur = Auth::user();
+        $this->assertAdmin($utilisateur);
+
+        $utilisateurCible = Utilisateur::where('matricule', $matricule)->firstOrFail();
+
+        return Inertia::render('Admin/Utilisateurs/Edit', [
+            'user' => [
+                'id' => $utilisateurCible->matricule,
+                'nom' => $utilisateurCible->nom,
+                'prenom' => $utilisateurCible->prenom,
+                'matricule' => $utilisateurCible->matricule,
+                'username' => $utilisateurCible->matricule,
+                'email' => $utilisateurCible->email,
+                'telephone' => $utilisateurCible->telephone,
+                'role' => $utilisateurCible->role,
+                'region' => $utilisateurCible->id_region,
+                'branche' => $utilisateurCible->id_branche,
+                'manager_matricule' => $utilisateurCible->manager_matricule,
+                'date_embauche' => $utilisateurCible->created_at?->format('Y-m-d'),
+                'is_active' => $utilisateurCible->est_actif ?? true,
+            ],
+            'regions' => Region::select('id_region', 'nom_region')->orderBy('nom_region')->get(),
+            'branches' => Branche::select('id_branche', 'nom_branche')->orderBy('nom_branche')->get(),
+            'roles' => Role::select('nom_role', 'description')->orderBy('nom_role')->get(),
+            ...$this->getAdminPageData('Modifier un Utilisateur', [], $utilisateur),
+        ]);
+    }
+
+    /**
+     * Met à jour un utilisateur (ADMIN uniquement)
+     */
+    public function update(Request $request, string $matricule): RedirectResponse
+    {
+        $utilisateur = Auth::user();
+        $this->assertAdmin($utilisateur);
+
+        $utilisateurCible = Utilisateur::where('matricule', $matricule)->firstOrFail();
+
+        $validated = $request->validate([
+            'nom' => ['required', 'string', 'max:100'],
+            'prenom' => ['required', 'string', 'max:100'],
+            'email' => [
+                'required',
+                'email',
+                'max:100',
+                Rule::unique('utilisateurs', 'email')->ignore($utilisateurCible->matricule, 'matricule'),
+            ],
+            'telephone' => ['nullable', 'string', 'max:20'],
+            'role' => ['required', 'string', 'max:50'],
+            'region' => ['required', 'string', 'max:5'],
+            'branche' => ['required', 'string', 'max:5'],
+            'manager_matricule' => ['nullable', 'string', 'max:5'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $region = Region::where('id_region', $validated['region'])->first();
+        $branche = Branche::where('id_branche', $validated['branche'])->first();
+        $role = Role::where('nom_role', $validated['role'])->first();
+
+        $utilisateurCible->nom = $validated['nom'];
+        $utilisateurCible->prenom = $validated['prenom'];
+        $utilisateurCible->email = $validated['email'];
+        $utilisateurCible->telephone = $validated['telephone'] ?? null;
+        $utilisateurCible->role = $validated['role'];
+        $utilisateurCible->role_nom = $role?->nom_role ?? $validated['role'];
+        $utilisateurCible->id_region = $validated['region'];
+        $utilisateurCible->id_branche = $validated['branche'];
+        $utilisateurCible->region_nom = $region?->nom_region ?? $utilisateurCible->region_nom;
+        $utilisateurCible->type_region = $region?->est_taniere ? 'Tanière' : 'Non-Tanière';
+        $utilisateurCible->manager_matricule = $validated['manager_matricule'] ?? null;
+        $utilisateurCible->est_actif = $validated['is_active'] ?? $utilisateurCible->est_actif;
+        $utilisateurCible->statut = $utilisateurCible->est_actif ? 'actif' : 'inactif';
+        $utilisateurCible->est_admin = strtoupper($utilisateurCible->role) === 'ADMIN';
+
+        if (!empty($validated['password'])) {
+            $utilisateurCible->password = Hash::make($validated['password']);
+        }
+
+        $utilisateurCible->save();
+
+        return redirect()->route('admin.utilisateurs.show', ['matricule' => $utilisateurCible->matricule]);
+    }
     
     /**
      * Affiche l'analyse des gaps pour tous les utilisateurs
@@ -167,10 +310,7 @@ class UtilisateursController extends Controller
     {
         $utilisateur = Auth::user();
         
-        // Vérifier que l'utilisateur est ADMIN
-        if ($utilisateur->role !== 'ADMIN') {
-            abort(403, 'Accès réservé aux administrateurs');
-        }
+        $this->assertAdmin($utilisateur);
         
         // Récupérer les utilisateurs avec leurs scores et gaps
         $utilisateurs = Utilisateur::with(['regionEntity', 'branche'])
@@ -195,6 +335,13 @@ class UtilisateursController extends Controller
             'utilisateurs' => $utilisateurs,
             ...$this->getAdminPageData('Analyse des Gaps de Performance', [], $utilisateur),
         ]);
+    }
+
+    private function assertAdmin(?Utilisateur $utilisateur): void
+    {
+        if (!$utilisateur || strtoupper($utilisateur->role ?? '') !== 'ADMIN') {
+            abort(403, 'Accès réservé aux administrateurs');
+        }
     }
     
     /**

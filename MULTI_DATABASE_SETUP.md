@@ -92,21 +92,24 @@ php artisan cleanup:legacy --dry-run
 
 ## 📊 Modèles et Connexions
 
-### Modèles Core (MySQL)
+La majorité des modèles métiers sont dans `app/Models` et déclarent explicitement leur connexion (`mysql`, `pgsql`, `clickhouse`).
+Les classes de base (`CoreModel`, `BusinessModel`, `AnalyticsModel`) vivent dans `app/Models/Core`, `app/Models/Business`, `app/Models/Analytics` pour factoriser la connexion et les utilitaires.
+
+### Exemples Core (MySQL)
 - `Utilisateur` - Authentification et données utilisateur
 - `Region` - Régions géographiques
 - `Branche` - Branches organisationnelles
 - `Role` - Rôles et permissions
 - `LogAdministration` - Logs d'audit
 
-### Modèles Business (PostgreSQL)
+### Exemples Business (PostgreSQL)
 - `Evaluation` - Évaluations 360°
 - `RegleEvaluation` - Règles d'évaluation
 - `PeriodeEvaluation` - Périodes d'évaluation
 - `Notification` - Notifications système
 - `RemplacementTemporaire` - Remplacements
 
-### Modèles Analytics (ClickHouse)
+### Exemples Analytics (ClickHouse)
 - `ScoreUtilisateur` - Scores utilisateurs
 - `EvaluationAnalytics` - Données d'évaluation analytiques
 - `ScoreAnalytics` - Scores agrégés
@@ -118,11 +121,11 @@ php artisan cleanup:legacy --dry-run
 ### 1. Variables d'Environnement
 ```env
 # MySQL (Core)
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_DATABASE=sabc_core
-MYSQL_USERNAME=sabc_user
-MYSQL_PASSWORD=your_password
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=sabc_core
+DB_USERNAME=sabc_user
+DB_PASSWORD=your_password
 
 # PostgreSQL (Business)
 PGSQL_HOST=localhost
@@ -147,6 +150,9 @@ php artisan migrate --database=pgsql
 
 # 2. Initialisation ClickHouse (via Docker)
 ./database/clickhouse/run_clickhouse_script.sh database/clickhouse/create_analytics_tables.sql
+
+# Note: la définition ClickHouse est centralisée dans le script SQL ci-dessus
+# afin d'éviter les doubles sources (migrations Laravel ClickHouse archivées).
 
 # 3. Données de test
 php artisan seed:multi-db --connection=all
@@ -207,9 +213,10 @@ php artisan db:test-connections
 ```
 app/
 ├── Models/
-│   ├── Core/           # Modèles MySQL
-│   ├── Business/       # Modèles PostgreSQL
-│   └── Analytics/      # Modèles ClickHouse
+│   ├── Core/           # Base MySQL (CoreModel)
+│   ├── Business/       # Base PostgreSQL (BusinessModel)
+│   ├── Analytics/      # Base ClickHouse (AnalyticsModel)
+│   └── *.php           # Modèles métier avec connexion explicite
 ├── Services/
 │   └── DatabaseSyncService.php
 └── Console/Commands/

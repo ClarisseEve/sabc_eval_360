@@ -1,8 +1,8 @@
 import React from 'react';
 import { Head } from '@inertiajs/react';
-import AppLayout from '@/components/layout/app/AppLayout';
+import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent } from '@/Components/UI/Card/Card';
-import useAuth from '@/hooks/useAuth';
+import useAuth from '@/Hooks/useAuth';
 
 /**
  * Page des rapports pour le rôle Assistant Superviseur Sponsoring (AS)

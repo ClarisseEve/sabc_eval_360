@@ -28,7 +28,7 @@ export default function Password({ user, pageTitle, isAdmin, permissions }: Prop
     const updatePassword: FormEventHandler = (e) => {
         e.preventDefault();
 
-        put(route('settings.password.update'), {
+        put(route('password.update'), {
             preserveScroll: true,
             onSuccess: () => reset(),
             onError: (errors) => {
