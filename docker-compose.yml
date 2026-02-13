@@ -1,5 +1,5 @@
 # SABC Eval360 - Docker Compose Architecture Microservices
-# Version: Phase 1 - Foundation + Strangler Pattern
+# Version: Phase 3 - Analytics Service Extraction (Strangler Pattern)
 #
 # Architecture:
 #   ┌─────────────────────────────────────────────────────────────┐
@@ -12,15 +12,13 @@
 #   ┌─────▼─────┐       ┌─────▼─────┐       ┌─────▼─────┐
 #   │ Core App  │       │ Analytics │       │ Evaluation│
 #   │ (Laravel) │       │ Service   │       │ Service   │
-#   │ Monolithe │       │ (Future)  │       │ (Future)  │
+#   │ Monolithe │       │  (Go)     │       │  (Go)     │
 #   └─────┬─────┘       └─────┬─────┘       └─────┬─────┘
 #         │                   │                   │
 #   ┌─────▼─────┐       ┌─────▼─────┐       ┌─────▼─────┐
 #   │  MySQL    │       │ClickHouse │       │PostgreSQL │
 #   │  (CORE)   │       │(ANALYTICS)│       │ (BUSINESS)│
 #   └───────────┘       └───────────┘       └───────────┘
-
-version: '3.8'
 
 services:
   # =============================================================================
@@ -52,6 +50,8 @@ services:
       - sabc-network
     depends_on:
       - core-app
+      - evaluation-service
+      - analytics-service
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dashboard.rule=Host(`traefik.localhost`)"
@@ -100,14 +100,28 @@ services:
       # Session
       - SESSION_DRIVER=redis
       # Cache
-      - CACHE_DRIVER=redis
+      - CACHE_STORE=redis
       # Logging
       - LOG_CHANNEL=stack
       - LOG_LEVEL=debug
       # Service Discovery
       - SERVICE_NAME=core-app
+      - JAEGER_ENABLED=${JAEGER_ENABLED:-true}
+      - JAEGER_SERVICE_NAME=${JAEGER_SERVICE_NAME:-core-app}
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6831
+      - JAEGER_SAMPLER_TYPE=${JAEGER_SAMPLER_TYPE:-const}
+      - JAEGER_SAMPLER_PARAM=${JAEGER_SAMPLER_PARAM:-1}
+      - JAEGER_LOG_SPANS=${JAEGER_LOG_SPANS:-false}
+      # Evaluation Microservice (Strangler Pattern)
+      - EVALUATION_SERVICE_URL=http://evaluation-service:8080
+      - EVALUATION_SERVICE_GRPC=evaluation-service:50051
+      - EVALUATION_SERVICE_KEY=${SERVICE_KEY:-internal-service-key}
+      # Analytics Microservice (Strangler Pattern)
+      - ANALYTICS_MICROSERVICE_ENABLED=${ANALYTICS_MICROSERVICE_ENABLED:-false}
+      - ANALYTICS_SERVICE_URL=http://analytics-service:8080
+      - ANALYTICS_SERVICE_KEY=${ANALYTICS_SERVICE_KEY:-internal-service-key}
+      - ANALYTICS_SERVICE_TIMEOUT=60
     volumes:
       - .:/var/www/html
       - ./storage:/var/www/html/storage
@@ -301,6 +315,22 @@ services:
         soft: 262144
         hard: 262144
 
+  clickhouse-init:
+    image: clickhouse/clickhouse-server:24.1
+    container_name: sabc-clickhouse-init
+    restart: "no"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./database/clickhouse/create_analytics_tables.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "clickhouse-client --host clickhouse --multiquery < /docker-entrypoint-initdb.d/init.sql"
+    networks:
+      - sabc-network
+
   # =============================================================================
   # CACHE & MESSAGING
   # =============================================================================
@@ -320,6 +350,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.61.0
+    container_name: sabc-redis-exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    networks:
+      - sabc-network
+    depends_on:
+      redis:
+        condition: service_healthy
 
   # =============================================================================
   # PYTHON DATA PIPELINE (basé sur data_pipelines/requirements.txt)
@@ -384,11 +427,38 @@ services:
       - "9090:9090"
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/alerts:/etc/prometheus/alerts:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - sabc-network
+    depends_on:
+      - alertmanager
+
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: sabc-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./docker/alertmanager/templates:/etc/alertmanager/templates:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    environment:
+      - SMTP_HOST=${SMTP_HOST:-smtp.example.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
     networks:
       - sabc-network
 
@@ -402,6 +472,7 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clickhouse-datasource
     volumes:
       - grafana_data:/var/lib/grafana
       - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -411,54 +482,138 @@ services:
       - prometheus
 
   # =============================================================================
-  # FUTURE MICROSERVICES (Phase 2+)
-  # Décommenter quand prêts à extraire
+  # EVALUATION MICROSERVICE (Phase 2 - Go)
+  # =============================================================================
+  evaluation-service:
+    build:
+      context: ./services/evaluation
+      dockerfile: Dockerfile
+    container_name: sabc-evaluation-service
+    restart: unless-stopped
+    environment:
+      # Server
+      - EVAL_SERVER_HTTP_PORT=8080
+      - EVAL_SERVER_GRPC_PORT=50051
+      - EVAL_SERVER_ENVIRONMENT=${APP_ENV:-local}
+      # Database (PostgreSQL)
+      - EVAL_DATABASE_HOST=postgres
+      - EVAL_DATABASE_PORT=5432
+      - EVAL_DATABASE_DATABASE=sabc_business
+      - EVAL_DATABASE_USERNAME=sabc_user
+      - EVAL_DATABASE_PASSWORD=${DB_PASSWORD:-***REMOVED***}
+      - EVAL_DATABASE_SSL_MODE=disable
+      - EVAL_DATABASE_MAX_OPEN_CONNS=25
+      - EVAL_DATABASE_MAX_IDLE_CONNS=5
+      # Redis
+      - EVAL_REDIS_HOST=redis
+      - EVAL_REDIS_PORT=6379
+      - EVAL_REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      # Auth
+      - EVAL_AUTH_JWT_SECRET=${JWT_SECRET:-your-jwt-secret}
+      - EVAL_AUTH_SERVICE_KEY=${SERVICE_KEY:-internal-service-key}
+      - EVAL_AUTH_LARAVEL_APP_KEY=${APP_KEY}
+      # Tracing
+      - EVAL_TRACING_ENABLED=true
+      - EVAL_TRACING_SERVICE_NAME=evaluation-service
+      - EVAL_TRACING_AGENT_HOST=jaeger
+      - EVAL_TRACING_AGENT_PORT=6831
+      # Logging
+      - EVAL_LOGGING_LEVEL=info
+      - EVAL_LOGGING_FORMAT=json
+    ports:
+      - "8081:8080"   # HTTP API
+      - "50051:50051" # gRPC
+    networks:
+      - sabc-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      # Route /api/v2/evaluations to evaluation service
+      - "traefik.http.routers.evaluation.rule=Host(`localhost`) && PathPrefix(`/api/v2/evaluations`)"
+      - "traefik.http.routers.evaluation.entrypoints=web"
+      - "traefik.http.services.evaluation.loadbalancer.server.port=8080"
+      # Route /api/v2/periodes to evaluation service
+      - "traefik.http.routers.periodes.rule=Host(`localhost`) && PathPrefix(`/api/v2/periodes`)"
+      - "traefik.http.routers.periodes.entrypoints=web"
+      - "traefik.http.routers.periodes.service=evaluation"
+      # Route /api/v2/scores to evaluation service
+      - "traefik.http.routers.scores.rule=Host(`localhost`) && PathPrefix(`/api/v2/scores`)"
+      - "traefik.http.routers.scores.entrypoints=web"
+      - "traefik.http.routers.scores.service=evaluation"
+      # Rate limiting
+      - "traefik.http.middlewares.eval-ratelimit.ratelimit.average=50"
+      - "traefik.http.middlewares.eval-ratelimit.ratelimit.burst=20"
+      - "traefik.http.routers.evaluation.middlewares=eval-ratelimit"
+
+  # =============================================================================
+  # MICROSERVICES (Phase 3)
   # =============================================================================
 
-  # evaluation-service:
-  #   build:
-  #     context: ./services/evaluation
-  #     dockerfile: Dockerfile
-  #   container_name: sabc-evaluation-service
-  #   restart: unless-stopped
-  #   environment:
-  #     - DATABASE_URL=postgres://sabc_user:secret@postgres:5432/sabc_business
-  #     - REDIS_URL=redis://redis:6379
-  #     - HIERARCHY_SERVICE_URL=http://hierarchy-service:8080
-  #     - JAEGER_AGENT_HOST=jaeger
-  #   ports:
-  #     - "8081:8080"
-  #   networks:
-  #     - sabc-network
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.evaluation.rule=Host(`localhost`) && PathPrefix(`/api/v2/evaluations`)"
-  #     - "traefik.http.services.evaluation.loadbalancer.server.port=8080"
-  #   depends_on:
-  #     - postgres
-  #     - redis
-
-  # analytics-service:
-  #   build:
-  #     context: ./services/analytics
-  #     dockerfile: Dockerfile
-  #   container_name: sabc-analytics-service
-  #   restart: unless-stopped
-  #   environment:
-  #     - CLICKHOUSE_URL=http://clickhouse:8123
-  #     - REDIS_URL=redis://redis:6379
-  #     - JAEGER_AGENT_HOST=jaeger
-  #   ports:
-  #     - "8082:8080"
-  #   networks:
-  #     - sabc-network
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.analytics.rule=Host(`localhost`) && PathPrefix(`/api/v2/analytics`)"
-  #     - "traefik.http.services.analytics.loadbalancer.server.port=8080"
-  #   depends_on:
-  #     - clickhouse
-  #     - redis
+  analytics-service:
+    build:
+      context: ./services/analytics
+      dockerfile: Dockerfile
+    container_name: sabc-analytics-service
+    restart: unless-stopped
+    environment:
+      # Server
+      - ANALYTICS_SERVER_HTTP_PORT=8080
+      - ANALYTICS_SERVER_ENVIRONMENT=${APP_ENV:-local}
+      # ClickHouse
+      - ANALYTICS_CLICKHOUSE_HOST=clickhouse
+      - ANALYTICS_CLICKHOUSE_PORT=9000
+      - ANALYTICS_CLICKHOUSE_DATABASE=sabc_analytics
+      - ANALYTICS_CLICKHOUSE_USERNAME=default
+      - ANALYTICS_CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+      - ANALYTICS_CLICKHOUSE_DIAL_TIMEOUT=10s
+      - ANALYTICS_CLICKHOUSE_MAX_OPEN_CONNS=10
+      - ANALYTICS_CLICKHOUSE_MAX_IDLE_CONNS=5
+      - ANALYTICS_CLICKHOUSE_CONN_MAX_LIFETIME=1h
+      # Auth
+      - ANALYTICS_AUTH_SERVICE_KEY=${ANALYTICS_SERVICE_KEY:-internal-service-key}
+      # Tracing
+      - ANALYTICS_TRACING_ENABLED=true
+      - ANALYTICS_TRACING_SERVICE_NAME=analytics-service
+      - ANALYTICS_TRACING_AGENT_HOST=jaeger
+      - ANALYTICS_TRACING_AGENT_PORT=6831
+      # Logging
+      - ANALYTICS_LOGGING_LEVEL=info
+      - ANALYTICS_LOGGING_FORMAT=json
+    ports:
+      - "8082:8080"
+    networks:
+      - sabc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      # Route /api/v2/analytics to analytics service
+      - "traefik.http.routers.analytics.rule=Host(`localhost`) && PathPrefix(`/api/v2/analytics`)"
+      - "traefik.http.routers.analytics.entrypoints=web"
+      - "traefik.http.services.analytics.loadbalancer.server.port=8080"
+      # Rate limiting for analytics
+      - "traefik.http.middlewares.analytics-ratelimit.ratelimit.average=50"
+      - "traefik.http.middlewares.analytics-ratelimit.ratelimit.burst=25"
+      - "traefik.http.routers.analytics.middlewares=analytics-ratelimit"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      clickhouse-init:
+        condition: service_completed_successfully
 
 # =============================================================================
 # NETWORKS & VOLUMES
@@ -482,6 +637,8 @@ volumes:
   redis_data:
     driver: local
   prometheus_data:
+    driver: local
+  alertmanager_data:
     driver: local
   grafana_data:
     driver: local

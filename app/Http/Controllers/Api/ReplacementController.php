@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\RemplacementTemporaire;
 use App\Models\Utilisateur;
 use App\Services\ReplacementService;
 use Illuminate\Http\Request;
@@ -53,7 +52,7 @@ class ReplacementController extends Controller
      */
     public function getHistoriqueRemplacements(Request $request)
     {
-        $limit = $request->input('limit', 50);
+        $limit = (int) $request->input('limit', 50);
         $remplacements = $this->replacementService->getHistoriqueRemplacements($limit);
         return response()->json($remplacements);
     }
@@ -101,7 +100,10 @@ class ReplacementController extends Controller
         }
         
         $utilisateur = Utilisateur::where('matricule', $request->matricule)
-            ->with(['role', 'region'])
+            ->with([
+                'roleModel:id_role,nom_role',
+                'regionEntity:id_region,nom_region',
+            ])
             ->first();
             
         if (!$utilisateur) {
@@ -119,7 +121,9 @@ class ReplacementController extends Controller
         
         // Vérifier si l'utilisateur est déjà remplaçant
         if ($utilisateur->estRemplacantActif()) {
-            $remplacement = $utilisateur->remplacementActifCommeRemplacant();
+            $remplacement = $utilisateur->remplacementsActifsEnTantQueRemplacant()
+                ->with(['titulaire:matricule,nom,prenom,role,id_region'])
+                ->first();
             return response()->json([
                 'error' => 'Cet utilisateur est déjà remplaçant',
                 'remplacement' => $remplacement
@@ -132,9 +136,9 @@ class ReplacementController extends Controller
             'nom' => $utilisateur->nom,
             'prenom' => $utilisateur->prenom,
             'email' => $utilisateur->email,
-            'role' => $utilisateur->role->nom_role,
-            'id_role' => $utilisateur->id_role,
-            'region' => $utilisateur->region->nom_region,
+            'role' => $utilisateur->roleModel?->nom_role ?? $utilisateur->role,
+            'id_role' => $utilisateur->roleModel?->id_role,
+            'region' => $utilisateur->regionEntity?->nom_region,
             'id_region' => $utilisateur->id_region,
             'statut' => $utilisateur->statut
         ]);
@@ -162,17 +166,31 @@ class ReplacementController extends Controller
             return response()->json(['error' => 'Utilisateur non trouvé'], 404);
         }
         
-        $subordonnes = Utilisateur::where('id_manager', $utilisateur->id_utilisateur)
-            ->select('id_utilisateur', 'matricule', 'nom', 'prenom', 'id_role', 'id_region', 'statut')
-            ->with(['role:id_role,nom_role', 'region:id_region,nom_region'])
+        $subordonnes = Utilisateur::where('manager_matricule', $utilisateur->matricule)
+            ->with([
+                'roleModel:id_role,nom_role',
+                'regionEntity:id_region,nom_region',
+            ])
+            ->select('matricule', 'nom', 'prenom', 'role', 'id_region', 'statut')
             ->get();
-            
-        foreach ($subordonnes as $subordonne) {
-            $subordonne->est_indisponible = $subordonne->estIndisponible();
-            $subordonne->est_remplacant = $subordonne->estRemplacantActif();
-        }
+
+        $payload = $subordonnes->map(function (Utilisateur $subordonne) {
+            return [
+                'id_utilisateur' => $subordonne->id_utilisateur,
+                'matricule' => $subordonne->matricule,
+                'nom' => $subordonne->nom,
+                'prenom' => $subordonne->prenom,
+                'role' => $subordonne->roleModel?->nom_role ?? $subordonne->role,
+                'id_role' => $subordonne->roleModel?->id_role,
+                'region' => $subordonne->regionEntity?->nom_region,
+                'id_region' => $subordonne->id_region,
+                'statut' => $subordonne->statut,
+                'est_indisponible' => $subordonne->estIndisponible(),
+                'est_remplacant' => $subordonne->estRemplacantActif(),
+            ];
+        });
         
-        return response()->json($subordonnes);
+        return response()->json($payload->values());
     }
     
     /**
@@ -213,6 +231,13 @@ class ReplacementController extends Controller
                 $request->service_remplacement,
                 Auth::user()->matricule
             );
+
+            if (!$remplacement) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Erreur lors de la création du remplacement'
+                ], 500);
+            }
             
             if ($request->has('notifier_equipe') && $request->notifier_equipe) {
                 $this->replacementService->envoyerNotifications($remplacement->id_remplacement, true);
@@ -225,7 +250,7 @@ class ReplacementController extends Controller
                 'message' => 'Remplacement temporaire créé avec succès',
                 'remplacement' => $remplacement
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la création du remplacement: ' . $e->getMessage()
@@ -252,10 +277,17 @@ class ReplacementController extends Controller
         }
         
         try {
-            $this->replacementService->terminerRemplacement(
+            $success = $this->replacementService->terminerRemplacement(
                 $idRemplacement,
                 $request->date_fin_effective
             );
+
+            if (!$success) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Erreur lors de la terminaison du remplacement'
+                ], 500);
+            }
             
             if ($request->has('notifier_equipe') && $request->notifier_equipe) {
                 $this->replacementService->envoyerNotifications($idRemplacement, true);
@@ -265,7 +297,7 @@ class ReplacementController extends Controller
                 'success' => true,
                 'message' => 'Remplacement temporaire terminé avec succès'
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors de la terminaison du remplacement: ' . $e->getMessage()

@@ -5,9 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Utilisateur;
 use App\Models\Role;
-use App\Models\Region;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class UtilisateurController extends Controller
@@ -20,27 +18,33 @@ class UtilisateurController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Utilisateur::with(['role', 'region']);
+        $query = Utilisateur::with([
+            'roleModel:id_role,nom_role',
+            'regionEntity:id_region,nom_region',
+        ]);
         
         // Filtres
-        if ($request->has('exclude')) {
-            $query->where('id_utilisateur', '!=', $request->exclude);
+        if ($request->filled('exclude')) {
+            $query->where('matricule', '!=', $request->input('exclude'));
         }
         
-        if ($request->has('statut')) {
-            $query->where('statut', $request->statut);
+        if ($request->filled('statut')) {
+            $query->where('statut', $request->input('statut'));
         }
         
-        if ($request->has('id_role')) {
-            $query->where('id_role', $request->id_role);
+        if ($request->filled('id_role')) {
+            $nomRole = Role::where('id_role', $request->input('id_role'))->value('nom_role');
+            if ($nomRole) {
+                $query->where('role', $nomRole);
+            }
         }
         
-        if ($request->has('id_region')) {
-            $query->where('id_region', $request->id_region);
+        if ($request->filled('id_region')) {
+            $query->where('id_region', $request->input('id_region'));
         }
         
-        if ($request->has('search')) {
-            $search = $request->search;
+        if ($request->filled('search')) {
+            $search = $request->input('search');
             $query->where(function($q) use ($search) {
                 $q->where('nom', 'like', "%{$search}%")
                   ->orWhere('prenom', 'like', "%{$search}%")
@@ -49,19 +53,44 @@ class UtilisateurController extends Controller
             });
         }
         
-        $utilisateurs = $query->select(
-            'id_utilisateur', 'matricule', 'nom', 'prenom', 'email',
-            'id_role', 'id_region', 'statut', 'date_debut_indisponibilite',
-            'date_fin_indisponibilite', 'roles_support_json'
-        )->orderBy('nom')->orderBy('prenom')->get();
-        
-        // Ajouter des attributs calculés
-        foreach ($utilisateurs as $utilisateur) {
-            $utilisateur->est_indisponible = $utilisateur->estIndisponible();
-            $utilisateur->est_remplacant = $utilisateur->estRemplacantActif();
-        }
-        
-        return response()->json($utilisateurs);
+        $utilisateurs = $query->orderBy('nom')
+            ->orderBy('prenom')
+            ->get([
+                'matricule',
+                'nom',
+                'prenom',
+                'email',
+                'role',
+                'id_region',
+                'manager_matricule',
+                'statut',
+                'date_debut_indisponibilite',
+                'date_fin_indisponibilite',
+                'roles_support_json',
+            ]);
+
+        $payload = $utilisateurs->map(function (Utilisateur $utilisateur) {
+            return [
+                'id_utilisateur' => $utilisateur->id_utilisateur,
+                'matricule' => $utilisateur->matricule,
+                'nom' => $utilisateur->nom,
+                'prenom' => $utilisateur->prenom,
+                'email' => $utilisateur->email,
+                'role' => $utilisateur->roleModel?->nom_role ?? $utilisateur->role,
+                'id_role' => $utilisateur->roleModel?->id_role,
+                'region' => $utilisateur->regionEntity?->nom_region,
+                'id_region' => $utilisateur->id_region,
+                'manager_matricule' => $utilisateur->manager_matricule,
+                'statut' => $utilisateur->statut,
+                'date_debut_indisponibilite' => $utilisateur->date_debut_indisponibilite,
+                'date_fin_indisponibilite' => $utilisateur->date_fin_indisponibilite,
+                'roles_support_json' => $utilisateur->roles_support_json,
+                'est_indisponible' => $utilisateur->estIndisponible(),
+                'est_remplacant' => $utilisateur->estRemplacantActif(),
+            ];
+        });
+
+        return response()->json($payload->values());
     }
     
     /**
@@ -72,20 +101,35 @@ class UtilisateurController extends Controller
      */
     public function show(Utilisateur $utilisateur)
     {
-        $utilisateur->load(['role', 'region', 'manager']);
-        
-        // Ajouter des attributs calculés
-        $utilisateur->est_indisponible = $utilisateur->estIndisponible();
-        $utilisateur->est_remplacant = $utilisateur->estRemplacantActif();
-        
-        // Récupérer les remplacements actifs
-        $remplacementActif = $utilisateur->remplacementActifCommeRemplacant();
-        if ($remplacementActif) {
-            $remplacementActif->load('titulaire');
-            $utilisateur->remplacement_actif = $remplacementActif;
-        }
-        
-        return response()->json($utilisateur);
+        $utilisateur->load([
+            'roleModel:id_role,nom_role',
+            'regionEntity:id_region,nom_region',
+            'manager:matricule,nom,prenom',
+        ]);
+
+        $remplacementActif = $utilisateur->remplacementsActifsEnTantQueRemplacant()
+            ->with(['titulaire:matricule,nom,prenom,role,id_region'])
+            ->first();
+
+        return response()->json([
+            'id_utilisateur' => $utilisateur->id_utilisateur,
+            'matricule' => $utilisateur->matricule,
+            'nom' => $utilisateur->nom,
+            'prenom' => $utilisateur->prenom,
+            'email' => $utilisateur->email,
+            'role' => $utilisateur->roleModel?->nom_role ?? $utilisateur->role,
+            'id_role' => $utilisateur->roleModel?->id_role,
+            'region' => $utilisateur->regionEntity?->nom_region,
+            'id_region' => $utilisateur->id_region,
+            'manager_matricule' => $utilisateur->manager_matricule,
+            'manager_nom' => $utilisateur->manager
+                ? trim($utilisateur->manager->prenom . ' ' . $utilisateur->manager->nom)
+                : null,
+            'statut' => $utilisateur->statut,
+            'est_indisponible' => $utilisateur->estIndisponible(),
+            'est_remplacant' => $utilisateur->estRemplacantActif(),
+            'remplacement_actif' => $remplacementActif,
+        ]);
     }
     
     /**
@@ -97,19 +141,40 @@ class UtilisateurController extends Controller
      */
     public function getSubordonnes(Request $request, Utilisateur $utilisateur)
     {
-        $subordonnes = Utilisateur::where('id_manager', $utilisateur->id_utilisateur)
-            ->select('id_utilisateur', 'matricule', 'nom', 'prenom', 'id_role', 'id_region', 'statut')
-            ->with(['role:id_role,nom_role', 'region:id_region,nom_region'])
+        $subordonnes = Utilisateur::where('manager_matricule', $utilisateur->matricule)
+            ->with([
+                'roleModel:id_role,nom_role',
+                'regionEntity:id_region,nom_region',
+            ])
             ->orderBy('nom')
             ->orderBy('prenom')
-            ->get();
-            
-        foreach ($subordonnes as $subordonne) {
-            $subordonne->est_indisponible = $subordonne->estIndisponible();
-            $subordonne->est_remplacant = $subordonne->estRemplacantActif();
-        }
-        
-        return response()->json($subordonnes);
+            ->get([
+                'matricule',
+                'nom',
+                'prenom',
+                'role',
+                'id_region',
+                'statut',
+                'manager_matricule',
+            ]);
+
+        $payload = $subordonnes->map(function (Utilisateur $subordonne) {
+            return [
+                'id_utilisateur' => $subordonne->id_utilisateur,
+                'matricule' => $subordonne->matricule,
+                'nom' => $subordonne->nom,
+                'prenom' => $subordonne->prenom,
+                'role' => $subordonne->roleModel?->nom_role ?? $subordonne->role,
+                'id_role' => $subordonne->roleModel?->id_role,
+                'region' => $subordonne->regionEntity?->nom_region,
+                'id_region' => $subordonne->id_region,
+                'statut' => $subordonne->statut,
+                'est_indisponible' => $subordonne->estIndisponible(),
+                'est_remplacant' => $subordonne->estRemplacantActif(),
+            ];
+        });
+
+        return response()->json($payload->values());
     }
     
     /**
@@ -121,7 +186,8 @@ class UtilisateurController extends Controller
     public function getRemplacantsDisponibles(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'id_titulaire' => 'required|exists:utilisateurs,id_utilisateur',
+            'titulaire_matricule' => 'required_without:id_titulaire|exists:utilisateurs,matricule',
+            'id_titulaire' => 'required_without:titulaire_matricule|exists:utilisateurs,matricule',
             'date_debut' => 'required|date',
             'date_fin' => 'nullable|date|after:date_debut',
         ]);
@@ -130,32 +196,54 @@ class UtilisateurController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
         
-        $titulaire = Utilisateur::findOrFail($request->id_titulaire);
+        $titulaireMatricule = $request->input('titulaire_matricule', $request->input('id_titulaire'));
+        $titulaire = Utilisateur::where('matricule', $titulaireMatricule)->firstOrFail();
         
         // Récupérer les utilisateurs qui ne sont pas déjà indisponibles ou remplaçants
-        $query = Utilisateur::where('id_utilisateur', '!=', $titulaire->id_utilisateur)
+        $query = Utilisateur::where('matricule', '!=', $titulaire->matricule)
             ->where('statut', 'Actif')
             ->whereNull('date_debut_indisponibilite')
             ->whereNull('roles_support_json')
-            ->with(['role', 'region']);
+            ->with([
+                'roleModel:id_role,nom_role,niveau_taniere,niveau_non_taniere',
+                'regionEntity:id_region,nom_region',
+            ]);
             
         // Filtrer par région si demandé
-        if ($request->has('meme_region') && $request->meme_region) {
+        if ($request->boolean('meme_region')) {
             $query->where('id_region', $titulaire->id_region);
         }
         
         // Filtrer par niveau hiérarchique si demandé
-        if ($request->has('niveau_hierarchique_min')) {
-            $query->whereHas('role', function($q) use ($request, $titulaire) {
-                $q->where('niveau_hierarchique', '>=', $request->niveau_hierarchique_min);
+        if ($request->filled('niveau_hierarchique_min')) {
+            $niveauMin = (int) $request->input('niveau_hierarchique_min');
+            $query->whereHas('roleModel', function($q) use ($niveauMin) {
+                $q->where('niveau_taniere', '>=', $niveauMin)
+                    ->orWhere('niveau_non_taniere', '>=', $niveauMin);
             });
         }
         
         $remplacantsPotentiels = $query->select(
-            'id_utilisateur', 'matricule', 'nom', 'prenom', 'email',
-            'id_role', 'id_region', 'statut'
+            'matricule', 'nom', 'prenom', 'email',
+            'role', 'id_region', 'statut', 'manager_matricule'
         )->orderBy('nom')->orderBy('prenom')->get();
-        
-        return response()->json($remplacantsPotentiels);
+
+        $payload = $remplacantsPotentiels->map(function (Utilisateur $utilisateur) {
+            return [
+                'id_utilisateur' => $utilisateur->id_utilisateur,
+                'matricule' => $utilisateur->matricule,
+                'nom' => $utilisateur->nom,
+                'prenom' => $utilisateur->prenom,
+                'email' => $utilisateur->email,
+                'role' => $utilisateur->roleModel?->nom_role ?? $utilisateur->role,
+                'id_role' => $utilisateur->roleModel?->id_role,
+                'region' => $utilisateur->regionEntity?->nom_region,
+                'id_region' => $utilisateur->id_region,
+                'manager_matricule' => $utilisateur->manager_matricule,
+                'statut' => $utilisateur->statut,
+            ];
+        });
+
+        return response()->json($payload->values());
     }
 }

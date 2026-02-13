@@ -1,0 +1,120 @@
+# =============================================================================
+# SABC Eval360 - Alertmanager Configuration
+# =============================================================================
+
+global:
+  # SMTP configuration for email alerts
+  smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
+  smtp_from: 'alertmanager@sabc.cm'
+  smtp_auth_username: '${SMTP_USER}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+  # Slack webhook (optional)
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+
+# Templates
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree
+route:
+  # Default receiver
+  receiver: 'default-receiver'
+
+  # Group alerts by alertname and job
+  group_by: ['alertname', 'job', 'severity']
+
+  # Wait time before sending first notification
+  group_wait: 30s
+
+  # Wait time before sending subsequent notifications for same group
+  group_interval: 5m
+
+  # Repeat interval for unresolved alerts
+  repeat_interval: 4h
+
+  # Child routes
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # HR team alerts (evaluation business metrics)
+    - match:
+        team: hr
+      receiver: 'hr-team'
+      group_wait: 1m
+      repeat_interval: 8h
+
+    # Analytics team alerts
+    - match:
+        team: analytics
+      receiver: 'analytics-team'
+      group_wait: 5m
+      repeat_interval: 4h
+
+    # Database alerts
+    - match_re:
+        alertname: '^(MySQL|PostgreSQL|ClickHouse|Redis).*'
+      receiver: 'dba-team'
+      group_wait: 30s
+      repeat_interval: 2h
+
+# Inhibition rules
+inhibit_rules:
+  # If service is down, don't alert on high latency
+  - source_match:
+      alertname: 'ServiceDown'
+    target_match:
+      alertname: 'HighLatencyP95'
+    equal: ['job']
+
+  # If database is down, don't alert on connection issues
+  - source_match_re:
+      alertname: '^(MySQL|PostgreSQL|ClickHouse)Down$'
+    target_match:
+      alertname: 'HighDatabaseConnections'
+    equal: ['database']
+
+# Receivers
+receivers:
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'devops@sabc.cm'
+        send_resolved: true
+
+  - name: 'critical-receiver'
+    email_configs:
+      - to: 'devops@sabc.cm,it-manager@sabc.cm'
+        send_resolved: true
+    slack_configs:
+      - channel: '#sabc-alerts-critical'
+        send_resolved: true
+        title: '{{ template "slack.title" . }}'
+        text: '{{ template "slack.text" . }}'
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+
+  - name: 'hr-team'
+    email_configs:
+      - to: 'rh-eval360@sabc.cm'
+        send_resolved: true
+    slack_configs:
+      - channel: '#sabc-evaluations'
+        send_resolved: true
+
+  - name: 'analytics-team'
+    email_configs:
+      - to: 'analytics@sabc.cm'
+        send_resolved: true
+
+  - name: 'dba-team'
+    email_configs:
+      - to: 'dba@sabc.cm'
+        send_resolved: true
+    slack_configs:
+      - channel: '#sabc-alerts-db'
+        send_resolved: true

@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
             BusinessSeeder::class,
             EvaluationPermissionsSeeder::class,
             TemplateSeeder::class,
+            ReglesEvaluationSeeder::class,
         ]);
         
         // 3. ClickHouse (Analytics) - Données analytiques

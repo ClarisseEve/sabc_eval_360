@@ -213,4 +213,118 @@ class PeriodeEvaluation extends Model
         $soumises = $this->getNombreEvaluationsSoumises();
         return round(($soumises / $total) * 100, 2);
     }
+    
+    /**
+     * Scopes pour filtrer les périodes
+     */
+    public function scopePlanifiee($query)
+    {
+        return $query->where('statut', 'planifiee')
+                     ->where('est_ouverte', false)
+                     ->where('est_cloturee', false);
+    }
+    
+    public function scopeOuverte($query)
+    {
+        return $query->where('est_ouverte', true)
+                     ->where('est_cloturee', false);
+    }
+    
+    public function scopeFermee($query)
+    {
+        return $query->where('est_cloturee', true);
+    }
+    
+    public function scopeActive($query)
+    {
+        return $query->where('est_ouverte', true)
+                     ->where('est_cloturee', false)
+                     ->where('date_debut', '<=', now())
+                     ->where('date_fin', '>=', now());
+    }
+    
+    /**
+     * Vérifie si la période peut être modifiée
+     * 
+     * @return bool
+     */
+    public function estModifiable(): bool
+    {
+        // Une période peut être modifiée si elle est planifiée et non ouverte
+        return $this->statut === 'planifiee' && !$this->est_ouverte && !$this->est_cloturee;
+    }
+    
+    /**
+     * Récupère les dates de rappels
+     * 
+     * @return array
+     */
+    public function getDatesRappels(): array
+    {
+        if (!empty($this->rappels_envoyes) && is_array($this->rappels_envoyes)) {
+            return $this->rappels_envoyes;
+        }
+        
+        // Générer dates par défaut si non définies
+        if ($this->date_fin) {
+            return [
+                'j_moins_7' => $this->date_fin->copy()->subDays(7)->format('Y-m-d'),
+                'j_moins_3' => $this->date_fin->copy()->subDays(3)->format('Y-m-d'),
+                'j_moins_1' => $this->date_fin->copy()->subDays(1)->format('Y-m-d'),
+            ];
+        }
+        
+        return [];
+    }
+    
+    /**
+     * Ouvrir la période
+     * 
+     * @return bool
+     */
+    public function ouvrir(): bool
+    {
+        if ($this->est_ouverte) {
+            return false;
+        }
+        
+        return $this->update([
+            'est_ouverte' => true,
+            'est_cloturee' => false,
+            'statut' => 'active',
+        ]);
+    }
+    
+    /**
+     * Fermer la période
+     * 
+     * @return bool
+     */
+    public function fermer(): bool
+    {
+        if ($this->est_cloturee) {
+            return false;
+        }
+        
+        return $this->update([
+            'est_ouverte' => false,
+            'est_cloturee' => true,
+            'statut' => 'fermee',
+        ]);
+    }
+    
+    /**
+     * Vérifie si la période est en cours
+     * 
+     * @return bool
+     */
+    public function estEnCours(): bool
+    {
+        if (!$this->est_ouverte || $this->est_cloturee) {
+            return false;
+        }
+        
+        $now = now();
+        return $now->between($this->date_debut, $this->date_fin);
+    }
 }

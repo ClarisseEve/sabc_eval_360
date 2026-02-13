@@ -18,6 +18,7 @@ datasources:
     type: grafana-clickhouse-datasource
     access: proxy
     url: http://clickhouse:8123
+    uid: clickhouse
     jsonData:
       defaultDatabase: sabc_analytics
     editable: false

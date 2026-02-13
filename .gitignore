@@ -1,5 +1,5 @@
 /.phpunit.cache
-/.DS_Store
+.DS_Store
 /bootstrap/ssr
 /node_modules
 /public/build

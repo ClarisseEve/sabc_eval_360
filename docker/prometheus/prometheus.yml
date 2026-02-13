@@ -1,17 +1,24 @@
+# =============================================================================
 # Prometheus Configuration for SABC Eval360
+# Phase 4: Observability & Monitoring
+# =============================================================================
 
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
     monitor: 'sabc-eval360'
+    environment: 'production'
 
+# Alertmanager configuration
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
+        - targets: ['alertmanager:9093']
 
-rule_files: []
+# Alert rules files
+rule_files:
+  - '/etc/prometheus/alerts/*.yml'
 
 scrape_configs:
   # Prometheus self-monitoring
@@ -30,10 +37,10 @@ scrape_configs:
     static_configs:
       - targets: ['core-app:80']
 
-  # Redis metrics
+  # Redis metrics (redis_exporter)
   - job_name: 'redis'
     static_configs:
-      - targets: ['redis:6379']
+      - targets: ['redis-exporter:9121']
 
   # MySQL metrics (requires mysqld_exporter)
   # - job_name: 'mysql'
@@ -43,16 +50,16 @@ scrape_configs:
   # ClickHouse metrics
   - job_name: 'clickhouse'
     static_configs:
-      - targets: ['clickhouse:8123']
+      - targets: ['clickhouse:9363']
     metrics_path: '/metrics'
 
-  # Future microservices
-  # - job_name: 'evaluation-service'
-  #   static_configs:
-  #     - targets: ['evaluation-service:8080']
-  #   metrics_path: '/actuator/prometheus'
+  # Microservices
+  - job_name: 'evaluation-service'
+    static_configs:
+      - targets: ['evaluation-service:8080']
+    metrics_path: '/metrics'
 
-  # - job_name: 'analytics-service'
-  #   static_configs:
-  #     - targets: ['analytics-service:8080']
-  #   metrics_path: '/actuator/prometheus'
+  - job_name: 'analytics-service'
+    static_configs:
+      - targets: ['analytics-service:8080']
+    metrics_path: '/metrics'

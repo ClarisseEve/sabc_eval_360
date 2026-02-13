@@ -34,14 +34,16 @@ interface RoleCompetencyScore {
 }
 ```
 
-## API Laravel (à implémenter)
-**Note** : ces endpoints sont planifiés et ne sont pas encore exposés dans `routes/api.php`.
-Le frontend reste alimenté par `MOCK_ANALYTICS_DATA` tant que l'API n'est pas branchée.
+## API Analytics (microservice)
+**Note** : l'Analytics est exposé par le microservice Go `services/analytics` et routé par Traefik.
+Le front reçoit un `AnalyticsDataset` via l'Inertia render de `/admin/analytics` (proxy Laravel).
 
-- `GET /admin/api/analytics` → retourne `AnalyticsDataset` filtré selon query params (période, rôles, hiérarchie, etc.). S'appuie sur vues/materialized tables `analytics_metrics`, `analytics_demographics`, `analytics_competencies` (ClickHouse recommandé pour agrégations volumétriques).
-- `GET /admin/api/analytics/users` → pagination des `UserAnalyticsSummary` pour alimenter la tuile « utilisateurs mis en avant » et la heatmap (filtrable même jeu de paramètres).
-- `GET /admin/api/analytics/users/{matricule}` → détail exhaustif pour le tiroir (scores historiques, recommandations dynamiques, positionnement démographique).
-- `GET /admin/api/analytics/competencies/matrix` → expose la matrice de référence (peut être mise en cache application/Redis).
+- `GET /api/v2/analytics` → retourne `AnalyticsDataset` filtré selon query params (`period`, `start_date`, `end_date`).
+  *Source* : tables ClickHouse (`evaluations_analytics`, `scores_utilisateurs`, `logs_anomalies`, `recommandations`).
+  *Proxy* : `app/Services/AnalyticsServiceProxy.php` (feature flag `ANALYTICS_MICROSERVICE_ENABLED`).
+- (prévu) `GET /api/v2/analytics/users` → pagination des `UserAnalyticsSummary` pour la tuile « utilisateurs mis en avant ».
+- (prévu) `GET /api/v2/analytics/users/{matricule}` → détail exhaustif pour le tiroir (scores historiques, recommandations dynamiques).
+- (prévu) `GET /api/v2/analytics/competencies/matrix` → expose la matrice de référence (cache Redis possible).
 
 ## Pipelines & stockage (Airflow)
 1. **Ingestion** : extraire évaluations (`evaluations`, `scores_utilisateurs`) + référentiel RH (âge, sexe, ancienneté, hiérarchie, statut formation) + matrice compétences.
@@ -54,7 +56,8 @@ Le frontend reste alimenté par `MOCK_ANALYTICS_DATA` tant que l'API n'est pas b
 - Route protégée par `role:ADMIN`. L'admin peut lancer des évaluations descendantes, mais l'UI empêche auto/pairs (cf. `EvaluationPermissionsSeeder`). Les autres rôles reçoivent `AccessDenied`.
 
 ## TODO front/back
-- Remplacer `MOCK_ANALYTICS_DATA` par appels API une fois disponibles.
+- Brancher les filtres du panneau sur les query params de `/api/v2/analytics` (périodes + segments).
+- Remplacer `MOCK_ANALYTICS_DATA` par `dataset` uniquement lorsque `ANALYTICS_MICROSERVICE_ENABLED=true`.
 - Ajouter scénarios RWD (panel filtres sticky sur desktop, drawer plein écran mobile).
 - Finaliser le mode salle (thème haute visibilité + autorefresh) et enrichir les exports (PNG, JPEG, PDF, Excel déjà disponibles côté client via `useAnalyticsExport`).
 - Étendre `useAnalyticsData` pour appliquer filtres côté front tant que l'API n'est pas branchée.

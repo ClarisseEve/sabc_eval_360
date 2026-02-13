@@ -242,6 +242,25 @@ class ReplacementController extends Controller
     }
     
     /**
+     * Termine un remplacement via requête DELETE (compat front Inertia)
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        $success = $this->replacementService->terminerRemplacement($id, Carbon::today()->format('Y-m-d'));
+
+        if (!$success) {
+            return redirect()->back()
+                ->with('error', 'Une erreur est survenue lors de la suppression du remplacement');
+        }
+
+        return redirect()->route('admin.remplacements.index')
+            ->with('success', 'Remplacement supprimé avec succès');
+    }
+
+    /**
      * Termine un remplacement
      *
      * @param  int  $id

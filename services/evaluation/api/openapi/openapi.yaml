@@ -1,0 +1,713 @@
+openapi: 3.1.0
+info:
+  title: SABC Evaluation Service API
+  description: |
+    API for the SABC Eval360 Evaluation Microservice.
+    Handles all evaluation-related operations including creation, submission, validation, and scoring.
+  version: 2.0.0
+  contact:
+    name: SABC IT Team
+    email: it@sabc.cm
+  license:
+    name: Proprietary
+    identifier: UNLICENSED
+
+servers:
+  - url: http://localhost:8081
+    description: Development server
+  - url: http://evaluation-service:8080
+    description: Docker internal
+  - url: https://api.sabc.cm/v2
+    description: Production server
+
+tags:
+  - name: evaluations
+    description: Evaluation management
+  - name: periodes
+    description: Evaluation period management
+  - name: scores
+    description: User scores and analytics
+  - name: health
+    description: Service health checks
+
+paths:
+  /health:
+    get:
+      tags:
+        - health
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v2/evaluations:
+    get:
+      tags:
+        - evaluations
+      summary: List evaluations
+      operationId: listEvaluations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: statut
+          in: query
+          schema:
+            $ref: '#/components/schemas/Statut'
+        - name: type_evaluation
+          in: query
+          schema:
+            $ref: '#/components/schemas/TypeEvaluation'
+        - name: id_periode
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of evaluations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - evaluations
+      summary: Create a new evaluation
+      operationId: createEvaluation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEvaluationRequest'
+      responses:
+        '201':
+          description: Evaluation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v2/evaluations/{id}:
+    get:
+      tags:
+        - evaluations
+      summary: Get evaluation by ID
+      operationId: getEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Evaluation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - evaluations
+      summary: Update evaluation notes
+      operationId: updateEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNotesRequest'
+      responses:
+        '200':
+          description: Evaluation updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v2/evaluations/{id}/submit:
+    post:
+      tags:
+        - evaluations
+      summary: Submit evaluation for validation
+      operationId: submitEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Evaluation submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v2/evaluations/{id}/validate:
+    post:
+      tags:
+        - evaluations
+      summary: Validate or reject evaluation
+      operationId: validateEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateRequest'
+      responses:
+        '200':
+          description: Evaluation validated/rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v2/evaluations/pending:
+    get:
+      tags:
+        - evaluations
+      summary: Get pending evaluations to complete
+      operationId: getPendingEvaluations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of pending evaluations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v2/evaluations/to-validate:
+    get:
+      tags:
+        - evaluations
+      summary: Get evaluations awaiting validation
+      operationId: getEvaluationsToValidate
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of evaluations to validate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v2/periodes:
+    get:
+      tags:
+        - periodes
+      summary: List evaluation periods
+      operationId: listPeriodes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: List of periods
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeriodeListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v2/periodes/{id}:
+    get:
+      tags:
+        - periodes
+      summary: Get period by ID
+      operationId: getPeriode
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Period details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeriodeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v2/scores/{matricule}:
+    get:
+      tags:
+        - scores
+      summary: Get user scores
+      operationId: getUserScores
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: matricule
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id_periode
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User scores
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Statut:
+      type: string
+      enum:
+        - brouillon
+        - soumis
+        - valide
+        - rejete
+
+    TypeEvaluation:
+      type: string
+      enum:
+        - auto
+        - descendante
+        - pairs
+        - ascendante
+        - autre
+
+    Note:
+      type: object
+      required:
+        - code_critere
+        - nom_critere
+        - note
+        - ponderation
+      properties:
+        code_critere:
+          type: string
+        nom_critere:
+          type: string
+        note:
+          type: number
+          minimum: 1
+          maximum: 5
+        ponderation:
+          type: number
+        commentaire:
+          type: string
+        note_maximale:
+          type: number
+          default: 5
+
+    NotesJSON:
+      type: object
+      properties:
+        criteres:
+          type: array
+          items:
+            $ref: '#/components/schemas/Note'
+        note_moyenne:
+          type: number
+        note_globale:
+          type: number
+        date_calcul:
+          type: string
+          format: date-time
+
+    Evaluation:
+      type: object
+      properties:
+        id_evaluation:
+          type: string
+          format: uuid
+        evaluateur_matricule:
+          type: string
+        evalue_matricule:
+          type: string
+        id_periode:
+          type: string
+          format: uuid
+        id_regle:
+          type: string
+          format: uuid
+        date_evaluation:
+          type: string
+          format: date-time
+        date_soumission:
+          type: string
+          format: date-time
+          nullable: true
+        date_validation:
+          type: string
+          format: date-time
+          nullable: true
+        statut:
+          $ref: '#/components/schemas/Statut'
+        notes_json:
+          $ref: '#/components/schemas/NotesJSON'
+        commentaire_general:
+          type: string
+        commentaire_validation:
+          type: string
+          nullable: true
+        validateur_matricule:
+          type: string
+          nullable: true
+        score_global:
+          type: number
+          nullable: true
+        type_evaluation:
+          $ref: '#/components/schemas/TypeEvaluation'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PeriodeEvaluation:
+      type: object
+      properties:
+        id_periode:
+          type: string
+          format: uuid
+        code_periode:
+          type: string
+        nom_periode:
+          type: string
+        titre:
+          type: string
+        description:
+          type: string
+        date_debut:
+          type: string
+          format: date
+        date_fin:
+          type: string
+          format: date
+        statut:
+          type: string
+          enum:
+            - planifiee
+            - ouverte
+            - fermee
+            - archivee
+        est_ouverte:
+          type: boolean
+        est_cloturee:
+          type: boolean
+        nb_evaluations_attendues:
+          type: integer
+        nb_evaluations_completees:
+          type: integer
+        taux_completion:
+          type: number
+        jours_restants:
+          type: integer
+
+    ScoreUtilisateur:
+      type: object
+      properties:
+        matricule:
+          type: string
+        id_periode:
+          type: string
+          format: uuid
+        score_auto:
+          type: number
+          nullable: true
+        score_pairs:
+          type: number
+          nullable: true
+        score_manager:
+          type: number
+          nullable: true
+        score_global:
+          type: number
+          nullable: true
+        progression_vs_precedente:
+          type: number
+          nullable: true
+        nb_evaluations_recues:
+          type: integer
+        nb_evaluations_donnees:
+          type: integer
+        position_equipe:
+          type: integer
+          nullable: true
+        est_complet:
+          type: boolean
+        derniere_maj:
+          type: string
+          format: date-time
+
+    CreateEvaluationRequest:
+      type: object
+      required:
+        - evalue_matricule
+        - id_periode
+        - id_regle
+      properties:
+        evalue_matricule:
+          type: string
+        id_periode:
+          type: string
+          format: uuid
+        id_regle:
+          type: string
+          format: uuid
+
+    UpdateNotesRequest:
+      type: object
+      required:
+        - notes
+      properties:
+        notes:
+          $ref: '#/components/schemas/NotesJSON'
+        commentaire_general:
+          type: string
+
+    ValidateRequest:
+      type: object
+      required:
+        - est_valide
+      properties:
+        est_valide:
+          type: boolean
+        commentaire:
+          type: string
+
+    EvaluationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/Evaluation'
+        message:
+          type: string
+
+    EvaluationListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Evaluation'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PeriodeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PeriodeEvaluation'
+
+    PeriodeListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PeriodeEvaluation'
+
+    ScoreResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ScoreUtilisateur'
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - unhealthy
+        service:
+          type: string
+        version:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        checks:
+          type: object
+          properties:
+            database:
+              type: string
+            redis:
+              type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        has_more:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

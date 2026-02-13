@@ -17,7 +17,16 @@
 - Dashboard DR refactorisé pour utiliser `resources/js/Components/Dashboard/DirectorDashboard.tsx`.
 - Nettoyage des services vides (front/back) déplacés en archives + `docker/python/requirements.txt` aligné sur le pipeline.
 - Tests corrigés: composants Inertia en `Auth/*`, redirection racine vers login, et guard `app()->environment` dans `SecureLoggingService`.
-- Ajout de `.DS_Store` au `.gitignore`.
+- `.DS_Store` ignoré globalement dans `.gitignore` (macOS).
+- Phase 3: création du microservice Analytics (Go) avec endpoint `/api/v2/analytics`, mapping dataset Analytics et queries ClickHouse.
+- Proxy Laravel `AnalyticsServiceProxy` + injection du `dataset` dans `/admin/analytics` (fallback sur mock si service off).
+- Docker Compose: service `analytics-service` + job `clickhouse-init`, variables analytics côté `core-app`.
+- ClickHouse SQL: ajout des tables `scores_utilisateurs`, `logs_anomalies`, `recommandations` + `CREATE DATABASE IF NOT EXISTS`.
+- Prometheus: activation des scrapes `evaluation-service` et `analytics-service`.
+- Observability: metrics Laravel enrichies (histogrammes HTTP/DB), corrections des alertes Prometheus, scrape ClickHouse sur 9363, ajout redis_exporter, plugin Grafana ClickHouse.
+- Tracing Jaeger end-to-end: middleware Laravel + propagation headers vers services Go + init tracer côté Go.
+- go.sum générés (Go 1.23) pour `services/evaluation` et `services/analytics`; `composer.lock` mis à jour pour Jaeger (version `jonahgeorge/jaeger-client-php` fixée à `^1.5.2`).
+- Phase 5: alignement schéma evaluation (microservice) sur `notations_json`/`note_globale`, compatibilité JSON notes (legacy array ↔ struct), suppression hard delete côté repo.
 
 ## Archives
 - `archives/resources/js/routes.tsx`
@@ -39,6 +48,7 @@
 - Couche services backend : `app/Services/*` contient des services actifs (Evaluation/Hierarchy/Replacement/...) et des placeholders vides (Analytics/Notification/Report/RulesEngine).
 - UI kit riche sous `resources/js/Components/UI/*` ; dossier `radio-group` encore en kebab‑case.
 - Duplication détectée : deux pages `RoleSpecificEvaluation` quasi identiques (`resources/js/Pages/Common/Evaluations` et `resources/js/Pages/Evaluation`).
+- `docker/traefik/traefik.yml` est référencé par `docker-compose.yml` mais le fichier n'existe pas encore.
 
 ## Migration microservices (axes & étapes)
 - Axes: découpage domaine (Auth/Identité, Utilisateurs/Structure, Evaluations/Regles, Analytics/Reporting, Notifications/Exports).
@@ -58,3 +68,4 @@
 5. Vérifier la cohérence des routes “team” dans la navigation (actuellement non exposées en backend).
 6. Lancer les tests:
    - `php artisan test`
+7. Générer `go.sum` pour `services/analytics` (run `go mod tidy`) quand Go est disponible.

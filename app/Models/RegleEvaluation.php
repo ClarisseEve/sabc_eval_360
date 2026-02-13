@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Business\BusinessModel;
+use Carbon\Carbon;
 
 class RegleEvaluation extends Model
 {
@@ -36,14 +36,14 @@ class RegleEvaluation extends Model
      *
      * @var bool
      */
-    public $incrementing = false;
+    public $incrementing = true;
     
     /**
      * Le type de la clé primaire.
      *
      * @var string
      */
-    protected $keyType = 'string';
+    protected $keyType = 'int';
     
     /**
      * Les attributs qui sont assignables en masse.
@@ -52,10 +52,14 @@ class RegleEvaluation extends Model
      */
     protected $fillable = [
         'nom_regle',
+        'description',
         'criteres_evaluation_json',
         'est_active',
-        'date_debut',
-        'date_fin',
+        'role_evaluateur',
+        'role_evalue',
+        'type_evaluation',
+        'meme_region_obligatoire',
+        'meme_branche_obligatoire',
     ];
     
     /**
@@ -64,11 +68,10 @@ class RegleEvaluation extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'criteres_evaluation_json' => 'json',
+        'criteres_evaluation_json' => 'array',
         'est_active' => 'boolean',
-        'date_debut' => 'date',
-        'date_fin' => 'date',
-        'parametres_json' => 'json',
+        'meme_region_obligatoire' => 'boolean',
+        'meme_branche_obligatoire' => 'boolean',
     ];
     
     /**
@@ -80,81 +83,67 @@ class RegleEvaluation extends Model
     }
     
     /**
-     * Vérifie si la règle est active à une date donnée
-     * 
-     * @param \DateTime|string|null $date
-     * @return bool
+     * Scope pour filtrer les règles actives
+     */
+    public function scopeActif($query)
+    {
+        return $query->where('est_active', true);
+    }
+    
+    /**
+     * Scope pour filtrer par catégorie
+     */
+    public function scopeByCategorie($query, string $categorie)
+    {
+        return $query->whereJsonContains('criteres_evaluation_json->categories', $categorie);
+    }
+    
+    /**
+     * Accessor pour récupérer les critères
+     */
+    public function getCriteresAttribute(): array
+    {
+        $data = $this->criteres_evaluation_json;
+        return $data['criteres'] ?? [];
+    }
+    
+    /**
+     * Accessor pour récupérer les catégories
+     */
+    public function getCategoriesAttribute(): array
+    {
+        $data = $this->criteres_evaluation_json;
+        return $data['categories'] ?? [];
+    }
+    
+    /**
+     * Accessor pour calculer le total des pondérations
+     */
+    public function getTotalPonderationAttribute(): int
+    {
+        return collect($this->criteres)->sum('ponderation');
+    }
+
+    /**
+     * Compatibilité ascendante: vérifie si la règle est active à une date donnée.
      */
     public function estActiveADate($date = null): bool
     {
-        if (!$this->est_active) {
+        if (! $this->est_active) {
             return false;
         }
-        
-        $date = $date ? new \DateTime($date) : new \DateTime();
-        
-        // Si pas de dates spécifiées, la règle est active
-        if (!$this->date_debut && !$this->date_fin) {
-            return true;
-        }
-        
-        // Vérifier si la date est dans la plage de dates
-        if ($this->date_debut && $date < new \DateTime($this->date_debut)) {
+
+        $dateReference = $date instanceof Carbon ? $date : Carbon::parse($date ?? now());
+
+        // Si les colonnes existent et sont renseignées, respecter la fenêtre d'activité.
+        if (isset($this->date_debut) && $this->date_debut && $dateReference->lt(Carbon::parse($this->date_debut))) {
             return false;
         }
-        
-        if ($this->date_fin && $date > new \DateTime($this->date_fin)) {
+
+        if (isset($this->date_fin) && $this->date_fin && $dateReference->gt(Carbon::parse($this->date_fin))) {
             return false;
         }
-        
+
         return true;
-    }
-    
-    /**
-     * Récupère les critères d'évaluation sous forme de tableau
-     * 
-     * @return array
-     */
-    public function getCriteres(): array
-    {
-        return $this->criteres_evaluation_json ?? [];
-    }
-    
-    /**
-     * Vérifie si un critère existe dans cette règle
-     * 
-     * @param string $codeCritere
-     * @return bool
-     */
-    public function hasCritere(string $codeCritere): bool
-    {
-        $criteres = $this->getCriteres();
-        
-        foreach ($criteres as $critere) {
-            if (isset($critere['code']) && $critere['code'] === $codeCritere) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Récupère la pondération d'un critère
-     * 
-     * @param string $codeCritere
-     * @return float|null
-     */
-    public function getPonderationCritere(string $codeCritere): ?float
-    {
-        $criteres = $this->getCriteres();
-        
-        foreach ($criteres as $critere) {
-            if (isset($critere['code']) && $critere['code'] === $codeCritere) {
-                return $critere['ponderation'] ?? null;
-            }
-        }
-        
-        return null;
     }
 }

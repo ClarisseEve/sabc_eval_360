@@ -1,0 +1,56 @@
+{
+  "repository_type": "monorepo",
+  "parts": [
+    {
+      "part_id": "app",
+      "name": "Application principale (Laravel + Vite)",
+      "root_path": ".",
+      "type": "web",
+      "tech_stack": "Laravel 12, Inertia, React 19, Vite 6"
+    },
+    {
+      "part_id": "analytics",
+      "name": "Service Analytics (Go)",
+      "root_path": "services/analytics",
+      "type": "backend",
+      "tech_stack": "Go 1.23, Gin, ClickHouse"
+    },
+    {
+      "part_id": "evaluation",
+      "name": "Service Evaluation (Go)",
+      "root_path": "services/evaluation",
+      "type": "backend",
+      "tech_stack": "Go 1.23, Gin, PostgreSQL, Redis"
+    },
+    {
+      "part_id": "pipelines",
+      "name": "Data Pipelines (Python)",
+      "root_path": "data_pipelines",
+      "type": "data",
+      "tech_stack": "Python, pandas, sqlalchemy"
+    }
+  ],
+  "integration_points": [
+    {
+      "from": "app",
+      "to": "evaluation",
+      "type": "REST",
+      "path": "/api/v2/evaluations",
+      "notes": "Strangler proxy with feature flags"
+    },
+    {
+      "from": "app",
+      "to": "analytics",
+      "type": "REST",
+      "path": "/api/v2/analytics",
+      "notes": "Proxy with optional service key"
+    },
+    {
+      "from": "pipelines",
+      "to": "analytics",
+      "type": "ETL",
+      "path": "ClickHouse",
+      "notes": "Batch loads"
+    }
+  ]
+}

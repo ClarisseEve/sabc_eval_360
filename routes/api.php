@@ -6,6 +6,8 @@ use App\Http\Controllers\Auth\AuthCheckController;
 // use App\Http\Controllers\Api\UserController; // Temporarily commented out
 use App\Http\Controllers\Api\EvaluationController;
 use App\Http\Controllers\Api\HierarchyController;
+use App\Http\Controllers\Api\UtilisateurController;
+use App\Http\Controllers\Api\ReplacementController;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,6 +46,24 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     */
 
-    // Other API routes can be added here
+    // Utilisateurs API
+    Route::prefix('utilisateurs')->name('api.utilisateurs.')->controller(UtilisateurController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{utilisateur}', 'show')->name('show');
+        Route::get('/{utilisateur}/subordonnes', 'getSubordonnes')->name('subordonnes');
+        Route::post('/remplacants-disponibles', 'getRemplacantsDisponibles')->name('remplacants-disponibles');
+    });
+
+    // Remplacements API
+    Route::prefix('remplacements')->name('api.remplacements.')->controller(ReplacementController::class)->group(function () {
+        Route::get('/actifs', 'getRemplacementsActifs')->name('actifs');
+        Route::get('/a-venir', 'getRemplacementsAVenir')->name('a-venir');
+        Route::get('/historique', 'getHistoriqueRemplacements')->name('historique');
+        Route::get('/par-utilisateur', 'getRemplacementsPourUtilisateur')->name('par-utilisateur');
+        Route::get('/utilisateur-info', 'getUtilisateurInfo')->name('utilisateur-info');
+        Route::get('/subordonnes', 'getSubordonnes')->name('subordonnes');
+        Route::post('/', 'store')->name('store');
+        Route::post('/{idRemplacement}/terminer', 'terminer')->name('terminer');
+    });
 
 });
