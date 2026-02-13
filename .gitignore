@@ -10,7 +10,10 @@
 /vendor
 .env
 .env.backup
+.env.bak
+.env.docker
 .env.production
+mcp.json
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
