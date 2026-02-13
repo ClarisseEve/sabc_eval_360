@@ -1,0 +1,117 @@
+<?xml version="1.0"?>
+<!-- =============================================================================
+     SABC Eval360 - ClickHouse Users Configuration
+     ============================================================================= -->
+<clickhouse>
+    <profiles>
+        <!-- Default profile for analytics queries -->
+        <default>
+            <max_memory_usage>4000000000</max_memory_usage>
+            <max_execution_time>300</max_execution_time>
+            <max_rows_to_read>1000000000</max_rows_to_read>
+            <max_bytes_to_read>100000000000</max_bytes_to_read>
+            <use_uncompressed_cache>0</use_uncompressed_cache>
+            <load_balancing>random</load_balancing>
+        </default>
+
+        <!-- Profile for heavy analytics (larger limits) -->
+        <analytics>
+            <max_memory_usage>8000000000</max_memory_usage>
+            <max_execution_time>600</max_execution_time>
+            <max_rows_to_read>10000000000</max_rows_to_read>
+            <max_bytes_to_read>1000000000000</max_bytes_to_read>
+            <use_uncompressed_cache>1</use_uncompressed_cache>
+        </analytics>
+
+        <!-- Profile for data ingestion -->
+        <ingestion>
+            <max_memory_usage>2000000000</max_memory_usage>
+            <max_execution_time>3600</max_execution_time>
+            <max_insert_block_size>1048576</max_insert_block_size>
+        </ingestion>
+
+        <!-- Read-only profile for dashboards -->
+        <readonly>
+            <readonly>1</readonly>
+            <max_memory_usage>2000000000</max_memory_usage>
+            <max_execution_time>60</max_execution_time>
+        </readonly>
+    </profiles>
+
+    <users>
+        <!-- Default user (admin) -->
+        <default>
+            <password></password>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <access_management>1</access_management>
+        </default>
+
+        <!-- Application user for Laravel -->
+        <sabc_app>
+            <password_sha256_hex><!-- Generate with: echo -n 'your_password' | sha256sum --></password_sha256_hex>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <databases>
+                <sabc_analytics>
+                    <permissions>
+                        <readonly>0</readonly>
+                    </permissions>
+                </sabc_analytics>
+            </databases>
+        </sabc_app>
+
+        <!-- Analytics user for heavy queries -->
+        <sabc_analytics>
+            <password_sha256_hex><!-- Generate with: echo -n 'your_password' | sha256sum --></password_sha256_hex>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>analytics</profile>
+            <quota>default</quota>
+            <databases>
+                <sabc_analytics>
+                    <permissions>
+                        <readonly>0</readonly>
+                    </permissions>
+                </sabc_analytics>
+            </databases>
+        </sabc_analytics>
+
+        <!-- Dashboard user (read-only) -->
+        <grafana>
+            <password_sha256_hex><!-- Generate with: echo -n 'grafana_password' | sha256sum --></password_sha256_hex>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>readonly</profile>
+            <quota>default</quota>
+            <databases>
+                <sabc_analytics>
+                    <permissions>
+                        <readonly>1</readonly>
+                    </permissions>
+                </sabc_analytics>
+            </databases>
+        </grafana>
+    </users>
+
+    <quotas>
+        <default>
+            <interval>
+                <duration>3600</duration>
+                <queries>0</queries>
+                <errors>0</errors>
+                <result_rows>0</result_rows>
+                <read_rows>0</read_rows>
+                <execution_time>0</execution_time>
+            </interval>
+        </default>
+    </quotas>
+</clickhouse>

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\PeriodeEvaluation;
 use App\Models\RegleEvaluation;
+use App\Services\PeriodeEvaluationService;
+use App\Exceptions\PeriodeChevauchementException;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -11,10 +13,18 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Traits\FormatsUserData;
+use Carbon\Carbon;
 
 class PeriodeEvaluationController extends Controller
 {
     use FormatsUserData;
+    
+    protected PeriodeEvaluationService $periodeService;
+    
+    public function __construct(PeriodeEvaluationService $periodeService)
+    {
+        $this->periodeService = $periodeService;
+    }
 
     public function index(): InertiaResponse
     {
@@ -97,6 +107,7 @@ class PeriodeEvaluationController extends Controller
             'date_fin' => 'required|date|after:date_debut',
             'id_regle' => 'required|exists:regles_evaluation,id_regle',
             'parametres_json' => 'nullable|json',
+            'dates_rappels' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
@@ -104,25 +115,50 @@ class PeriodeEvaluationController extends Controller
         }
 
         try {
+            $dateDebut = Carbon::parse($request->date_debut);
+            $dateFin = Carbon::parse($request->date_fin);
+            
+            // Validation des dates selon règles SABC
+            $this->periodeService->validateDates($dateDebut, $dateFin, true);
+            
+            // Validation chevauchement
+            $this->periodeService->validateNoChevauchement($dateDebut, $dateFin);
+            
             $nomPeriode = $request->titre;
             $codePeriode = $this->generatePeriodeCode();
+            
+            // Générer dates rappels si non fournies
+            $datesRappels = $request->dates_rappels ?? 
+                $this->periodeService->generateDatesRappels($dateFin);
 
-            PeriodeEvaluation::create([
+            $periode = PeriodeEvaluation::create([
                 'code_periode' => $codePeriode,
                 'nom_periode' => $nomPeriode,
                 'titre' => $nomPeriode,
                 'description' => $request->description,
-                'date_debut' => $request->date_debut,
-                'date_fin' => $request->date_fin,
+                'date_debut' => $dateDebut,
+                'date_fin' => $dateFin,
                 'statut' => 'planifiee',
                 'est_ouverte' => false,
                 'est_cloturee' => false,
                 'id_regle' => $request->id_regle,
+                'rappels_envoyes' => $datesRappels,
                 'parametres_json' => $request->parametres_json ? json_decode($request->parametres_json, true) : null,
             ]);
+            
+            // Calculer statistiques initiales
+            $this->periodeService->calculateStatistiques($periode);
 
             return redirect()->route('admin.evaluations.periodes.index')
                 ->with('success', "Période d'évaluation créée avec succès.");
+        } catch (PeriodeChevauchementException $e) {
+            return back()
+                ->withErrors(['dates' => $e->getMessage()])
+                ->withInput();
+        } catch (\InvalidArgumentException $e) {
+            return back()
+                ->withErrors(['dates' => $e->getMessage()])
+                ->withInput();
         } catch (\Exception $e) {
             return back()
                 ->withErrors(['error' => "Erreur lors de la création de la période: {$e->getMessage()}"])
@@ -130,22 +166,108 @@ class PeriodeEvaluationController extends Controller
         }
     }
 
+    public function edit(string $id): InertiaResponse
+    {
+        $periode = PeriodeEvaluation::with('regleEvaluation')->findOrFail($id);
+        
+        if (!$periode->estModifiable()) {
+            return redirect()->route('admin.evaluations.periodes.index')
+                ->withErrors(['periode' => 'Cette période ne peut plus être modifiée car elle est ouverte ou fermée']);
+        }
+        
+        $regles = RegleEvaluation::select('id_regle', 'nom_regle', 'criteres_evaluation_json')->get();
+        
+        return Inertia::render('Admin/Evaluations/EditPeriode', [
+            'periode' => [
+                'id_periode' => $periode->id_periode,
+                'code_periode' => $periode->code_periode,
+                'nom_periode' => $periode->nom_periode,
+                'titre' => $periode->titre ?? $periode->nom_periode,
+                'description' => $periode->description,
+                'date_debut' => $periode->date_debut->format('Y-m-d'),
+                'date_fin' => $periode->date_fin->format('Y-m-d'),
+                'id_regle' => $periode->id_regle,
+                'dates_rappels' => $periode->getDatesRappels(),
+                'statut' => $periode->statut,
+            ],
+            'regles' => $regles,
+            ...$this->getAdminPageData("Modifier la Période d'Évaluation", [], Auth::user()),
+        ]);
+    }
+    
+    public function update(Request $request, string $id)
+    {
+        $periode = PeriodeEvaluation::findOrFail($id);
+        
+        if (!$periode->estModifiable()) {
+            return back()->withErrors([
+                'periode' => 'Cette période ne peut plus être modifiée car elle est ouverte ou fermée'
+            ]);
+        }
+        
+        $validator = Validator::make($request->all(), [
+            'titre' => 'required|string|max:255',
+            'description' => 'nullable|string|max:1000',
+            'date_debut' => 'required|date',
+            'date_fin' => 'required|date|after:date_debut',
+            'id_regle' => 'required|exists:regles_evaluation,id_regle',
+            'dates_rappels' => 'nullable|array',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        try {
+            $dateDebut = Carbon::parse($request->date_debut);
+            $dateFin = Carbon::parse($request->date_fin);
+            
+            // Validation des dates
+            $this->periodeService->validateDates($dateDebut, $dateFin, false);
+            
+            // Validation chevauchement (exclure période courante)
+            $this->periodeService->validateNoChevauchement($dateDebut, $dateFin, $id);
+            
+            // Générer dates rappels si non fournies
+            $datesRappels = $request->dates_rappels ?? 
+                $this->periodeService->generateDatesRappels($dateFin);
+
+            $periode->update([
+                'nom_periode' => $request->titre,
+                'titre' => $request->titre,
+                'description' => $request->description,
+                'date_debut' => $dateDebut,
+                'date_fin' => $dateFin,
+                'id_regle' => $request->id_regle,
+                'rappels_envoyes' => $datesRappels,
+            ]);
+
+            return redirect()->route('admin.evaluations.periodes.index')
+                ->with('success', "Période d'évaluation mise à jour avec succès.");
+        } catch (PeriodeChevauchementException $e) {
+            return back()
+                ->withErrors(['dates' => $e->getMessage()])
+                ->withInput();
+        } catch (\InvalidArgumentException $e) {
+            return back()
+                ->withErrors(['dates' => $e->getMessage()])
+                ->withInput();
+        } catch (\Exception $e) {
+            return back()
+                ->withErrors(['error' => "Erreur lors de la mise à jour: {$e->getMessage()}"])
+                ->withInput();
+        }
+    }
+    
     public function show(string $id): InertiaResponse
     {
         $periode = PeriodeEvaluation::with(['regleEvaluation', 'evaluations.evaluateur', 'evaluations.evalue'])
             ->findOrFail($id);
 
+        // Recalculer statistiques via le service
+        $statistiques = $this->periodeService->calculateStatistiques($periode);
+        
         $evaluations = $periode->evaluations;
-        $statistiques = [
-            'total_evaluations' => $evaluations->count(),
-            'evaluations_brouillon' => $evaluations->where('statut', 'brouillon')->count(),
-            'evaluations_soumises' => $evaluations->where('statut', 'soumis')->count(),
-            'evaluations_validees' => $evaluations->where('statut', 'valide')->count(),
-            'evaluations_rejetees' => $evaluations->where('statut', 'rejete')->count(),
-            'taux_completion' => $evaluations->count() > 0
-                ? round(($evaluations->where('statut', 'valide')->count() / $evaluations->count()) * 100, 2)
-                : 0,
-        ];
 
         return Inertia::render('Admin/Evaluations/ShowPeriode', [
             'periode' => [
@@ -245,7 +367,7 @@ class PeriodeEvaluationController extends Controller
         try {
             $periode = PeriodeEvaluation::findOrFail($id);
 
-            if ($periode->evaluations()->count() > 0) {
+            if (!$this->periodeService->canDelete($periode)) {
                 return back()->withErrors(['error' => 'Impossible de supprimer une période contenant des évaluations.']);
             }
 

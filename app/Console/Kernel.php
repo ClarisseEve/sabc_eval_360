@@ -12,6 +12,42 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
+        // Ouverture automatique des périodes d'évaluation (tous les jours à 00:05)
+        $schedule->command('periodes:ouvrir')
+            ->dailyAt('00:05')
+            ->timezone('Africa/Douala')
+            ->withoutOverlapping()
+            ->onSuccess(function () {
+                \Log::info('Scheduled job periodes:ouvrir exécuté avec succès');
+            })
+            ->onFailure(function () {
+                \Log::error('Scheduled job periodes:ouvrir a échoué');
+            });
+        
+        // Fermeture automatique des périodes d'évaluation (tous les jours à 23:55)
+        $schedule->command('periodes:fermer')
+            ->dailyAt('23:55')
+            ->timezone('Africa/Douala')
+            ->withoutOverlapping()
+            ->onSuccess(function () {
+                \Log::info('Scheduled job periodes:fermer exécuté avec succès');
+            })
+            ->onFailure(function () {
+                \Log::error('Scheduled job periodes:fermer a échoué');
+            });
+        
+        // Envoi des rappels d'évaluations (tous les jours à 08:00)
+        $schedule->command('evaluations:rappels')
+            ->dailyAt('08:00')
+            ->timezone('Africa/Douala')
+            ->withoutOverlapping()
+            ->onSuccess(function () {
+                \Log::info('Scheduled job evaluations:rappels exécuté avec succès');
+            })
+            ->onFailure(function () {
+                \Log::error('Scheduled job evaluations:rappels a échoué');
+            });
+        
         // Synchronisation MySQL vers PostgreSQL toutes les 15 minutes
         $schedule->call(function () {
             $syncService = app(\App\Services\DatabaseSyncService::class);

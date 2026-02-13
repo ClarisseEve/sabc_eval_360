@@ -7,6 +7,9 @@
 # -----------------------------------------------------------------------------
 FROM composer:2.6 AS composer
 
+# Install sockets extension required by jaeger-client-php
+RUN docker-php-ext-install sockets
+
 WORKDIR /app
 
 COPY composer.json composer.lock ./
@@ -60,7 +63,8 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         mbstring \
         opcache \
         bcmath \
-        pcntl
+        pcntl \
+        sockets
 
 # Install Redis extension
 RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \

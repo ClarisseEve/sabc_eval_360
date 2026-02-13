@@ -1,0 +1,142 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {
+    "started": "2026-02-13T11:12:02Z",
+    "last_updated": "2026-02-13T11:39:14Z"
+  },
+  "mode": "deep_dive",
+  "scan_level": "exhaustive",
+  "project_root": "/Users/macbook/Documents/SABC/sabc_eval360",
+  "output_folder": "docs",
+  "completed_steps": [
+    {
+      "step": "step_13b",
+      "status": "completed",
+      "timestamp": "2026-02-13T11:39:14Z",
+      "summary": "Comprehensive file inventories generated for API/Back-end Blocs 1 through 5."
+    },
+    {
+      "step": "step_13c",
+      "status": "completed",
+      "timestamp": "2026-02-13T11:39:14Z",
+      "summary": "Dependency graphs, data flows, and integration points documented for Evaluation, Hierarchy, Replacement, and Admin hierarchy flows."
+    },
+    {
+      "step": "step_13d",
+      "status": "completed",
+      "timestamp": "2026-02-13T11:39:14Z",
+      "summary": "Related code references and reuse opportunities identified across adjacent controllers/services for all completed blocs."
+    },
+    {
+      "step": "step_13e",
+      "status": "completed",
+      "timestamp": "2026-02-13T11:39:14Z",
+      "outputs": [
+        "deep-dive-api-backend-bloc-1.md",
+        "deep-dive-api-backend-bloc-2-evaluation.md",
+        "deep-dive-api-backend-bloc-3-hierarchy.md",
+        "deep-dive-api-backend-bloc-4-replacements.md",
+        "deep-dive-api-backend-bloc-5-admin-hierarchy.md"
+      ],
+      "summary": "Deep-dive documentation written for progressive API/Back-end blocs 1 to 5."
+    },
+    {
+      "step": "step_13f",
+      "status": "completed",
+      "timestamp": "2026-02-13T11:39:14Z",
+      "outputs": [
+        "index.md"
+      ],
+      "summary": "Master index updated with all deep-dive links and metadata (5 blocs)."
+    }
+  ],
+  "current_step": "step_13g",
+  "findings": {
+    "project_classification": {
+      "repository_type": "monorepo",
+      "parts_count": 4,
+      "primary_language": "PHP",
+      "architecture_type": "Laravel monolith + Go microservices + Python pipelines"
+    },
+    "technology_stack": [
+      {
+        "part_id": "app",
+        "tech_summary": "Laravel 12, Inertia React, Sanctum, mixed MySQL/PGSQL models with Evaluation + Hierarchy domain services"
+      }
+    ],
+    "batches_completed": [
+      {
+        "path": "routes/api.php + auth check",
+        "files_scanned": 24,
+        "summary": "API/auth and core evaluation-related dependencies documented in Bloc 1."
+      },
+      {
+        "path": "evaluation flow (web/api/service/proxy/models)",
+        "files_scanned": 23,
+        "summary": "End-to-end evaluation flow documented in Bloc 2."
+      },
+      {
+        "path": "hierarchy flow (api/service/models)",
+        "files_scanned": 7,
+        "summary": "Hierarchy supervision/assignment/data access rules documented in Bloc 3."
+      },
+      {
+        "path": "replacement flow (api/admin/service/models)",
+        "files_scanned": 8,
+        "summary": "Replacement lifecycle, status transitions, and notification coupling documented in Bloc 4."
+      },
+      {
+        "path": "admin hierarchy flow (users/structure/roles)",
+        "files_scanned": 13,
+        "summary": "Admin hierarchy governance, structure CRUD, and role/permission matrix documented in Bloc 5."
+      }
+    ]
+  },
+  "outputs_generated": [
+    "deep-dive-api-backend-bloc-1.md",
+    "deep-dive-api-backend-bloc-2-evaluation.md",
+    "deep-dive-api-backend-bloc-3-hierarchy.md",
+    "deep-dive-api-backend-bloc-4-replacements.md",
+    "deep-dive-api-backend-bloc-5-admin-hierarchy.md",
+    "index.md",
+    "project-scan-report.json"
+  ],
+  "resume_instructions": "Continue with next deep-dive block (e.g., API Utilisateur/Replacement route activation, admin evaluations routing cleanup) and append deep_dive_targets.",
+  "deep_dive_targets": [
+    {
+      "target_name": "API/Back-end Bloc 1",
+      "target_path": "routes/api.php",
+      "files_analyzed": 24,
+      "output_file": "deep-dive-api-backend-bloc-1.md",
+      "timestamp": "2026-02-13T11:20:32Z"
+    },
+    {
+      "target_name": "API/Back-end Bloc 2 - Flux Evaluation",
+      "target_path": "app/Http/Controllers/EvaluationController.php",
+      "files_analyzed": 23,
+      "output_file": "deep-dive-api-backend-bloc-2-evaluation.md",
+      "timestamp": "2026-02-13T11:20:32Z"
+    },
+    {
+      "target_name": "API/Back-end Bloc 3 - Flux Hierarchy",
+      "target_path": "app/Http/Controllers/Api/HierarchyController.php",
+      "files_analyzed": 7,
+      "output_file": "deep-dive-api-backend-bloc-3-hierarchy.md",
+      "timestamp": "2026-02-13T11:20:32Z"
+    },
+    {
+      "target_name": "API/Back-end Bloc 4 - Flux Remplacements",
+      "target_path": "app/Http/Controllers/Api/ReplacementController.php",
+      "files_analyzed": 8,
+      "output_file": "deep-dive-api-backend-bloc-4-replacements.md",
+      "timestamp": "2026-02-13T11:39:14Z"
+    },
+    {
+      "target_name": "API/Back-end Bloc 5 - Admin Hiérarchie",
+      "target_path": "app/Http/Controllers/UtilisateursController.php",
+      "files_analyzed": 13,
+      "output_file": "deep-dive-api-backend-bloc-5-admin-hierarchy.md",
+      "timestamp": "2026-02-13T11:39:14Z"
+    }
+  ]
+}

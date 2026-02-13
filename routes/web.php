@@ -112,8 +112,16 @@ Route::middleware(['auth'])->group(function () {
     // Routes pour l'administration (accessibles uniquement par l'admin)
     Route::middleware(['role:ADMIN'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('analytics/{section?}', function ($section = null) {
+            $dataset = null;
+            $filters = request()->only(['period', 'start_date', 'end_date']);
+
+            if (config('services.analytics.enabled')) {
+                $dataset = app(\App\Services\AnalyticsServiceProxy::class)->getDataset($filters);
+            }
+
             return Inertia::render('Admin/Analytics/Index', [
                 'section' => $section,
+                'dataset' => $dataset,
             ]);
         })->where('section', '.*')->name('analytics');
 
@@ -125,6 +133,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/{id}', 'show')->name('show');
             Route::get('/{id}/edit', 'edit')->name('edit');
             Route::put('/{id}', 'update')->name('update');
+            Route::post('/{id}/terminer', 'terminer')->name('terminer');
             Route::delete('/{id}', 'destroy')->name('destroy');
         });
         
@@ -227,6 +236,23 @@ Route::middleware(['auth'])->group(function () {
                 // Suppression d'une période
                 Route::delete('/{id}', 'destroy')->name('destroy');
             });
+            
+            // Gestion des règles d'évaluation
+            Route::prefix('regles')->name('regles.')->controller(\App\Http\Controllers\Admin\ReglesEvaluationController::class)->group(function () {
+                // Liste des règles
+                Route::get('/', 'index')->name('index');
+                
+                // Création d'une nouvelle règle
+                Route::get('/create', 'create')->name('create');
+                Route::post('/', 'store')->name('store');
+                
+                // Édition d'une règle
+                Route::get('/{id}/edit', 'edit')->name('edit');
+                Route::put('/{id}', 'update')->name('update');
+                
+                // Activation/désactivation d'une règle
+                Route::patch('/{id}/toggle', 'toggleActif')->name('toggle');
+            });
         });
         
         // Routes pour la gestion des utilisateurs (ADMIN uniquement)
@@ -306,6 +332,11 @@ Route::middleware(['auth'])->group(function () {
         return Inertia::render('Auth/TestRedirection');
     })->name('test.redirection');
 });
+
+// Prometheus metrics endpoint (no auth - internal network only)
+Route::get('/metrics', \App\Http\Controllers\MetricsController::class)
+    ->name('metrics')
+    ->withoutMiddleware(['web']);
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

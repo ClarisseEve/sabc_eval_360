@@ -1,0 +1,131 @@
+# Sprint Status - SABC Eval360
+# Generated: 2026-01-30
+# Project: sabc_eval360
+# Project Key: sabc_eval360
+# Tracking System: file-system
+# Story Location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-01-30
+project: sabc_eval360
+project_key: sabc_eval360
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 0
+  epic-0: in-progress
+  0-1-initialisation-du-monorepo-et-environnement: backlog
+  epic-0-retrospective: optional
+
+  # Epic 1
+  epic-1: backlog
+  1-1-authentification-session-utilisateur: backlog
+  1-2-gestion-des-roles-permissions-rbac: backlog
+  1-3-gestion-hierarchique-des-utilisateurs: backlog
+  1-4-profil-utilisateur-champs-restreints: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2
+  epic-2: backlog
+  2-1-structure-organisationnelle-regions-branches: backlog
+  2-2-regles-de-coherence-hierarchique: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3
+  epic-3: backlog
+  3-1-creation-de-regles-devaluation-avec-criteres: backlog
+  3-2-configuration-des-eligibilites-devaluation: backlog
+  3-3-gestion-des-exceptions-de-roles-dr-cdtt: backlog
+  3-4-creation-de-templates-devaluation: backlog
+  3-5-assignation-de-templates-par-role-et-periode: backlog
+  3-6-creation-et-gestion-des-periodes-devaluation: backlog
+  3-7-ouverture-fermeture-automatique-des-periodes: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4
+  epic-4: backlog
+  4-1-creation-devaluation-pour-utilisateur-eligible: backlog
+  4-2-notation-et-commentaires-sur-criteres: backlog
+  4-3-validation-et-soumission-devaluation: backlog
+  4-8-reprise-hors-ligne-et-resubmit: backlog
+  4-4-validation-rejet-devaluation-par-manager: backlog
+  4-5-consultation-des-evaluations-recues: backlog
+  4-6-consultation-des-evaluations-donnees: backlog
+  4-7-contre-evaluation-manager: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5
+  epic-5: backlog
+  5-1-notification-douverture-de-periode: backlog
+  5-2-rappels-automatiques-pour-evaluations-en-retard: backlog
+  5-3-notifications-de-validation-en-attente-pour-managers: backlog
+  5-4-centre-de-notifications-lecture-marquage: backlog
+  5-5-escalade-niveau-1-3-jours: backlog
+  5-6-escalade-niveau-2-7-jours: backlog
+  5-7-escalade-niveau-3-10-15-jours: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6
+  epic-6: backlog
+  6-1-dashboard-manager-progression-equipe: ready-for-dev
+  6-2-dashboard-manager-validations-en-attente: backlog
+  6-3-dashboard-collaborateur-statut-evaluation: ready-for-dev
+  epic-6-retrospective: optional
+
+  # Epic 7
+  epic-7: backlog
+  7-1-kpis-globaux-par-region-branche-role: backlog
+  7-2-analytics-utilisateur-scores-historique: backlog
+  7-3-tendances-multi-periodes: backlog
+  7-4-detection-et-signalement-danomalies: backlog
+  7-5-recommandations-formation: backlog
+  7-6-recommandations-mentorat: backlog
+  7-7-recommandations-mobilite: backlog
+  epic-7-retrospective: optional
+
+  # Epic 8
+  epic-8: backlog
+  8-1-report-builder-avec-sections-templatisees: backlog
+  8-2-export-rapport-powerpoint-pptx: backlog
+  8-3-export-rapport-excel-xlsx: backlog
+  8-4-export-graphes-individuels: backlog
+  epic-8-retrospective: optional
+
+  # Epic 9
+  epic-9: backlog
+  9-1-logs-daudit-et-tracabilite: backlog
+  9-2-corrections-affectations-utilisateurs-support: backlog
+  9-3-observabilite-monitoring-plateforme: backlog
+  9-4-standardisation-api-contrats-openapi: backlog
+  9-5-proxies-fallback-services-strangler: backlog
+  9-6-pipelines-de-sync-multi-db: backlog
+  epic-9-retrospective: optional

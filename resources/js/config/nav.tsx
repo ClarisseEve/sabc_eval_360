@@ -66,6 +66,12 @@ export const NAV_ITEMS: NavItem[] = [
         roles: ['ADMIN'],
       },
       {
+        title: 'Règles d\'évaluation',
+        href: '/admin/evaluations/regles',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ['ADMIN'],
+      },
+      {
         title: 'Historique',
         href: '/admin/evaluations/history',
         icon: <ChevronRight className="h-4 w-4" />,
