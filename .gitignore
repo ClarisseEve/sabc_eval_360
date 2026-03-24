@@ -9,11 +9,10 @@ node_modules/
 /storage/*.key
 /storage/pail
 /vendor
+# Env files — NEVER commit real or template env files with passwords
 .env
-.env.backup
-.env.bak
-# .env.docker est un template commité (sans vrais secrets, mots de passe = defaults dev)
-.env.production
+.env.*
+!.env.example
 mcp.json
 .phpactor.json
 .phpunit.result.cache
