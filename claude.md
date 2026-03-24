@@ -1,71 +1,144 @@
-# Suivi Claude – SABC Eval360
+# SABC Eval360 – Contexte Projet & Migration NestJS
 
-## Changements réalisés
-- Alignement des routes Inertia et sécurisation des pages admin (utilisateurs) avec des méthodes `store/edit/update` + normalisation des routes utilisées côté front.
-- Suppression du routing React Router (archivé) et des doublons de dashboards (archivés).
-- Correction de la résolution Inertia pour `Common/*` et suppression de la page `auth-debug`.
-- Ajout des pages `/register` et `/forgot-password` (inscription désactivée + support IT).
-- Mise à jour des docs (versions réelles, licence propriétaire, auth, multi‑DB, analytics) et du config DB (suppression `mysql_core`).
-- Ajout de tests Pest (pages auth + service SecureLoggingService).
-- Déclaration des dépendances Python de base pour le pipeline.
-- Normalisation du casing (Hooks, Layouts, Pages/Auth/Errors/Settings) + mise à jour des imports et des `Inertia::render`.
-- Resolver Inertia et imports front alignés sur `resources/js/pages` (racine en minuscule, sous‑dossiers PascalCase).
-- Nettoyage du doublon `useTheme.tsx` (conserver `useTheme.ts`) et correction d’import dans `resources/js/app.tsx`.
-- Centralisation des compétences d’évaluation via `resources/js/Components/Forms/evaluationSkillsConfig.ts` + composant paramétré `RoleEvaluationForm` utilisé dans les pages d’évaluation.
-- Archivage des anciens `*EvaluationForm.tsx` (remplacés par `RoleEvaluationForm`) et ajout d’index manquants dans `resources/js/Components/UI`.
-- Harmonisation UI: dossier `RadioGroup` + import corrigé dans `resources/js/Components/appearance-tabs.tsx`.
-- Dashboard DR refactorisé pour utiliser `resources/js/Components/Dashboard/DirectorDashboard.tsx`.
-- Nettoyage des services vides (front/back) déplacés en archives + `docker/python/requirements.txt` aligné sur le pipeline.
-- Tests corrigés: composants Inertia en `Auth/*`, redirection racine vers login, et guard `app()->environment` dans `SecureLoggingService`.
-- `.DS_Store` ignoré globalement dans `.gitignore` (macOS).
-- Phase 3: création du microservice Analytics (Go) avec endpoint `/api/v2/analytics`, mapping dataset Analytics et queries ClickHouse.
-- Proxy Laravel `AnalyticsServiceProxy` + injection du `dataset` dans `/admin/analytics` (fallback sur mock si service off).
-- Docker Compose: service `analytics-service` + job `clickhouse-init`, variables analytics côté `core-app`.
-- ClickHouse SQL: ajout des tables `scores_utilisateurs`, `logs_anomalies`, `recommandations` + `CREATE DATABASE IF NOT EXISTS`.
-- Prometheus: activation des scrapes `evaluation-service` et `analytics-service`.
-- Observability: metrics Laravel enrichies (histogrammes HTTP/DB), corrections des alertes Prometheus, scrape ClickHouse sur 9363, ajout redis_exporter, plugin Grafana ClickHouse.
-- Tracing Jaeger end-to-end: middleware Laravel + propagation headers vers services Go + init tracer côté Go.
-- go.sum générés (Go 1.23) pour `services/evaluation` et `services/analytics`; `composer.lock` mis à jour pour Jaeger (version `jonahgeorge/jaeger-client-php` fixée à `^1.5.2`).
-- Phase 5: alignement schéma evaluation (microservice) sur `notations_json`/`note_globale`, compatibilité JSON notes (legacy array ↔ struct), suppression hard delete côté repo.
+## Vue d'ensemble
+Système d'évaluation 360° pour la SABC (Société Anonyme des Brasseries du Cameroun).
+Migration en cours d'un monolithe Laravel + React/Inertia vers une architecture microservices NestJS.
+
+## Stack technique
+
+### Monolithe actuel (Laravel)
+- **Backend**: Laravel 11 (PHP 8.2) + Inertia.js
+- **Frontend**: React 19 + TypeScript + Tailwind CSS + shadcn/ui
+- **Auth**: Sanctum (session-based)
+- **BDD Core**: MySQL (utilisateurs, branches, régions, rôles, structure org.)
+- **BDD Business**: PostgreSQL (évaluations, périodes, règles, templates)
+- **BDD Analytics**: ClickHouse (scores, anomalies, recommandations)
+- **Cache**: Redis
+- **Tests**: Pest (PHP) + Vitest (JS)
+
+### Nouvelle architecture NestJS (`apps/api/`)
+- **Runtime**: Node.js 20 + NestJS 11
+- **ORM**: Prisma 6 (MySQL core) — à étendre pour PostgreSQL
+- **Auth**: Passport (JWT + Local strategy) + bcrypt
+- **Validation**: class-validator + class-transformer
+- **Tests**: Jest + Supertest
+- **Build**: TypeScript 5.9, target ES2023
+
+### Services Go existants
+- `services/evaluation/` — microservice évaluation (Go 1.23)
+- `services/analytics/` — microservice analytics + ClickHouse (Go 1.23)
+
+### Observabilité
+- Prometheus + Grafana + Jaeger (tracing) + redis_exporter + ClickHouse exporter
+
+## Architecture BDD (3 bases)
+
+| Base       | Usage           | Tables clés                                        |
+|------------|----------------|----------------------------------------------------|
+| MySQL      | Core/Identité  | utilisateurs, branches, regions, roles, districts, secteurs, service_commercial, replacement_temporaire |
+| PostgreSQL | Business       | evaluations, periodes_evaluation, regles_evaluation, templates, template_role_periode |
+| ClickHouse | Analytics      | scores_utilisateurs, logs_anomalies, recommandations |
+
+**Relations cross-DB**: Evaluation (PG) → Utilisateur (MySQL) via matricule — jointure côté application.
+
+## État de la migration NestJS
+
+### Modules NestJS existants (`apps/api/src/`)
+- `auth/` — Login (JWT), guards (local + JWT), strategies — **FAIT**
+- `users/` — findByEmail, findByMatricule — **FAIT**
+- `prisma/` — Client Prisma global (MySQL) — **FAIT**
+
+### Prisma schema existant (MySQL)
+Modèles: `Branche`, `Region`, `Role`, `Utilisateur` (avec hiérarchie self-ref via manager_matricule)
+
+### Modules à créer pour migration complète
+
+| Module NestJS          | Source Laravel                                    | Priorité |
+|------------------------|--------------------------------------------------|----------|
+| `evaluations/`         | EvaluationService + EvaluationController + Policy | P0       |
+| `periodes/`            | PeriodeEvaluationService + Controller             | P0       |
+| `hierarchy/`           | HierarchyService + HierarchyController            | P1       |
+| `remplacements/`       | ReplacementService + Controller                   | P1       |
+| `analytics/`           | AnalyticsServiceProxy (→ Go service)              | P2       |
+| `templates/`           | TemplateAssignationService + Controllers          | P2       |
+| `regles/`              | RegleEvaluationValidationService + Controller     | P2       |
+| `admin/`               | Admin Controllers (structure, rôles, etc.)        | P3       |
+| `dashboard/`           | DashboardController (40 méthodes par rôle)        | P3       |
+| `notifications/`       | Service placeholder                               | P3       |
+
+### Endpoints API Laravel à porter (~50 routes)
+
+**Auth** (déjà porté):
+- `POST /api/auth/login` → `POST /api/auth/login`
+- `GET /api/auth/me` → `GET /api/auth/me`
+
+**Evaluations** (P0):
+- `GET|POST /api/evaluations`
+- `GET|PUT /api/evaluations/{id}`
+- `POST /api/evaluations/{id}/submit`
+- `POST /api/evaluations/{id}/validate`
+- `GET /api/evaluations/periodes-actives`
+- `GET /api/evaluations/eligibles`
+- `GET /api/evaluations/historique`
+- `GET /api/evaluations/rapport/{idPeriode}`
+- `POST /api/evaluations/rappels/{idPeriode}`
+
+**Hierarchy** (P1):
+- `GET /api/hierarchy/region/{idRegion}`
+- `GET /api/hierarchy/region/{idRegion}/stats`
+- `GET /api/hierarchy/subordonnes`
+- `GET /api/hierarchy/tous-subordonnes`
+- `GET /api/hierarchy/chaine`
+- `GET /api/hierarchy/managers-eligibles/{idUtilisateur}`
+- `POST /api/hierarchy/verifier-supervision`
+- `POST /api/hierarchy/valider-assignation`
+- `POST /api/hierarchy/assigner-manager`
+
+**Remplacements** (P1):
+- `GET /api/remplacements/actifs|a-venir|historique|par-utilisateur`
+- `POST /api/remplacements`
+- `POST /api/remplacements/{id}/terminer`
+
+**Analytics** (P2):
+- `GET /api/analytics/dashboard|evaluations|performances`
+- `GET /api/analytics/region/{idRegion}`
+
+**Utilisateurs**:
+- `GET /api/utilisateurs`
+- `GET /api/utilisateurs/{utilisateur}`
+- `GET /api/utilisateurs/{utilisateur}/subordonnes`
+- `POST /api/utilisateurs/remplacants-disponibles`
+
+## Conventions du projet
+
+### Nommage
+- Entités/tables en français (utilisateur, evaluation, periode_evaluation, etc.)
+- Code NestJS en anglais (noms de classes, méthodes) avec entités françaises
+- Frontend: pages PascalCase dans `resources/js/pages/`
+- Routes Inertia: résolues depuis `resources/js/pages` (racine minuscule, sous-dossiers PascalCase)
+
+### Patterns
+- **Strangler pattern**: proxy Laravel → microservice (déjà en place pour Analytics et Evaluation Go)
+- **Cross-DB joins**: côté application, jamais en SQL
+- **UUID**: clés primaires pour évaluations et périodes (PostgreSQL)
+- **Matricule**: clé primaire string pour utilisateurs (MySQL)
+
+### Docker
+- `docker-compose.yml` à la racine — services: core-app, mysql, postgres, clickhouse, redis, jaeger, prometheus, grafana
+- NestJS app pas encore intégré dans docker-compose
+- Dockerfile NestJS: `apps/api/Dockerfile` (multi-stage, node:20-alpine)
 
 ## Archives
-- `archives/resources/js/routes.tsx`
-- `archives/resources/js/Pages/*/routes.tsx`
-- `archives/resources/js/Pages/Dashboard/*`
-- `archives/resources/js/Pages/dashboard.tsx`
-- `archives/resources/js/Pages/Common/auth-debug.tsx`
-- `archives/database/migrations/clickhouse/*`
-- `archives/resources/js/Components/Forms/*EvaluationForm.tsx`
-- `archives/resources/js/Services/*`
-- `archives/app/Services/*`
+- `archives/resources/js/` — anciens routes React Router, dashboards, formulaires, services front/back
+- `archives/database/migrations/clickhouse/`
+- `archives/app/Services/` — services vides
 
-## Découvertes (app/ + resources/)
-- Layouts existants : `resources/js/Components/Layout/app/AppLayout.tsx` + réexport dans `resources/js/Layouts/index.ts` (éviter de recréer des layouts).
-- Layouts auth disponibles dans `resources/js/Components/Layout/auth/*`.
-- Dashboards : base déjà en place avec `resources/js/Components/Dashboard/DashboardLayout.tsx` + dashboards spécialisés (Director/Manager/Operational/etc.).
-- Formulaires d’évaluation : hook `resources/js/Hooks/useEvaluationForms.ts` + services API `resources/js/Services/{api}/evaluationForms.ts`.
-- Couche services front : `resources/js/Services/{api}/*` utilisée, fichiers `resources/js/Services/auth.ts`, `cache.ts`, `utils.ts` vides.
-- Couche services backend : `app/Services/*` contient des services actifs (Evaluation/Hierarchy/Replacement/...) et des placeholders vides (Analytics/Notification/Report/RulesEngine).
-- UI kit riche sous `resources/js/Components/UI/*` ; dossier `radio-group` encore en kebab‑case.
-- Duplication détectée : deux pages `RoleSpecificEvaluation` quasi identiques (`resources/js/Pages/Common/Evaluations` et `resources/js/Pages/Evaluation`).
-- `docker/traefik/traefik.yml` est référencé par `docker-compose.yml` mais le fichier n'existe pas encore.
-
-## Migration microservices (axes & étapes)
-- Axes: découpage domaine (Auth/Identité, Utilisateurs/Structure, Evaluations/Regles, Analytics/Reporting, Notifications/Exports).
-- Axes: données par service (MySQL core, ClickHouse analytics) + contrats API versionnés.
-- Axes: communication (REST/gRPC + events) et gateway (Kong/Traefik/Nginx) + auth service-to-service.
-- Axes: observabilité (logs, traces, métriques) + CI/CD par service.
-- Étapes: cartographier routes/services + usages front (`routes/*`, `app/Services/*`, `resources/js/Services/{api}`).
-- Étapes: extraire Analytics en premier (service dédié + ClickHouse Docker, ingestion asynchrone).
-- Étapes: introduire gateway/BFF, brancher le front sur l’API gateway.
-- Étapes: extraire Notifications/Reporting, puis Evaluations/Regles, en mode strangler.
-
-## Prochaines actions recommandées
-1. Mettre à jour `pnpm-lock.yaml` après retrait de `react-router-dom`.
-2. Compléter les formulaires utilisateurs (Create/Edit) pour poster vers `admin.utilisateurs.store/update`.
-3. Valider si les anciens `*EvaluationForm.tsx` archivés doivent être supprimés définitivement ou conservés.
-4. Implémenter les endpoints Analytics côté API et brancher le front.
-5. Vérifier la cohérence des routes “team” dans la navigation (actuellement non exposées en backend).
-6. Lancer les tests:
-   - `php artisan test`
-7. Générer `go.sum` pour `services/analytics` (run `go mod tidy`) quand Go est disponible.
+## Prochaines actions (migration NestJS)
+1. **Prisma multi-datasource**: ajouter PostgreSQL au schema Prisma pour évaluations/périodes
+2. **Module Evaluations**: CRUD complet + soumission + validation + policies (guards NestJS)
+3. **Module Périodes**: gestion des périodes d'évaluation avec statuts automatiques
+4. **Module Hierarchy**: arbre hiérarchique, subordonnés, chaîne managériale
+5. **Module Remplacements**: remplacements temporaires
+6. **Intégration Docker Compose**: ajouter service NestJS
+7. **Tests E2E**: couvrir tous les endpoints migrés
+8. **Gateway/BFF**: router le front vers NestJS au lieu de Laravel (strangler progressif)
