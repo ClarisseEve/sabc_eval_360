@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  /* Couleurs SABC */
+  --color-sabc-red-primary: #C8102E;
+  --color-sabc-red-dark: #9B0021;
+  --color-sabc-red-light: #E8394F;
+  --color-sabc-gray-50: #FAFAFA;
+  --color-sabc-gray-100: #F5F5F5;
+  --color-sabc-gray-200: #EEEEEE;
+  --color-sabc-gray-300: #E0E0E0;
+  --color-sabc-gray-400: #BDBDBD;
+  --color-sabc-gray-500: #9E9E9E;
+  --color-sabc-gray-600: #757575;
+  --color-sabc-gray-700: #616161;
+  --color-sabc-gray-800: #424242;
+  --color-sabc-gray-900: #212121;
+  --color-sabc-error: #D32F2F;
+  --color-sabc-success: #388E3C;
+  --color-sabc-warning: #F57C00;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--color-sabc-gray-50);
+  color: var(--color-sabc-gray-900);
+}
