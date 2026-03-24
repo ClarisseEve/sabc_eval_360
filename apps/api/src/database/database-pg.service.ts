@@ -26,8 +26,8 @@ export class DatabasePgService implements OnModuleInit, OnModuleDestroy {
   }
 
   async query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
-    const result: QueryResult<T> = await this.pool.query(sql, params);
-    return result.rows;
+    const result = await this.pool.query(sql, params);
+    return result.rows as T[];
   }
 
   async queryOne<T = any>(sql: string, params: any[] = []): Promise<T | null> {

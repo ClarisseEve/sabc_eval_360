@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { EvaluationsService } from './evaluations.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateEvaluationDto } from './dto/create-evaluation.dto';
@@ -30,9 +30,24 @@ export class EvaluationsController {
     return this.service.getPeriodesActives();
   }
 
+  @Get('eligibles')
+  async eligibles(@Request() req: any) {
+    return this.service.getEligibles(req.user.matricule);
+  }
+
   @Get('historique')
   async historique(@Request() req: any) {
     return this.service.getHistorique(req.user.matricule);
+  }
+
+  @Get('rapport/:idPeriode')
+  async rapport(@Param('idPeriode') idPeriode: string, @Request() req: any) {
+    return this.service.getRapport(idPeriode, req.user.matricule);
+  }
+
+  @Post('rappels/:idPeriode')
+  async rappels(@Param('idPeriode') idPeriode: string) {
+    return this.service.envoyerRappels(idPeriode);
   }
 
   @Get(':id')

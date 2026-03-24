@@ -11,34 +11,53 @@ export class AdminRolesService {
   ) {}
 
   async getRoles() {
-    const roles = await this.prisma.role.findMany({
-      include: { _count: { select: { utilisateurs: true } } },
+    return this.prisma.role.findMany({
       orderBy: { nom_role: 'asc' },
     });
-    return roles;
   }
 
-  async getRoleById(id: number) {
+  async getRoleById(id: string) {
     const role = await this.prisma.role.findUnique({
       where: { id_role: id },
-      include: { utilisateurs: { select: { matricule: true, nom: true, prenom: true, statut: true } } },
     });
     if (!role) throw new NotFoundException('Rôle introuvable');
-    return role;
+
+    // Get users with this role (cross-field: utilisateur.role matches role.nom_role)
+    const users = await this.prisma.utilisateur.findMany({
+      where: { role: role.nom_role },
+      select: { matricule: true, nom: true, prenom: true, statut: true },
+    });
+
+    return { ...role, utilisateurs: users };
   }
 
-  async createRole(data: { nom_role: string; niveau_hierarchique?: number; description?: string }) {
+  async createRole(data: {
+    id_role: string;
+    nom_role: string;
+    id_branche: string;
+    description?: string;
+    niveau_taniere?: number;
+    niveau_non_taniere?: number;
+  }) {
     return this.prisma.role.create({ data });
   }
 
-  async updateRole(id: number, data: { nom_role?: string; niveau_hierarchique?: number; description?: string }) {
+  async updateRole(id: string, data: {
+    nom_role?: string;
+    description?: string;
+    niveau_taniere?: number;
+    niveau_non_taniere?: number;
+  }) {
     const role = await this.prisma.role.findUnique({ where: { id_role: id } });
     if (!role) throw new NotFoundException('Rôle introuvable');
     return this.prisma.role.update({ where: { id_role: id }, data });
   }
 
-  async deleteRole(id: number) {
-    const count = await this.prisma.utilisateur.count({ where: { id_role: id } });
+  async deleteRole(id: string) {
+    const role = await this.prisma.role.findUnique({ where: { id_role: id } });
+    if (!role) throw new NotFoundException('Rôle introuvable');
+
+    const count = await this.prisma.utilisateur.count({ where: { role: role.nom_role } });
     if (count > 0) {
       throw new BadRequestException(`Impossible de supprimer: ${count} utilisateur(s) avec ce rôle`);
     }

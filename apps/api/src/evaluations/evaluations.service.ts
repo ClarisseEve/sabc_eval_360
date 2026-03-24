@@ -196,6 +196,78 @@ export class EvaluationsService {
     );
   }
 
+  async getEligibles(matricule: string) {
+    // Get users the current user can evaluate: subordinates + peers in same region
+    const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
+    if (!user) return [];
+
+    const [subordinates, peers] = await Promise.all([
+      this.prisma.utilisateur.findMany({
+        where: { manager_matricule: matricule, statut: 'Actif' },
+        select: { matricule: true, nom: true, prenom: true, role: true, role_nom: true },
+      }),
+      this.prisma.utilisateur.findMany({
+        where: {
+          id_region: user.id_region,
+          statut: 'Actif',
+          matricule: { not: matricule },
+          niveau_hierarchique: user.niveau_hierarchique,
+        },
+        select: { matricule: true, nom: true, prenom: true, role: true, role_nom: true },
+      }),
+    ]);
+
+    // Include self for auto-evaluation
+    return {
+      auto: { matricule: user.matricule, nom: user.nom, prenom: user.prenom, role: user.role },
+      subordonnes: subordinates,
+      pairs: peers,
+    };
+  }
+
+  async getRapport(idPeriode: string, matricule: string) {
+    const periode = await this.pg.queryOne('SELECT * FROM periodes_evaluation WHERE id_periode = $1', [idPeriode]);
+    if (!periode) throw new NotFoundException('Période introuvable');
+
+    const evaluations = await this.pg.query<Evaluation>(
+      `SELECT * FROM evaluations WHERE id_periode = $1 ORDER BY date_evaluation DESC`,
+      [idPeriode],
+    );
+
+    const stats = {
+      total: evaluations.length,
+      brouillon: evaluations.filter(e => e.statut === 'brouillon').length,
+      soumis: evaluations.filter(e => e.statut === 'soumis').length,
+      valide: evaluations.filter(e => e.statut === 'valide').length,
+    };
+
+    return { periode, evaluations, stats };
+  }
+
+  async envoyerRappels(idPeriode: string) {
+    const periode = await this.pg.queryOne<{ id_periode: string; nom_periode: string; date_fin: string }>(
+      `SELECT * FROM periodes_evaluation WHERE id_periode = $1 AND statut = 'ouverte'`,
+      [idPeriode],
+    );
+    if (!periode) throw new BadRequestException('Période non active');
+
+    const dateFin = new Date(periode.date_fin);
+    const joursRestants = Math.ceil((dateFin.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+    // Find evaluations still in draft
+    const brouillons = await this.pg.query<{ evaluateur_matricule: string }>(
+      `SELECT DISTINCT evaluateur_matricule FROM evaluations
+       WHERE id_periode = $1 AND statut = 'brouillon'`,
+      [idPeriode],
+    );
+
+    return {
+      rappels_envoyes: brouillons.length,
+      jours_restants: joursRestants,
+      matricules: brouillons.map(b => b.evaluateur_matricule),
+    };
+  }
+
   // --- Private helpers ---
 
   private determinerType(evaluateur: any, evalue: any): string {

@@ -35,15 +35,17 @@ describe('AdminRolesService', () => {
 
   describe('deleteRole', () => {
     it('should reject deletion when users exist', async () => {
+      mockPrisma.role.findUnique.mockResolvedValue({ id_role: 'DR', nom_role: 'Directeur Régional' });
       mockPrisma.utilisateur.count.mockResolvedValue(3);
-      await expect(service.deleteRole(1)).rejects.toThrow(BadRequestException);
+      await expect(service.deleteRole('DR')).rejects.toThrow(BadRequestException);
     });
 
     it('should delete when no users', async () => {
+      mockPrisma.role.findUnique.mockResolvedValue({ id_role: 'TST', nom_role: 'Test' });
       mockPrisma.utilisateur.count.mockResolvedValue(0);
-      mockPrisma.role.delete.mockResolvedValue({ id_role: 1 });
-      await service.deleteRole(1);
-      expect(mockPrisma.role.delete).toHaveBeenCalledWith({ where: { id_role: 1 } });
+      mockPrisma.role.delete.mockResolvedValue({ id_role: 'TST' });
+      await service.deleteRole('TST');
+      expect(mockPrisma.role.delete).toHaveBeenCalledWith({ where: { id_role: 'TST' } });
     });
   });
 

@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminUsersService } from './admin-users.service';
 
 @Controller('admin/utilisateurs')
@@ -10,14 +10,10 @@ export class AdminUsersController {
   @Get()
   getUsers(
     @Query('statut') statut?: string,
-    @Query('id_role') id_role?: string,
+    @Query('role') role?: string,
     @Query('id_region') id_region?: string,
   ) {
-    return this.usersService.getUsers({
-      statut,
-      id_role: id_role ? parseInt(id_role) : undefined,
-      id_region: id_region ? parseInt(id_region) : undefined,
-    });
+    return this.usersService.getUsers({ statut, role, id_region });
   }
 
   @Get(':matricule')

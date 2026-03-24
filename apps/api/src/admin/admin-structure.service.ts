@@ -14,17 +14,17 @@ export class AdminStructureService {
     });
   }
 
-  async createRegion(data: { nom_region: string; code_region?: string; est_taniere?: boolean }) {
+  async createRegion(data: { id_region: string; nom_region: string; est_taniere?: boolean }) {
     return this.prisma.region.create({ data });
   }
 
-  async updateRegion(id: number, data: { nom_region?: string; code_region?: string; est_taniere?: boolean }) {
+  async updateRegion(id: string, data: { nom_region?: string; est_taniere?: boolean }) {
     const region = await this.prisma.region.findUnique({ where: { id_region: id } });
     if (!region) throw new NotFoundException('Région introuvable');
     return this.prisma.region.update({ where: { id_region: id }, data });
   }
 
-  async deleteRegion(id: number) {
+  async deleteRegion(id: string) {
     const count = await this.prisma.utilisateur.count({ where: { id_region: id } });
     if (count > 0) {
       throw new BadRequestException(`Impossible de supprimer: ${count} utilisateur(s) rattaché(s) à cette région`);

@@ -10,15 +10,15 @@ export class AdminUsersService {
     private pg: DatabasePgService,
   ) {}
 
-  async getUsers(filters?: { statut?: string; id_role?: number; id_region?: number }) {
+  async getUsers(filters?: { statut?: string; role?: string; id_region?: string }) {
     const where: any = {};
     if (filters?.statut) where.statut = filters.statut;
-    if (filters?.id_role) where.id_role = filters.id_role;
+    if (filters?.role) where.role = filters.role;
     if (filters?.id_region) where.id_region = filters.id_region;
 
     return this.prisma.utilisateur.findMany({
       where,
-      include: { role: true, region: true },
+      include: { region: true, branche: true },
       orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
     });
   }
@@ -26,7 +26,7 @@ export class AdminUsersService {
   async getUserByMatricule(matricule: string) {
     const user = await this.prisma.utilisateur.findUnique({
       where: { matricule },
-      include: { role: true, region: true, branche: true },
+      include: { region: true, branche: true },
     });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
@@ -45,6 +45,7 @@ export class AdminUsersService {
 
     return {
       ...user,
+      password: undefined,
       stats: {
         evaluations_total: parseInt(evalStats?.total ?? '0'),
         evaluations_validees: parseInt(evalStats?.validees ?? '0'),
@@ -59,10 +60,13 @@ export class AdminUsersService {
     nom: string;
     prenom: string;
     email: string;
-    mot_de_passe: string;
-    id_role: number;
-    id_region?: number;
-    id_branche?: number;
+    password: string;
+    role: string;
+    role_nom: string;
+    id_region: string;
+    id_branche: string;
+    region_nom: string;
+    type_region: string;
     manager_matricule?: string;
     telephone?: string;
   }) {
@@ -72,15 +76,16 @@ export class AdminUsersService {
     const emailExists = await this.prisma.utilisateur.findFirst({ where: { email: data.email } });
     if (emailExists) throw new BadRequestException('Cet email est déjà utilisé');
 
-    const hashedPassword = await bcrypt.hash(data.mot_de_passe, 10);
+    const hashedPassword = await bcrypt.hash(data.password, 10);
 
     return this.prisma.utilisateur.create({
       data: {
         ...data,
-        mot_de_passe: hashedPassword,
+        password: hashedPassword,
         statut: 'Actif',
+        est_actif: true,
       },
-      include: { role: true, region: true },
+      include: { region: true, branche: true },
     });
   }
 
@@ -88,10 +93,12 @@ export class AdminUsersService {
     nom?: string;
     prenom?: string;
     email?: string;
-    id_role?: number;
-    id_region?: number;
-    id_branche?: number;
-    manager_matricule?: string;
+    role?: string;
+    role_nom?: string;
+    id_region?: string;
+    id_branche?: string;
+    region_nom?: string;
+    type_region?: string;
     telephone?: string;
     statut?: string;
   }) {
@@ -101,14 +108,13 @@ export class AdminUsersService {
     return this.prisma.utilisateur.update({
       where: { matricule },
       data,
-      include: { role: true, region: true },
+      include: { region: true, branche: true },
     });
   }
 
   async getSubordonnes(matricule: string) {
     return this.prisma.utilisateur.findMany({
       where: { manager_matricule: matricule },
-      include: { role: true },
       orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
     });
   }
@@ -122,9 +128,8 @@ export class AdminUsersService {
         statut: 'Actif',
         matricule: { not: matricule },
         id_region: user.id_region,
-        est_remplacant: false,
+        est_indisponible: false,
       },
-      include: { role: true },
       orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
     });
   }
