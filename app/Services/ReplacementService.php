@@ -215,9 +215,9 @@ class ReplacementService
             );
             
             // Notification au manager du titulaire
-            if ($titulaire->id_manager) {
+            if ($titulaire->manager_matricule) {
                 $this->creerNotification(
-                    $titulaire->id_manager,
+                    $titulaire->manager_matricule,
                     "Remplacement temporaire",
                     "{$titulaire->prenom} {$titulaire->nom} sera remplacé(e) par {$remplacant->prenom} {$remplacant->nom} à partir du " . 
                     Carbon::parse($remplacement->date_debut)->format('d/m/Y') . "."
@@ -226,7 +226,7 @@ class ReplacementService
             
             // Notification à l'équipe du titulaire
             if ($notifierEquipe) {
-                $subordonnes = Utilisateur::where('id_manager', $titulaire->id_utilisateur)->get();
+                $subordonnes = Utilisateur::where('manager_matricule', $titulaire->matricule)->get();
                 foreach ($subordonnes as $subordonne) {
                     $this->creerNotification(
                         $subordonne->id_utilisateur,

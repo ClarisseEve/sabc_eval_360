@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, usePage, Link } from '@inertiajs/react';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
@@ -15,12 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs/T
  * - Avatars : Initiales cercles colorés
  */
 const CSCDashboard: React.FC = () => {
-  // Simuler un utilisateur pour la démo
+  const { auth } = usePage<any>().props;
   const mockUser = {
-    name: 'Paul Kamga',
-    email: 'paul.kamga@sabc.com',
-    role: 'CSC',
-    avatar: undefined
+    name: auth?.user?.name || [auth?.user?.prenom, auth?.user?.nom].filter(Boolean).join(' ') || 'Utilisateur',
+    email: auth?.user?.email || '',
+    role: auth?.user?.role?.nom_role || auth?.user?.role_nom || 'CSC',
+    avatar: auth?.user?.avatar,
   };
   
   return (
@@ -270,6 +270,23 @@ const CSCDashboard: React.FC = () => {
           </CardContent>
         </Card>
         
+        {/* Validations en attente */}
+        <div className="mb-6">
+          <Link href="/common/evaluations/a-valider">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-amber-400">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-600">Évaluations à valider</div>
+                    <div className="text-xs text-gray-400 mt-0.5">Soumises par vos subordonnés</div>
+                  </div>
+                  <div className="text-2xl text-amber-500">&#8594;</div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
         {/* Sections inférieures */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* Évaluations en attente */}

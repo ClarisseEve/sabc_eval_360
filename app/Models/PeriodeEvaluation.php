@@ -32,18 +32,18 @@ class PeriodeEvaluation extends Model
     protected $primaryKey = 'id_periode';
     
     /**
-     * Indique si les IDs sont auto-incrémentés.
+     * Indique si les IDs sont auto-incrémentés (UUID → non).
      *
      * @var bool
      */
-    public $incrementing = true;
-    
+    public $incrementing = false;
+
     /**
-     * Le type de données de la clé primaire.
+     * Le type de données de la clé primaire (UUID).
      *
      * @var string
      */
-    protected $keyType = 'int';
+    protected $keyType = 'string';
     
     /**
      * Les attributs qui sont assignables en masse.
@@ -133,6 +133,10 @@ class PeriodeEvaluation extends Model
     public function estActive(): bool
     {
         $now = now();
+
+        if ($this->statut !== 'ouverte') {
+            return false;
+        }
 
         if ($this->est_cloturee) {
             return false;
@@ -226,18 +230,20 @@ class PeriodeEvaluation extends Model
     
     public function scopeOuverte($query)
     {
-        return $query->where('est_ouverte', true)
+        return $query->where('statut', 'ouverte')
+                     ->where('est_ouverte', true)
                      ->where('est_cloturee', false);
     }
     
     public function scopeFermee($query)
     {
-        return $query->where('est_cloturee', true);
+        return $query->whereIn('statut', ['fermee', 'archivee']);
     }
     
     public function scopeActive($query)
     {
-        return $query->where('est_ouverte', true)
+        return $query->where('statut', 'ouverte')
+                     ->where('est_ouverte', true)
                      ->where('est_cloturee', false)
                      ->where('date_debut', '<=', now())
                      ->where('date_fin', '>=', now());
@@ -291,7 +297,7 @@ class PeriodeEvaluation extends Model
         return $this->update([
             'est_ouverte' => true,
             'est_cloturee' => false,
-            'statut' => 'active',
+            'statut' => 'ouverte',
         ]);
     }
     

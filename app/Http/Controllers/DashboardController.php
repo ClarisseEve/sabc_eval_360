@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Traits\FormatsUserData;
+use App\Models\Evaluation;
+use App\Models\PeriodeEvaluation;
 
 /**
  * Contrôleur centralisé pour tous les tableaux de bord SABC
@@ -17,14 +19,68 @@ use App\Traits\FormatsUserData;
 class DashboardController extends Controller
 {
     use FormatsUserData;
-    
+
     /**
-     * Tableau de bord principal - redirige vers le dashboard spécifique au rôle
+     * Calcule les statistiques de base pour le dashboard d'un utilisateur
+     */
+    private function getDashboardStats($user): array
+    {
+        if (!$user) {
+            return [];
+        }
+
+        $matricule = $user->matricule;
+
+        $enAttente = Evaluation::where('evaluateur_matricule', $matricule)
+            ->whereIn('statut', ['brouillon', 'soumis'])
+            ->count();
+
+        $total = Evaluation::where('evaluateur_matricule', $matricule)->count();
+
+        $scorePersonnel = Evaluation::where('evalue_matricule', $matricule)
+            ->where('statut', 'valide')
+            ->whereNotNull('note_globale')
+            ->orderByDesc('created_at')
+            ->value('note_globale');
+
+        $periodeActive = PeriodeEvaluation::where('statut', 'ouverte')->first();
+
+        return [
+            'evaluations_en_attente' => $enAttente,
+            'evaluations_total'      => $total,
+            'score_personnel'        => $scorePersonnel ? round($scorePersonnel, 1) : null,
+            'periode_active'         => $periodeActive ? [
+                'id'   => $periodeActive->id_periode,
+                'nom'  => $periodeActive->nom_periode,
+                'fin'  => $periodeActive->date_fin,
+            ] : null,
+        ];
+    }
+
+    /**
+     * Tableau de bord principal - redirige vers le dashboard du rôle de l'utilisateur connecté
      */
     public function index(): \Illuminate\Http\RedirectResponse
     {
-        \Log::debug('Route dashboard atteinte - redirection directe vers dashboard.admin');
-        return redirect()->route('dashboard.admin');
+        $roleNom = strtolower(\Illuminate\Support\Facades\Auth::user()?->role_nom ?? 'admin');
+
+        $routeMap = [
+            'admin' => 'dashboard.admin',
+            'dr'    => 'dashboard.dr',
+            'cdtt'  => 'dashboard.cdtt',
+            'csc'   => 'dashboard.csc',
+            'cdv'   => 'dashboard.cdv',
+            'cds'   => 'dashboard.cds',
+            'rtm'   => 'dashboard.rtm',
+            'tmo'   => 'dashboard.tmo',
+            'srmo'  => 'dashboard.srmo',
+            'ss'    => 'dashboard.ss',
+            'as'    => 'dashboard.as',
+        ];
+
+        $route = $routeMap[$roleNom] ?? 'dashboard.admin';
+
+        return redirect()->route($route);
     }
     
     /**
@@ -33,129 +89,110 @@ class DashboardController extends Controller
     public function admin(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('Admin/Dashboard/index', [
             ...$this->getAdminPageData('Tableau de Bord Administrateur', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
-    
-    /**
-     * Tableau de bord Directeur Régional (DR)
-     */
+
     public function dr(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('DR/Dashboard/index', [
             ...$this->getPageData('Tableau de Bord Directeur Régional', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
-    
-    /**
-     * Tableau de bord Chef Département Trade (CDTT)
-     */
+
     public function cdtt(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('CDTT/Dashboard/index', [
             ...$this->getPageData('Tableau de Bord Chef Département', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
-    
-    /**
-     * Tableau de bord Chef Service Commercial (CSC)
-     */
+
     public function csc(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('CSC/Dashboard/index', [
             ...$this->getPageData('Tableau de Bord Chef Service', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
-    
-    /**
-     * Tableau de bord Chef District Vente (CDV)
-     */
+
     public function cdv(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('CDV/Dashboard/index', [
             ...$this->getPageData('Tableau de Bord Chef District', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
-    
-    /**
-     * Tableau de bord Chef de Secteur (CDS)
-     */
+
     public function cds(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('CDS/Dashboard/index', [
             ...$this->getPageData('Tableau de Bord Chef de Secteur', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
-    
-    /**
-     * Tableau de bord Regional Trade Marketing (RTM)
-     */
+
     public function rtm(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('RTM/Dashboard/index', [
             ...$this->getPageData('Tableau de Bord Marketing Régional', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
-    
-    /**
-     * Tableau de bord Trade Marketing Operator (TMO)
-     */
+
     public function tmo(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('TMO/Dashboard/index', [
             ...$this->getPageData('Tableau de Bord Marketing Opérationnel', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
-    
-    /**
-     * Tableau de bord Superviseur Régional Marketing Opérationnel (SRMO)
-     */
+
     public function srmo(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('SRMO/Dashboard/index', [
             ...$this->getPageData('Tableau de Bord Superviseur Marketing', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
-    
-    /**
-     * Tableau de bord Superviseur Sponsoring (SS)
-     */
+
     public function ss(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('SS/Dashboard/index', [
             ...$this->getPageData('Tableau de Bord Superviseur Sponsoring', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
-    
-    /**
-     * Tableau de bord Assistant Superviseur Sponsoring (AS)
-     */
+
     public function as(): Response
     {
         $user = Auth::user();
-        
+
         return Inertia::render('AS/Dashboard/index', [
             ...$this->getPageData('Tableau de Bord Assistant Superviseur', [], $user),
+            'dashboardStats' => $this->getDashboardStats($user),
         ]);
     }
 }

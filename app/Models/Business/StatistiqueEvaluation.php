@@ -97,8 +97,9 @@ class StatistiqueEvaluation extends BusinessModel
             $count = 0;
             
             foreach ($evaluationsValidees as $evaluation) {
-                if ($evaluation->notes_json) {
-                    $notes = json_decode($evaluation->notes_json, true);
+                $rawNotes = $evaluation->notations_json ?? $evaluation->notes_json;
+                if ($rawNotes) {
+                    $notes = is_array($rawNotes) ? $rawNotes : json_decode($rawNotes, true);
                     if (is_array($notes)) {
                         foreach ($notes as $note) {
                             if (isset($note['note']) && is_numeric($note['note'])) {

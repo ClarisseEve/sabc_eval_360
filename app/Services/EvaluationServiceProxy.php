@@ -468,9 +468,7 @@ class EvaluationServiceProxy
                 return ['success' => true, 'data' => $evaluations];
 
             case 'activePeriodes':
-                $periodes = \App\Models\PeriodeEvaluation::where('statut', 'ouverte')
-                    ->where('est_ouverte', true)
-                    ->where('est_cloturee', false)
+                $periodes = \App\Models\PeriodeEvaluation::active()
                     ->get();
                 return $periodes->toArray();
 

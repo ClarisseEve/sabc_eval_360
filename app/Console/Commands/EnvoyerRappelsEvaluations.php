@@ -35,10 +35,8 @@ class EnvoyerRappelsEvaluations extends Command
         
         $this->info('🔍 Recherche des périodes actives nécessitant des rappels...');
         
-        // Récupérer les périodes ouvertes
-        $periodesActives = PeriodeEvaluation::where('est_ouverte', true)
-            ->where('est_cloturee', false)
-            ->where('date_fin', '>=', now())
+        // Récupérer les périodes actives
+        $periodesActives = PeriodeEvaluation::active()
             ->get();
         
         if ($periodesActives->isEmpty()) {

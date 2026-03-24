@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthCheckController;
 // use App\Http\Controllers\Api\UserController; // Temporarily commented out
+use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\EvaluationController;
 use App\Http\Controllers\Api\HierarchyController;
 use App\Http\Controllers\Api\UtilisateurController;
@@ -52,6 +53,42 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{utilisateur}', 'show')->name('show');
         Route::get('/{utilisateur}/subordonnes', 'getSubordonnes')->name('subordonnes');
         Route::post('/remplacants-disponibles', 'getRemplacantsDisponibles')->name('remplacants-disponibles');
+    });
+
+    // Evaluations API
+    Route::prefix('evaluations')->name('api.evaluations.')->controller(EvaluationController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::get('/periodes-actives', 'getPeriodesActives')->name('periodes-actives');
+        Route::get('/eligibles', 'getUtilisateursEligibles')->name('eligibles');
+        Route::get('/historique', 'historique')->name('historique');
+        Route::get('/{id}', 'show')->name('show');
+        Route::put('/{id}', 'update')->name('update');
+        Route::post('/{id}/submit', 'submit')->name('submit');
+        Route::post('/{id}/validate', 'validate')->name('validate');
+        Route::get('/rapport/{idPeriode}', 'rapport')->name('rapport');
+        Route::post('/rappels/{idPeriode}', 'envoyerRappels')->name('rappels');
+    });
+
+    // Hierarchy API
+    Route::prefix('hierarchy')->name('api.hierarchy.')->controller(HierarchyController::class)->group(function () {
+        Route::get('/region/{idRegion}', 'getHierarchieRegion')->name('region');
+        Route::get('/region/{idRegion}/stats', 'getStatistiquesRegion')->name('region.stats');
+        Route::get('/subordonnes', 'getSubordonnesDirects')->name('subordonnes');
+        Route::get('/tous-subordonnes', 'getTousSubordonnes')->name('tous-subordonnes');
+        Route::get('/chaine', 'getChaineHierarchique')->name('chaine');
+        Route::get('/managers-eligibles/{idUtilisateur}', 'getManagersEligibles')->name('managers-eligibles');
+        Route::post('/verifier-supervision', 'verifierSupervision')->name('verifier-supervision');
+        Route::post('/valider-assignation', 'validerAssignationManager')->name('valider-assignation');
+        Route::post('/assigner-manager', 'assignerManager')->name('assigner-manager');
+    });
+
+    // Analytics API
+    Route::prefix('analytics')->name('api.analytics.')->controller(AnalyticsController::class)->group(function () {
+        Route::get('/dashboard', 'dashboard')->name('dashboard');
+        Route::get('/evaluations', 'evaluations')->name('evaluations');
+        Route::get('/performances', 'performances')->name('performances');
+        Route::get('/region/{idRegion}', 'region')->name('region');
     });
 
     // Remplacements API

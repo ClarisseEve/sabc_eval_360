@@ -8,6 +8,7 @@ use App\Models\Evaluation;
 use App\Models\PeriodeEvaluation;
 use App\Models\Utilisateur;
 use App\Models\RegleEvaluation;
+use App\Models\Business\Template;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -61,7 +62,7 @@ class EvaluationController extends Controller
         }
 
         // Récupérer la période active (PGSQL)
-        $periode = PeriodeEvaluation::where('statut', 'active')->first();
+        $periode = PeriodeEvaluation::active()->first();
         if (!$periode) {
             abort(422, 'Aucune période active');
         }
@@ -110,7 +111,7 @@ class EvaluationController extends Controller
     }
 
     /**
-     * Page "Mes évaluations" - affiche les types d'évaluations disponibles selon le rôle
+     * Page "Mes évaluations" - templates disponibles + cibles selon le rôle
      */
     public function mine(): Response
     {
@@ -119,38 +120,36 @@ class EvaluationController extends Controller
         if ($this->isAdmin($utilisateur)) {
             abort(403);
         }
-        
-        // Pour l'instant, utiliser des données simulées
-        $templates = [
-            [
-                'id' => 1,
-                'title' => 'Évaluation des compétences managériales',
-                'description' => 'Évaluation des compétences de leadership',
-                'status' => 'published'
-            ],
-            [
-                'id' => 2,
-                'title' => 'Évaluation des compétences commerciales',
-                'description' => 'Évaluation des compétences de vente',
-                'status' => 'published'
-            ]
-        ];
-        
-        $evaluationTargets = [
-            'auto' => [$utilisateur],
-            'peers' => [],
-            'subordinates' => []
-        ];
-        
+
+        $periode = PeriodeEvaluation::active()->first();
+
+        // Templates applicables à ce rôle (PGSQL via Business\Template)
+        $templates = $this->getApplicableTemplates($utilisateur);
+
+        // Cibles d'évaluation selon la hiérarchie
+        $targets = $this->getEvaluationTargets($utilisateur);
+
+        // Stats évaluations complétées cette période
+        $completed = 0;
+        $total = array_sum(array_map('count', $targets));
+        if ($periode) {
+            $completed = DB::connection('pgsql')->table('evaluations')
+                ->where('evaluateur_matricule', $utilisateur->matricule)
+                ->where('id_periode', $periode->id_periode)
+                ->whereIn('statut', ['valide', 'soumis'])
+                ->count();
+        }
+
         return Inertia::render('Common/Evaluations/Mine', [
-            'templates' => $templates,
-            'evaluationTargets' => $evaluationTargets,
-            'user' => $utilisateur ? $this->formatUserForUI($utilisateur) : null,
+            'templates'         => $templates,
+            'evaluationTargets' => $targets,
+            'stats'             => ['completed' => $completed, 'total' => $total],
+            'user'              => $this->formatUserForUI($utilisateur),
         ]);
     }
 
     /**
-     * Page "À compléter" - évaluations en cours
+     * Page "À compléter" — évaluations brouillon + à démarrer
      */
     public function pending(): Response
     {
@@ -159,13 +158,78 @@ class EvaluationController extends Controller
         if ($this->isAdmin($utilisateur)) {
             abort(403);
         }
-        
-        // Pour l'instant, utiliser des données simulées
-        $pendingEvaluations = [];
-        
+
+        $periode     = PeriodeEvaluation::active()->first();
+        $targets     = $this->getEvaluationTargets($utilisateur);
+        $evaluations = [];
+
+        // Récupérer les brouillons existants (PGSQL)
+        $brouillons = collect();
+        if ($periode) {
+            $rows = DB::connection('pgsql')->table('evaluations')
+                ->where('evaluateur_matricule', $utilisateur->matricule)
+                ->where('id_periode', $periode->id_periode)
+                ->where('statut', 'brouillon')
+                ->get();
+
+            // Charger les infos cibles depuis MySQL
+            $evalueMatricules = $rows->pluck('evalue_matricule')->unique();
+            $evalues = Utilisateur::whereIn('matricule', $evalueMatricules)
+                ->get()->keyBy('matricule');
+
+            foreach ($rows as $row) {
+                $cible = $evalues->get($row->evalue_matricule);
+                if (!$cible) continue;
+                $type = $this->determinerTypeEvaluationPourCibles($utilisateur, $cible);
+                $evaluations[$type][] = [
+                    'type'       => $type,
+                    'statut'     => 'a_terminer',
+                    'deadline'   => $periode->date_fin,
+                    'evaluation' => [
+                        'id_evaluation'  => $row->id_evaluation,
+                        'id'             => $row->id_evaluation,
+                        'statut'         => $row->statut,
+                        'note_globale'   => $row->note_globale,
+                        'notations_json' => json_decode($row->notations_json ?? '[]', true),
+                        'date_soumission' => $row->date_soumission,
+                    ],
+                    'cible' => $this->formatCible($cible),
+                ];
+                $brouillons->push($row->evalue_matricule);
+            }
+        }
+
+        // Ajouter les cibles non encore commencées ("à faire")
+        foreach ($targets as $type => $cibles) {
+            foreach ($cibles as $cible) {
+                if ($brouillons->contains($cible['matricule'])) continue;
+                $evaluations[$type][] = [
+                    'type'       => $type,
+                    'statut'     => 'a_faire',
+                    'deadline'   => $periode?->date_fin,
+                    'evaluation' => null,
+                    'cible'      => $cible,
+                ];
+            }
+        }
+
+        $aTerminer = 0;
+        $aFaire    = 0;
+        foreach ($evaluations as $tasks) {
+            foreach ($tasks as $task) {
+                $task['statut'] === 'a_terminer' ? $aTerminer++ : $aFaire++;
+            }
+        }
+
         return Inertia::render('Common/Evaluations/Pending', [
-            'evaluations' => $pendingEvaluations,
-            'user' => $utilisateur ? $this->formatUserForUI($utilisateur) : null,
+            'evaluations'   => $evaluations,
+            'statistiques'  => [
+                'total_a_faire'    => $aFaire,
+                'total_a_terminer' => $aTerminer,
+                'total_general'    => $aFaire + $aTerminer,
+            ],
+            'role_permissions' => $this->getRolePermissions($utilisateur),
+            'user'             => $this->formatUserForUI($utilisateur),
         ]);
     }
 
@@ -211,7 +275,7 @@ class EvaluationController extends Controller
         if (!$target) {
             return response()->json(['error' => 'Utilisateur cible introuvable'], 404);
         }
-        $periode = PeriodeEvaluation::where('statut', 'active')->first();
+        $periode = PeriodeEvaluation::active()->first();
         $regleUuid = $this->mapTemplateIdToUuid($templateParam) ?: null;
         if ($regleUuid) {
             $regle = RegleEvaluation::find($regleUuid);
@@ -277,56 +341,84 @@ class EvaluationController extends Controller
     }
 
     /**
-     * Affichage d'une évaluation spécifique
+     * Affichage d'une évaluation spécifique (raw DB — évite les relations Eloquent cross-DB)
      */
     public function show(string $id): Response
     {
         $utilisateur = Auth::user();
-        
-        // Récupérer l'évaluation avec relations
-        $evaluation = Evaluation::with(['evaluateur', 'evalue', 'periode', 'regle', 'validateur'])
-            ->find($id);
-        
-        if (!$evaluation) {
-            abort(404, 'Évaluation introuvable');
-        }
-        
-        // Vérifier que l'utilisateur peut voir cette évaluation
-        if (!$this->peutAccederEvaluation($utilisateur, $evaluation)) {
+
+        $evalRow = DB::connection('pgsql')->table('evaluations')
+            ->where('id_evaluation', $id)
+            ->first();
+
+        if (!$evalRow) abort(404, 'Évaluation introuvable');
+
+        if (!$this->peutAccederEvaluationRaw($utilisateur, $evalRow)) {
             abort(403, 'Vous n\'êtes pas autorisé à voir cette évaluation');
         }
-        
+
+        $evaluateur = Utilisateur::where('matricule', $evalRow->evaluateur_matricule)->first();
+        $evalue     = Utilisateur::where('matricule', $evalRow->evalue_matricule)->first();
+        $criteres   = $this->getCriteresForEvaluation($evalRow);
+
+        $evaluation = [
+            'id_evaluation'      => $evalRow->id_evaluation,
+            'id'                 => $evalRow->id_evaluation,
+            'statut'             => $evalRow->statut,
+            'note_globale'       => $evalRow->note_globale,
+            'notations_json'     => json_decode($evalRow->notations_json ?? '[]', true),
+            'commentaire_general' => $evalRow->commentaire_general,
+            'date_evaluation'    => $evalRow->date_evaluation,
+            'date_soumission'    => $evalRow->date_soumission,
+            'evaluateur'         => $evaluateur,
+            'evalue'             => $evalue,
+            'regle'              => ['criteres_evaluation_json' => $criteres],
+        ];
+
         return Inertia::render('Common/Evaluations/Show', [
             'evaluation' => $evaluation,
-            'user' => $utilisateur
+            'user'       => $this->formatUserForUI($utilisateur),
         ]);
     }
 
     /**
-     * Édition d'une évaluation
+     * Édition d'une évaluation (raw DB — évite les relations Eloquent cross-DB)
      */
     public function edit(string $id): Response
     {
         $utilisateur = Auth::user();
-        
-        // Récupérer l'évaluation avec relations
-        $evaluation = Evaluation::with(['evaluateur', 'evalue', 'periode', 'regle'])
-            ->find($id);
-        
-        if (!$evaluation) {
-            abort(404, 'Évaluation introuvable');
-        }
-        
-        // Vérifier que l'utilisateur peut éditer cette évaluation
-        // Seul l'évaluateur peut éditer et seulement si statut = 'brouillon'
-        if ($evaluation->evaluateur->matricule !== $utilisateur->matricule || 
-            $evaluation->statut !== 'brouillon') {
+
+        $evalRow = DB::connection('pgsql')->table('evaluations')
+            ->where('id_evaluation', $id)
+            ->first();
+
+        if (!$evalRow) abort(404, 'Évaluation introuvable');
+
+        if (($evalRow->evaluateur_matricule ?? '') !== $utilisateur->matricule
+            || ($evalRow->statut ?? '') !== 'brouillon') {
             abort(403, 'Vous n\'êtes pas autorisé à modifier cette évaluation');
         }
-        
+
+        $evaluateur = Utilisateur::where('matricule', $evalRow->evaluateur_matricule)->first();
+        $evalue     = Utilisateur::where('matricule', $evalRow->evalue_matricule)->first();
+        $criteres   = $this->getCriteresForEvaluation($evalRow);
+
+        $evaluation = [
+            'id_evaluation'      => $evalRow->id_evaluation,
+            'id'                 => $evalRow->id_evaluation,
+            'statut'             => $evalRow->statut,
+            'note_globale'       => $evalRow->note_globale,
+            'notations_json'     => json_decode($evalRow->notations_json ?? '[]', true),
+            'commentaire_general' => $evalRow->commentaire_general,
+            'date_evaluation'    => $evalRow->date_evaluation,
+            'evaluateur'         => $evaluateur,
+            'evalue'             => $evalue,
+            'regle'              => ['criteres_evaluation_json' => $criteres],
+        ];
+
         return Inertia::render('Common/Evaluations/Edit', [
             'evaluation' => $evaluation,
-            'user' => $utilisateur
+            'user'       => $this->formatUserForUI($utilisateur),
         ]);
     }
 
@@ -403,34 +495,293 @@ class EvaluationController extends Controller
                 ->route('evaluations.edit', ['id' => $id])
                 ->with('success', 'Brouillon enregistré');
     }
-    
+
     /**
-     * Vérifie si un utilisateur peut accéder à une évaluation
+     * Page "À valider" — évaluations soumises par les subordonnés directs
      */
-    private function peutAccederEvaluation($utilisateur, $evaluation): bool
+    public function aValider(): Response
     {
-        // L'évaluateur peut toujours accéder (utiliser matricule comme clé)
-        if ($evaluation->evaluateur->matricule === $utilisateur->matricule) {
-            return true;
+        $utilisateur = Auth::user();
+        if ($this->isAdmin($utilisateur)) abort(403);
+
+        // Subordonnés directs de l'utilisateur connecté
+        $subMatricules = Utilisateur::where('manager_matricule', $utilisateur->matricule)
+            ->pluck('matricule')
+            ->toArray();
+
+        $aValider = [];
+
+        if (!empty($subMatricules)) {
+            $rows = DB::connection('pgsql')->table('evaluations')
+                ->where('statut', 'soumis')
+                ->whereIn('evalue_matricule', $subMatricules)
+                ->orderByDesc('date_soumission')
+                ->get();
+
+            // Charger les infos MySQL des évaluateurs et évalués
+            $allMatricules = $rows->flatMap(fn($r) => [$r->evaluateur_matricule, $r->evalue_matricule])
+                ->unique()->values()->toArray();
+            $users = Utilisateur::whereIn('matricule', $allMatricules)->get()->keyBy('matricule');
+
+            foreach ($rows as $row) {
+                $evaluateur = $users->get($row->evaluateur_matricule);
+                $evalue     = $users->get($row->evalue_matricule);
+                $aValider[] = [
+                    'id_evaluation'       => $row->id_evaluation,
+                    'statut'              => $row->statut,
+                    'date_soumission'     => $row->date_soumission,
+                    'date_evaluation'     => $row->date_evaluation,
+                    'note_globale'        => $row->note_globale,
+                    'commentaire_general' => $row->commentaire_general,
+                    'notations_json'      => json_decode($row->notations_json ?? '[]', true),
+                    'type_evaluation'     => $row->type_evaluation,
+                    'evaluateur' => $evaluateur ? $this->formatCible($evaluateur) : ['matricule' => $row->evaluateur_matricule, 'nom' => '', 'prenom' => ''],
+                    'evalue'     => $evalue     ? $this->formatCible($evalue)     : ['matricule' => $row->evalue_matricule,     'nom' => '', 'prenom' => ''],
+                ];
+            }
         }
-        
-        // L'évalué peut accéder si l'évaluation est validée
-        if ($evaluation->evalue->matricule === $utilisateur->matricule && $evaluation->statut === 'valide') {
-            return true;
+
+        return Inertia::render('Common/Evaluations/ToValidate', [
+            'aValider' => $aValider,
+            'stats'    => [
+                'total'   => count($aValider),
+                'urgents' => collect($aValider)->filter(fn($e) => $e['date_soumission'] && \Carbon\Carbon::parse($e['date_soumission'])->diffInDays(now()) > 3)->count(),
+            ],
+            'user' => $this->formatUserForUI($utilisateur),
+        ]);
+    }
+
+    /**
+     * Valide ou rejette une évaluation soumise par un subordonné
+     */
+    public function valider(Request $request, string $id)
+    {
+        $utilisateur = Auth::user();
+        if (!$utilisateur) abort(401);
+
+        $validated = $request->validate([
+            'action'                 => 'required|in:valide,rejete',
+            'commentaire_validation' => 'nullable|string|max:500',
+        ]);
+
+        $evalRow = DB::connection('pgsql')->table('evaluations')
+            ->where('id_evaluation', $id)
+            ->where('statut', 'soumis')
+            ->first();
+
+        if (!$evalRow) abort(404, 'Évaluation introuvable ou non soumise');
+
+        // Vérifier que l'utilisateur est bien le manager de l'évalué
+        $evalue = Utilisateur::where('matricule', $evalRow->evalue_matricule)->first();
+        if (!$evalue || $evalue->manager_matricule !== $utilisateur->matricule) {
+            abort(403, 'Vous n\'êtes pas autorisé à valider cette évaluation');
         }
-        
-        // Le manager peut accéder pour validation
-        if ($evaluation->evalue->manager_matricule === $utilisateur->matricule) {
-            return true;
-        }
-        
-        // DR et CDTT peuvent accéder à toutes les évaluations de leur région
-        if (in_array($utilisateur->role_nom, ['DR', 'CDTT']) && 
-            $evaluation->evalue->id_region === $utilisateur->id_region) {
-            return true;
-        }
-        
+
+        $nouveauStatut = $validated['action'] === 'valide' ? 'valide' : 'brouillon';
+
+        DB::connection('pgsql')->table('evaluations')
+            ->where('id_evaluation', $id)
+            ->update([
+                'statut'     => $nouveauStatut,
+                'updated_at' => now(),
+            ]);
+
+        $message = $validated['action'] === 'valide'
+            ? 'Évaluation validée avec succès'
+            : 'Évaluation renvoyée en brouillon';
+
+        return redirect()->route('evaluations.a-valider')
+            ->with('success', $message);
+    }
+
+    /**
+     * Vérifie l'accès à une évaluation via un objet stdClass (raw DB row)
+     */
+    private function peutAccederEvaluationRaw($utilisateur, $evalRow): bool
+    {
+        if (($evalRow->evaluateur_matricule ?? '') === $utilisateur->matricule) return true;
+
+        if (($evalRow->evalue_matricule ?? '') === $utilisateur->matricule
+            && ($evalRow->statut ?? '') === 'valide') return true;
+
+        $evalue = Utilisateur::where('matricule', $evalRow->evalue_matricule ?? '')->first();
+        if ($evalue && $evalue->manager_matricule === $utilisateur->matricule) return true;
+
+        if (in_array($utilisateur->role_nom, ['DR', 'CDTT'])
+            && $evalue && $evalue->id_region === $utilisateur->id_region) return true;
+
         return false;
+    }
+
+    /**
+     * Charge les critères d'évaluation depuis un template ou une règle (PGSQL)
+     */
+    private function getCriteresForEvaluation($evalRow): array
+    {
+        if (empty($evalRow->id_regle)) return [];
+
+        // Essayer comme UUID (Business\Template)
+        $template = Template::with(['items.competence'])->find($evalRow->id_regle);
+        if ($template) {
+            return $template->items->map(fn($item) => [
+                'id'            => (string) $item->id,
+                'libelle'       => $item->competence?->libelle ?? 'Critère',
+                'description'   => $item->competence?->description,
+                'poids'         => $item->poids_critere,
+                'section_label' => $item->section_label,
+                'section_order' => $item->section_order,
+            ])->toArray();
+        }
+
+        // Essayer comme entier (RegleEvaluation)
+        if (is_numeric($evalRow->id_regle)) {
+            $regle = RegleEvaluation::find($evalRow->id_regle);
+            if ($regle) {
+                return $regle->criteres_evaluation_json ?? [];
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Récupère les templates applicables au rôle de l'utilisateur (PGSQL Business\Template)
+     * avec fallback sur RegleEvaluation si aucun template publié trouvé.
+     */
+    private function getApplicableTemplates($utilisateur): array
+    {
+        $roleNom = $utilisateur->role_nom ?? $utilisateur->role ?? '';
+
+        // Essayer via Business\Template + TemplateEvaluatorRole
+        $templates = Template::with(['evaluatorRoles'])
+            ->where('statut', 'publie')
+            ->whereHas('evaluatorRoles', fn($q) => $q->where('role_evaluateur', $roleNom))
+            ->get();
+
+        if ($templates->isNotEmpty()) {
+            return $templates->map(fn($t) => [
+                'id'             => $t->id_template,
+                'id_regle'       => $t->id_template,
+                'nom'            => $t->nom,
+                'title'          => $t->nom,
+                'description'    => $t->description ?? '',
+                'evaluated_role' => $t->evaluated_role,
+                'status'         => 'published',
+            ])->toArray();
+        }
+
+        // Fallback sur RegleEvaluation
+        $regles = RegleEvaluation::where('est_active', true)
+            ->where(function ($q) use ($roleNom) {
+                $q->where('role_evaluateur', $roleNom)
+                  ->orWhereNull('role_evaluateur');
+            })
+            ->get();
+
+        return $regles->map(fn($r) => [
+            'id'          => $r->id_regle,
+            'id_regle'    => $r->id_regle,
+            'nom'         => $r->nom_regle,
+            'title'       => $r->nom_regle,
+            'description' => $r->description ?? '',
+            'status'      => 'published',
+        ])->toArray();
+    }
+
+    /**
+     * Construit les groupes de cibles d'évaluation selon la hiérarchie SABC.
+     */
+    private function getEvaluationTargets($utilisateur): array
+    {
+        $targets = [
+            'auto'         => [],
+            'peers'        => [],
+            'subordinates' => [],
+            'ascendante'   => [],
+        ];
+
+        // Auto-évaluation
+        $targets['auto'][] = $this->formatCible($utilisateur);
+
+        // Subordonnés directs
+        $subordonnes = Utilisateur::where('manager_matricule', $utilisateur->matricule)
+            ->where('est_actif', true)
+            ->get();
+        foreach ($subordonnes as $s) {
+            $targets['subordinates'][] = $this->formatCible($s);
+        }
+
+        // Pairs (même région + même niveau hiérarchique)
+        if ($utilisateur->id_region && $utilisateur->niveau_hierarchique) {
+            $pairs = Utilisateur::where('id_region', $utilisateur->id_region)
+                ->where('niveau_hierarchique', $utilisateur->niveau_hierarchique)
+                ->where('matricule', '!=', $utilisateur->matricule)
+                ->where('est_actif', true)
+                ->get();
+            foreach ($pairs as $p) {
+                $targets['peers'][] = $this->formatCible($p);
+            }
+        }
+
+        // Évaluation ascendante (manager direct)
+        if ($utilisateur->manager_matricule) {
+            $manager = Utilisateur::where('matricule', $utilisateur->manager_matricule)
+                ->where('est_actif', true)
+                ->first();
+            if ($manager) {
+                $targets['ascendante'][] = $this->formatCible($manager);
+            }
+        }
+
+        // Nettoyer les groupes vides
+        return array_filter($targets, fn($group) => count($group) > 0);
+    }
+
+    /**
+     * Formate un utilisateur en tableau cible pour le frontend.
+     */
+    private function formatCible($utilisateur): array
+    {
+        return [
+            'matricule'  => $utilisateur->matricule,
+            'prenom'     => $utilisateur->prenom,
+            'nom'        => $utilisateur->nom,
+            'role_nom'   => $utilisateur->role_nom ?? $utilisateur->role,
+            'region_nom' => $utilisateur->region_nom,
+            'avatar'     => $utilisateur->photo_url ?? null,
+        ];
+    }
+
+    /**
+     * Détermine le type d'évaluation entre deux utilisateurs.
+     */
+    private function determinerTypeEvaluationPourCibles($evaluateur, $evalue): string
+    {
+        if ($evaluateur->matricule === $evalue->matricule) {
+            return 'auto';
+        }
+        if ($evaluateur->matricule === $evalue->manager_matricule) {
+            return 'descendante';
+        }
+        if ($evaluateur->manager_matricule === $evalue->matricule) {
+            return 'ascendante';
+        }
+        return 'pairs';
+    }
+
+    /**
+     * Construit les permissions rôle pour la page Pending.
+     */
+    private function getRolePermissions($utilisateur): array
+    {
+        $role = $utilisateur->role_nom ?? $utilisateur->role ?? '';
+        $permissions = [
+            'peut_auto_evaluation'   => true,
+            'peut_evaluer_pairs'     => in_array($role, ['DR', 'CDTT', 'CSC', 'CDV', 'CDS', 'RTM', 'SRMO', 'TMO', 'SS', 'AS']),
+            'peut_evaluer_equipe'    => in_array($role, ['DR', 'CDTT', 'CSC', 'CDV', 'RTM', 'SRMO', 'SS']),
+            'peut_evaluer_ascendant' => in_array($role, ['CSC', 'CDV', 'CDS', 'RTM', 'TMO', 'SS', 'AS']),
+        ];
+        return array_filter($permissions);
     }
 
     /**

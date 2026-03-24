@@ -31,23 +31,16 @@ class PeriodeEvaluationController extends Controller
         $user = Auth::user();
 
         $periodes = PeriodeEvaluation::with('regleEvaluation')
+            ->withCount([
+                'evaluations',
+                'evaluations as evaluations_validees_count' => function ($query) {
+                    $query->where('statut', 'valide');
+                },
+            ])
             ->orderByDesc('date_debut')
             ->get()
             ->map(function (PeriodeEvaluation $periode) {
-                $statut = $periode->statut ?? ($periode->est_cloturee ? 'terminee' : ($periode->est_ouverte ? 'active' : 'planifiee'));
-
-                $nbEvaluations = 0;
-                $nbValidees = 0;
-
-                try {
-                    $nbEvaluations = $periode->evaluations()->count();
-                    $nbValidees = $periode->evaluations()->where('statut', 'valide')->count();
-                } catch (\Throwable $exception) {
-                    \Log::warning('Unable to count evaluations for période', [
-                        'periode' => $periode->id_periode,
-                        'message' => $exception->getMessage(),
-                    ]);
-                }
+                $statut = $periode->statut ?? ($periode->est_cloturee ? 'fermee' : ($periode->est_ouverte ? 'ouverte' : 'planifiee'));
 
                 return [
                     'id_periode' => $periode->id_periode,
@@ -61,8 +54,8 @@ class PeriodeEvaluationController extends Controller
                     'est_ouverte' => (bool) $periode->est_ouverte,
                     'est_cloturee' => (bool) $periode->est_cloturee,
                     'regle_nom' => $periode->regleEvaluation?->nom_regle ?? 'N/A',
-                    'nb_evaluations' => $nbEvaluations,
-                    'nb_evaluations_completees' => $nbValidees,
+                    'nb_evaluations' => (int) ($periode->evaluations_count ?? 0),
+                    'nb_evaluations_completees' => (int) ($periode->evaluations_validees_count ?? 0),
                     'created_at' => $periode->created_at,
                     'updated_at' => $periode->updated_at,
                 ];
@@ -70,9 +63,9 @@ class PeriodeEvaluationController extends Controller
 
         $statistiques = [
             'total_periodes' => $periodes->count(),
-            'periodes_actives' => $periodes->where('statut', 'active')->count(),
+            'periodes_actives' => $periodes->where('statut', 'ouverte')->count(),
             'periodes_ouvertes' => $periodes->where('est_ouverte', true)->count(),
-            'periodes_terminees' => $periodes->where('statut', 'terminee')->count(),
+            'periodes_terminees' => $periodes->whereIn('statut', ['fermee', 'archivee'])->count(),
         ];
 
         $regles = RegleEvaluation::select('id_regle', 'nom_regle', 'criteres_evaluation_json')->get();
@@ -319,7 +312,7 @@ class PeriodeEvaluationController extends Controller
                     $periode->update([
                         'est_ouverte' => true,
                         'est_cloturee' => false,
-                        'statut' => 'active',
+                        'statut' => 'ouverte',
                     ]);
                     $message = 'Période ouverte aux évaluations.';
                     break;
@@ -337,7 +330,7 @@ class PeriodeEvaluationController extends Controller
                     $periode->update([
                         'est_ouverte' => true,
                         'est_cloturee' => false,
-                        'statut' => 'active',
+                        'statut' => 'ouverte',
                     ]);
                     $message = 'Période activée.';
                     break;
@@ -346,9 +339,9 @@ class PeriodeEvaluationController extends Controller
                     $periode->update([
                         'est_ouverte' => false,
                         'est_cloturee' => true,
-                        'statut' => 'terminee',
+                        'statut' => 'archivee',
                     ]);
-                    $message = 'Période terminée.';
+                    $message = 'Période archivée.';
                     break;
 
                 default:

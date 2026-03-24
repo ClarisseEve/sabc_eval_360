@@ -1,7 +1,8 @@
 import React from 'react';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, usePage, Link } from '@inertiajs/react';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { DirectorDashboard } from '@/Components/Dashboard/DirectorDashboard';
+import { Card, CardContent } from '@/Components/UI/Card/Card';
 import { SharedData } from '@/types';
 
 const DRDashboard: React.FC = () => {
@@ -162,6 +163,23 @@ const DRDashboard: React.FC = () => {
   return (
     <AppLayout user={layoutUser} notifications={notifications} onLogout={handleLogout}>
       <Head title="Tableau de bord Directeur Régional - SABC Évaluation 360°" />
+
+      {/* Validations en attente */}
+      <div className="px-4 pt-6 max-w-7xl mx-auto">
+        <Link href="/common/evaluations/a-valider">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-amber-400">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-600">Évaluations à valider</div>
+                  <div className="text-xs text-gray-400 mt-0.5">Soumises par vos subordonnés</div>
+                </div>
+                <div className="text-2xl text-amber-500">&#8594;</div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
 
       <DirectorDashboard
         user={dashboardUser}

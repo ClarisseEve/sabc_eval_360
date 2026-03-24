@@ -45,9 +45,7 @@ class OuvrirPeriodesAutomatiquement extends Command
         $this->info('🔍 Recherche des périodes à ouvrir...');
         
         // Récupérer les périodes planifiées dont la date de début est atteinte ou passée
-        $periodesAOuvrir = PeriodeEvaluation::where('statut', 'planifiee')
-            ->where('est_ouverte', false)
-            ->where('est_cloturee', false)
+        $periodesAOuvrir = PeriodeEvaluation::planifiee()
             ->where('date_debut', '<=', now())
             ->get();
         

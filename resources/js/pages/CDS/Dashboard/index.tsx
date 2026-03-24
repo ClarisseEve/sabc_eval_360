@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
@@ -14,12 +14,12 @@ import { Button } from '@/Components/UI/Button/Button';
  * - Progression : Barres pourcentages
  */
 const CDSDashboard: React.FC = () => {
-  // Simuler un utilisateur pour la démo
+  const { auth } = usePage<any>().props;
   const mockUser = {
-    name: 'Jean Tamba',
-    email: 'jean.tamba@sabc.com',
-    role: 'CDS',
-    avatar: undefined
+    name: auth?.user?.name || [auth?.user?.prenom, auth?.user?.nom].filter(Boolean).join(' ') || 'Utilisateur',
+    email: auth?.user?.email || '',
+    role: auth?.user?.role?.nom_role || auth?.user?.role_nom || 'CDS',
+    avatar: auth?.user?.avatar,
   };
   
   return (

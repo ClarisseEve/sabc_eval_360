@@ -235,21 +235,23 @@ class HierarchyController extends Controller
         }
 
         // Effectuer l'assignation
-        $utilisateurCible = Utilisateur::find($request->id_utilisateur);
-        $ancienManager = $utilisateurCible->id_manager;
-        
+        $utilisateurCible = Utilisateur::where('matricule', $request->id_utilisateur)->first();
+        if (!$utilisateurCible) {
+            return response()->json(['success' => false, 'message' => 'Utilisateur introuvable'], 404);
+        }
+        $ancienManager = $utilisateurCible->manager_matricule;
+
         $utilisateurCible->update([
-            'id_manager' => $request->id_manager
+            'manager_matricule' => $request->id_manager,
         ]);
 
-        // Log de l'action
         \App\Models\LogAdministration::enregistrerAction(
-            $utilisateur->id_utilisateur,
+            $utilisateur->matricule,
             'assignation_manager',
             'utilisateurs',
-            $request->id_utilisateur,
-            ['id_manager' => $ancienManager],
-            ['id_manager' => $request->id_manager]
+            $utilisateurCible->matricule,
+            ['manager_matricule' => $ancienManager],
+            ['manager_matricule' => $request->id_manager]
         );
 
         return response()->json([
@@ -336,7 +338,7 @@ class HierarchyController extends Controller
             'total_utilisateurs' => $region->utilisateurs->count(),
             'repartition_par_role' => $utilisateursParRole->map->count(),
             'repartition_par_niveau' => $utilisateursParNiveau->map->count(),
-            'utilisateurs_sans_manager' => $region->utilisateurs->where('id_manager', null)->count(),
+            'utilisateurs_sans_manager' => $region->utilisateurs->where('manager_matricule', null)->count(),
         ];
 
         return response()->json([

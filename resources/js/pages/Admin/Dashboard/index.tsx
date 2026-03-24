@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs/Tabs';
 import { WelcomeMessage } from '@/Components/UI/WelcomeMessage';
@@ -16,14 +16,13 @@ import EvaluationsTab from '@/Components/Dashboard/Admin/Tabs/EvaluationsTab';
  * - Supervision : Évaluations 360°, validation, analytics
  */
 const AdminDashboard: React.FC = () => {
-  // État pour suivre l'onglet actif (limité à 2 onglets)
   const [activeTab, setActiveTab] = useState("overview");
-  // Simuler un utilisateur administrateur pour la démo
+  const { auth } = usePage<any>().props;
   const mockUser = {
-    name: 'Admin SABC',
-    email: 'admin@sabc.cm',
-    role: 'ADMIN',
-    avatar: undefined
+    name: auth?.user?.name || [auth?.user?.prenom, auth?.user?.nom].filter(Boolean).join(' ') || 'Administrateur',
+    email: auth?.user?.email || 'admin@sabc.cm',
+    role: auth?.user?.role?.nom_role || auth?.user?.role_nom || 'ADMIN',
+    avatar: auth?.user?.avatar,
   };
   
   // Données de démonstration pour les statistiques système

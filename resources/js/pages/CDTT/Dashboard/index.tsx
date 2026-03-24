@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, usePage, Link } from '@inertiajs/react';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
@@ -15,12 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs/T
  * - Analytics : Radar charts comparatifs
  */
 const CDTTDashboard: React.FC = () => {
-  // Simuler un utilisateur pour la démo
+  const { auth } = usePage<any>().props;
   const mockUser = {
-    name: 'Sophie Dupont',
-    email: 'sophie.dupont@sabc.com',
-    role: 'CDTT',
-    avatar: undefined
+    name: auth?.user?.name || [auth?.user?.prenom, auth?.user?.nom].filter(Boolean).join(' ') || 'Utilisateur',
+    email: auth?.user?.email || '',
+    role: auth?.user?.role?.nom_role || auth?.user?.role_nom || 'CDTT',
+    avatar: auth?.user?.avatar,
   };
   
   return (
@@ -81,18 +81,19 @@ const CDTTDashboard: React.FC = () => {
               </Card>
               
               {/* Évaluations à valider */}
-              <Card className="border-l-4 border-l-sabc-warning">
-                <CardHeader className="pb-2">
-                  <CardTitle>Évaluations à valider</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-2xl font-bold text-sabc-gray-900">5</h3>
-                    <span className="rounded-full bg-sabc-warning/10 px-2 py-1 text-xs font-medium text-sabc-warning">Urgent</span>
-                  </div>
-                  <Button className="mt-4" size="sm" variant="destructive">Valider</Button>
-                </CardContent>
-              </Card>
+              <Link href="/common/evaluations/a-valider">
+                <Card className="border-l-4 border-l-amber-400 cursor-pointer hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2">
+                    <CardTitle>Évaluations à valider</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-sabc-gray-500 mt-0.5">Soumises par vos subordonnés</div>
+                      <div className="text-2xl text-amber-500">&#8594;</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             </div>
             
             {/* Liste des collaborateurs commerciaux */}

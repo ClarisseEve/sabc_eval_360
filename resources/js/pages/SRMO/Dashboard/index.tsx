@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
@@ -15,12 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs/T
  * - Avatars : Initiales cercles colorés
  */
 const SRMODashboard: React.FC = () => {
-  // Simuler un utilisateur pour la démo
+  const { auth } = usePage<any>().props;
   const mockUser = {
-    name: 'Jean Nkoulou',
-    email: 'jean.nkoulou@sabc.com',
-    role: 'SRMO',
-    avatar: undefined
+    name: auth?.user?.name || [auth?.user?.prenom, auth?.user?.nom].filter(Boolean).join(' ') || 'Utilisateur',
+    email: auth?.user?.email || '',
+    role: auth?.user?.role?.nom_role || auth?.user?.role_nom || 'SRMO',
+    avatar: auth?.user?.avatar,
   };
   
   return (

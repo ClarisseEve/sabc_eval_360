@@ -12,670 +12,486 @@ use App\Models\LogAdministration;
 use App\Models\EvaluationPermission;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class EvaluationService
 {
     /**
-     * Vérifie si un utilisateur peut créer une évaluation pour un autre utilisateur avec une règle spécifique
-     * 
-     * @param string $evaluateurMatricule Matricule de l'évaluateur
-     * @param string $evalueMatricule Matricule de l'utilisateur à évaluer
-     * @param string $idRegle UUID de la règle d'évaluation (regles_evaluation.id_regle)
-     * @return bool
+     * Vérifie si un utilisateur (par matricule) peut créer une évaluation
      */
     public function canCreateEvaluation(string $evaluateurMatricule, string $evalueMatricule, ?string $idRegle = null): bool
     {
-        // Récupérer les utilisateurs et la règle
         $evaluateur = Utilisateur::where('matricule', $evaluateurMatricule)->first();
-        $evalue = Utilisateur::where('matricule', $evalueMatricule)->first();
-        $regle = $idRegle ? RegleEvaluation::find($idRegle) : null;
-        
-        // Vérifier que les entités existent
+        $evalue     = Utilisateur::where('matricule', $evalueMatricule)->first();
+
         if (!$evaluateur || !$evalue) {
             return false;
         }
-        
-        // Déterminer le type d'évaluation
-        $typeEvaluation = $this->determinerTypeEvaluation($evaluateur, $evalue);
-        
-        // Vérifier les permissions selon les règles SABC
-        if (!EvaluationPermission::estAutorise($evaluateur->role, $evalue->role, $typeEvaluation)) {
+
+        if (!$evaluateur->peutEvaluer($evalue)) {
             return false;
         }
-        
-        // Vérifications supplémentaires selon les règles métier
-        if (!$this->verifierConditionsSupplementaires($evaluateur, $evalue, $typeEvaluation)) {
-            return false;
-        }
-        
-        // Vérifier l'existence d'une période d'évaluation active
-        $periodeActive = PeriodeEvaluation::where('est_ouverte', true)
-            ->where('est_cloturee', false)
+
+        $periodeActive = PeriodeEvaluation::where('statut', 'ouverte')
+            ->where('date_debut', '<=', now())
+            ->where('date_fin', '>=', now())
             ->orderByDesc('date_debut')
             ->first();
+
         if (!$periodeActive) {
             return false;
         }
-        
-        // Vérifier si une évaluation existe déjà pour cette période/règle
-        // Utiliser les matricules pour être compatible avec le schéma Business (PGSQL)
+
         $exists = DB::connection('pgsql')
             ->table('evaluations')
-            ->where('evaluateur_matricule', $evaluateur->matricule)
-            ->where('evalue_matricule', $evalue->matricule)
+            ->where('evaluateur_matricule', $evaluateurMatricule)
+            ->where('evalue_matricule', $evalueMatricule)
             ->where('id_periode', $periodeActive->id_periode)
-            ->when($idRegle, function ($q) use ($idRegle) { $q->where('id_regle', $idRegle); })
+            ->when($idRegle, fn($q) => $q->where('id_regle', $idRegle))
             ->exists();
-        if ($exists) {
-            return false;
-        }
-        
-        return true;
+
+        return !$exists;
     }
-    
+
     /**
-     * Crée une nouvelle évaluation
-     * 
-     * @param int $idEvaluateur
-     * @param int $idEvalue
-     * @param int $idPeriode
-     * @param int $idRegle
-     * @return Evaluation|null
+     * Crée une nouvelle évaluation (brouillon)
+     *
+     * @param string $evaluateurMatricule
+     * @param string $evalueMatricule
+     * @param string $idPeriode  UUID
+     * @param string|null $idRegle  UUID
      */
-    public function creerEvaluation(int $idEvaluateur, int $idEvalue, int $idPeriode, int $idRegle): ?Evaluation
+    public function creerEvaluation(string $evaluateurMatricule, string $evalueMatricule, string $idPeriode, ?string $idRegle = null): ?object
     {
-        $evaluateur = Utilisateur::find($idEvaluateur);
-        $evalue = Utilisateur::find($idEvalue);
-        $periode = PeriodeEvaluation::find($idPeriode);
-        $regle = RegleEvaluation::find($idRegle);
-        
-        // Validations
-        if (!$evaluateur || !$evalue || !$periode || !$regle) {
+        $evaluateur = Utilisateur::where('matricule', $evaluateurMatricule)->first();
+        $evalue     = Utilisateur::where('matricule', $evalueMatricule)->first();
+        $periode    = PeriodeEvaluation::find($idPeriode);
+
+        if (!$evaluateur || !$evalue || !$periode) {
             return null;
         }
-        
-        // Vérifier si l'évaluation est autorisée
+
         if (!$evaluateur->peutEvaluer($evalue)) {
             return null;
         }
-        
-        // Vérifier si la période est active
+
         if (!$periode->estActive()) {
             return null;
         }
-        
-        // Vérifier si une évaluation existe déjà
-        $evaluationExistante = Evaluation::where([
-            'id_evaluateur' => $idEvaluateur,
-            'id_evalue' => $idEvalue,
-            'id_periode' => $idPeriode,
-        ])->first();
-        
-        if ($evaluationExistante) {
-            return $evaluationExistante;
+
+        // Évaluation existante ?
+        $existante = DB::connection('pgsql')->table('evaluations')
+            ->where('evaluateur_matricule', $evaluateurMatricule)
+            ->where('evalue_matricule', $evalueMatricule)
+            ->where('id_periode', $idPeriode)
+            ->first();
+
+        if ($existante) {
+            return $existante;
         }
-        
-        // Créer l'évaluation
-        $evaluation = Evaluation::create([
-            'id_evaluateur' => $idEvaluateur,
-            'id_evalue' => $idEvalue,
-            'id_periode' => $idPeriode,
-            'id_regle' => $idRegle,
-            'date_evaluation' => now(),
-            'statut' => 'brouillon',
-            'notes_json' => [],
+
+        $id = Str::uuid()->toString();
+
+        DB::connection('pgsql')->table('evaluations')->insert([
+            'id_evaluation'        => $id,
+            'evaluateur_matricule' => $evaluateurMatricule,
+            'evalue_matricule'     => $evalueMatricule,
+            'id_periode'           => $idPeriode,
+            'id_regle'             => $idRegle,
+            'date_evaluation'      => now()->toDateString(),
+            'statut'               => 'brouillon',
+            'notations_json'       => json_encode([]),
+            'type_evaluation'      => $this->determinerTypeEvaluation($evaluateur, $evalue),
+            'created_at'           => now(),
+            'updated_at'           => now(),
         ]);
-        
-        // Log de l'action
+
         LogAdministration::enregistrerAction(
-            $idEvaluateur,
+            $evaluateurMatricule,
             'creation',
             'evaluations',
-            $evaluation->id_evaluation,
+            $id,
             null,
-            $evaluation->toArray()
+            compact('evaluateurMatricule', 'evalueMatricule', 'idPeriode')
         );
-        
-        // Notification à l'évalué
-        Notification::notifierNouvelleEvaluation($idEvalue, $idEvaluateur);
-        
-        return $evaluation;
+
+        Notification::notifierNouvelleEvaluation($evalueMatricule, $evaluateurMatricule);
+
+        return DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->first();
     }
-    
+
     /**
-     * Met à jour les notes d'une évaluation
-     * 
-     * @param int $idEvaluation
-     * @param array $notes
-     * @param string|null $commentaireGeneral
-     * @return bool
+     * Met à jour les notes d'une évaluation (brouillon)
+     *
+     * @param string $idEvaluation  UUID
      */
-    public function mettreAJourNotes(int $idEvaluation, array $notes, ?string $commentaireGeneral = null): bool
+    public function mettreAJourNotes(string $idEvaluation, array $notes, ?string $commentaireGeneral = null): bool
     {
-        $evaluation = Evaluation::find($idEvaluation);
-        
+        $evaluation = DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $idEvaluation)->first();
+
         if (!$evaluation || $evaluation->statut !== 'brouillon') {
             return false;
         }
-        
-        $anciennesValeurs = $evaluation->toArray();
-        
-        $evaluation->update([
-            'notes_json' => $notes,
+
+        DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $idEvaluation)->update([
+            'notations_json'      => json_encode($notes),
             'commentaire_general' => $commentaireGeneral,
+            'updated_at'          => now(),
         ]);
-        
-        // Log de l'action
+
         LogAdministration::enregistrerAction(
-            $evaluation->id_evaluateur,
+            $evaluation->evaluateur_matricule,
             'modification',
             'evaluations',
-            $evaluation->id_evaluation,
-            $anciennesValeurs,
-            $evaluation->fresh()->toArray()
+            $idEvaluation,
+            ['notations_json' => $evaluation->notations_json],
+            ['notations_json' => $notes]
         );
-        
+
         return true;
     }
-    
+
     /**
      * Soumet une évaluation pour validation
-     * 
-     * @param int $idEvaluation
-     * @return array
+     *
+     * @param string $idEvaluation  UUID
      */
-    public function soumettrePourValidation(int $idEvaluation): array
+    public function soumettrePourValidation(string $idEvaluation): array
     {
-        $evaluation = Evaluation::find($idEvaluation);
-        
+        $evaluation = DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $idEvaluation)->first();
+
         if (!$evaluation) {
             return ['success' => false, 'message' => 'Évaluation introuvable'];
         }
-        
-        // Vérifier si l'évaluation peut être soumise
-        if (!$evaluation->peutEtreSoumise()) {
-            return ['success' => false, 'message' => 'L\'évaluation ne peut pas être soumise dans son état actuel'];
+
+        if ($evaluation->statut !== 'brouillon') {
+            return ['success' => false, 'message' => 'L\'évaluation n\'est pas en brouillon'];
         }
-        
-        $anciennesValeurs = $evaluation->toArray();
-        
-        $evaluation->update([
-            'statut' => 'soumis',
+
+        $notes = json_decode($evaluation->notations_json, true) ?? [];
+        if (empty($notes)) {
+            return ['success' => false, 'message' => 'L\'évaluation est vide'];
+        }
+
+        DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $idEvaluation)->update([
+            'statut'          => 'soumis',
             'date_soumission' => now(),
+            'updated_at'      => now(),
         ]);
-        
-        // Log de l'action
+
         LogAdministration::enregistrerAction(
-            $evaluation->id_evaluateur,
+            $evaluation->evaluateur_matricule,
             'soumission',
             'evaluations',
-            $evaluation->id_evaluation,
-            $anciennesValeurs,
-            $evaluation->fresh()->toArray()
+            $idEvaluation,
+            ['statut' => 'brouillon'],
+            ['statut' => 'soumis']
         );
-        
-        // Notification au manager pour validation
-        if ($evaluation->evalue->manager) {
+
+        // Notifier le manager de l'évalué
+        $evalue = Utilisateur::where('matricule', $evaluation->evalue_matricule)->first();
+        if ($evalue?->manager_matricule) {
             Notification::creer(
-                $evaluation->evalue->manager->id_utilisateur,
+                $evalue->manager_matricule,
                 'Évaluation à valider',
-                "Une évaluation de {$evaluation->evalue->prenom} {$evaluation->evalue->nom} est en attente de validation.",
+                "Une évaluation de {$evalue->prenom} {$evalue->nom} est en attente de validation.",
                 'validation'
             );
         }
-        
+
         return ['success' => true, 'message' => 'Évaluation soumise avec succès'];
     }
-    
+
     /**
      * Valide ou rejette une évaluation
-     * 
-     * @param int $idEvaluation
-     * @param int $idValidateur
-     * @param bool $estValidee
-     * @param string|null $commentaireValidation
-     * @return array
+     *
+     * @param string $idEvaluation  UUID
+     * @param string $validateurMatricule
      */
-    public function validerEvaluation(int $idEvaluation, int $idValidateur, bool $estValidee, ?string $commentaireValidation = null): array
+    public function validerEvaluation(string $idEvaluation, string $validateurMatricule, bool $estValidee, ?string $commentaireValidation = null): array
     {
-        $evaluation = Evaluation::find($idEvaluation);
-        $validateur = Utilisateur::find($idValidateur);
-        
+        $evaluation = DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $idEvaluation)->first();
+        $validateur = Utilisateur::where('matricule', $validateurMatricule)->first();
+
         if (!$evaluation || !$validateur) {
             return ['success' => false, 'message' => 'Évaluation ou validateur introuvable'];
         }
-        
-        // Vérifier si l'évaluation peut être validée par ce validateur
-        if (!$evaluation->peutEtreValidee($validateur)) {
-            return ['success' => false, 'message' => 'Vous n\'êtes pas autorisé à valider cette évaluation'];
+
+        if ($evaluation->statut !== 'soumis') {
+            return ['success' => false, 'message' => 'L\'évaluation n\'est pas soumise'];
         }
-        
-        $anciennesValeurs = $evaluation->toArray();
-        $nouveauStatut = $estValidee ? 'valide' : 'rejete';
-        
-        $evaluation->update([
-            'statut' => $nouveauStatut,
-            'id_validateur' => $idValidateur,
-            'date_validation' => now(),
-            'commentaire_validation' => $commentaireValidation,
+
+        // Le validateur doit être le manager de l'évalué
+        $evalue = Utilisateur::where('matricule', $evaluation->evalue_matricule)->first();
+        if (!$evalue || $evalue->manager_matricule !== $validateurMatricule) {
+            return ['success' => false, 'message' => 'Non autorisé à valider cette évaluation'];
+        }
+
+        $nouveauStatut = $estValidee ? 'valide' : 'brouillon';
+
+        DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $idEvaluation)->update([
+            'statut'     => $nouveauStatut,
+            'updated_at' => now(),
         ]);
-        
-        // Si rejetée, remettre en brouillon
-        if (!$estValidee) {
-            $evaluation->update(['statut' => 'brouillon']);
-        }
-        
-        // Log de l'action
+
         LogAdministration::enregistrerAction(
-            $idValidateur,
+            $validateurMatricule,
             $estValidee ? 'validation' : 'rejet',
             'evaluations',
-            $evaluation->id_evaluation,
-            $anciennesValeurs,
-            $evaluation->fresh()->toArray()
+            $idEvaluation,
+            ['statut' => 'soumis'],
+            ['statut' => $nouveauStatut]
         );
-        
-        // Notification à l'évaluateur
-        Notification::notifierValidationEvaluation($evaluation->id_evaluateur, $estValidee);
-        
-        // Si validée, mettre à jour les scores
+
+        Notification::notifierValidationEvaluation($evaluation->evaluateur_matricule, $estValidee);
+
         if ($estValidee) {
-            $this->mettreAJourScores($evaluation->id_evalue, $evaluation->id_periode);
+            $this->mettreAJourScores($evaluation->evalue_matricule, $evaluation->id_periode);
         }
-        
-        $message = $estValidee ? 'Évaluation validée avec succès' : 'Évaluation rejetée';
+
+        $message = $estValidee ? 'Évaluation validée avec succès' : 'Évaluation renvoyée en brouillon';
         return ['success' => true, 'message' => $message];
     }
-    
+
     /**
      * Met à jour les scores d'un utilisateur pour une période
-     * 
-     * @param int $idUtilisateur
-     * @param int $idPeriode
-     * @return void
+     *
+     * @param string $matricule
+     * @param string $idPeriode  UUID
      */
-    public function mettreAJourScores(int $idUtilisateur, int $idPeriode): void
+    public function mettreAJourScores(string $matricule, string $idPeriode): void
     {
-        $matriculeUtilisateur = (string) $idUtilisateur;
-
-        $evaluationsValidees = Evaluation::where('id_evalue', $matriculeUtilisateur)
+        $evaluationsValidees = DB::connection('pgsql')
+            ->table('evaluations')
+            ->where('evalue_matricule', $matricule)
             ->where('id_periode', $idPeriode)
             ->where('statut', 'valide')
-            ->with(['evaluateur.role'])
             ->get();
-        
+
         if ($evaluationsValidees->isEmpty()) {
             return;
         }
-        
-        // Calculer les scores par type d'évaluation
-        $scoreAutoEvaluation = $this->calculerScoreParType($evaluationsValidees, 'auto');
-        $scorePairs = $this->calculerScoreParType($evaluationsValidees, 'pairs');
-        $scoreManager = $this->calculerScoreParType($evaluationsValidees, 'manager');
-        
-        // Créer ou mettre à jour le score utilisateur
-        $scoreUtilisateur = ScoreUtilisateur::updateOrCreate(
-            [
-                'matricule' => $matriculeUtilisateur,
-                'id_periode' => $idPeriode,
-            ],
-            [
-                'score_auto_evaluation' => $scoreAutoEvaluation,
-                'score_pairs' => $scorePairs,
-                'score_manager' => $scoreManager,
-            ]
-        );
-        
-        // Calculer et sauvegarder le score global
-        $scoreUtilisateur->mettreAJourScoreGlobal();
-    }
-    
-    /**
-     * Calcule le score moyen par type d'évaluation
-     * 
-     * @param Collection $evaluations
-     * @param string $type
-     * @return float|null
-     */
-    private function calculerScoreParType(Collection $evaluations, string $type): ?float
-    {
-        $evaluationsType = $evaluations->filter(function ($evaluation) use ($type) {
-            switch ($type) {
-                case 'auto':
-                    return $evaluation->id_evaluateur === $evaluation->id_evalue;
-                case 'pairs':
-                    return $evaluation->id_evaluateur !== $evaluation->id_evalue && 
-                           $evaluation->evaluateur->role->getNiveauHierarchique($evaluation->evalue->region->est_taniere) === 
-                           $evaluation->evalue->role->getNiveauHierarchique($evaluation->evalue->region->est_taniere);
-                case 'manager':
-                    return $evaluation->id_evaluateur === $evaluation->evalue->id_manager;
-                default:
-                    return false;
+
+        $evalue = Utilisateur::where('matricule', $matricule)->first();
+
+        $scoreAuto    = null;
+        $scorePairs   = null;
+        $scoreManager = null;
+
+        foreach ($evaluationsValidees as $eval) {
+            $notes    = json_decode($eval->notations_json, true) ?? [];
+            $moyenne  = $this->calculerMoyenneNotes($notes);
+            if ($moyenne === null) continue;
+
+            if ($eval->evaluateur_matricule === $matricule) {
+                // auto-évaluation
+                $scoreAuto = $moyenne;
+            } elseif ($evalue && $eval->evaluateur_matricule === $evalue->manager_matricule) {
+                // évaluation manager
+                $scoreManager = isset($scoreManager) ? round(($scoreManager + $moyenne) / 2, 2) : $moyenne;
+            } else {
+                // pairs
+                $scorePairs = isset($scorePairs) ? round(($scorePairs + $moyenne) / 2, 2) : $moyenne;
             }
-        });
-        
-        if ($evaluationsType->isEmpty()) {
+        }
+
+        ScoreUtilisateur::updateOrCreate(
+            ['matricule' => $matricule, 'id_periode' => $idPeriode],
+            [
+                'score_auto'    => $scoreAuto,
+                'score_pairs'   => $scorePairs,
+                'score_manager' => $scoreManager,
+                'derniere_maj'  => now(),
+            ]
+        )->mettreAJourScoreGlobal();
+    }
+
+    /**
+     * Calcule la moyenne d'un tableau de notes
+     */
+    private function calculerMoyenneNotes(array $notes): ?float
+    {
+        if (empty($notes)) {
             return null;
         }
-        
-        $sommeScores = $evaluationsType->sum(function ($evaluation) {
-            return $evaluation->getNoteMoyenne();
-        });
-        
-        return round($sommeScores / $evaluationsType->count(), 2);
-    }
-    
-    /**
-     * Construit les détails des scores pour le JSON
-     * 
-     * @param Collection $evaluations
-     * @return array
-     */
-    private function construireDetailsScores(Collection $evaluations): array
-    {
-        $details = [];
-        
-        foreach ($evaluations as $evaluation) {
-            $details[] = [
-                'id_evaluation' => $evaluation->id_evaluation,
-                'evaluateur' => [
-                    'id' => $evaluation->evaluateur->id_utilisateur,
-                    'nom' => "{$evaluation->evaluateur->prenom} {$evaluation->evaluateur->nom}",
-                    'role' => $evaluation->evaluateur->role->nom_role,
-                ],
-                'note_moyenne' => $evaluation->getNoteMoyenne(),
-                'notes_detail' => $evaluation->getNotes(),
-                'date_evaluation' => $evaluation->date_evaluation->format('Y-m-d'),
-            ];
+
+        $somme = 0;
+        $poids = 0;
+
+        foreach ($notes as $n) {
+            if (isset($n['note'])) {
+                $p = $n['poids'] ?? $n['ponderation'] ?? 1;
+                $somme += $n['note'] * $p;
+                $poids += $p;
+            }
         }
-        
-        return $details;
+
+        return $poids > 0 ? round($somme / $poids, 2) : null;
     }
-    
+
     /**
      * Récupère les évaluations en attente pour un utilisateur
-     * 
-     * @param int $idUtilisateur
-     * @return Collection
+     *
+     * @param string $matricule
      */
-    public function getEvaluationsEnAttente(int $idUtilisateur): Collection
+    public function getEvaluationsEnAttente(string $matricule): Collection
     {
-        return Evaluation::where('id_evaluateur', $idUtilisateur)
-            ->where('statut', 'brouillon')
-            ->with(['evalue', 'periode'])
+        $rows = DB::connection('pgsql')
+            ->table('evaluations')
+            ->where('evaluateur_matricule', $matricule)
+            ->whereIn('statut', ['brouillon', 'soumis'])
+            ->orderByDesc('date_evaluation')
             ->get();
+
+        return $rows;
     }
-    
+
     /**
      * Récupère les évaluations à valider pour un manager
-     * 
-     * @param int $idManager
-     * @return Collection
+     *
+     * @param string $managerMatricule
      */
-    public function getEvaluationsAValider(int $idManager): Collection
+    public function getEvaluationsAValider(string $managerMatricule): Collection
     {
-        return Evaluation::where('statut', 'soumis')
-            ->whereHas('evalue', function ($query) use ($idManager) {
-                $query->where('id_manager', $idManager);
-            })
-            ->with(['evaluateur', 'evalue', 'periode'])
+        // Récupérer les matricules des subordonnés directs (MySQL)
+        $subMatricules = Utilisateur::where('manager_matricule', $managerMatricule)
+            ->pluck('matricule')
+            ->toArray();
+
+        if (empty($subMatricules)) {
+            return collect();
+        }
+
+        return DB::connection('pgsql')
+            ->table('evaluations')
+            ->where('statut', 'soumis')
+            ->whereIn('evalue_matricule', $subMatricules)
+            ->orderByDesc('date_soumission')
             ->get();
     }
-    
-    /**
-     * Génère un rapport d'évaluation pour une période
-     * 
-     * @param int $idPeriode
-     * @param int|null $idRegion
-     * @return array
-     */
-    public function genererRapportPeriode(int $idPeriode, ?int $idRegion = null): array
-    {
-        $query = Evaluation::where('id_periode', $idPeriode);
-        
-        if ($idRegion) {
-            $query->whereHas('evalue', function ($q) use ($idRegion) {
-                $q->where('id_region', $idRegion);
-            });
-        }
-        
-        $evaluations = $query->with(['evaluateur', 'evalue', 'periode'])->get();
-        
-        $rapport = [
-            'periode' => PeriodeEvaluation::find($idPeriode),
-            'statistiques' => [
-                'total_evaluations' => $evaluations->count(),
-                'brouillons' => $evaluations->where('statut', 'brouillon')->count(),
-                'soumises' => $evaluations->where('statut', 'soumis')->count(),
-                'validees' => $evaluations->where('statut', 'valide')->count(),
-                'rejetees' => $evaluations->where('statut', 'rejete')->count(),
-            ],
-            'taux_completion' => $this->calculerTauxCompletion($evaluations),
-            'scores_moyens' => $this->calculerScoresMoyens($idPeriode, $idRegion),
-        ];
-        
-        return $rapport;
-    }
-    
-    /**
-     * Calcule le taux de complétion des évaluations
-     * 
-     * @param Collection $evaluations
-     * @return float
-     */
-    private function calculerTauxCompletion(Collection $evaluations): float
-    {
-        if ($evaluations->isEmpty()) {
-            return 0;
-        }
-        
-        $completees = $evaluations->whereIn('statut', ['soumis', 'valide'])->count();
-        return round(($completees / $evaluations->count()) * 100, 2);
-    }
-    
-    /**
-     * Calcule les scores moyens pour une période
-     * 
-     * @param int $idPeriode
-     * @param int|null $idRegion
-     * @return array
-     */
-    private function calculerScoresMoyens(int $idPeriode, ?int $idRegion = null): array
-    {
-        $query = ScoreUtilisateur::where('id_periode', $idPeriode);
-        
-        if ($idRegion) {
-            $query->whereHas('utilisateur', function ($q) use ($idRegion) {
-                $q->where('id_region', $idRegion);
-            });
-        }
-        
-        $scores = $query->get();
-        
-        return [
-            'score_auto_evaluation' => $scores->avg('score_auto_evaluation'),
-            'score_pairs' => $scores->avg('score_pairs'),
-            'score_manager' => $scores->avg('score_manager'),
-            'score_global' => $scores->avg('score_global'),
-        ];
-    }
-    
+
     /**
      * Envoie des rappels pour les évaluations en retard
-     * 
-     * @param int $idPeriode
-     * @return int Nombre de rappels envoyés
+     *
+     * @param string $idPeriode  UUID
      */
-    public function envoyerRappelsEvaluations(int $idPeriode): int
+    public function envoyerRappelsEvaluations(string $idPeriode): int
     {
         $periode = PeriodeEvaluation::find($idPeriode);
-        
+
         if (!$periode || !$periode->estActive()) {
             return 0;
         }
-        
+
         $joursRestants = now()->diffInDays($periode->date_fin);
-        
+
         if ($joursRestants > 7) {
-            return 0; // Pas de rappel si plus de 7 jours restants
+            return 0;
         }
-        
-        $evaluationsEnRetard = Evaluation::where('id_periode', $idPeriode)
+
+        $evaluationsEnRetard = DB::connection('pgsql')
+            ->table('evaluations')
+            ->where('id_periode', $idPeriode)
             ->where('statut', 'brouillon')
             ->where('created_at', '<', now()->subDays(3))
-            ->with(['evaluateur'])
             ->get();
-        
-        $rappelsEnvoyes = 0;
-        
-        foreach ($evaluationsEnRetard as $evaluation) {
-            $matriculeEvaluateur = optional($evaluation->evaluateur)->matricule ?? (string) $evaluation->id_evaluateur;
 
+        $rappelsEnvoyes = 0;
+
+        foreach ($evaluationsEnRetard as $evaluation) {
             Notification::notifierRappelEvaluation(
-                $matriculeEvaluateur,
+                $evaluation->evaluateur_matricule,
                 $joursRestants
             );
             $rappelsEnvoyes++;
         }
-        
+
         return $rappelsEnvoyes;
     }
-    
+
     /**
-     * Détermine le type d'évaluation selon les règles SABC
-     * 
-     * @param Utilisateur $evaluateur
-     * @param Utilisateur $evalue
-     * @return string
-     */
-    private function determinerTypeEvaluation(Utilisateur $evaluateur, Utilisateur $evalue): string
-    {
-        // Auto-évaluation
-        if ($evaluateur->matricule === $evalue->matricule) {
-            return 'auto';
-        }
-        
-        // Évaluation descendante (manager vers subordonné)
-        if ($evalue->manager_matricule === $evaluateur->matricule) {
-            return 'descendante';
-        }
-        
-        // Évaluation par les pairs (même niveau hiérarchique et même région)
-        if ($evaluateur->niveau_hierarchique === $evalue->niveau_hierarchique && 
-            $evaluateur->id_region === $evalue->id_region &&
-            $evaluateur->id_branche === $evalue->id_branche) {
-            return 'pairs';
-        }
-        
-        // Évaluation ascendante (subordonné vers manager)
-        if ($evaluateur->manager_matricule === $evalue->matricule) {
-            return 'ascendante';
-        }
-        
-        return 'autre';
-    }
-    
-    /**
-     * Vérifie les conditions supplémentaires selon les règles SABC
-     * 
-     * @param Utilisateur $evaluateur
-     * @param Utilisateur $evalue
-     * @param string $typeEvaluation
-     * @return bool
-     */
-    private function verifierConditionsSupplementaires(Utilisateur $evaluateur, Utilisateur $evalue, string $typeEvaluation): bool
-    {
-        // Vérifier que les utilisateurs sont dans la même région
-        if ($evaluateur->id_region !== $evalue->id_region) {
-            return false;
-        }
-        
-        // Vérifier que les utilisateurs sont actifs
-        if (!$evaluateur->est_actif || !$evalue->est_actif) {
-            return false;
-        }
-        
-        // Cas spécial pour RTM et SRMO : vérification stricte des rôles des subordonnés
-        if (in_array($evaluateur->role, ['RTM', 'SRMO']) && $typeEvaluation === 'descendante') {
-            if ($evaluateur->role === 'RTM') {
-                return in_array($evalue->role, ['TMO', 'SS']);
-            }
-            if ($evaluateur->role === 'SRMO') {
-                return $evalue->role === 'TMO';
-            }
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Récupère les évaluations à compléter pour un utilisateur selon son rôle
-     * 
-     * @param Utilisateur $utilisateur
-     * @return array
+     * Récupère les évaluations à compléter selon les permissions du rôle
      */
     public function getEvaluationsACompleter(Utilisateur $utilisateur): array
     {
-        $periodeActive = PeriodeEvaluation::where('statut', 'active')->first();
+        $periodeActive = PeriodeEvaluation::where('statut', 'ouverte')
+            ->where('date_debut', '<=', now())
+            ->where('date_fin', '>=', now())
+            ->first();
+
         if (!$periodeActive) {
             return [];
         }
-        
+
+        $permissions = EvaluationPermission::getPermissionsPourRole($utilisateur->role_nom ?? $utilisateur->role);
         $evaluations = [];
-        $permissions = EvaluationPermission::getPermissionsPourRole($utilisateur->role);
-        
+
         foreach ($permissions as $permission) {
             $cibles = $this->getCiblesEvaluation($utilisateur, $permission);
-            
+
             foreach ($cibles as $cible) {
-                // Vérifier si l'évaluation existe déjà
-                $evaluationExistante = Evaluation::where([
-                    'evaluateur_matricule' => $utilisateur->matricule,
-                    'evalue_matricule' => $cible->matricule,
-                    'id_periode' => $periodeActive->id_periode,
-                ])->first();
-                
-                if (!$evaluationExistante) {
+                $existante = DB::connection('pgsql')->table('evaluations')
+                    ->where('evaluateur_matricule', $utilisateur->matricule)
+                    ->where('evalue_matricule', $cible->matricule)
+                    ->where('id_periode', $periodeActive->id_periode)
+                    ->first();
+
+                if (!$existante) {
                     $evaluations[] = [
-                        'type' => $permission->type_evaluation,
-                        'cible' => $cible,
-                        'statut' => 'a_faire',
+                        'type'     => $permission->type_evaluation,
+                        'cible'    => $cible,
+                        'statut'   => 'a_faire',
                         'deadline' => $periodeActive->date_fin,
                     ];
-                } elseif ($evaluationExistante->statut === 'brouillon') {
+                } elseif ($existante->statut === 'brouillon') {
                     $evaluations[] = [
-                        'type' => $permission->type_evaluation,
-                        'cible' => $cible,
-                        'evaluation' => $evaluationExistante,
-                        'statut' => 'a_terminer',
-                        'deadline' => $periodeActive->date_fin,
+                        'type'       => $permission->type_evaluation,
+                        'cible'      => $cible,
+                        'evaluation' => $existante,
+                        'statut'     => 'a_terminer',
+                        'deadline'   => $periodeActive->date_fin,
                     ];
                 }
             }
         }
-        
+
         return $evaluations;
     }
-    
-    /**
-     * Récupère les cibles d'évaluation selon le type et l'utilisateur
-     * 
-     * @param Utilisateur $utilisateur
-     * @param EvaluationPermission $permission
-     * @return Collection
-     */
-    private function getCiblesEvaluation(Utilisateur $utilisateur, EvaluationPermission $permission): Collection
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers privés
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function determinerTypeEvaluation(Utilisateur $evaluateur, Utilisateur $evalue): string
+    {
+        if ($evaluateur->matricule === $evalue->matricule) {
+            return 'auto';
+        }
+        if ($evalue->manager_matricule === $evaluateur->matricule) {
+            return 'descendante';
+        }
+        if ($evaluateur->manager_matricule === $evalue->matricule) {
+            return 'ascendante';
+        }
+        if ($evaluateur->niveau_hierarchique === $evalue->niveau_hierarchique
+            && $evaluateur->id_region === $evalue->id_region) {
+            return 'pairs';
+        }
+        return '360';
+    }
+
+    private function getCiblesEvaluation(Utilisateur $utilisateur, $permission): Collection
     {
         switch ($permission->type_evaluation) {
             case 'auto':
                 return collect([$utilisateur]);
-                
+
             case 'descendante':
                 return Utilisateur::where('manager_matricule', $utilisateur->matricule)
                     ->where('role', $permission->role_evalue)
                     ->where('est_actif', true)
                     ->get();
-                    
+
             case 'pairs':
                 return Utilisateur::where('niveau_hierarchique', $utilisateur->niveau_hierarchique)
                     ->where('id_region', $utilisateur->id_region)
@@ -684,9 +500,9 @@ class EvaluationService
                     ->where('matricule', '!=', $utilisateur->matricule)
                     ->where('est_actif', true)
                     ->get();
-                    
+
             default:
-                return collect([]);
+                return collect();
         }
     }
 }

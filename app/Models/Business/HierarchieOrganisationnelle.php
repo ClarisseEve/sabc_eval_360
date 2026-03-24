@@ -77,7 +77,7 @@ class HierarchieOrganisationnelle extends BusinessModel
      */
     public static function getSubordonnesDirects($id_manager)
     {
-        return self::where('id_manager', $id_manager)
+        return self::where('manager_matricule', $id_manager)
             ->where('est_actif', true)
             ->get();
     }
@@ -101,8 +101,8 @@ class HierarchieOrganisationnelle extends BusinessModel
         
         $resultat[] = $utilisateur_courant;
         
-        while ($utilisateur_courant && $utilisateur_courant->id_manager) {
-            $utilisateur_courant = self::where('id_utilisateur', $utilisateur_courant->id_manager)
+        while ($utilisateur_courant && $utilisateur_courant->manager_matricule) {
+            $utilisateur_courant = self::where('id_utilisateur', $utilisateur_courant->manager_matricule)
                 ->where('est_actif', true)
                 ->first();
                 

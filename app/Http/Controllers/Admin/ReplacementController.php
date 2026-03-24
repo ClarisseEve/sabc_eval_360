@@ -340,9 +340,8 @@ class ReplacementController extends Controller
             return response()->json(['error' => 'Utilisateur introuvable'], 404);
         }
         
-        $subordonnes = Utilisateur::where('id_manager', $utilisateur->id_utilisateur)
-            ->select('id_utilisateur', 'matricule', 'nom', 'prenom', 'id_role')
-            ->with('role:id_role,nom_role')
+        $subordonnes = Utilisateur::where('manager_matricule', $utilisateur->matricule)
+            ->select('matricule', 'nom', 'prenom', 'role')
             ->get();
             
         return response()->json($subordonnes);

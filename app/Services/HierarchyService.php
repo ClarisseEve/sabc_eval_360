@@ -92,7 +92,7 @@ class HierarchyService
                     'role' => $utilisateur->role->nom_role,
                     'matricule' => $utilisateur->matricule,
                     'email' => $utilisateur->email,
-                    'manager_id' => $utilisateur->id_manager,
+                    'manager_id' => $utilisateur->manager_matricule,
                 ];
             })->toArray();
         }
@@ -108,7 +108,7 @@ class HierarchyService
      */
     public function getSubordonnesDirects(int $idUtilisateur): Collection
     {
-        return Utilisateur::where('id_manager', $idUtilisateur)
+        return Utilisateur::where('manager_matricule', $idUtilisateur)
             ->with(['role', 'region'])
             ->get();
     }

@@ -39,6 +39,13 @@ class CoreSeeder extends Seeder
     private function seedRegions()
     {
         $regions = [
+            // Région virtuelle pour les profils système (non opérationnelle)
+            [
+                'id_region' => 'RG-00',
+                'nom_region' => 'Siège',
+                'est_taniere' => false,
+            ],
+            // Régions tanières (réseau dense)
             [
                 'id_region' => 'RG-01',
                 'nom_region' => 'Littoral',
@@ -49,6 +56,7 @@ class CoreSeeder extends Seeder
                 'nom_region' => 'Centre',
                 'est_taniere' => true,
             ],
+            // Régions non-tanières
             [
                 'id_region' => 'RG-03',
                 'nom_region' => 'Ouest',
@@ -57,6 +65,16 @@ class CoreSeeder extends Seeder
             [
                 'id_region' => 'RG-04',
                 'nom_region' => 'Nord',
+                'est_taniere' => false,
+            ],
+            [
+                'id_region' => 'RG-05',
+                'nom_region' => 'Est',
+                'est_taniere' => false,
+            ],
+            [
+                'id_region' => 'RG-06',
+                'nom_region' => 'Sud',
                 'est_taniere' => false,
             ],
         ];
@@ -110,6 +128,19 @@ class CoreSeeder extends Seeder
     private function seedRoles()
     {
         $roles = [
+            // Rôle administrateur système
+            [
+                'id_role' => 'RL-00',
+                'nom_role' => 'ADMIN',
+                'description' => 'Administrateur système',
+                'id_branche' => 'BR-03',
+                'niveau_taniere' => null,
+                'niveau_non_taniere' => null,
+                'peut_auto_evaluer' => false,
+                'peut_evaluer_pairs' => false,
+                'peut_evaluer_subordonnes' => false,
+                'peut_cross_branch' => false,
+            ],
             // Rôles de direction
             [
                 'id_role' => 'RL-01',
@@ -209,6 +240,30 @@ class CoreSeeder extends Seeder
                 'peut_evaluer_subordonnes' => true,
                 'peut_cross_branch' => false,
             ],
+            [
+                'id_role' => 'RL-09',
+                'nom_role' => 'SS',
+                'description' => 'Superviseur Sponsoring',
+                'id_branche' => 'BR-02',
+                'niveau_taniere' => 4,
+                'niveau_non_taniere' => 3,
+                'peut_auto_evaluer' => true,
+                'peut_evaluer_pairs' => true,
+                'peut_evaluer_subordonnes' => true,
+                'peut_cross_branch' => false,
+            ],
+            [
+                'id_role' => 'RL-10',
+                'nom_role' => 'AS',
+                'description' => 'Assistant Superviseur',
+                'id_branche' => 'BR-02',
+                'niveau_taniere' => 5,
+                'niveau_non_taniere' => 4,
+                'peut_auto_evaluer' => true,
+                'peut_evaluer_pairs' => true,
+                'peut_evaluer_subordonnes' => false,
+                'peut_cross_branch' => false,
+            ],
         ];
 
         foreach ($roles as $roleData) {
@@ -227,22 +282,22 @@ class CoreSeeder extends Seeder
     private function seedUtilisateurs()
     {
         $utilisateurs = [
-            // Utilisateur admin système
+            // ─── Profil système ───────────────────────────────────────────
             [
-                'matricule' => 'US-01',
-                'nom' => 'Admin',
-                'prenom' => 'System',
-                'email' => 'admin@sabc.cm',
-                'password' => Hash::make('admin123'),
-                'role' => 'DR',
-                'niveau_hierarchique' => 1,
-                'id_region' => 'RG-01',
-                'id_branche' => 'BR-01',
-                'est_actif' => true,
-                'est_admin' => true,
-                'region_nom' => 'Littoral',
-                'role_nom' => 'DR',
-                'type_region' => 'taniere',
+                'matricule'          => 'US-01',
+                'nom'                => 'Admin',
+                'prenom'             => 'System',
+                'email'              => 'admin@sabc.cm',
+                'password'           => Hash::make('admin123'),
+                'role'               => 'ADMIN',
+                'niveau_hierarchique' => 0,
+                'id_region'          => 'RG-00',
+                'id_branche'         => 'BR-03',
+                'est_actif'          => true,
+                'est_admin'          => true,
+                'region_nom'         => 'Siège',
+                'role_nom'           => 'ADMIN',
+                'type_region'        => 'siege',
             ],
             // DR Littoral (Tanière)
             [
@@ -366,23 +421,170 @@ class CoreSeeder extends Seeder
                 'role_nom' => 'CSC',
                 'type_region' => 'taniere',
             ],
-            // CDV (subordonné de CSC US-07) pour tests descendante
+            // ─── Branche Commerciale — Littoral ───────────────────────────
+            // CDV (subordonné de CSC US-07)
             [
-                'matricule' => 'US-09',
-                'nom' => 'Tchoua',
-                'prenom' => 'Martial',
-                'email' => 'martial.tchoua@sabc.cm',
-                'password' => Hash::make('***REMOVED***'),
-                'role' => 'CDV',
-                'manager_matricule' => 'US-07',
+                'matricule'           => 'US-09',
+                'nom'                 => 'Tchoua',
+                'prenom'              => 'Martial',
+                'email'               => 'martial.tchoua@sabc.cm',
+                'password'            => Hash::make('***REMOVED***'),
+                'role'                => 'CDV',
+                'manager_matricule'   => 'US-07',
                 'niveau_hierarchique' => 4,
-                'id_region' => 'RG-01',
-                'id_branche' => 'BR-01',
-                'est_actif' => true,
-                'est_admin' => false,
-                'region_nom' => 'Littoral',
-                'role_nom' => 'CDV',
-                'type_region' => 'taniere',
+                'id_region'           => 'RG-01',
+                'id_branche'          => 'BR-01',
+                'est_actif'           => true,
+                'est_admin'           => false,
+                'region_nom'          => 'Littoral',
+                'role_nom'            => 'CDV',
+                'type_region'         => 'taniere',
+            ],
+            // CDS (subordonné de CDV US-09)
+            [
+                'matricule'           => 'US-10',
+                'nom'                 => 'Owona',
+                'prenom'              => 'Patrick',
+                'email'               => 'patrick.owona@sabc.cm',
+                'password'            => Hash::make('***REMOVED***'),
+                'role'                => 'CDS',
+                'manager_matricule'   => 'US-09',
+                'niveau_hierarchique' => 5,
+                'id_region'           => 'RG-01',
+                'id_branche'          => 'BR-01',
+                'est_actif'           => true,
+                'est_admin'           => false,
+                'region_nom'          => 'Littoral',
+                'role_nom'            => 'CDS',
+                'type_region'         => 'taniere',
+            ],
+            // CDS pair (même manager, pour tests pairs)
+            [
+                'matricule'           => 'US-11',
+                'nom'                 => 'Ngono',
+                'prenom'              => 'Céline',
+                'email'               => 'celine.ngono@sabc.cm',
+                'password'            => Hash::make('***REMOVED***'),
+                'role'                => 'CDS',
+                'manager_matricule'   => 'US-09',
+                'niveau_hierarchique' => 5,
+                'id_region'           => 'RG-01',
+                'id_branche'          => 'BR-01',
+                'est_actif'           => true,
+                'est_admin'           => false,
+                'region_nom'          => 'Littoral',
+                'role_nom'            => 'CDS',
+                'type_region'         => 'taniere',
+            ],
+
+            // ─── Branche Marketing — Littoral ──────────────────────────────
+            // RTM (subordonné de CDTT US-06)
+            [
+                'matricule'           => 'US-12',
+                'nom'                 => 'Manga',
+                'prenom'              => 'Eric',
+                'email'               => 'eric.manga@sabc.cm',
+                'password'            => Hash::make('***REMOVED***'),
+                'role'                => 'RTM',
+                'manager_matricule'   => 'US-06',
+                'niveau_hierarchique' => 3,
+                'id_region'           => 'RG-01',
+                'id_branche'          => 'BR-02',
+                'est_actif'           => true,
+                'est_admin'           => false,
+                'region_nom'          => 'Littoral',
+                'role_nom'            => 'RTM',
+                'type_region'         => 'taniere',
+            ],
+            // SRMO (subordonné de CDTT US-06, non-tanière)
+            [
+                'matricule'           => 'US-13',
+                'nom'                 => 'Tabi',
+                'prenom'              => 'Rodrigue',
+                'email'               => 'rodrigue.tabi@sabc.cm',
+                'password'            => Hash::make('***REMOVED***'),
+                'role'                => 'SRMO',
+                'manager_matricule'   => 'US-06',
+                'niveau_hierarchique' => 3,
+                'id_region'           => 'RG-01',
+                'id_branche'          => 'BR-02',
+                'est_actif'           => true,
+                'est_admin'           => false,
+                'region_nom'          => 'Littoral',
+                'role_nom'            => 'SRMO',
+                'type_region'         => 'taniere',
+            ],
+            // TMO (subordonné de RTM US-12)
+            [
+                'matricule'           => 'US-14',
+                'nom'                 => 'Bella',
+                'prenom'              => 'Joëlle',
+                'email'               => 'joelle.bella@sabc.cm',
+                'password'            => Hash::make('***REMOVED***'),
+                'role'                => 'TMO',
+                'manager_matricule'   => 'US-12',
+                'niveau_hierarchique' => 4,
+                'id_region'           => 'RG-01',
+                'id_branche'          => 'BR-02',
+                'est_actif'           => true,
+                'est_admin'           => false,
+                'region_nom'          => 'Littoral',
+                'role_nom'            => 'TMO',
+                'type_region'         => 'taniere',
+            ],
+            // TMO pair (subordonné de SRMO US-13, pour tests SRMO)
+            [
+                'matricule'           => 'US-15',
+                'nom'                 => 'Simo',
+                'prenom'              => 'Ariel',
+                'email'               => 'ariel.simo@sabc.cm',
+                'password'            => Hash::make('***REMOVED***'),
+                'role'                => 'TMO',
+                'manager_matricule'   => 'US-13',
+                'niveau_hierarchique' => 4,
+                'id_region'           => 'RG-01',
+                'id_branche'          => 'BR-02',
+                'est_actif'           => true,
+                'est_admin'           => false,
+                'region_nom'          => 'Littoral',
+                'role_nom'            => 'TMO',
+                'type_region'         => 'taniere',
+            ],
+            // SS (subordonné de RTM US-12)
+            [
+                'matricule'           => 'US-16',
+                'nom'                 => 'Kouam',
+                'prenom'              => 'Didier',
+                'email'               => 'didier.kouam@sabc.cm',
+                'password'            => Hash::make('***REMOVED***'),
+                'role'                => 'SS',
+                'manager_matricule'   => 'US-12',
+                'niveau_hierarchique' => 4,
+                'id_region'           => 'RG-01',
+                'id_branche'          => 'BR-02',
+                'est_actif'           => true,
+                'est_admin'           => false,
+                'region_nom'          => 'Littoral',
+                'role_nom'            => 'SS',
+                'type_region'         => 'taniere',
+            ],
+            // AS (subordonné de SS US-16)
+            [
+                'matricule'           => 'US-17',
+                'nom'                 => 'Mekongo',
+                'prenom'              => 'Vanessa',
+                'email'               => 'vanessa.mekongo@sabc.cm',
+                'password'            => Hash::make('***REMOVED***'),
+                'role'                => 'AS',
+                'manager_matricule'   => 'US-16',
+                'niveau_hierarchique' => 5,
+                'id_region'           => 'RG-01',
+                'id_branche'          => 'BR-02',
+                'est_actif'           => true,
+                'est_admin'           => false,
+                'region_nom'          => 'Littoral',
+                'role_nom'            => 'AS',
+                'type_region'         => 'taniere',
             ],
         ];
 

@@ -7,16 +7,16 @@
 # -----------------------------------------------------------------------------
 FROM composer:2.6 AS composer
 
-# Install sockets extension required by jaeger-client-php
-RUN docker-php-ext-install sockets
-
 WORKDIR /app
 
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
+# --ignore-platform-reqs: ext-sockets est compilée dans le stage app, pas ici
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --ignore-platform-reqs
 
 COPY . .
-RUN composer dump-autoload --optimize --no-dev
+# --no-scripts: évite package:discover qui nécessite laravel/pail (dev-dep non installée)
+# package:discover est exécuté dans l'entrypoint au démarrage du container
+RUN composer dump-autoload --optimize --no-dev --ignore-platform-reqs --no-scripts
 
 # -----------------------------------------------------------------------------
 # Stage 2: Node.js build (Frontend assets)
@@ -26,6 +26,7 @@ FROM node:20-alpine AS node
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
+# --frozen-lockfile pour prod / --no-frozen-lockfile pour dev si lockfile désynchronisé
 RUN npm install -g pnpm && pnpm install --frozen-lockfile
 
 COPY . .
@@ -47,12 +48,14 @@ RUN apk add --no-cache \
     icu-dev \
     oniguruma-dev \
     libpq-dev \
+    linux-headers \
     curl \
     git \
     unzip
 
-# Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+# Install PHP extensions + Redis PECL dans le même RUN pour éviter de re-télécharger les build-deps
+RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
         pdo_pgsql \
@@ -64,10 +67,7 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         opcache \
         bcmath \
         pcntl \
-        sockets
-
-# Install Redis extension
-RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+        sockets \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apk del .build-deps
@@ -91,6 +91,10 @@ COPY --from=composer /app/vendor ./vendor
 COPY --from=node /app/public/build ./public/build
 COPY . .
 
+# Configure entrypoint
+COPY docker/php/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
@@ -99,8 +103,8 @@ RUN chown -R www-data:www-data /var/www/html \
 # Expose port
 EXPOSE 80
 
-# Start services
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Start via entrypoint (package:discover + supervisord)
+ENTRYPOINT ["/entrypoint.sh"]
 
 # -----------------------------------------------------------------------------
 # Stage 4: Development (optional)

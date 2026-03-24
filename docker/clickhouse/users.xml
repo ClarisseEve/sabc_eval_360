@@ -4,28 +4,28 @@
      ============================================================================= -->
 <clickhouse>
     <profiles>
-        <!-- Default profile for analytics queries -->
+        <!-- Default profile (dev: limites réduites) -->
         <default>
-            <max_memory_usage>4000000000</max_memory_usage>
+            <max_memory_usage>536870912</max_memory_usage>  <!-- 512 MB -->
             <max_execution_time>300</max_execution_time>
-            <max_rows_to_read>1000000000</max_rows_to_read>
-            <max_bytes_to_read>100000000000</max_bytes_to_read>
+            <max_rows_to_read>100000000</max_rows_to_read>
+            <max_bytes_to_read>10000000000</max_bytes_to_read>
             <use_uncompressed_cache>0</use_uncompressed_cache>
             <load_balancing>random</load_balancing>
         </default>
 
-        <!-- Profile for heavy analytics (larger limits) -->
+        <!-- Profile for heavy analytics (dev: 1 GB) -->
         <analytics>
-            <max_memory_usage>8000000000</max_memory_usage>
+            <max_memory_usage>1073741824</max_memory_usage>  <!-- 1 GB -->
             <max_execution_time>600</max_execution_time>
-            <max_rows_to_read>10000000000</max_rows_to_read>
-            <max_bytes_to_read>1000000000000</max_bytes_to_read>
+            <max_rows_to_read>1000000000</max_rows_to_read>
+            <max_bytes_to_read>100000000000</max_bytes_to_read>
             <use_uncompressed_cache>1</use_uncompressed_cache>
         </analytics>
 
         <!-- Profile for data ingestion -->
         <ingestion>
-            <max_memory_usage>2000000000</max_memory_usage>
+            <max_memory_usage>536870912</max_memory_usage>  <!-- 512 MB -->
             <max_execution_time>3600</max_execution_time>
             <max_insert_block_size>1048576</max_insert_block_size>
         </ingestion>
@@ -50,55 +50,35 @@
             <access_management>1</access_management>
         </default>
 
-        <!-- Application user for Laravel -->
+        <!-- Application user for Laravel (dev: mot de passe vide) -->
+        <!-- Pour prod: générer SHA256 avec: echo -n 'password' | sha256sum -->
         <sabc_app>
-            <password_sha256_hex><!-- Generate with: echo -n 'your_password' | sha256sum --></password_sha256_hex>
+            <password></password>
             <networks>
                 <ip>::/0</ip>
             </networks>
             <profile>default</profile>
             <quota>default</quota>
-            <databases>
-                <sabc_analytics>
-                    <permissions>
-                        <readonly>0</readonly>
-                    </permissions>
-                </sabc_analytics>
-            </databases>
         </sabc_app>
 
-        <!-- Analytics user for heavy queries -->
+        <!-- Analytics user (dev: mot de passe vide) -->
         <sabc_analytics>
-            <password_sha256_hex><!-- Generate with: echo -n 'your_password' | sha256sum --></password_sha256_hex>
+            <password></password>
             <networks>
                 <ip>::/0</ip>
             </networks>
             <profile>analytics</profile>
             <quota>default</quota>
-            <databases>
-                <sabc_analytics>
-                    <permissions>
-                        <readonly>0</readonly>
-                    </permissions>
-                </sabc_analytics>
-            </databases>
         </sabc_analytics>
 
-        <!-- Dashboard user (read-only) -->
+        <!-- Grafana read-only user (dev: mot de passe vide) -->
         <grafana>
-            <password_sha256_hex><!-- Generate with: echo -n 'grafana_password' | sha256sum --></password_sha256_hex>
+            <password></password>
             <networks>
                 <ip>::/0</ip>
             </networks>
             <profile>readonly</profile>
             <quota>default</quota>
-            <databases>
-                <sabc_analytics>
-                    <permissions>
-                        <readonly>1</readonly>
-                    </permissions>
-                </sabc_analytics>
-            </databases>
         </grafana>
     </users>
 

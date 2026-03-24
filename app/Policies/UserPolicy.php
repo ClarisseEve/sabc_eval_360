@@ -29,7 +29,7 @@ class UserPolicy
         }
 
         // Un manager peut voir ses subordonnés directs
-        if ($targetUser->id_manager === $user->id_utilisateur) {
+        if ($targetUser->manager_matricule === $user->id_utilisateur) {
             return true;
         }
 
@@ -197,7 +197,7 @@ class UserPolicy
         }
 
         // Un manager peut voir les statistiques de ses subordonnés directs
-        if ($targetUser->id_manager === $user->id_utilisateur) {
+        if ($targetUser->manager_matricule === $user->id_utilisateur) {
             return true;
         }
 
@@ -336,7 +336,7 @@ class UserPolicy
      */
     private function getAllSubordinates(Utilisateur $user, &$subordinates): void
     {
-        $directSubordinates = Utilisateur::where('id_manager', $user->id_utilisateur)->get();
+        $directSubordinates = Utilisateur::where('manager_matricule', $user->matricule)->get();
         
         foreach ($directSubordinates as $subordinate) {
             if (!$subordinates->contains('id_utilisateur', $subordinate->id_utilisateur)) {

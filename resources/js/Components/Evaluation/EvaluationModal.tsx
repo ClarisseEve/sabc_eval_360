@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { router } from '@inertiajs/react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/Components/UI/Dialog/Dialog';
 import { Button } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
@@ -29,6 +30,7 @@ export default function EvaluationModal({ open, onOpenChange, templateId, target
   const [periode, setPeriode] = useState<any>(null);
   const [target, setTarget] = useState<any>(null);
   const [started, setStarted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [notes, setNotes] = useState<{ id: string; note: number; commentaire: string }[]>([]);
 
   useEffect(() => {
@@ -69,6 +71,27 @@ export default function EvaluationModal({ open, onOpenChange, templateId, target
   // Validation: commentaire obligatoire si note < 3
   const invalidComments = () => {
     return notes.some(n => (n.note < 3) && (!n.commentaire || n.commentaire.trim().length === 0));
+  };
+
+  const handleSaveDraft = () => {
+    if (!targetMatricule || !template || invalidComments()) return;
+    setSubmitting(true);
+    router.post('/common/evaluations', {
+      id_regle: template.id_regle ?? null,
+      target_matricule: targetMatricule,
+      notes: notes,
+      commentaire_general: '',
+    }, {
+      onSuccess: () => {
+        setSubmitting(false);
+        onOpenChange(false);
+      },
+      onError: (errors) => {
+        setSubmitting(false);
+        const first = Object.values(errors)[0];
+        setError(typeof first === 'string' ? first : 'Erreur lors de la sauvegarde');
+      },
+    });
   };
 
   // Group by section for a nicer structure
@@ -161,7 +184,13 @@ export default function EvaluationModal({ open, onOpenChange, templateId, target
             {started && (
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => onOpenChange(false)}>Fermer</Button>
-                <Button disabled={invalidComments()} className="bg-sabc-red-primary text-white">Enregistrer le brouillon</Button>
+                <Button
+                  disabled={invalidComments() || submitting}
+                  onClick={handleSaveDraft}
+                  className="bg-sabc-red-primary text-white"
+                >
+                  {submitting ? 'Enregistrement…' : 'Enregistrer le brouillon'}
+                </Button>
               </div>
             )}
           </div>

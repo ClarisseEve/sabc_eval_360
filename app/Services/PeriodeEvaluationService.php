@@ -143,10 +143,7 @@ class PeriodeEvaluationService
      */
     public function getPeriodeActive(): ?PeriodeEvaluation
     {
-        return PeriodeEvaluation::where('est_ouverte', true)
-            ->where('est_cloturee', false)
-            ->where('date_debut', '<=', now())
-            ->where('date_fin', '>=', now())
+        return PeriodeEvaluation::active()
             ->orderByDesc('date_debut')
             ->first();
     }
@@ -181,7 +178,7 @@ class PeriodeEvaluationService
         return $periode->update([
             'est_ouverte' => true,
             'est_cloturee' => false,
-            'statut' => 'active',
+            'statut' => 'ouverte',
         ]);
     }
     

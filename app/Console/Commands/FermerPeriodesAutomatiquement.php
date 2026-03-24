@@ -45,8 +45,7 @@ class FermerPeriodesAutomatiquement extends Command
         $this->info('🔍 Recherche des périodes à fermer...');
         
         // Récupérer les périodes ouvertes dont la date de fin est dépassée
-        $periodesAFermer = PeriodeEvaluation::where('est_ouverte', true)
-            ->where('est_cloturee', false)
+        $periodesAFermer = PeriodeEvaluation::ouverte()
             ->where('date_fin', '<', now())
             ->get();
         
@@ -63,18 +62,23 @@ class FermerPeriodesAutomatiquement extends Command
                 if ($isDryRun) {
                     $this->line("  [DRY-RUN] Fermeture de : {$periode->nom_periode} (ID: {$periode->id_periode})");
                 } else {
-                    // Calculer les statistiques finales avant fermeture
-                    $stats = $this->periodeService->calculateStatistiques($periode);
-                    
+                    // fermerPeriode calcule déjà les statistiques finales
                     $this->periodeService->fermerPeriode($periode);
+                    $periode->refresh();
                     $this->info("  ✓ Fermé : {$periode->nom_periode} (ID: {$periode->id_periode})");
-                    $this->line("    Stats : {$stats['nb_evaluations_completees']}/{$stats['nb_evaluations_attendues']} évaluations ({$stats['taux_completion']}%)");
+                    $this->line(
+                        "    Stats : {$periode->nb_evaluations_completees}/{$periode->nb_evaluations_attendues} évaluations ({$periode->taux_completion}%)"
+                    );
                     
                     Log::info('Période fermée automatiquement', [
                         'id_periode' => $periode->id_periode,
                         'nom_periode' => $periode->nom_periode,
                         'date_fin' => $periode->date_fin->format('Y-m-d'),
-                        'statistiques' => $stats,
+                        'statistiques' => [
+                            'nb_evaluations_attendues' => $periode->nb_evaluations_attendues,
+                            'nb_evaluations_completees' => $periode->nb_evaluations_completees,
+                            'taux_completion' => $periode->taux_completion,
+                        ],
                     ]);
                 }
                 

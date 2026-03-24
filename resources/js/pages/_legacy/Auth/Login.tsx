@@ -1,3 +1,5 @@
+// @legacy — Remplacé par apps/web/src/pages/auth/LoginPage.tsx
+// À supprimer une fois la migration complète validée.
 import React, { useState, useEffect } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Button } from '@/Components/UI/Button/Button';

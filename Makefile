@@ -32,16 +32,23 @@ RESET := \033[0m
 # Setup & Installation
 # =============================================================================
 
-setup: ## Initial project setup
+setup: ## Initial project setup (core services only)
 	@echo "$(CYAN)Setting up SABC Eval360...$(RESET)"
 	@if [ ! -f .env ]; then cp .env.docker .env; echo "$(GREEN)Created .env from .env.docker$(RESET)"; fi
-	@docker compose build
-	@docker compose up -d
-	@sleep 10
+	@docker compose build core-app mysql postgres clickhouse redis
+	@docker compose up -d mysql postgres clickhouse redis
+	@echo "$(YELLOW)Waiting for databases to be healthy...$(RESET)"
+	@docker compose up -d --wait mysql postgres clickhouse redis 2>/dev/null || sleep 15
+	@docker compose up -d core-app
 	@docker compose exec core-app php artisan key:generate --force
 	@docker compose exec core-app php artisan migrate --force
+	@docker compose exec core-app php artisan db:seed --class=CoreSeeder --force 2>/dev/null || true
 	@docker compose exec core-app php artisan storage:link
-	@echo "$(GREEN)Setup complete! Access the app at http://localhost$(RESET)"
+	@echo "$(GREEN)Setup complete!$(RESET)"
+	@echo "  App:      http://localhost"
+	@echo "  MySQL:    localhost:3307  (DataGrip)"
+	@echo "  Postgres: localhost:5433  (DataGrip)"
+	@echo "  CH HTTP:  localhost:8124  (DataGrip)"
 
 install-deps: ## Install PHP and Node dependencies
 	@echo "$(CYAN)Installing dependencies...$(RESET)"
@@ -53,30 +60,57 @@ install-deps: ## Install PHP and Node dependencies
 # Docker Compose Operations
 # =============================================================================
 
-up: ## Start all containers
-	@echo "$(CYAN)Starting containers...$(RESET)"
+up: ## Start core services (app + dbs + redis)
+	@echo "$(CYAN)Starting core services...$(RESET)"
 	@docker compose up -d
-	@echo "$(GREEN)Containers started$(RESET)"
-	@echo "$(YELLOW)Services:$(RESET)"
-	@echo "  - App:        http://localhost"
-	@echo "  - Traefik:    http://localhost:8080"
-	@echo "  - Grafana:    http://localhost:3001"
-	@echo "  - Prometheus: http://localhost:9090"
-	@echo "  - Jaeger:     http://localhost:16686"
+	@echo "$(GREEN)Services démarrés$(RESET)"
+	@echo "$(YELLOW)Accès:$(RESET)"
+	@echo "  App:      http://localhost"
+	@echo "  MySQL:    localhost:3307  (DataGrip: user=sabc_user db=sabc_core)"
+	@echo "  Postgres: localhost:5433  (DataGrip: user=sabc_user db=sabc_business)"
+	@echo "  CH HTTP:  localhost:8124  (DataGrip: user=default   db=sabc_analytics)"
+
+up-gateway: ## Start core + gateway (Traefik)
+	@docker compose --profile gateway up -d
+	@echo "$(GREEN)Gateway + core démarrés$(RESET)"
+	@echo "  Traefik: http://localhost:8080"
+
+up-observability: ## Start core + observability stack
+	@docker compose --profile observability up -d
+	@echo "$(GREEN)Observability stack démarré$(RESET)"
+	@echo "  Grafana:     http://localhost:3001 (admin/$$GRAFANA_PASSWORD)"
+	@echo "  Prometheus:  http://localhost:9090"
+	@echo "  Jaeger:      http://localhost:16686"
+	@echo "  Alertmanager: http://localhost:9093"
+
+up-microservices: ## Start core + Go microservices
+	@docker compose --profile microservices up -d
+	@echo "$(GREEN)Microservices démarrés$(RESET)"
+	@echo "  Evaluation: http://localhost:8081"
+	@echo "  Analytics:  http://localhost:8082"
+
+up-full: ## Start everything (all profiles)
+	@docker compose --profile gateway --profile observability --profile microservices --profile pipeline --profile scale-workers up -d
+	@echo "$(GREEN)Stack complète démarrée$(RESET)"
 
 down: ## Stop all containers
 	@echo "$(CYAN)Stopping containers...$(RESET)"
-	@docker compose down
+	@docker compose --profile gateway --profile observability --profile microservices --profile pipeline --profile scale-workers down
 	@echo "$(GREEN)Containers stopped$(RESET)"
 
-restart: ## Restart all containers
+restart: ## Restart core services
 	@echo "$(CYAN)Restarting containers...$(RESET)"
 	@docker compose restart
 	@echo "$(GREEN)Containers restarted$(RESET)"
 
-build: ## Build/rebuild containers
-	@echo "$(CYAN)Building containers...$(RESET)"
-	@docker compose build --no-cache
+build: ## Build core app image
+	@echo "$(CYAN)Building core-app...$(RESET)"
+	@docker compose build --no-cache core-app
+	@echo "$(GREEN)Build complete$(RESET)"
+
+build-all: ## Build all images
+	@echo "$(CYAN)Building all images...$(RESET)"
+	@docker compose --profile microservices --profile pipeline build --no-cache
 	@echo "$(GREEN)Build complete$(RESET)"
 
 # =============================================================================
@@ -103,10 +137,13 @@ shell: ## Open shell in core-app container
 	@docker compose exec core-app sh
 
 shell-mysql: ## Open MySQL shell
-	@docker compose exec mysql mysql -u sabc_user -p sabc_core
+	@docker compose exec mysql mysql -u sabc_user -psecret sabc_core
 
 shell-postgres: ## Open PostgreSQL shell
 	@docker compose exec postgres psql -U sabc_user -d sabc_business
+
+shell-clickhouse: ## Open ClickHouse client
+	@docker compose exec clickhouse clickhouse-client --database sabc_analytics
 
 shell-redis: ## Open Redis CLI
 	@docker compose exec redis redis-cli
@@ -191,10 +228,26 @@ build-assets: ## Build frontend assets
 # Cleanup
 # =============================================================================
 
+db-dump: ## Dump all databases to ./backups/
+	@mkdir -p backups
+	@echo "$(CYAN)Dumping MySQL...$(RESET)"
+	@docker compose exec mysql mysqldump -u sabc_user -psecret sabc_core > backups/mysql_sabc_core_$$(date +%Y%m%d_%H%M%S).sql
+	@echo "$(CYAN)Dumping PostgreSQL...$(RESET)"
+	@docker compose exec -T postgres pg_dump -U sabc_user sabc_business > backups/postgres_sabc_business_$$(date +%Y%m%d_%H%M%S).sql
+	@echo "$(GREEN)Dumps saved in ./backups/$(RESET)"
+
+db-restore-mysql: ## Restore MySQL from file: make db-restore-mysql FILE=backups/mysql_sabc_core_xxx.sql
+	@docker compose exec -T mysql mysql -u sabc_user -psecret sabc_core < $(FILE)
+	@echo "$(GREEN)MySQL restored from $(FILE)$(RESET)"
+
+db-restore-postgres: ## Restore PostgreSQL from file: make db-restore-postgres FILE=backups/postgres_sabc_business_xxx.sql
+	@docker compose exec -T postgres psql -U sabc_user sabc_business < $(FILE)
+	@echo "$(GREEN)PostgreSQL restored from $(FILE)$(RESET)"
+
 clean: ## Remove all containers, volumes, and networks
 	@echo "$(RED)WARNING: This will remove all data!$(RESET)"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ]
-	@docker compose down -v --remove-orphans
+	@docker compose --profile gateway --profile observability --profile microservices --profile pipeline --profile scale-workers down -v --remove-orphans
 	@echo "$(GREEN)Cleanup complete$(RESET)"
 
 prune: ## Remove unused Docker resources

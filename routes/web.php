@@ -90,14 +90,18 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/mine', 'mine')->name('mine');
         
         // Évaluations à compléter selon les règles SABC
-        Route::get('/pending', [\App\Http\Controllers\EvaluationsACompleterController::class, 'index'])->name('pending');
+        Route::get('/pending', 'pending')->name('pending');
         
         // Création d'une nouvelle évaluation
         Route::get('/create', 'create')->name('create');
 
         // Détails JSON pour le modal
         Route::get('/details', 'details')->name('details');
-        
+
+        // Évaluations à valider (pour les managers)
+        Route::get('/a-valider', 'aValider')->name('a-valider');
+        Route::post('/{id}/valider', 'valider')->name('valider');
+
         // Affichage d'une évaluation spécifique
         Route::get('/{id}', 'show')->name('show');
         

@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\EvaluationService;
 use App\Models\Evaluation;
+use App\Models\Utilisateur;
 use App\Models\PeriodeEvaluation;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 
 class EvaluationController extends Controller
 {
@@ -26,183 +27,242 @@ class EvaluationController extends Controller
     public function index(Request $request): JsonResponse
     {
         $utilisateur = Auth::user();
-        
-        $evaluationsEnAttente = $this->evaluationService->getEvaluationsEnAttente($utilisateur->id_utilisateur);
-        $evaluationsAValider = $this->evaluationService->getEvaluationsAValider($utilisateur->id_utilisateur);
-        
+
+        $enAttente = DB::connection('pgsql')
+            ->table('evaluations')
+            ->where('evaluateur_matricule', $utilisateur->matricule)
+            ->where('statut', 'brouillon')
+            ->orderByDesc('date_evaluation')
+            ->get();
+
+        $aValider = DB::connection('pgsql')
+            ->table('evaluations')
+            ->where('statut', 'soumis')
+            ->whereIn('evalue_matricule', function ($q) use ($utilisateur) {
+                $q->select('matricule')
+                    ->from(DB::connection('mysql')->getDatabaseName() . '.utilisateurs')
+                    ->where('manager_matricule', $utilisateur->matricule);
+            })
+            ->orderByDesc('date_soumission')
+            ->get();
+
         return response()->json([
             'success' => true,
-            'data' => [
-                'en_attente' => $evaluationsEnAttente,
-                'a_valider' => $evaluationsAValider,
-            ]
+            'data'    => [
+                'en_attente' => $enAttente,
+                'a_valider'  => $aValider,
+            ],
         ]);
     }
 
     /**
-     * Crée une nouvelle évaluation
+     * Crée une nouvelle évaluation (brouillon)
      */
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'id_evalue' => 'required|integer|exists:utilisateurs,id_utilisateur',
-            'id_periode' => 'required|integer|exists:periodes_evaluation,id_periode',
-            'id_regle' => 'required|integer|exists:regles_evaluation,id_regle',
+            'evalue_matricule' => 'required|string',
+            'id_periode'       => 'nullable|string',
+            'id_regle'         => 'nullable|string',
         ]);
 
         $utilisateur = Auth::user();
-        
-        $evaluation = $this->evaluationService->creerEvaluation(
-            $utilisateur->id_utilisateur,
-            $request->id_evalue,
-            $request->id_periode,
-            $request->id_regle
-        );
+        $evalue = Utilisateur::where('matricule', $request->evalue_matricule)->first();
 
-        if (!$evaluation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Impossible de créer l\'évaluation. Vérifiez vos permissions et les paramètres.'
-            ], 403);
+        if (!$evalue) {
+            return response()->json(['success' => false, 'message' => 'Utilisateur évalué introuvable'], 404);
         }
+
+        if (!$utilisateur->peutEvaluer($evalue)) {
+            return response()->json(['success' => false, 'message' => 'Permission refusée'], 403);
+        }
+
+        // Période active si non fournie
+        $idPeriode = $request->id_periode;
+        if (!$idPeriode) {
+            $periode = PeriodeEvaluation::where('statut', 'ouverte')->first();
+            $idPeriode = $periode?->id_periode;
+        }
+
+        if (!$idPeriode) {
+            return response()->json(['success' => false, 'message' => 'Aucune période active'], 422);
+        }
+
+        // Évaluation déjà existante ?
+        $exists = DB::connection('pgsql')->table('evaluations')
+            ->where('evaluateur_matricule', $utilisateur->matricule)
+            ->where('evalue_matricule', $request->evalue_matricule)
+            ->where('id_periode', $idPeriode)
+            ->exists();
+
+        if ($exists) {
+            return response()->json(['success' => false, 'message' => 'Une évaluation existe déjà pour cette période'], 409);
+        }
+
+        $id = \Illuminate\Support\Str::uuid()->toString();
+        DB::connection('pgsql')->table('evaluations')->insert([
+            'id_evaluation'       => $id,
+            'evaluateur_matricule' => $utilisateur->matricule,
+            'evalue_matricule'    => $request->evalue_matricule,
+            'id_periode'          => $idPeriode,
+            'id_regle'            => $request->id_regle,
+            'date_evaluation'     => now()->toDateString(),
+            'statut'              => 'brouillon',
+            'notations_json'      => json_encode([]),
+            'type_evaluation'     => '360',
+            'created_at'          => now(),
+            'updated_at'          => now(),
+        ]);
+
+        $evaluation = DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->first();
 
         return response()->json([
             'success' => true,
             'message' => 'Évaluation créée avec succès',
-            'data' => $evaluation->load(['evalue', 'periode', 'regle'])
+            'data'    => $evaluation,
         ], 201);
     }
 
     /**
      * Affiche une évaluation spécifique
      */
-    public function show(int $id): JsonResponse
+    public function show(string $id): JsonResponse
     {
-        $evaluation = Evaluation::with(['evaluateur', 'evalue', 'periode', 'regle', 'validateur'])
-            ->find($id);
+        $evaluation = DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->first();
 
         if (!$evaluation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Évaluation introuvable'
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'Évaluation introuvable'], 404);
         }
 
         $utilisateur = Auth::user();
-        
-        // Vérifier les permissions d'accès
+
         if (!$this->peutAccederEvaluation($utilisateur, $evaluation)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Accès non autorisé à cette évaluation'
-            ], 403);
+            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $evaluation
-        ]);
+        return response()->json(['success' => true, 'data' => $evaluation]);
     }
 
     /**
      * Met à jour les notes d'une évaluation
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(Request $request, string $id): JsonResponse
     {
         $request->validate([
-            'notes' => 'required|array',
-            'notes.*' => 'required|numeric|min:1|max:5',
+            'notes'              => 'required|array',
             'commentaire_general' => 'nullable|string|max:1000',
         ]);
 
-        $evaluation = Evaluation::find($id);
-        
+        $evaluation = DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->first();
+
         if (!$evaluation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Évaluation introuvable'
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'Évaluation introuvable'], 404);
         }
 
         $utilisateur = Auth::user();
-        
-        // Vérifier que l'utilisateur est l'évaluateur
-        if ($evaluation->id_evaluateur !== $utilisateur->id_utilisateur) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Vous n\'êtes pas autorisé à modifier cette évaluation'
-            ], 403);
+
+        if ($evaluation->evaluateur_matricule !== $utilisateur->matricule) {
+            return response()->json(['success' => false, 'message' => 'Non autorisé'], 403);
         }
 
-        $success = $this->evaluationService->mettreAJourNotes(
-            $id,
-            $request->notes,
-            $request->commentaire_general
-        );
-
-        if (!$success) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Impossible de mettre à jour l\'évaluation'
-            ], 400);
+        if ($evaluation->statut !== 'brouillon') {
+            return response()->json(['success' => false, 'message' => 'L\'évaluation ne peut plus être modifiée'], 400);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Évaluation mise à jour avec succès',
-            'data' => $evaluation->fresh()
+        DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->update([
+            'notations_json'      => json_encode($request->notes),
+            'commentaire_general' => $request->commentaire_general,
+            'updated_at'          => now(),
         ]);
+
+        return response()->json(['success' => true, 'message' => 'Évaluation mise à jour', 'data' => DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->first()]);
     }
 
     /**
      * Soumet une évaluation pour validation
      */
-    public function submit(int $id): JsonResponse
+    public function submit(string $id): JsonResponse
     {
-        $evaluation = Evaluation::find($id);
-        
+        $evaluation = DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->first();
+
         if (!$evaluation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Évaluation introuvable'
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'Évaluation introuvable'], 404);
         }
 
         $utilisateur = Auth::user();
-        
-        // Vérifier que l'utilisateur est l'évaluateur
-        if ($evaluation->id_evaluateur !== $utilisateur->id_utilisateur) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Vous n\'êtes pas autorisé à soumettre cette évaluation'
-            ], 403);
+
+        if ($evaluation->evaluateur_matricule !== $utilisateur->matricule) {
+            return response()->json(['success' => false, 'message' => 'Non autorisé'], 403);
         }
 
-        $result = $this->evaluationService->soumettrePourValidation($id);
+        if ($evaluation->statut !== 'brouillon') {
+            return response()->json(['success' => false, 'message' => 'L\'évaluation n\'est pas en brouillon'], 400);
+        }
 
-        return response()->json($result, $result['success'] ? 200 : 400);
+        $notes = json_decode($evaluation->notations_json, true) ?? [];
+        if (empty($notes)) {
+            return response()->json(['success' => false, 'message' => 'L\'évaluation est vide'], 400);
+        }
+
+        DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->update([
+            'statut'          => 'soumis',
+            'date_soumission' => now(),
+            'updated_at'      => now(),
+        ]);
+
+        // Notifier le manager de l'évalué
+        $evalue = Utilisateur::where('matricule', $evaluation->evalue_matricule)->first();
+        if ($evalue?->manager_matricule) {
+            \App\Models\Notification::creer(
+                $evalue->manager_matricule,
+                'Évaluation à valider',
+                "Une évaluation de {$evalue->prenom} {$evalue->nom} est en attente de validation.",
+                'validation'
+            );
+        }
+
+        return response()->json(['success' => true, 'message' => 'Évaluation soumise avec succès']);
     }
 
     /**
      * Valide ou rejette une évaluation
      */
-    public function validate(Request $request, int $id): JsonResponse
+    public function validate(Request $request, string $id): JsonResponse
     {
         $request->validate([
-            'est_validee' => 'required|boolean',
+            'est_validee'            => 'required|boolean',
             'commentaire_validation' => 'nullable|string|max:1000',
         ]);
 
-        $utilisateur = Auth::user();
-        
-        $result = $this->evaluationService->validerEvaluation(
-            $id,
-            $utilisateur->id_utilisateur,
-            $request->est_validee,
-            $request->commentaire_validation
-        );
+        $evaluation = DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->first();
 
-        return response()->json($result, $result['success'] ? 200 : 400);
+        if (!$evaluation || $evaluation->statut !== 'soumis') {
+            return response()->json(['success' => false, 'message' => 'Évaluation introuvable ou non soumise'], 404);
+        }
+
+        $utilisateur = Auth::user();
+
+        // Vérifier que le validateur est le manager de l'évalué
+        $evalue = Utilisateur::where('matricule', $evaluation->evalue_matricule)->first();
+        if (!$evalue || $evalue->manager_matricule !== $utilisateur->matricule) {
+            return response()->json(['success' => false, 'message' => 'Non autorisé à valider cette évaluation'], 403);
+        }
+
+        $nouveauStatut = $request->est_validee ? 'valide' : 'rejete';
+
+        DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->update([
+            'statut'     => $nouveauStatut,
+            'updated_at' => now(),
+        ]);
+
+        // Si rejeté, remettre en brouillon pour correction
+        if (!$request->est_validee) {
+            DB::connection('pgsql')->table('evaluations')->where('id_evaluation', $id)->update(['statut' => 'brouillon']);
+        }
+
+        $message = $request->est_validee ? 'Évaluation validée' : 'Évaluation renvoyée en brouillon';
+
+        return response()->json(['success' => true, 'message' => $message]);
     }
 
     /**
@@ -210,146 +270,66 @@ class EvaluationController extends Controller
      */
     public function getPeriodesActives(): JsonResponse
     {
-        $periodes = PeriodeEvaluation::actives()
-            ->with(['regle', 'region'])
+        $periodes = PeriodeEvaluation::where('statut', 'ouverte')
+            ->where('date_debut', '<=', now())
+            ->where('date_fin', '>=', now())
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $periodes
-        ]);
+        return response()->json(['success' => true, 'data' => $periodes]);
     }
 
     /**
-     * Génère un rapport d'évaluation pour une période
-     */
-    public function rapport(Request $request, int $idPeriode): JsonResponse
-    {
-        $request->validate([
-            'id_region' => 'nullable|integer|exists:regions,id_region',
-        ]);
-
-        $utilisateur = Auth::user();
-        
-        // Vérifier les permissions pour générer des rapports
-        if (!$utilisateur->role->peutGenererRapports()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Vous n\'êtes pas autorisé à générer des rapports'
-            ], 403);
-        }
-
-        $rapport = $this->evaluationService->genererRapportPeriode(
-            $idPeriode,
-            $request->id_region
-        );
-
-        return response()->json([
-            'success' => true,
-            'data' => $rapport
-        ]);
-    }
-
-    /**
-     * Envoie des rappels pour les évaluations en retard
-     */
-    public function envoyerRappels(int $idPeriode): JsonResponse
-    {
-        $utilisateur = Auth::user();
-        
-        // Vérifier les permissions (DR, CDTT uniquement)
-        if (!in_array($utilisateur->role->nom_role, ['DR', 'CDTT'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Vous n\'êtes pas autorisé à envoyer des rappels'
-            ], 403);
-        }
-
-        $rappelsEnvoyes = $this->evaluationService->envoyerRappelsEvaluations($idPeriode);
-
-        return response()->json([
-            'success' => true,
-            'message' => "{$rappelsEnvoyes} rappel(s) envoyé(s)",
-            'data' => ['rappels_envoyes' => $rappelsEnvoyes]
-        ]);
-    }
-
-    /**
-     * Récupère les utilisateurs éligibles pour évaluation
-     */
-    public function getUtilisateursEligibles(): JsonResponse
-    {
-        $utilisateur = Auth::user();
-        
-        $hierarchyService = app(\App\Services\HierarchyService::class);
-        $utilisateursEligibles = $hierarchyService->getUtilisateursEligiblesPourEvaluation($utilisateur->id_utilisateur);
-
-        return response()->json([
-            'success' => true,
-            'data' => $utilisateursEligibles
-        ]);
-    }
-
-    /**
-     * Récupère l'historique des évaluations d'un utilisateur
+     * Historique des évaluations reçues par un utilisateur
      */
     public function historique(Request $request): JsonResponse
     {
-        $request->validate([
-            'id_utilisateur' => 'nullable|integer|exists:utilisateurs,id_utilisateur',
-            'limit' => 'nullable|integer|min:1|max:100',
-        ]);
+        $utilisateur  = Auth::user();
+        $matriculeCible = $request->matricule ?? $utilisateur->matricule;
 
-        $utilisateur = Auth::user();
-        $idUtilisateur = $request->id_utilisateur ?? $utilisateur->id_utilisateur;
-        
-        // Vérifier les permissions d'accès à l'historique
-        if ($idUtilisateur !== $utilisateur->id_utilisateur && !$utilisateur->peutVoirHistorique($idUtilisateur)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Accès non autorisé à cet historique'
-            ], 403);
+        // Vérifier les droits
+        if ($matriculeCible !== $utilisateur->matricule) {
+            $cible = Utilisateur::where('matricule', $matriculeCible)->first();
+            if (!$cible) {
+                return response()->json(['success' => false, 'message' => 'Utilisateur introuvable'], 404);
+            }
+            $peutVoir = $cible->manager_matricule === $utilisateur->matricule
+                || in_array($utilisateur->role_nom, ['ADMIN', 'DR', 'CDTT']);
+            if (!$peutVoir) {
+                return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
+            }
         }
 
-        $evaluations = Evaluation::where('id_evalue', $idUtilisateur)
+        $evaluations = DB::connection('pgsql')
+            ->table('evaluations')
+            ->where('evalue_matricule', $matriculeCible)
             ->where('statut', 'valide')
-            ->with(['evaluateur', 'periode', 'regle'])
-            ->orderBy('date_evaluation', 'desc')
+            ->orderByDesc('date_evaluation')
             ->limit($request->limit ?? 20)
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $evaluations
-        ]);
+        return response()->json(['success' => true, 'data' => $evaluations]);
     }
 
-    /**
-     * Vérifie si un utilisateur peut accéder à une évaluation
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+
     private function peutAccederEvaluation($utilisateur, $evaluation): bool
     {
-        // L'évaluateur peut toujours accéder
-        if ($evaluation->id_evaluateur === $utilisateur->id_utilisateur) {
+        if ($evaluation->evaluateur_matricule === $utilisateur->matricule) {
             return true;
         }
-
-        // L'évalué peut accéder si l'évaluation est validée
-        if ($evaluation->id_evalue === $utilisateur->id_utilisateur && $evaluation->statut === 'valide') {
+        if ($evaluation->evalue_matricule === $utilisateur->matricule && $evaluation->statut === 'valide') {
             return true;
         }
-
-        // Le manager peut accéder pour validation
-        if ($evaluation->evalue->id_manager === $utilisateur->id_utilisateur) {
+        // Manager de l'évalué
+        $evalue = Utilisateur::where('matricule', $evaluation->evalue_matricule)->first();
+        if ($evalue && $evalue->manager_matricule === $utilisateur->matricule) {
             return true;
         }
-
-        // DR et CDTT peuvent accéder à toutes les évaluations de leur région
-        if (in_array($utilisateur->role->nom_role, ['DR', 'CDTT']) && 
-            $evaluation->evalue->id_region === $utilisateur->id_region) {
-            return true;
+        // DR/CDTT de la même région
+        if (in_array($utilisateur->role_nom, ['ADMIN', 'DR', 'CDTT'])) {
+            return !$evalue || $evalue->id_region === $utilisateur->id_region
+                || $utilisateur->role_nom === 'ADMIN';
         }
-
         return false;
     }
 }
