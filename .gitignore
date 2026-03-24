@@ -1,7 +1,8 @@
 /.phpunit.cache
 .DS_Store
 /bootstrap/ssr
-/node_modules
+node_modules/
+**/dist/
 /public/build
 /public/hot
 /public/storage
@@ -11,7 +12,7 @@
 .env
 .env.backup
 .env.bak
-.env.docker
+# .env.docker est un template commité (sans vrais secrets, mots de passe = defaults dev)
 .env.production
 mcp.json
 .phpactor.json
@@ -29,3 +30,6 @@ yarn-error.log
 
 # Local session artifacts
 cookies.txt
+
+# Backups de bases de données (générés par scripts/dump-local-dbs.sh)
+/backups/
