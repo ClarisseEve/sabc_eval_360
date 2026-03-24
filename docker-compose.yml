@@ -2,23 +2,24 @@
 # Version: Phase 3 - Analytics Service Extraction (Strangler Pattern)
 #
 # Architecture:
-#   ┌─────────────────────────────────────────────────────────────┐
-#   │                      Traefik Gateway                        │
-#   │                    (Routing + Load Balancing)               │
-#   └──────────────────────────┬──────────────────────────────────┘
-#                              │
-#         ┌────────────────────┼────────────────────┐
-#         │                    │                    │
-#   ┌─────▼─────┐       ┌─────▼─────┐       ┌─────▼─────┐
-#   │ Core App  │       │ Analytics │       │ Evaluation│
-#   │ (Laravel) │       │ Service   │       │ Service   │
-#   │ Monolithe │       │  (Go)     │       │  (Go)     │
-#   └─────┬─────┘       └─────┬─────┘       └─────┬─────┘
-#         │                   │                   │
-#   ┌─────▼─────┐       ┌─────▼─────┐       ┌─────▼─────┐
-#   │  MySQL    │       │ClickHouse │       │PostgreSQL │
-#   │  (CORE)   │       │(ANALYTICS)│       │ (BUSINESS)│
-#   └───────────┘       └───────────┘       └───────────┘
+#   ┌─────────────────────────────────────────────────────────────────────┐
+#   │                         Traefik Gateway                            │
+#   │                    (Routing + Load Balancing)                      │
+#   └────────────────────────────┬──────────────────────────────────────┘
+#                                │
+#      ┌──────────┬──────────────┼──────────────┬──────────────┐
+#      │          │              │              │              │
+#  ┌───▼────┐ ┌──▼───────┐ ┌───▼─────┐  ┌─────▼─────┐  ┌────▼────┐
+#  │  Core  │ │ NestJS   │ │Analytics│  │ Evaluation│  │  Redis  │
+#  │ Laravel│ │  API     │ │ Service │  │ Service   │  │  Cache  │
+#  │(legacy)│ │(v3 new)  │ │  (Go)   │  │  (Go)     │  │         │
+#  └───┬────┘ └──┬───┬───┘ └───┬─────┘  └─────┬─────┘  └─────────┘
+#      │         │   │         │               │
+#  ┌───▼─────────▼┐ │    ┌────▼──────┐  ┌─────▼─────┐
+#  │   MySQL      │ │    │ClickHouse │  │PostgreSQL │
+#  │  (CORE)      │ │    │(ANALYTICS)│  │ (BUSINESS)│
+#  └──────────────┘ │    └───────────┘  └─────▲─────┘
+#                   └─────────────────────────┘
 
 services:
   # =============================================================================
@@ -27,6 +28,7 @@ services:
   gateway:
     image: traefik:v3.0
     container_name: sabc-gateway
+    profiles: [gateway]
     command:
       - "--api.dashboard=true"
       - "--api.insecure=true"
@@ -50,6 +52,7 @@ services:
       - sabc-network
     depends_on:
       - core-app
+      - nestjs-api
       - evaluation-service
       - analytics-service
     labels:
@@ -150,12 +153,15 @@ services:
   # =============================================================================
   # QUEUE WORKERS - Traitement asynchrone par domaine
   # =============================================================================
+  # queue-worker-* et scheduler sont gérés par supervisord dans core-app (dev).
+  # Ajouter le profile "scale-workers" pour les lancer en conteneurs séparés (prod).
   queue-worker-default:
     build:
       context: .
       dockerfile: docker/Dockerfile
       target: app
     container_name: sabc-queue-default
+    profiles: [scale-workers]
     restart: unless-stopped
     command: php artisan queue:work redis --queue=default,notifications --sleep=3 --tries=3 --max-time=3600
     environment:
@@ -178,6 +184,7 @@ services:
       dockerfile: docker/Dockerfile
       target: app
     container_name: sabc-queue-evaluations
+    profiles: [scale-workers]
     restart: unless-stopped
     command: php artisan queue:work redis --queue=evaluations,scores --sleep=3 --tries=3 --max-time=3600
     environment:
@@ -200,6 +207,7 @@ services:
       dockerfile: docker/Dockerfile
       target: app
     container_name: sabc-queue-analytics
+    profiles: [scale-workers]
     restart: unless-stopped
     command: php artisan queue:work redis --queue=analytics,sync --sleep=3 --tries=3 --max-time=3600
     environment:
@@ -224,6 +232,7 @@ services:
       dockerfile: docker/Dockerfile
       target: app
     container_name: sabc-scheduler
+    profiles: [scale-workers]
     restart: unless-stopped
     command: >
       sh -c "while true; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"
@@ -251,7 +260,7 @@ services:
       - MYSQL_USER=sabc_user
       - MYSQL_PASSWORD=${DB_PASSWORD:-***REMOVED***}
     ports:
-      - "3306:3306"
+      - "3307:3306"  # Hôte:3307 → évite conflits avec MySQL local (3306)
     volumes:
       - mysql_data:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -273,7 +282,7 @@ services:
       - POSTGRES_USER=sabc_user
       - POSTGRES_PASSWORD=${DB_PASSWORD:-***REMOVED***}
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Hôte:5433 → évite conflits avec PostgreSQL local (5432)
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -295,8 +304,8 @@ services:
       - CLICKHOUSE_USER=default
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     ports:
-      - "8123:8123"  # HTTP
-      - "9000:9000"  # Native
+      - "8124:8123"  # HTTP  → Hôte:8124 évite conflits avec ClickHouse OrbStack (8123)
+      - "9001:9000"  # Native → Hôte:9001 évite conflits avec ClickHouse OrbStack (9000)
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - clickhouse_logs:/var/log/clickhouse-server
@@ -354,6 +363,7 @@ services:
   redis-exporter:
     image: oliver006/redis_exporter:v1.61.0
     container_name: sabc-redis-exporter
+    profiles: [observability]
     restart: unless-stopped
     environment:
       - REDIS_ADDR=redis://redis:6379
@@ -372,6 +382,7 @@ services:
       context: ./data_pipelines
       dockerfile: Dockerfile
     container_name: sabc-python-pipeline
+    profiles: [pipeline]
     restart: unless-stopped
     environment:
       - MYSQL_HOST=mysql
@@ -405,6 +416,7 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:1.53
     container_name: sabc-jaeger
+    profiles: [observability]
     restart: unless-stopped
     ports:
       - "5775:5775/udp"   # Zipkin compact thrift
@@ -422,6 +434,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.48.0
     container_name: sabc-prometheus
+    profiles: [observability]
     restart: unless-stopped
     ports:
       - "9090:9090"
@@ -442,6 +455,7 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.26.0
     container_name: sabc-alertmanager
+    profiles: [observability]
     restart: unless-stopped
     ports:
       - "9093:9093"
@@ -465,6 +479,7 @@ services:
   grafana:
     image: grafana/grafana:10.2.2
     container_name: sabc-grafana
+    profiles: [observability]
     restart: unless-stopped
     ports:
       - "3001:3000"
@@ -482,6 +497,61 @@ services:
       - prometheus
 
   # =============================================================================
+  # NESTJS API (Phase 4 - Strangler Pattern replacement for Laravel)
+  # =============================================================================
+  nestjs-api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: sabc-nestjs-api
+    restart: unless-stopped
+    environment:
+      # Server
+      - PORT=3000
+      # MySQL (Prisma - CORE)
+      - DATABASE_URL=mysql://sabc_user:${DB_PASSWORD:-***REMOVED***}@mysql:3306/sabc_core
+      # PostgreSQL (BUSINESS)
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_DATABASE=sabc_business
+      - PG_USER=sabc_user
+      - PG_PASSWORD=${DB_PASSWORD:-***REMOVED***}
+      # Auth
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret}
+      - JWT_EXPIRATION=24h
+      # Analytics microservice (Strangler proxy)
+      - ANALYTICS_MICROSERVICE_ENABLED=${ANALYTICS_MICROSERVICE_ENABLED:-false}
+      - ANALYTICS_SERVICE_URL=http://analytics-service:8080
+      - ANALYTICS_SERVICE_KEY=${ANALYTICS_SERVICE_KEY:-internal-service-key}
+      # Frontend CORS
+      - FRONTEND_URL=http://localhost
+    ports:
+      - "3000:3000"
+    networks:
+      - sabc-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      # Route /api/v3/* to NestJS API (strangler: v3 = new NestJS endpoints)
+      - "traefik.http.routers.nestjs-api.rule=Host(`localhost`) && PathPrefix(`/api/v3`)"
+      - "traefik.http.routers.nestjs-api.entrypoints=web"
+      - "traefik.http.services.nestjs-api.loadbalancer.server.port=3000"
+      # Rate limiting
+      - "traefik.http.middlewares.nestjs-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.nestjs-ratelimit.ratelimit.burst=50"
+      - "traefik.http.routers.nestjs-api.middlewares=nestjs-ratelimit"
+
+  # =============================================================================
   # EVALUATION MICROSERVICE (Phase 2 - Go)
   # =============================================================================
   evaluation-service:
@@ -489,6 +559,7 @@ services:
       context: ./services/evaluation
       dockerfile: Dockerfile
     container_name: sabc-evaluation-service
+    profiles: [microservices]
     restart: unless-stopped
     environment:
       # Server
@@ -564,6 +635,7 @@ services:
       context: ./services/analytics
       dockerfile: Dockerfile
     container_name: sabc-analytics-service
+    profiles: [microservices]
     restart: unless-stopped
     environment:
       # Server
