@@ -1,20 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Head, Link } from '@/lib/inertia-shim';
+import { useAuthContext } from '@/Contexts/AuthContext';
 import { Button } from '@/Components/UI/Button/Button';
 import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/Components/UI/Card/Card';
-import { Badge } from '@/Components/UI/Badge/Badge';
-import { Eye, EyeOff, User, Lock, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Alert, AlertDescription } from '@/Components/UI/Alert/Alert';
-
-interface LoginProps {
-  errors: {
-    identifier?: string;
-    password?: string;
-  };
-  status?: string;
-}
 
 type TestAccount = {
   label: string;
@@ -25,18 +18,23 @@ type TestAccount = {
   badgeColor?: string;
 };
 
-const Login: React.FC<LoginProps> = ({ errors, status }) => {
-  const { data, setData, post, processing } = useForm({
-    identifier: '',
-    password: 'admin123', // Mot de passe par défaut pour les tests
-    remember: false as const,
-  });
+const Login: React.FC = () => {
+  const { login, isAuthenticated } = useAuthContext();
+  const navigate = useNavigate();
 
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [errors, setErrors] = useState<{ identifier?: string; password?: string }>({});
+  const [status, setStatus] = useState('');
 
-  // Inertia gère automatiquement le CSRF
+  // Redirect if already authenticated
+  if (isAuthenticated) {
+    navigate('/dashboard', { replace: true });
+    return null;
+  }
 
-  // Un seul compte administrateur pour la gestion initiale
   const testAccounts: TestAccount[] = [
     { 
       label: 'Admin', 
@@ -64,28 +62,26 @@ const Login: React.FC<LoginProps> = ({ errors, status }) => {
     }
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log('Tentative de connexion...');
-    
-    // Utiliser la méthode post d'Inertia (le token CSRF est géré automatiquement)
-    post('/login', {
-      preserveScroll: true,
-      onError: (errors: Record<string, string>) => {
-        console.error('Erreurs de connexion:', errors);
-        // Focus sur le champ en erreur pour améliorer l'expérience utilisateur
-        if (errors.identifier) {
-          document.getElementById('identifier')?.focus();
-        } else if (errors.password) {
-          document.getElementById('password')?.focus();
-        }
-      },
-      onSuccess: () => {
-        console.log('Connexion réussie! Le serveur retourne la page du tableau de bord...');
-        // Pas de redirection côté client: Inertia reçoit directement la page cible
+    setProcessing(true);
+    setErrors({});
+
+    try {
+      await login(identifier, password);
+      navigate('/dashboard', { replace: true });
+    } catch (error: any) {
+      const serverErrors = error.response?.data?.errors || {};
+      if (error.response?.status === 401) {
+        setErrors({ identifier: 'Identifiants incorrects.' });
+      } else if (typeof serverErrors === 'object' && Object.keys(serverErrors).length) {
+        setErrors(serverErrors);
+      } else {
+        setErrors({ identifier: error.response?.data?.message || 'Erreur de connexion.' });
       }
-    });
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (
@@ -122,7 +118,7 @@ const Login: React.FC<LoginProps> = ({ errors, status }) => {
                 <div 
                   key={index} 
                   className="flex flex-col p-2 hover:bg-sabc-gray-50 cursor-pointer rounded-md mb-1 transition-colors"
-                  onClick={() => setData('identifier', account.username)}
+                  onClick={() => setIdentifier(account.username)}
                 >
                   <div className="flex items-center">
                     <span className="font-medium text-sabc-gray-800">{account.label}</span>
@@ -146,8 +142,8 @@ const Login: React.FC<LoginProps> = ({ errors, status }) => {
                 <Input
                   id="identifier"
                   type="text"
-                  value={data.identifier}
-                  onChange={(e) => setData('identifier', e.target.value)}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   required
                   autoFocus
                   className={`h-11 rounded-lg ${errors.identifier ? 'border-sabc-error' : 'border-sabc-gray-200'}`}
@@ -172,8 +168,8 @@ const Login: React.FC<LoginProps> = ({ errors, status }) => {
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    value={data.password}
-                    onChange={(e) => setData('password', e.target.value)}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                     className={`h-11 rounded-lg pr-12 ${errors.password ? 'border-sabc-error' : 'border-sabc-gray-200'}`}
                   />
@@ -195,8 +191,8 @@ const Login: React.FC<LoginProps> = ({ errors, status }) => {
                 <input
                   id="remember"
                   type="checkbox"
-                  checked={data.remember}
-                  onChange={(e) => setData('remember', e.target.checked as false)}
+                  checked={false}
+                  onChange={() => {}}
                   className="h-5 w-5 rounded border-sabc-gray-300 text-sabc-red-primary focus:ring-sabc-red-primary"
                 />
                 <Label htmlFor="remember" className="text-sm font-medium text-sabc-gray-700">

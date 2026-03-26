@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
 import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { ArrowLeft, Save } from 'lucide-react';
-import { Link } from '@inertiajs/react';
+import { Link } from '@/lib/inertia-shim';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
 import { Checkbox } from '@/Components/UI/Checkbox/Checkbox';
 import { route } from '@/routes';
@@ -171,7 +171,7 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser, re
       
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center mb-6">
-          <Link href={route('admin.utilisateurs.show', { matricule: formData.matricule })}>
+          <Link href={`/admin/utilisateurs/${formData.matricule}`}>
             <Button variant="ghost" className="mr-4">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Retour
@@ -408,7 +408,7 @@ const UserEditPage: React.FC<UserEditPageProps> = ({ auth, user: initialUser, re
             
             {/* Boutons d'action */}
             <div className="flex justify-end space-x-2">
-              <Link href={route('admin.utilisateurs.show', { matricule: formData.matricule })}>
+              <Link href={`/admin/utilisateurs/${formData.matricule}`}>
                 <Button variant="outline">Annuler</Button>
               </Link>
               <Button type="submit" className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white">

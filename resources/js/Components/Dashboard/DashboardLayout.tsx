@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '@/Hooks/useAuth';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;

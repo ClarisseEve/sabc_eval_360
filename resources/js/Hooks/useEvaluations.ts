@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { router } from '@inertiajs/react';
+import { router } from '@/lib/inertia-shim';
 import { useAuth } from './useAuth';
 import { evaluationService } from '../Services/{api}';
 import { Evaluation, EvaluationNote, EvaluationStatus } from '../types';

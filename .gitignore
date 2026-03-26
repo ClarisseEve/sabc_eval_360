@@ -1,34 +1,30 @@
-/.phpunit.cache
-.DS_Store
-/bootstrap/ssr
+# Dependencies
 node_modules/
+apps/api/node_modules/
+
+# Build output
 **/dist/
-/public/build
-/public/hot
-/public/storage
-/storage/*.key
-/storage/pail
-/vendor
-# Env files — NEVER commit real or template env files with passwords
+
+# Env files
 .env
 .env.*
 !.env.example
+
+# OS
+.DS_Store
+
+# IDE
+/.idea
+/.vscode
+/.fleet
+/.nova
+/.zed
 mcp.json
-.phpactor.json
-.phpunit.result.cache
-Homestead.json
-Homestead.yaml
+
+# Logs
 npm-debug.log
 yarn-error.log
-/auth.json
-/.fleet
-/.idea
-/.nova
-/.vscode
-/.zed
 
-# Local session artifacts
+# Local artifacts
 cookies.txt
-
-# Backups de bases de données (générés par scripts/dump-local-dbs.sh)
 /backups/

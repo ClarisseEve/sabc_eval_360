@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { usePage } from '@inertiajs/react';
+import { usePage } from '@/lib/inertia-shim';
 
 /**
  * Interface pour les propriétés de page Inertia

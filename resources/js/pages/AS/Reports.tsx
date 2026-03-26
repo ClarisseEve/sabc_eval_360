@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent } from '@/Components/UI/Card/Card';
 import useAuth from '@/Hooks/useAuth';

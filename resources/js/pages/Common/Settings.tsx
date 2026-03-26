@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
 import { useAuth } from '@/Hooks/useAuth';
 import { useAuthBridge } from '@/Hooks/useAuthBridge';
 import AppLayout from '@/Components/Layout/app/AppLayout';

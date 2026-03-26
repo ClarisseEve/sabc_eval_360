@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs/Tabs';
 import {

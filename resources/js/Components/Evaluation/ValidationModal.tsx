@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { router } from '@inertiajs/react';
+import { router } from '@/lib/inertia-shim';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/Components/UI/Dialog/Dialog';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';

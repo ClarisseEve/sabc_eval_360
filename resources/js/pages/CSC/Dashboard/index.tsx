@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head, usePage, Link } from '@inertiajs/react';
+import { Head, usePage, Link } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';

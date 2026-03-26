@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
@@ -7,7 +7,7 @@ import { Badge } from '@/Components/UI/Badge/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
 import { Input } from '@/Components/UI/Input/Input';
 import { SearchFilter } from '@/Components/UI/SearchFilter';
-import { Link } from '@inertiajs/react';
+import { Link } from '@/lib/inertia-shim';
 
 /**
  * Page de gestion des templates d'évaluation pour l'administrateur

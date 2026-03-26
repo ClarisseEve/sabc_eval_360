@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent } from '@/Components/UI/Card';
 import { Button } from '@/Components/UI/Button';
@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/Components/UI/Checkbox';
 import { ArrowLeft, Save } from 'lucide-react';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
-import { route } from 'ziggy-js';
 
 interface CreateRoleProps {
   auth: {
@@ -40,7 +39,7 @@ export default function CreateRole({ auth, pageTitle }: CreateRoleProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    post(route('admin.roles.store'));
+    post('/admin/roles');
   };
 
   const niveauxHierarchiques = [

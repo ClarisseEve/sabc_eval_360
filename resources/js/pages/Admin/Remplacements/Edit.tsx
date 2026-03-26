@@ -1,6 +1,6 @@
 import React, { useState, FormEvent } from 'react';
-import { Head } from '@inertiajs/react';
-import { useForm } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
+import { useForm } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent, CardFooter } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
@@ -8,7 +8,6 @@ import { Label } from '@/Components/UI/Label/Label';
 import { Input } from '@/Components/UI/Input/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
 import { Textarea } from '@/Components/UI/Textarea/Textarea';
-import { route } from 'ziggy-js';
 
 /**
  * Page d'édition d'un remplacement temporaire existant
@@ -103,7 +102,7 @@ export default function Edit({ remplacement, utilisateurs = [], roles = [], auth
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    put(route('admin.remplacements.update', replacementData.id));
+    put(`/admin/remplacements/${replacementData.id}`);
   };
 
   return (
@@ -218,7 +217,7 @@ export default function Edit({ remplacement, utilisateurs = [], roles = [], auth
                   
                   <div className="flex items-center justify-end space-x-3">
                     <Button
-                      onClick={() => window.location.href = route('admin.remplacements.index')}
+                      onClick={() => window.location.href = '/admin/remplacements'}
                       variant="secondary"
                       disabled={processing}
                       type="button"

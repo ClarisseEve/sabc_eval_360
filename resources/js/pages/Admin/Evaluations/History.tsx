@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, usePage } from '@/lib/inertia-shim';
 import { useAuth } from '@/Hooks/useAuth';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';

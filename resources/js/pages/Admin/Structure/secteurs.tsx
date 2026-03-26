@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent } from '@/Components/UI/Card/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
@@ -12,7 +12,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/Components/UI/Dialog/Dialog';
 import { MapPin, Plus, Trash2, Users, MoreHorizontal, Building } from 'lucide-react';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
-import { route } from 'ziggy-js';
 
 interface Secteur {
   id_secteur: string;
@@ -68,7 +67,7 @@ export default function SecteursIndex({ secteurs, services, districts, auth, pag
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    post(route('admin.structure.secteurs.store'), {
+    post('/admin/structure/secteurs', {
       onSuccess: () => {
         setIsCreateModalOpen(false);
         reset();
@@ -85,7 +84,7 @@ export default function SecteursIndex({ secteurs, services, districts, auth, pag
     
     if (confirm('Êtes-vous sûr de vouloir supprimer ce secteur ? Cette action est irréversible.')) {
       setDeletingSecteur(secteurId);
-      destroy(route('admin.structure.secteurs.destroy', secteurId), {
+      destroy(`/admin/structure/secteurs/${secteurId}`, {
         onFinish: () => setDeletingSecteur(null),
       });
     }

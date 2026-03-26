@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent } from '@/Components/UI/Card/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
@@ -49,7 +49,7 @@ export default function RegionsIndex({ regions, auth, pageTitle }: RegionsProps)
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    post(route('admin.structure.regions.store'), {
+    post('/admin/structure/regions', {
       onSuccess: () => {
         setIsCreateModalOpen(false);
         reset();
@@ -69,7 +69,7 @@ export default function RegionsIndex({ regions, auth, pageTitle }: RegionsProps)
     e.preventDefault();
     if (!editingRegion) return;
     
-    put(route('admin.structure.regions.update', editingRegion.id_region), {
+    put(`/admin/structure/regions/${editingRegion.id_region}`, {
       onSuccess: () => {
         setEditingRegion(null);
         reset();
@@ -85,7 +85,7 @@ export default function RegionsIndex({ regions, auth, pageTitle }: RegionsProps)
     
     if (confirm('Êtes-vous sûr de vouloir supprimer cette région ? Cette action est irréversible.')) {
       setDeletingRegion(regionId);
-      destroy(route('admin.structure.regions.destroy', regionId), {
+      destroy(`/admin/structure/regions/${regionId}`, {
         onFinish: () => setDeletingRegion(null),
       });
     }

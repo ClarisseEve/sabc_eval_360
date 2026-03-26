@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent, CardTitle } from '@/Components/UI/Card';
 import { Button } from '@/Components/UI/Button';
@@ -11,7 +11,6 @@ import { Checkbox } from '@/Components/UI/Checkbox';
 import { Badge } from '@/Components/UI/Badge';
 import { ArrowLeft, Save, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
-import { route } from 'ziggy-js';
 
 interface Role {
   id_role: string;
@@ -69,7 +68,7 @@ export default function CreateRule({ auth, pageTitle, roles }: CreateRuleProps) 
     }
 
     // Préparation des données selon les règles SABC
-    post(route('admin.roles.rules.store'), {
+    post('/admin/roles/rules', {
       ...data,
       criteres_evaluation_json: criteres,
       roles_autorises: selectedRoles,

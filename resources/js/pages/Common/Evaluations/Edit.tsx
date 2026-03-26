@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { adaptUserForLayout } from '@/utils/userAdapter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';

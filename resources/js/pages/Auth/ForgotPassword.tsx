@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link } from '@/lib/inertia-shim';
 import AuthCardLayout from '@/Components/Layout/auth/auth-card-layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Alert, AlertDescription } from '@/Components/UI/Alert/Alert';

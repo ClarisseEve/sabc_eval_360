@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
@@ -14,7 +14,6 @@ import { Label } from '@/Components/UI/Label';
 import { Textarea } from '@/Components/UI/Textarea';
 import { Shield, Users, Eye, Settings, Search, Filter, CheckCircle, XCircle, AlertCircle, Edit, Save, AlertTriangle, Lock, Unlock, Plus } from 'lucide-react';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
-import { route } from 'ziggy-js';
 
 interface Permission {
   id: string;
@@ -140,7 +139,7 @@ export default function RolesPermissions({ roles = [], regles_evaluation = [], a
               <div className="flex items-center gap-3">
                 <Button 
                   className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white"
-                  onClick={() => window.location.href = route('admin.roles.rules.create')}
+                  onClick={() => window.location.href = '/admin/roles/rules/create'}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Nouvelle Règle

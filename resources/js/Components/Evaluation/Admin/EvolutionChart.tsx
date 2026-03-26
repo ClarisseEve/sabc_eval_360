@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from '@inertiajs/react';
+import { useForm } from '@/lib/inertia-shim';
 import { Button } from '@/Components/UI/Button/Button';
 import { Select } from '@/Components/UI/Select/Select';
 import { Card } from '@/Components/UI/Card/Card';

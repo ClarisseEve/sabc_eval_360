@@ -1,5 +1,5 @@
 import React from 'react';
-import { useForm } from '@inertiajs/react';
+import { useForm } from '@/lib/inertia-shim';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/Components/UI/Dialog';
 import { Button } from '@/Components/UI/Button';
 import { AlertTriangle } from 'lucide-react';

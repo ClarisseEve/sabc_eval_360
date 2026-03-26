@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent } from '@/Components/UI/Card/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
@@ -12,7 +12,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/Components/UI/Dialog/Dialog';
 import { Building2, Plus, Trash2, Users, MoreHorizontal, MapPin } from 'lucide-react';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
-import { route } from 'ziggy-js';
 
 interface ServiceCommercial {
   id_service: string;
@@ -56,7 +55,7 @@ export default function ServicesIndex({ services, regions, auth, pageTitle }: Se
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    post(route('admin.structure.services.store'), {
+    post('/admin/structure/services', {
       onSuccess: () => {
         setIsCreateModalOpen(false);
         reset();
@@ -76,7 +75,7 @@ export default function ServicesIndex({ services, regions, auth, pageTitle }: Se
     
     if (confirm('Êtes-vous sûr de vouloir supprimer ce service commercial ? Cette action est irréversible.')) {
       setDeletingService(serviceId);
-      destroy(route('admin.structure.services.destroy', serviceId), {
+      destroy(`/admin/structure/services/${serviceId}`, {
         onFinish: () => setDeletingService(null),
       });
     }

@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@/lib/inertia-shim';
 import { Card } from '@/Components/UI/Card/Card';
 import { cn } from '@/lib/utils';
 

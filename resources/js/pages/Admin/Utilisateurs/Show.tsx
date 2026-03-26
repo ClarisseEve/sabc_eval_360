@@ -1,12 +1,12 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Progress } from '@/Components/UI/Progress/Progress';
 import { ArrowLeft, Award, Calendar, Building, Phone, Mail, Users, TrendingUp, Target } from 'lucide-react';
-import { Link } from '@inertiajs/react';
+import { Link } from '@/lib/inertia-shim';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 /**

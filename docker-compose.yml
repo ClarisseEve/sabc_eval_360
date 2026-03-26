@@ -552,6 +552,28 @@ services:
       - "traefik.http.routers.nestjs-api.middlewares=nestjs-ratelimit"
 
   # =============================================================================
+  # FRONTEND SPA (React + Vite, served by Nginx)
+  # =============================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    container_name: sabc-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    networks:
+      - sabc-network
+    depends_on:
+      nestjs-api:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`localhost`) && !PathPrefix(`/api`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+  # =============================================================================
   # EVALUATION MICROSERVICE (Phase 2 - Go)
   # =============================================================================
   evaluation-service:

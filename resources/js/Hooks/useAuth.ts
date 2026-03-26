@@ -1,6 +1,6 @@
 import { useCallback, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/Contexts/AuthContext';
-import { router } from '@inertiajs/react';
 
 /**
  * Hook personnalisé pour la gestion de l'authentification
@@ -8,6 +8,7 @@ import { router } from '@inertiajs/react';
  */
 export const useAuth = () => {
   const auth = useAuthContext();
+  const navigate = useNavigate();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState<boolean>(false);
 
@@ -37,7 +38,7 @@ export const useAuth = () => {
     
     try {
       await auth.logout();
-      router.visit('/login');
+      navigate('/login', { replace: true });
       return true;
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error);
@@ -45,7 +46,7 @@ export const useAuth = () => {
     } finally {
       setProcessing(false);
     }
-  }, [auth]);
+  }, [auth, navigate]);
 
   // Fonction pour vérifier les permissions basées sur le rôle
   const hasPermission = useCallback((permission: string): boolean => {

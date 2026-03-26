@@ -1,5 +1,5 @@
 import React, { FormEvent } from 'react';
-import { Head, useForm, Link } from '@inertiajs/react';
+import { Head, useForm, Link } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent, CardFooter } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
@@ -7,7 +7,6 @@ import { Label } from '@/Components/UI/Label/Label';
 import { Input } from '@/Components/UI/Input/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
 import { Textarea } from '@/Components/UI/Textarea/Textarea';
-import { route } from 'ziggy-js';
 
 /**
  * Page de création d'un nouveau remplacement temporaire
@@ -80,7 +79,7 @@ export default function Create({ utilisateurs = [], roles = [], auth }: CreatePr
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    post(route('admin.remplacements.store'));
+    post('/admin/remplacements');
   };
 
   return (
@@ -194,7 +193,7 @@ export default function Create({ utilisateurs = [], roles = [], auth }: CreatePr
                   </div>
                   
                   <div className="flex items-center justify-end space-x-3">
-                    <Link href={route('admin.remplacements.index')}>
+                    <Link href="/admin/remplacements">
                       <Button
                         type="button"
                         variant="secondary"

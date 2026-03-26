@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useForm } from '@inertiajs/react';
+import { useForm } from '@/lib/inertia-shim';
 import { route } from '@/routes';
 import { Button } from '@/Components/UI/Button/Button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/Components/UI/Dialog/Dialog';
@@ -27,7 +27,7 @@ export default function DeleteUser() {
   const deleteUser = (e: React.FormEvent) => {
     e.preventDefault();
 
-    destroy(route('profile.destroy'), {
+    destroy('/api/profile', {
       preserveScroll: true,
       onSuccess: () => closeModal(),
       onError: () => {

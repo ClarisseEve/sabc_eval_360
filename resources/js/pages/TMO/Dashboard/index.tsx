@@ -1,8 +1,8 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
 import { AppLayout } from '@/Layouts';
 import { MarketingSupervisorDashboard } from '@/Components/Dashboard/MarketingSupervisorDashboard';
-import { usePage } from '@inertiajs/react';
+import { usePage } from '@/lib/inertia-shim';
 import { SharedData } from '@/types';
 
 export default function TMODashboard() {

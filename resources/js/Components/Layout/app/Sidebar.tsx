@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from '@inertiajs/react';
+import { Link } from '@/lib/inertia-shim';
 import { LogOut, ChevronDown, ChevronRight, AlignLeft, Menu, Users } from 'lucide-react';
 import { cn } from '@/utils/helpers';
 import { Button } from '@/Components/UI/Button/Button';

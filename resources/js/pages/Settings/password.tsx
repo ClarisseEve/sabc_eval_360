@@ -1,5 +1,5 @@
 import React, { FormEventHandler, useRef } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/lib/inertia-shim';
 import { Transition } from '@headlessui/react';
 import { Button } from '@/Components/UI/Button';
 import { Input } from '@/Components/UI/Input';
@@ -28,7 +28,7 @@ export default function Password({ user, pageTitle, isAdmin, permissions }: Prop
     const updatePassword: FormEventHandler = (e) => {
         e.preventDefault();
 
-        put(route('password.update'), {
+        put('/api/password', {
             preserveScroll: true,
             onSuccess: () => reset(),
             onError: (errors) => {

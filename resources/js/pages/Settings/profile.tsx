@@ -1,5 +1,5 @@
 import React, { FormEventHandler } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/lib/inertia-shim';
 import { Transition } from '@headlessui/react';
 import { Button } from '@/Components/UI/Button';
 import { Input } from '@/Components/UI/Input';
@@ -31,7 +31,7 @@ export default function Profile({ user, pageTitle, isAdmin, permissions, mustVer
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        patch(route('profile.update'), {
+        patch('/api/profile', {
             preserveScroll: true,
         });
     };

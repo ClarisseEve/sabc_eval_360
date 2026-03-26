@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent } from '@/Components/UI/Card/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
@@ -12,7 +12,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/Components/UI/Dialog/Dialog';
 import { Building, Plus, Trash2, Users, MoreHorizontal, MapPin } from 'lucide-react';
 import { RoleGuard } from '@/Components/Auth/RoleGuard';
-import { route } from 'ziggy-js';
 
 interface District {
   id_district: string;
@@ -56,7 +55,7 @@ export default function DistrictsIndex({ districts, services, auth, pageTitle }:
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    post(route('admin.structure.districts.store'), {
+    post('/admin/structure/districts', {
       onSuccess: () => {
         setIsCreateModalOpen(false);
         reset();
@@ -76,7 +75,7 @@ export default function DistrictsIndex({ districts, services, auth, pageTitle }:
     
     if (confirm('Êtes-vous sûr de vouloir supprimer ce district ? Cette action est irréversible.')) {
       setDeletingDistrict(districtId);
-      destroy(route('admin.structure.districts.destroy', districtId), {
+      destroy(`/admin/structure/districts/${districtId}`, {
         onFinish: () => setDeletingDistrict(null),
       });
     }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head, router } from '@/lib/inertia-shim';
 import { Button } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Badge } from '@/Components/UI/Badge';
@@ -179,15 +179,15 @@ const AdminUsersPage = ({
   };
 
   const handleViewUser = (matricule: string) => {
-    router.visit(route('admin.utilisateurs.show', { matricule }));
+    router.visit(`/admin/utilisateurs/${matricule}`);
   };
 
   const handleEditUser = (matricule: string) => {
-    router.visit(route('admin.utilisateurs.edit', { matricule }));
+    router.visit(`/admin/utilisateurs/${matricule}/edit`);
   };
 
   const handleCreateUser = () => {
-    router.visit(route('admin.utilisateurs.create'));
+    router.visit('/admin/utilisateurs/create');
   };
 
   return (

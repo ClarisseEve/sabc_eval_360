@@ -1,10 +1,9 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
-import { Link } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
+import { Link } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent, CardFooter } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
-import { route } from 'ziggy-js';
 
 /**
  * Page de détails d'un remplacement temporaire
@@ -91,7 +90,7 @@ export default function Show({ remplacement, auth }: ShowProps) {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-semibold text-gray-900">Détails du Remplacement</h1>
             <div className="flex space-x-3">
-              <Link href={route('admin.remplacements.edit', { id: String(replacementData.id) })}>
+              <Link href={`/admin/remplacements/${replacementData.id}/edit`}>
                 <Button
                   variant="secondary"
                   type="button"
@@ -265,7 +264,7 @@ export default function Show({ remplacement, auth }: ShowProps) {
           </div>
           
           <div className="mt-6 flex justify-between">
-            <Link href={route('admin.remplacements.index')}>
+            <Link href="/admin/remplacements">
               <Button
                 variant="secondary"
                 type="button"

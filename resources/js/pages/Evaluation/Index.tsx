@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
 import { AlertCircle, CheckCircle, Clock, Filter, Search, Plus } from 'lucide-react';
 
 // Layouts

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
@@ -7,7 +7,7 @@ import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { Textarea } from '@/Components/UI/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
-import { Link } from '@inertiajs/react';
+import { Link } from '@/lib/inertia-shim';
 import SectionsCompetencesEditor from '@/Components/Evaluation/Admin/SectionsCompetencesEditor';
 
 // Page d'édition de template d'évaluation

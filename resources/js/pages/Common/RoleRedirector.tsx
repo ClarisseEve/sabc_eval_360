@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useAuthContext } from '@/Contexts/AuthContext';
-import { router } from '@inertiajs/react';
+import { router } from '@/lib/inertia-shim';
 
 /**
  * Composant de redirection basé sur le rôle de l'utilisateur

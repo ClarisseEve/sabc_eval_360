@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from '@inertiajs/react';
+import { Link } from '@/lib/inertia-shim';
 import { Button } from '@/Components/UI/Button/Button';
 import { ArrowLeft, Home, Shield } from 'lucide-react';
 

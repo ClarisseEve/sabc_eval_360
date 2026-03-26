@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link } from '@/lib/inertia-shim';
 import { useAuth } from '@/Hooks/useAuth';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';

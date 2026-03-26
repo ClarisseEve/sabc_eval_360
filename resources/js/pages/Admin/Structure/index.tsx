@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { adaptUserForLayout } from '@/utils/userAdapter';
 import HierarchyTree, { SABC_HIERARCHY_DATA } from '@/Components/UI/HierarchyTree/HierarchyTree';

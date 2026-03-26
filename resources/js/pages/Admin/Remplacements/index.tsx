@@ -1,12 +1,11 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
-import { Link } from '@inertiajs/react';
+import { Head } from '@/lib/inertia-shim';
+import { Link } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardHeader, CardContent, CardFooter } from '@/Components/UI/Card/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
 import { Button } from '@/Components/UI/Button/Button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/Components/UI/DropdownMenu/DropdownMenu';
-import { route } from 'ziggy-js';
 
 /**
  * Page d'administration des remplacements temporaires
@@ -74,7 +73,7 @@ export default function Remplacements({ remplacements = [], auth }: Remplacement
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-semibold text-gray-900">Gestion des Remplacements Temporaires</h1>
-            <Link href={route('admin.remplacements.create')}>
+            <Link href="/admin/remplacements/create">
               <Button 
                 variant="default"
                 type="button"
@@ -125,12 +124,12 @@ export default function Remplacements({ remplacements = [], auth }: Remplacement
                           <DropdownMenu>
                             <DropdownMenuTrigger className="cursor-pointer">Actions</DropdownMenuTrigger>
                             <DropdownMenuContent>
-                              <Link href={route('admin.remplacements.show', { id: String(remplacement.id) })}>
+                              <Link href={`/admin/remplacements/${remplacement.id}`}>
                                 <DropdownMenuItem>
                                   Voir détails
                                 </DropdownMenuItem>
                               </Link>
-                              <Link href={route('admin.remplacements.edit', { id: String(remplacement.id) })}>
+                              <Link href={`/admin/remplacements/${remplacement.id}/edit`}>
                                 <DropdownMenuItem>
                                   Modifier
                                 </DropdownMenuItem>
