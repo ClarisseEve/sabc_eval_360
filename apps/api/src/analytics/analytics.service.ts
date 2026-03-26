@@ -194,11 +194,8 @@ export class AnalyticsService {
       details: Record<string, any>;
     }> = [];
 
-    const whereClause = matricule
-      ? `WHERE evalue_matricule = '${matricule}'`
-      : idRegion
-        ? `WHERE evalue_matricule IN (SELECT matricule FROM utilisateurs WHERE id_region = '${idRegion}')`
-        : '';
+    // All queries below use parameterized $1 placeholders — never string interpolation.
+    const params = matricule ? [matricule] : [];
 
     // 1. Divergence auto-évaluation vs évaluations des autres (seuil: 1.5 pts)
     const divergences = await this.pg.query<any>(
@@ -213,9 +210,10 @@ export class AnalyticsService {
        WHERE e_auto.type_evaluation = 'auto' AND e_auto.statut = 'valide'
          AND e_autres.type_evaluation != 'auto' AND e_autres.statut = 'valide'
          AND e_auto.note_globale IS NOT NULL AND e_autres.note_globale IS NOT NULL
-         ${matricule ? `AND e_auto.evalue_matricule = '${matricule}'` : ''}
+         ${matricule ? 'AND e_auto.evalue_matricule = $1' : ''}
        GROUP BY e_auto.evalue_matricule
        HAVING ABS(AVG(e_auto.note_globale) - AVG(e_autres.note_globale)) > 1.5`,
+      params,
     );
 
     for (const d of divergences) {
@@ -239,7 +237,7 @@ export class AnalyticsService {
          FROM evaluations
          WHERE statut = 'valide' AND note_globale IS NOT NULL
            AND date_evaluation >= NOW() - INTERVAL '3 months'
-           ${matricule ? `AND evalue_matricule = '${matricule}'` : ''}
+           ${matricule ? 'AND evalue_matricule = $1' : ''}
          GROUP BY evalue_matricule
        ),
        ancien AS (
@@ -248,7 +246,7 @@ export class AnalyticsService {
          WHERE statut = 'valide' AND note_globale IS NOT NULL
            AND date_evaluation < NOW() - INTERVAL '3 months'
            AND date_evaluation >= NOW() - INTERVAL '6 months'
-           ${matricule ? `AND evalue_matricule = '${matricule}'` : ''}
+           ${matricule ? 'AND evalue_matricule = $1' : ''}
          GROUP BY evalue_matricule
        )
        SELECT r.evalue_matricule as matricule,
@@ -256,6 +254,7 @@ export class AnalyticsService {
               r.score_recent - a.score_ancien as progression
        FROM recent r JOIN ancien a ON r.evalue_matricule = a.evalue_matricule
        WHERE r.score_recent - a.score_ancien < -1`,
+      params,
     );
 
     for (const b of baisses) {
@@ -280,9 +279,10 @@ export class AnalyticsService {
               AVG(note_globale) as moyenne_notes
        FROM evaluations
        WHERE statut = 'valide' AND note_globale IS NOT NULL AND type_evaluation != 'auto'
-         ${matricule ? `AND evaluateur_matricule = '${matricule}'` : ''}
+         ${matricule ? 'AND evaluateur_matricule = $1' : ''}
        GROUP BY evaluateur_matricule
        HAVING COUNT(*) >= 3 AND VARIANCE(note_globale) < 0.5`,
+      params,
     );
 
     for (const u of uniformites) {
@@ -312,9 +312,10 @@ export class AnalyticsService {
               COUNT(*) as nb_evaluations
        FROM evaluations e, global_avg g
        WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL AND e.type_evaluation != 'auto'
-         ${matricule ? `AND e.evaluateur_matricule = '${matricule}'` : ''}
+         ${matricule ? 'AND e.evaluateur_matricule = $1' : ''}
        GROUP BY e.evaluateur_matricule, g.avg_global
        HAVING COUNT(*) >= 3 AND ABS(AVG(e.note_globale) - g.avg_global) > 1`,
+      params,
     );
 
     for (const b of biaisResult) {
