@@ -174,6 +174,15 @@ export const analyticsApi = {
   evaluations: () => api.get('/analytics/evaluations'),
   performances: () => api.get('/analytics/performances'),
   region: (idRegion: string) => api.get(`/analytics/region/${idRegion}`),
+  classementRegional: (idRegion: string) => api.get(`/analytics/region/${idRegion}/classement`),
+  axesAmelioration: (matricule?: string) =>
+    api.get(matricule ? `/analytics/axes-amelioration/${matricule}` : '/analytics/axes-amelioration'),
+  anomalies: (params?: { matricule?: string; id_region?: string }) =>
+    api.get('/analytics/anomalies', { params }),
+  recommandations: (matricule?: string) =>
+    api.get(matricule ? `/analytics/recommandations/${matricule}` : '/analytics/recommandations'),
+  scores: (matricule?: string) =>
+    api.get(matricule ? `/analytics/scores/${matricule}` : '/analytics/scores'),
 };
 
 // ─── Utilisateurs ────────────────────────────────────────────────────────────
