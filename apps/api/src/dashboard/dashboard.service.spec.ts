@@ -5,6 +5,8 @@ describe('DashboardService', () => {
   let mockPg: any;
   let mockPrisma: any;
 
+  let mockCache: any;
+
   beforeEach(() => {
     mockPg = {
       query: jest.fn(),
@@ -14,10 +16,20 @@ describe('DashboardService', () => {
     mockPrisma = {
       utilisateur: {
         count: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      region: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      role: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       $queryRawUnsafe: jest.fn(),
     };
-    service = new DashboardService(mockPg, mockPrisma);
+    mockCache = {
+      getOrCompute: jest.fn((_key: string, _ttl: number, fn: () => any) => fn()),
+    };
+    service = new DashboardService(mockPg, mockPrisma, mockCache);
   });
 
   describe('getStats', () => {

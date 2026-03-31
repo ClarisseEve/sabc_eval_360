@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { Module, Global } from '@nestjs/common';
+import { CacheService } from './common/cache.service';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { DatabasePgModule } from './database/database-pg.module';
@@ -16,7 +17,10 @@ import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthModule } from './health/health.module';
 
+@Global()
 @Module({
+  providers: [CacheService],
+  exports: [CacheService],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,

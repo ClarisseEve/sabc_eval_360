@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabasePgService } from '../database/database-pg.service';
+import { CacheService } from '../common/cache.service';
 
 @Injectable()
 export class AnalyticsService {
@@ -12,6 +13,7 @@ export class AnalyticsService {
   constructor(
     private config: ConfigService,
     private pg: DatabasePgService,
+    private cache: CacheService,
   ) {
     this.serviceUrl = config.get('ANALYTICS_SERVICE_URL', 'http://analytics-service:8080');
     this.serviceKey = config.get('ANALYTICS_SERVICE_KEY', 'internal-service-key');
@@ -19,6 +21,11 @@ export class AnalyticsService {
   }
 
   async getDashboard(filters: { start_date?: string; end_date?: string } = {}) {
+    const key = `analytics:dashboard:${filters.start_date ?? ''}:${filters.end_date ?? ''}`;
+    return this.cache.getOrCompute(key, 120, () => this._getDashboard(filters));
+  }
+
+  private async _getDashboard(filters: { start_date?: string; end_date?: string } = {}) {
     if (this.enabled) {
       try {
         const res = await fetch(`${this.serviceUrl}/api/v2/analytics`, {
@@ -123,6 +130,10 @@ export class AnalyticsService {
 
   // ─── Axes d'amélioration pour un utilisateur ─────────────────────────────
   async getAxesAmelioration(matricule: string) {
+    return this.cache.getOrCompute(`analytics:axes:${matricule}`, 300, () => this._getAxesAmelioration(matricule));
+  }
+
+  private async _getAxesAmelioration(matricule: string) {
     const evaluations = await this.pg.query<any>(
       `SELECT notations_json, type_evaluation, note_globale
        FROM evaluations
@@ -186,6 +197,11 @@ export class AnalyticsService {
 
   // ─── Détection d'anomalies ───────────────────────────────────────────────
   async detecterAnomalies(matricule?: string, idRegion?: string) {
+    const key = `analytics:anomalies:${matricule ?? 'all'}:${idRegion ?? 'all'}`;
+    return this.cache.getOrCompute(key, 180, () => this._detecterAnomalies(matricule, idRegion));
+  }
+
+  private async _detecterAnomalies(matricule?: string, idRegion?: string) {
     const anomalies: Array<{
       type: string;
       description: string;
@@ -348,9 +364,13 @@ export class AnalyticsService {
 
   // ─── Recommandations personnalisées ─────────────────────────────────────
   async getRecommandations(matricule: string) {
+    return this.cache.getOrCompute(`analytics:reco:${matricule}`, 300, () => this._getRecommandations(matricule));
+  }
+
+  private async _getRecommandations(matricule: string) {
     const [axes, scores, user] = await Promise.all([
-      this.getAxesAmelioration(matricule),
-      this.getScoresUtilisateur(matricule),
+      this._getAxesAmelioration(matricule),
+      this._getScoresUtilisateur(matricule),
       this.pg.queryOne<any>(
         `SELECT u.matricule, u.nom, u.prenom, u.role, u.id_region, u.niveau_hierarchique
          FROM utilisateurs u WHERE u.matricule = $1`,
@@ -469,6 +489,10 @@ export class AnalyticsService {
 
   // ─── Scores détaillés utilisateur ────────────────────────────────────────
   async getScoresUtilisateur(matricule: string) {
+    return this.cache.getOrCompute(`analytics:scores:${matricule}`, 120, () => this._getScoresUtilisateur(matricule));
+  }
+
+  private async _getScoresUtilisateur(matricule: string) {
     const recent = await this.pg.queryOne<any>(
       `SELECT AVG(note_globale) as score_recent
        FROM evaluations
@@ -526,6 +550,10 @@ export class AnalyticsService {
 
   // ─── Classement régional (anonymisé) ────────────────────────────────────
   async getClassementRegional(idRegion: string) {
+    return this.cache.getOrCompute(`analytics:classement:${idRegion}`, 300, () => this._getClassementRegional(idRegion));
+  }
+
+  private async _getClassementRegional(idRegion: string) {
     const classement = await this.pg.query<any>(
       `SELECT
          e.evalue_matricule,

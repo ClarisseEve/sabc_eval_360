@@ -1,0 +1,264 @@
+/**
+ * SABC Design System - Palette de couleurs officielle
+ * Basé sur les règles graphiques SABC
+ */
+
+:root {
+  /* Couleurs Primaires (OBLIGATOIRES) */
+  --sabc-red-primary: #E53E3E;    /* Rouge SABC principal */
+  --sabc-red-light: #FED7D7;      /* Rouge clair backgrounds */
+  --sabc-red-dark: #C53030;       /* Rouge foncé hover/active */
+  --sabc-accent: #FF9800;         /* Orange accent */
+  --sabc-accent-light: #FFE0B2;   /* Orange clair */
+
+  /* Nuances de Gris (COMPLÈTES) */
+  --sabc-gray-50: #F5F5F5;        /* Background app */
+  --sabc-gray-50-rgb: 245, 245, 245;  /* Version RGB pour transparence */
+  --sabc-gray-100: #F5F5F5;       /* Background cards */
+  --sabc-gray-100-rgb: 245, 245, 245;  /* Version RGB pour transparence */
+  --sabc-gray-200: #E0E0E0;       /* Bordures, séparateurs */
+  --sabc-gray-200-rgb: 224, 224, 224;  /* Version RGB pour transparence */
+  --sabc-gray-400: #9E9E9E;       /* Texte secondaire */
+  --sabc-gray-400-rgb: 158, 158, 158;  /* Version RGB pour transparence */
+  --sabc-gray-800: #424242;       /* Texte principal */
+  --sabc-gray-800-rgb: 66, 66, 66;  /* Version RGB pour transparence */
+  --sabc-gray-900: #1A202C;       /* Titres importants */
+  --sabc-gray-900-rgb: 26, 32, 44;  /* Version RGB pour transparence */
+
+  /* Couleurs Fonctionnelles */
+  --sabc-success: #48BB78;        /* Validations */
+  --sabc-warning: #D69E2E;        /* Alertes */
+  --sabc-error: #E53E3E;          /* Erreurs (rouge SABC) */
+  --sabc-info: #3182CE;           /* Informations */
+  
+  /* Palette pour graphiques */
+  --sabc-chart-1: var(--sabc-red-primary);
+  --sabc-chart-2: var(--sabc-accent);
+  --sabc-chart-3: var(--sabc-success);
+  --sabc-chart-4: var(--sabc-info);
+  --sabc-chart-5: var(--sabc-warning);
+  --sabc-chart-6: var(--sabc-gray-400);
+}
+
+/* Thème sombre - Appliqué quand la classe .dark est présente sur le document */
+.dark {
+  /* Couleurs Primaires en mode sombre */
+  --sabc-red-primary: #E53E3E;    /* Rouge SABC principal - inchangé */
+  --sabc-red-light: #FED7D7;      /* Rouge clair backgrounds */
+  --sabc-red-dark: #C53030;       /* Rouge foncé hover/active */
+  --sabc-accent: #FF9800;         /* Orange accent */
+  --sabc-accent-light: #FFE0B2;   /* Orange clair */
+
+  /* Nuances de Gris adaptées au thème sombre */
+  --sabc-gray-50: #121212;        /* Background app - sombre */
+  --sabc-gray-50-rgb: 18, 18, 18;  /* Version RGB pour transparence */
+  --sabc-gray-100: #1E1E1E;       /* Background cards - sombre */
+  --sabc-gray-100-rgb: 30, 30, 30;  /* Version RGB pour transparence */
+  --sabc-gray-200: #333333;       /* Bordures, séparateurs - sombre */
+  --sabc-gray-200-rgb: 51, 51, 51;  /* Version RGB pour transparence */
+  --sabc-gray-400: #A0A0A0;       /* Texte secondaire - plus clair */
+  --sabc-gray-400-rgb: 160, 160, 160;  /* Version RGB pour transparence */
+  --sabc-gray-800: #E0E0E0;       /* Texte principal - clair */
+  --sabc-gray-800-rgb: 224, 224, 224;  /* Version RGB pour transparence */
+  --sabc-gray-900: #F5F5F5;       /* Titres importants - très clair */
+
+  /* Couleurs fonctionnelles adaptées au thème sombre */
+  --sabc-success: #4CAF50;        /* Validations - plus vif */
+  --sabc-warning: #FFC107;        /* Alertes - plus vif */
+  --sabc-error: #F44336;          /* Erreurs - plus vif */
+  --sabc-info: #2196F3;           /* Informations - plus vif */
+  
+  /* Palette pour graphiques - plus vive pour contraste sur fond sombre */
+  --sabc-chart-1: #FF5252;        /* Rouge plus vif */
+  --sabc-chart-2: #FFAB40;        /* Orange plus vif */
+  --sabc-chart-3: #69F0AE;        /* Vert plus vif */
+  --sabc-chart-4: #40C4FF;        /* Bleu plus vif */
+  --sabc-chart-5: #FFD740;        /* Jaune plus vif */
+  --sabc-chart-6: #B0BEC5;        /* Gris plus vif */
+}
+
+/* Classes utilitaires pour les couleurs de fond */
+.bg-sabc-primary { background-color: var(--sabc-red-primary); }
+.bg-sabc-light { background-color: var(--sabc-red-light); }
+.bg-sabc-dark { background-color: var(--sabc-red-dark); }
+.bg-sabc-accent { background-color: var(--sabc-accent); }
+.bg-sabc-accent-light { background-color: var(--sabc-accent-light); }
+.bg-sabc-success { background-color: var(--sabc-success); }
+.bg-sabc-warning { background-color: var(--sabc-warning); }
+.bg-sabc-info { background-color: var(--sabc-info); }
+.bg-sabc-gray-50 { background-color: var(--sabc-gray-50); }
+.bg-sabc-gray-100 { background-color: var(--sabc-gray-100); }
+.bg-sabc-gray-200 { background-color: var(--sabc-gray-200); }
+.bg-sabc-gray-400 { background-color: var(--sabc-gray-400); }
+.bg-sabc-gray-800 { background-color: var(--sabc-gray-800); }
+.bg-sabc-gray-900 { background-color: var(--sabc-gray-900); }
+
+/* Classes utilitaires pour les couleurs de texte */
+.text-sabc-primary { color: var(--sabc-red-primary); }
+.text-sabc-light { color: var(--sabc-red-light); }
+.text-sabc-dark { color: var(--sabc-red-dark); }
+.text-sabc-accent { color: var(--sabc-accent); }
+.text-sabc-accent-light { color: var(--sabc-accent-light); }
+.text-sabc-success { color: var(--sabc-success); }
+.text-sabc-warning { color: var(--sabc-warning); }
+.text-sabc-error { color: var(--sabc-error); }
+.text-sabc-info { color: var(--sabc-info); }
+.text-sabc-gray-50 { color: var(--sabc-gray-50); }
+.text-sabc-gray-100 { color: var(--sabc-gray-100); }
+.text-sabc-gray-200 { color: var(--sabc-gray-200); }
+.text-sabc-gray-400 { color: var(--sabc-gray-400); }
+.text-sabc-gray-800 { color: var(--sabc-gray-800); }
+.text-sabc-gray-900 { color: var(--sabc-gray-900); }
+
+/* Classes utilitaires pour les bordures */
+.border-sabc-primary { border-color: var(--sabc-red-primary); }
+.border-sabc-light { border-color: var(--sabc-red-light); }
+.border-sabc-dark { border-color: var(--sabc-red-dark); }
+.border-sabc-accent { border-color: var(--sabc-accent); }
+.border-sabc-accent-light { border-color: var(--sabc-accent-light); }
+.border-sabc-success { border-color: var(--sabc-success); }
+.border-sabc-warning { border-color: var(--sabc-warning); }
+.border-sabc-error { border-color: var(--sabc-error); }
+.border-sabc-info { border-color: var(--sabc-info); }
+.border-sabc-gray-50 { border-color: var(--sabc-gray-50); }
+.border-sabc-gray-100 { border-color: var(--sabc-gray-100); }
+.border-sabc-gray-200 { border-color: var(--sabc-gray-200); }
+.border-sabc-gray-400 { border-color: var(--sabc-gray-400); }
+.border-sabc-gray-800 { border-color: var(--sabc-gray-800); }
+.border-sabc-gray-900 { border-color: var(--sabc-gray-900); }
+
+/* Styles spécifiques pour garantir la visibilité des boutons */
+.bg-sabc-red-primary, button.bg-sabc-red-primary {
+  background-color: var(--sabc-red-primary) !important;
+  color: white !important;
+}
+
+.hover\:bg-sabc-red-dark:hover, button.hover\:bg-sabc-red-dark:hover {
+  background-color: var(--sabc-red-dark) !important;
+}
+
+.hover\:bg-sabc-accent:hover, button.hover\:bg-sabc-accent:hover {
+  background-color: var(--sabc-accent) !important;
+}
+
+.hover\:bg-sabc-accent-light:hover, button.hover\:bg-sabc-accent-light:hover {
+  background-color: var(--sabc-accent-light) !important;
+}
+
+/* Garantir que les boutons du design system sont toujours visibles */
+/* Conserve la lisibilité des boutons explicitement forcés en blanc sans casser les variantes data-state */
+button.text-white {
+  color: white !important;
+}
+
+/* Styles pour les boutons ghost */
+button[class*="variant-ghost"] {
+  background-color: transparent !important;
+}
+
+button[class*="text-sabc-error"] {
+  color: var(--sabc-error) !important;
+}
+
+/* Styles spécifiques pour le thème sombre */
+.dark .bg-white {
+  background-color: var(--sabc-gray-100) !important;
+}
+
+.dark .border-sabc-gray-200 {
+  border-color: var(--sabc-gray-200) !important;
+}
+
+.dark .text-sabc-gray-800 {
+  color: var(--sabc-gray-800) !important;
+}
+
+.dark .text-sabc-gray-400 {
+  color: var(--sabc-gray-400) !important;
+}
+
+/* Amélioration de la lisibilité des textes dans les badges/avatars en mode sombre */
+.dark .bg-red-500,
+.dark .bg-red-600,
+.dark .bg-sabc-red-primary,
+.dark .bg-sabc-red-dark {
+  color: white !important;
+}
+
+.dark .bg-red-500 *,
+.dark .bg-red-600 *,
+.dark .bg-sabc-red-primary *,
+.dark .bg-sabc-red-dark * {
+  color: white !important;
+}
+
+/* Styles spécifiques pour les avatars et badges en mode sombre */
+.dark [class*="avatar"],
+.dark [class*="badge"] {
+  color: white !important;
+  text-shadow: 0px 0px 2px rgba(0, 0, 0, 0.5);
+  font-weight: 600;
+}
+
+/* Amélioration de la lisibilité des infobulles en mode sombre */
+.dark [role="tooltip"],
+.dark [data-tooltip],
+.dark .tooltip {
+  color: var(--sabc-red-primary) !important;
+  background-color: var(--sabc-gray-900) !important;
+  border-color: var(--sabc-gray-700) !important;
+  text-shadow: 0px 0px 1px rgba(0, 0, 0, 0.963);
+  
+}
+
+/* Amélioration de la lisibilité des bulles de sélection en mode sombre */
+.dark .tab,
+.dark .tab-content,
+.dark [role="tabpanel"],
+.dark [role="tab"],
+.dark .tabs-boxed .tab,
+.dark .select-bordered,
+.dark .select-ghost,
+.dark .select option {
+  color: white !important;
+  text-shadow: 0px 0px 1px rgba(0, 0, 0, 0.3);
+}
+
+/* Style spécifique pour les onglets actifs */
+.dark .tab.tab-active,
+.dark [role="tab"][aria-selected="true"] {
+  background-color: var(--sabc-red-primary) !important;
+  color: white !important;
+  border-color: var(--sabc-red-primary) !important;
+  font-weight: 600;
+}
+
+/* Style pour les options sélectionnées dans les menus déroulants */
+.dark select option:checked,
+.dark select option:hover {
+  background-color: var(--sabc-red-primary) !important;
+  color: white !important;
+}
+
+/* Styles spécifiques pour les initiales dans les avatars */
+.dark .bg-sabc-red-primary [data-initials],
+.dark .bg-red-500 [data-initials],
+.dark .bg-red-600 [data-initials] {
+  color: white !important;
+  font-weight: 700;
+  text-shadow: 0px 0px 3px rgba(0, 0, 0, 0.7);
+}
+
+/* Styles pour les éléments interactifs en mode sombre */
+.dark .hover\:bg-sabc-gray-100:hover {
+  background-color: var(--sabc-gray-200) !important;
+}
+
+.dark .hover\:text-sabc-red-primary:hover {
+  color: var(--sabc-red-light) !important;
+}
+/* Styles spécifiques pour garantir la visibilité des boutons */
+.bg-sabc-red-primary, button.bg-sabc-red-primary {
+  background-color: var(--sabc-red-primary) !important;
+  color: white !important;
+}

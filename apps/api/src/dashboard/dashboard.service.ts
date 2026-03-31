@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CacheService } from '../common/cache.service';
 
 export interface DashboardStats {
   evaluations_en_attente: number;
@@ -21,6 +22,26 @@ export interface AdminDashboardStats extends DashboardStats {
   evaluations_validees: number;
   taux_completion: number;
   remplacements_actifs: number;
+  regions?: RegionStats[];
+  performance_par_role?: RolePerformance[];
+  evaluations_par_statut?: { name: string; value: number; color: string }[];
+}
+
+export interface RegionStats {
+  id: string;
+  nom: string;
+  est_taniere: boolean;
+  utilisateurs: number;
+  evaluations: number;
+  badgeColor: string;
+  badgeText: string;
+}
+
+export interface RolePerformance {
+  role: string;
+  count: number;
+  avgScore: number;
+  completion: number;
 }
 
 const ROLE_TITLES: Record<string, string> = {
@@ -42,9 +63,14 @@ export class DashboardService {
   constructor(
     private pg: DatabasePgService,
     private prisma: PrismaService,
+    private cache: CacheService,
   ) {}
 
   async getStats(matricule: string): Promise<DashboardStats> {
+    return this.cache.getOrCompute(`dashboard:stats:${matricule}`, 60, () => this._getStats(matricule));
+  }
+
+  private async _getStats(matricule: string): Promise<DashboardStats> {
     const [enAttente, total, score, periodeActive] = await Promise.all([
       this.pg.queryOne<{ count: string }>(
         `SELECT COUNT(*) as count FROM evaluations
@@ -78,8 +104,12 @@ export class DashboardService {
   }
 
   async getAdminStats(matricule: string): Promise<AdminDashboardStats> {
-    const [baseStats, userStats, evalStats, remplacements] = await Promise.all([
-      this.getStats(matricule),
+    return this.cache.getOrCompute(`dashboard:admin:${matricule}`, 30, () => this._getAdminStats(matricule));
+  }
+
+  private async _getAdminStats(matricule: string): Promise<AdminDashboardStats> {
+    const [baseStats, userStats, evalStats, remplacements, regions, rolePerf] = await Promise.all([
+      this._getStats(matricule),
       this.prisma.utilisateur.count().then(async (total) => ({
         total,
         actifs: await this.prisma.utilisateur.count({ where: { statut: 'Actif' } }),
@@ -98,9 +128,12 @@ export class DashboardService {
       this.prisma.$queryRawUnsafe<{ count: bigint }[]>(
         `SELECT COUNT(*) as count FROM replacement_temporaire WHERE est_actif = 1 AND (date_fin IS NULL OR date_fin >= CURDATE())`,
       ),
+      this._getRegionStats(),
+      this._getRolePerformance(),
     ]);
 
     const totalEval = parseInt(evalStats?.total ?? '0');
+    const enCours = parseInt(evalStats?.en_cours ?? '0');
     const validees = parseInt(evalStats?.validees ?? '0');
 
     return {
@@ -108,11 +141,100 @@ export class DashboardService {
       total_utilisateurs: userStats.total,
       utilisateurs_actifs: userStats.actifs,
       total_evaluations: totalEval,
-      evaluations_en_cours: parseInt(evalStats?.en_cours ?? '0'),
+      evaluations_en_cours: enCours,
       evaluations_validees: validees,
       taux_completion: totalEval > 0 ? Math.round((validees / totalEval) * 10000) / 100 : 0,
       remplacements_actifs: Number(remplacements?.[0]?.count ?? 0),
+      regions,
+      performance_par_role: rolePerf,
+      evaluations_par_statut: [
+        { name: 'Validees', value: validees, color: '#48BB78' },
+        { name: 'En cours', value: enCours, color: '#D69E2E' },
+        { name: 'En attente', value: parseInt(baseStats.evaluations_en_attente?.toString() ?? '0'), color: '#FF9800' },
+      ].filter(d => d.value > 0),
     };
+  }
+
+  private async _getRegionStats(): Promise<RegionStats[]> {
+    try {
+      const regions = await this.prisma.region.findMany({
+        include: {
+          _count: { select: { utilisateurs: true } },
+          utilisateurs: { select: { matricule: true } },
+        },
+      });
+
+      const regionStats: RegionStats[] = [];
+      for (const region of regions) {
+        let evalCount = 0;
+        const matricules = region.utilisateurs.map((u: { matricule: string }) => u.matricule);
+        if (matricules.length > 0) {
+          const placeholders = matricules.map((_: string, i: number) => `$${i + 1}`).join(',');
+          const result = await this.pg.queryOne<{ count: string }>(
+            `SELECT COUNT(*) as count FROM evaluations WHERE evaluateur_matricule IN (${placeholders})`,
+            matricules,
+          ).catch(() => null);
+          evalCount = parseInt(result?.count ?? '0');
+        }
+
+        regionStats.push({
+          id: region.id_region,
+          nom: region.nom_region,
+          est_taniere: region.est_taniere,
+          utilisateurs: region._count.utilisateurs,
+          evaluations: evalCount,
+          badgeColor: region.est_taniere ? '#E53E3E' : '#FF9800',
+          badgeText: region.est_taniere ? 'Taniere' : 'Non-taniere',
+        });
+      }
+      return regionStats;
+    } catch {
+      return [];
+    }
+  }
+
+  private async _getRolePerformance(): Promise<RolePerformance[]> {
+    try {
+      const roles = await this.prisma.role.findMany();
+      const rolePerf: RolePerformance[] = [];
+
+      for (const role of roles) {
+        const users = await this.prisma.utilisateur.findMany({
+          where: { role_nom: role.nom_role },
+          select: { matricule: true },
+        });
+        if (users.length === 0) continue;
+
+        const matricules = users.map((u: { matricule: string }) => u.matricule);
+        let avgScore = 0;
+        let completion = 0;
+
+        const placeholders = matricules.map((_: string, i: number) => `$${i + 1}`).join(',');
+        const result = await this.pg.queryOne<{ avg_score: number; completion: number }>(
+          `SELECT
+             COALESCE(AVG(note_globale), 0) as avg_score,
+             CASE WHEN COUNT(*) > 0
+               THEN ROUND(COUNT(*) FILTER (WHERE statut = 'valide')::numeric / COUNT(*)::numeric * 100)
+               ELSE 0 END as completion
+           FROM evaluations
+           WHERE evalue_matricule IN (${placeholders})`,
+          matricules,
+        ).catch(() => null);
+        avgScore = result?.avg_score ?? 0;
+        completion = Number(result?.completion ?? 0);
+
+        rolePerf.push({
+          role: role.nom_role,
+          count: users.length,
+          avgScore: Math.round(avgScore * 10) / 10,
+          completion,
+        });
+      }
+
+      return rolePerf.sort((a, b) => b.avgScore - a.avgScore);
+    } catch {
+      return [];
+    }
   }
 
   getRoleTitle(role: string): string {
