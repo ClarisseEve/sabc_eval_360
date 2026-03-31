@@ -44,6 +44,12 @@ export class PeriodesController {
     return this.service.fermer(id);
   }
 
+  @Post(':id/toggle')
+  async toggle(@Param('id') id: string) {
+    const p = await this.service.findById(id);
+    return p.est_ouverte ? this.service.fermer(id) : this.service.ouvrir(id);
+  }
+
   @Get(':id/statistiques')
   statistiques(@Param('id') id: string) {
     return this.service.calculateStatistiques(id);

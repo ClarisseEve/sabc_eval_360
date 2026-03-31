@@ -1,11 +1,15 @@
-import { Controller, Get, Post, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
-  constructor(private notificationsService: NotificationsService) {}
+  constructor(
+    private notificationsService: NotificationsService,
+    private prisma: PrismaService,
+  ) {}
 
   @Get()
   getMyNotifications(
@@ -30,8 +34,74 @@ export class NotificationsController {
     return this.notificationsService.marquerCommeLue(id);
   }
 
+  @Post(':id/read')
+  markAsReadAlias(@Param('id') id: string) {
+    return this.notificationsService.marquerCommeLue(id);
+  }
+
   @Post('lire-tout')
   markAllRead(@Request() req: any) {
     return this.notificationsService.marquerToutesLues(req.user.matricule);
+  }
+
+  @Post('read-all')
+  markAllReadAlias(@Request() req: any) {
+    return this.notificationsService.marquerToutesLues(req.user.matricule);
+  }
+
+  @Post('send-bulk')
+  async sendBulk(
+    @Request() req: any,
+    @Body() body: {
+      titre: string;
+      message: string;
+      type?: string;
+      cible: 'role' | 'region' | 'individu' | 'tous';
+      role?: string;
+      id_region?: string;
+      matricules?: string[];
+    },
+  ) {
+    const targets: string[] = [];
+
+    if (body.cible === 'tous') {
+      const users = await this.prisma.utilisateur.findMany({
+        where: { est_actif: true, role: { not: 'ADMIN' } },
+        select: { matricule: true },
+      });
+      targets.push(...users.map(u => u.matricule));
+    } else if (body.cible === 'role' && body.role) {
+      const users = await this.prisma.utilisateur.findMany({
+        where: { role: body.role, est_actif: true },
+        select: { matricule: true },
+      });
+      targets.push(...users.map(u => u.matricule));
+    } else if (body.cible === 'region' && body.id_region) {
+      const users = await this.prisma.utilisateur.findMany({
+        where: { id_region: body.id_region, est_actif: true },
+        select: { matricule: true },
+      });
+      targets.push(...users.map(u => u.matricule));
+    } else if (body.cible === 'individu' && body.matricules?.length) {
+      targets.push(...body.matricules);
+    }
+
+    let sent = 0;
+    for (const matricule of targets) {
+      try {
+        await this.notificationsService.create({
+          destinataire_matricule: matricule,
+          titre: body.titre,
+          message: body.message,
+          type: (body.type as any) ?? 'info',
+          expediteur_matricule: req.user.matricule,
+        });
+        sent++;
+      } catch {
+        // skip failures silently
+      }
+    }
+
+    return { sent, total_cibles: targets.length };
   }
 }

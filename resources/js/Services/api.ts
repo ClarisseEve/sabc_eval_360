@@ -143,28 +143,39 @@ export const reglesApi = {
 
 // ─── Admin ───────────────────────────────────────────────────────────────────
 export const adminApi = {
-  // Users
   users: {
-    list: (params?: any) => api.get('/admin/users', { params }),
-    get: (matricule: string) => api.get(`/admin/users/${matricule}`),
-    create: (data: any) => api.post('/admin/users', data),
-    update: (matricule: string, data: any) => api.put(`/admin/users/${matricule}`, data),
-    delete: (matricule: string) => api.delete(`/admin/users/${matricule}`),
+    list: (params?: any) => api.get('/admin/utilisateurs', { params }),
+    get: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}`),
+    create: (data: any) => api.post('/admin/utilisateurs', data),
+    update: (matricule: string, data: any) => api.put(`/admin/utilisateurs/${matricule}`, data),
+    delete: (matricule: string) => api.delete(`/admin/utilisateurs/${matricule}`),
+    subordonnes: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}/subordonnes`),
   },
-  // Roles
   roles: {
     list: () => api.get('/admin/roles'),
     get: (id: string) => api.get(`/admin/roles/${id}`),
     create: (data: any) => api.post('/admin/roles', data),
     update: (id: string, data: any) => api.put(`/admin/roles/${id}`, data),
     delete: (id: string) => api.delete(`/admin/roles/${id}`),
+    regles: () => api.get('/admin/roles/regles/evaluation'),
+    createRegle: (data: any) => api.post('/admin/roles/regles/evaluation', data),
   },
-  // Structure
   structure: {
+    overview: () => api.get('/admin/structure'),
     regions: () => api.get('/admin/structure/regions'),
+    createRegion: (data: any) => api.post('/admin/structure/regions', data),
+    updateRegion: (id: string, data: any) => api.put(`/admin/structure/regions/${id}`, data),
+    deleteRegion: (id: string) => api.delete(`/admin/structure/regions/${id}`),
     services: () => api.get('/admin/structure/services'),
+    createService: (data: any) => api.post('/admin/structure/services', data),
+    deleteService: (id: string) => api.delete(`/admin/structure/services/${id}`),
     districts: () => api.get('/admin/structure/districts'),
+    createDistrict: (data: any) => api.post('/admin/structure/districts', data),
+    deleteDistrict: (id: string) => api.delete(`/admin/structure/districts/${id}`),
     secteurs: () => api.get('/admin/structure/secteurs'),
+    createSecteur: (data: any) => api.post('/admin/structure/secteurs', data),
+    deleteSecteur: (id: string) => api.delete(`/admin/structure/secteurs/${id}`),
+    branches: () => api.get('/admin/structure/branches'),
   },
 };
 
@@ -195,7 +206,25 @@ export const utilisateursApi = {
 
 // ─── Notifications ───────────────────────────────────────────────────────────
 export const notificationsApi = {
-  list: () => api.get('/notifications'),
+  list: (params?: { non_lues?: boolean; limit?: number }) => api.get('/notifications', { params }),
+  count: () => api.get<{ count: number }>('/notifications/count'),
   markRead: (id: string) => api.post(`/notifications/${id}/read`),
   markAllRead: () => api.post('/notifications/read-all'),
+  sendBulk: (data: {
+    titre: string;
+    message: string;
+    type?: string;
+    cible: 'role' | 'region' | 'individu' | 'tous';
+    role?: string;
+    id_region?: string;
+    matricules?: string[];
+  }) => api.post('/notifications/send-bulk', data),
+};
+
+// ─── Profile (self-service) ─────────────────────────────────────────────────
+export const profileApi = {
+  update: (data: { nom?: string; prenom?: string; email?: string; telephone?: string }) =>
+    api.put('/auth/profile', data),
+  changePassword: (data: { current_password: string; password: string; password_confirmation: string }) =>
+    api.put('/auth/password', data),
 };

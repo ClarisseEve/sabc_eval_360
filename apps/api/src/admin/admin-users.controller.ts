@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/guards/roles.guard';
 import { AdminUsersService } from './admin-users.service';
@@ -36,6 +36,11 @@ export class AdminUsersController {
   @Put(':matricule')
   updateUser(@Param('matricule') matricule: string, @Body() body: any) {
     return this.usersService.updateUser(matricule, body);
+  }
+
+  @Delete(':matricule')
+  deactivateUser(@Param('matricule') matricule: string) {
+    return this.usersService.updateUser(matricule, { statut: 'Inactif', est_actif: false });
   }
 
   @Post('remplacants-disponibles')
