@@ -13,6 +13,8 @@ import {
   Briefcase,
   Map,
   Target,
+  Bell,
+  User,
 } from 'lucide-react';
 import type { Role } from './rbac';
 
@@ -21,15 +23,25 @@ export interface NavItem {
   href: string;
   icon: React.ReactNode;
   children?: NavItem[];
-  roles?: Role[]; // undefined => visible à tous
+  roles?: Role[];
+  badge?: 'notifications';
 }
+
+// Roles that have subordinates (can see "Mon équipe") — NOT CDS/AS
+const ROLES_WITH_SUBS: Role[] = ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'SS'];
+// Roles that can see analytics
+const ROLES_WITH_ANALYTICS: Role[] = ['ADMIN', 'DR', 'CDTT'];
+// All non-admin roles
+const ALL_OPERATIONAL: Role[] = ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'CDS', 'SS', 'AS'];
 
 export const NAV_ITEMS: NavItem[] = [
   {
     title: 'Tableau de bord',
-    href: '/:role/dashboard', // placeholder :role remplacé au rendu
+    href: '/:role/dashboard',
     icon: <Home className="h-5 w-5" />,
   },
+
+  // ── Évaluations ──
   {
     title: 'Évaluations',
     href: '#',
@@ -37,15 +49,29 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       {
         title: 'Mes évaluations',
-        href: '/common/evaluations/mine',
+        href: '/evaluations/mine',
         icon: <ChevronRight className="h-4 w-4" />,
-        roles: ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'CDS', 'SS', 'AS'],
+        roles: ALL_OPERATIONAL,
       },
       {
         title: 'À compléter',
-        href: '/common/evaluations/pending',
+        href: '/evaluations/pending',
         icon: <ChevronRight className="h-4 w-4" />,
-        roles: ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'CDS', 'SS', 'AS'],
+        roles: ALL_OPERATIONAL,
+        badge: 'notifications',
+      },
+      {
+        title: 'À valider',
+        href: '/evaluations/validate',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ROLES_WITH_SUBS,
+        badge: 'notifications',
+      },
+      {
+        title: 'Historique',
+        href: '/evaluations/history',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ALL_OPERATIONAL,
       },
       {
         title: 'Gestion globale',
@@ -54,31 +80,68 @@ export const NAV_ITEMS: NavItem[] = [
         roles: ['ADMIN'],
       },
       {
-        title: 'Templates',
-        href: '/admin/evaluations/templates',
-        icon: <ChevronRight className="h-4 w-4" />,
-        roles: ['ADMIN'],
-      },
-      {
-        title: 'Périodes d\'évaluation',
+        title: 'Périodes',
         href: '/admin/evaluations/periodes',
         icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN'],
       },
       {
-        title: 'Règles d\'évaluation',
+        title: 'Règles',
         href: '/admin/evaluations/regles',
-        icon: <ChevronRight className="h-4 w-4" />,
-        roles: ['ADMIN'],
-      },
-      {
-        title: 'Historique',
-        href: '/admin/evaluations/history',
         icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN'],
       },
     ],
   },
+
+  // ── Mon équipe (only roles with subordinates — NOT CDS/AS) ──
+  {
+    title: 'Mon équipe',
+    href: '#',
+    icon: <Users className="h-5 w-5" />,
+    roles: ROLES_WITH_SUBS,
+    children: [
+      {
+        title: 'Subordonnés',
+        href: '/equipe/subordonnes',
+        icon: <ChevronRight className="h-4 w-4" />,
+      },
+      {
+        title: 'Évaluations équipe',
+        href: '/equipe/evaluations',
+        icon: <ChevronRight className="h-4 w-4" />,
+      },
+    ],
+  },
+
+  // ── Analytics (ADMIN + DR + CDTT) ──
+  {
+    title: 'Analytics',
+    href: '#',
+    icon: <BarChart2 className="h-5 w-5" />,
+    roles: ROLES_WITH_ANALYTICS,
+    children: [
+      {
+        title: 'Vue d\'ensemble',
+        href: '/analytics/dashboard',
+        icon: <ChevronRight className="h-4 w-4" />,
+      },
+      {
+        title: 'Par région',
+        href: '/analytics/regions',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ['ADMIN', 'DR'],
+      },
+      {
+        title: 'Anomalies',
+        href: '/analytics/anomalies',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ['ADMIN'],
+      },
+    ],
+  },
+
+  // ── Admin: Utilisateurs ──
   {
     title: 'Utilisateurs',
     href: '#',
@@ -86,7 +149,7 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['ADMIN'],
     children: [
       {
-        title: 'Gestion des utilisateurs',
+        title: 'Liste',
         href: '/admin/utilisateurs',
         icon: <ChevronRight className="h-4 w-4" />,
       },
@@ -97,24 +160,36 @@ export const NAV_ITEMS: NavItem[] = [
       },
     ],
   },
+
+  // ── Admin: Notifications ──
   {
-    title: 'Remplacements',
+    title: 'Notifications',
     href: '#',
-    icon: <UserCheck className="h-5 w-5" />,
+    icon: <Bell className="h-5 w-5" />,
     roles: ['ADMIN'],
     children: [
       {
-        title: 'Gestion des remplacements',
-        href: '/admin/remplacements',
+        title: 'Envoyer',
+        href: '/admin/notifications/send',
         icon: <ChevronRight className="h-4 w-4" />,
       },
       {
-        title: 'Créer un remplacement',
-        href: '/admin/remplacements/create',
+        title: 'Historique',
+        href: '/admin/notifications/history',
         icon: <ChevronRight className="h-4 w-4" />,
       },
     ],
   },
+
+  // ── Admin: Remplacements ──
+  {
+    title: 'Remplacements',
+    href: '/admin/remplacements',
+    icon: <UserCheck className="h-5 w-5" />,
+    roles: ['ADMIN'],
+  },
+
+  // ── Admin: Rôles ──
   {
     title: 'Rôles',
     href: '#',
@@ -133,24 +208,21 @@ export const NAV_ITEMS: NavItem[] = [
       },
     ],
   },
+
+  // ── Admin: Structure ──
   {
-    title: 'Structure Organisationnelle',
-    href: '/admin/structure',
+    title: 'Structure',
+    href: '#',
     icon: <Building className="h-5 w-5" />,
     roles: ['ADMIN'],
     children: [
-      {
-        title: 'Vue globale',
-        href: '/admin/structure',
-        icon: <ChevronRight className="h-4 w-4" />,
-      },
       {
         title: 'Régions',
         href: '/admin/structure/regions',
         icon: <MapPin className="h-4 w-4" />,
       },
       {
-        title: 'Services Commerciaux',
+        title: 'Services',
         href: '/admin/structure/services',
         icon: <Briefcase className="h-4 w-4" />,
       },
@@ -166,45 +238,18 @@ export const NAV_ITEMS: NavItem[] = [
       },
     ],
   },
-  {
-    title: 'Mon équipe',
-    href: '/common/team',
-    icon: <Users className="h-5 w-5" />,
-    roles: ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'CDS', 'SS', 'AS'],
-    children: [
-      {
-        title: 'Vue d\'équipe',
-        href: '/common/team/overview',
-        icon: <ChevronRight className="h-4 w-4" />,
-      },
-      {
-        title: 'Évaluations équipe',
-        href: '/common/team/evaluations',
-        icon: <ChevronRight className="h-4 w-4" />,
-      },
-    ],
-  },
-  {
-    title: 'Analytics',
-    href: '/admin/analytics',
-    icon: <BarChart2 className="h-5 w-5" />,
-    roles: ['ADMIN'],
-  },
 ];
 
 export const NAV_BOTTOM_ITEMS: NavItem[] = [
-  { title: 'Profil', href: '/common/profile', icon: <Users className="h-5 w-5" /> },
+  {
+    title: 'Mon profil',
+    href: '/settings/profile',
+    icon: <User className="h-5 w-5" />,
+  },
   {
     title: 'Paramètres',
-    href: '/common/settings',
+    href: '/settings/password',
     icon: <Settings className="h-5 w-5" />,
-    roles: ['ADMIN'],
-    children: [
-      { title: 'Utilisateurs', href: '/admin/utilisateurs', icon: <ChevronRight className="h-4 w-4" /> },
-      { title: 'Régions', href: '/admin/structure/regions', icon: <ChevronRight className="h-4 w-4" /> },
-      { title: 'Rôles', href: '/admin/roles', icon: <ChevronRight className="h-4 w-4" /> },
-      { title: 'Remplacements', href: '/admin/remplacements', icon: <ChevronRight className="h-4 w-4" /> },
-    ],
   },
 ];
 
