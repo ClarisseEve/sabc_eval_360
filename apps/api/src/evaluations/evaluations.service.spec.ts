@@ -8,14 +8,14 @@ describe('EvaluationsService', () => {
 
   beforeEach(() => {
     mockPg = {
-      query: jest.fn(),
+      query: jest.fn().mockResolvedValue([]),
       queryOne: jest.fn(),
       execute: jest.fn(),
     };
     mockPrisma = {
       utilisateur: {
         findUnique: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
     service = new EvaluationsService(mockPg, mockPrisma);
@@ -23,10 +23,14 @@ describe('EvaluationsService', () => {
 
   describe('findById', () => {
     it('should return evaluation when found', async () => {
-      const eval_ = { id_evaluation: 'uuid-1', statut: 'brouillon' };
+      const eval_ = { id_evaluation: 'uuid-1', statut: 'brouillon', evaluateur_matricule: 'M1', evalue_matricule: 'M2' };
       mockPg.queryOne.mockResolvedValue(eval_);
+      // enrichEvaluations calls prisma.findMany + pg.query for periodes/regles
+      mockPrisma.utilisateur.findMany.mockResolvedValue([]);
+      mockPg.query.mockResolvedValue([]);
+
       const result = await service.findById('uuid-1');
-      expect(result).toEqual(eval_);
+      expect(result.id_evaluation).toBe('uuid-1');
     });
 
     it('should throw NotFoundException when not found', async () => {
@@ -37,7 +41,8 @@ describe('EvaluationsService', () => {
 
   describe('updateNotes', () => {
     it('should update notes for brouillon', async () => {
-      mockPg.queryOne.mockResolvedValue({ id_evaluation: 'uuid-1', statut: 'brouillon' });
+      mockPg.queryOne.mockResolvedValue({ id_evaluation: 'uuid-1', statut: 'brouillon', evaluateur_matricule: 'M1', evalue_matricule: 'M2' });
+      mockPg.query.mockResolvedValue([]);
       mockPg.execute.mockResolvedValue(1);
       const result = await service.updateNotes('uuid-1', [{ note: 4, poids: 1 }]);
       expect(result).toBe(true);
@@ -45,7 +50,8 @@ describe('EvaluationsService', () => {
     });
 
     it('should reject update for non-brouillon', async () => {
-      mockPg.queryOne.mockResolvedValue({ id_evaluation: 'uuid-1', statut: 'soumis' });
+      mockPg.queryOne.mockResolvedValue({ id_evaluation: 'uuid-1', statut: 'soumis', evaluateur_matricule: 'M1', evalue_matricule: 'M2' });
+      mockPg.query.mockResolvedValue([]);
       await expect(service.updateNotes('uuid-1', [])).rejects.toThrow(BadRequestException);
     });
   });
@@ -56,7 +62,10 @@ describe('EvaluationsService', () => {
         id_evaluation: 'uuid-1',
         statut: 'brouillon',
         notations_json: JSON.stringify([{ note: 4 }]),
+        evaluateur_matricule: 'M1',
+        evalue_matricule: 'M2',
       });
+      mockPg.query.mockResolvedValue([]);
       mockPg.execute.mockResolvedValue(1);
       const result = await service.submit('uuid-1');
       expect(result.success).toBe(true);
@@ -67,13 +76,22 @@ describe('EvaluationsService', () => {
         id_evaluation: 'uuid-1',
         statut: 'brouillon',
         notations_json: '[]',
+        evaluateur_matricule: 'M1',
+        evalue_matricule: 'M2',
       });
+      mockPg.query.mockResolvedValue([]);
       const result = await service.submit('uuid-1');
       expect(result.success).toBe(false);
     });
 
     it('should reject non-brouillon', async () => {
-      mockPg.queryOne.mockResolvedValue({ id_evaluation: 'uuid-1', statut: 'valide' });
+      mockPg.queryOne.mockResolvedValue({
+        id_evaluation: 'uuid-1',
+        statut: 'valide',
+        evaluateur_matricule: 'M1',
+        evalue_matricule: 'M2',
+      });
+      mockPg.query.mockResolvedValue([]);
       const result = await service.submit('uuid-1');
       expect(result.success).toBe(false);
     });
@@ -81,10 +99,16 @@ describe('EvaluationsService', () => {
 
   describe('getEnAttente', () => {
     it('should return pending evaluations', async () => {
-      const evals = [{ id_evaluation: '1' }, { id_evaluation: '2' }];
+      const evals = [
+        { id_evaluation: '1', evaluateur_matricule: 'M1', evalue_matricule: 'M2' },
+        { id_evaluation: '2', evaluateur_matricule: 'M1', evalue_matricule: 'M3' },
+      ];
       mockPg.query.mockResolvedValue(evals);
+      mockPrisma.utilisateur.findMany.mockResolvedValue([]);
       const result = await service.getEnAttente('MAT01');
-      expect(result).toEqual(evals);
+      expect(result).toHaveLength(2);
+      expect(result[0].id_evaluation).toBe('1');
+      expect(result[1].id_evaluation).toBe('2');
     });
   });
 

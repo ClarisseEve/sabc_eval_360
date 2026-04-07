@@ -4,6 +4,7 @@ describe('AnalyticsService', () => {
   let service: AnalyticsService;
   let mockPg: any;
   let mockConfig: any;
+  let mockCache: any;
 
   beforeEach(() => {
     mockPg = {
@@ -13,7 +14,10 @@ describe('AnalyticsService', () => {
     mockConfig = {
       get: jest.fn((key: string, defaultVal: string) => defaultVal),
     };
-    service = new AnalyticsService(mockConfig, mockPg);
+    mockCache = {
+      getOrCompute: jest.fn((_key: string, _ttl: number, fn: () => any) => fn()),
+    };
+    service = new AnalyticsService(mockConfig, mockPg, mockCache);
   });
 
   describe('getEvaluationsStats', () => {

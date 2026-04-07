@@ -24,7 +24,6 @@ describe('DashboardService', () => {
       role: {
         findMany: jest.fn().mockResolvedValue([]),
       },
-      $queryRawUnsafe: jest.fn(),
     };
     mockCache = {
       getOrCompute: jest.fn((_key: string, _ttl: number, fn: () => any) => fn()),
@@ -76,10 +75,12 @@ describe('DashboardService', () => {
         .mockResolvedValueOnce(null)              // periode
         .mockResolvedValueOnce({ total: '100', en_cours: '20', validees: '60' }); // eval stats
 
+      // 6th queryOne: remplacements count
+      mockPg.queryOne.mockResolvedValueOnce({ count: '3' });
+
       mockPrisma.utilisateur.count
         .mockResolvedValueOnce(50)                // total users
         .mockResolvedValueOnce(45);               // active users
-      mockPrisma.$queryRawUnsafe.mockResolvedValue([{ count: BigInt(3) }]);
 
       const result = await service.getAdminStats('ADMIN01');
 
