@@ -7,6 +7,7 @@ import { StatusBadge } from '@/Components/UI/Status/StatusBadge';
 import { Tooltip } from '@/Components/UI/Tooltip/Tooltip';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { useTheme } from '@/Hooks/useTheme';
+import { notificationsApi } from '@/Services/api';
 
 interface HeaderProps {
   user?: {
@@ -34,6 +35,9 @@ const Header: React.FC<HeaderProps> = ({
   pageTitle = 'Dashboard', // Titre par défaut si non fourni
 }) => {
   const { theme, toggleTheme } = useTheme();
+  const [apiNotifications, setApiNotifications] = React.useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = React.useState(0);
+  const [notificationsLoading, setNotificationsLoading] = React.useState(false);
   
   // Effet pour appliquer le thème au document
   React.useEffect(() => {
@@ -67,7 +71,46 @@ const Header: React.FC<HeaderProps> = ({
     };
   }, []);
   
-  const unreadNotifications = notifications.filter(notification => !notification.read);
+  const loadNotifications = React.useCallback(async () => {
+    setNotificationsLoading(true);
+    try {
+      const [listRes, countRes] = await Promise.all([
+        notificationsApi.list({ limit: 10 }),
+        notificationsApi.count(),
+      ]);
+      setApiNotifications(Array.isArray(listRes.data) ? listRes.data : []);
+      setUnreadCount(countRes.data?.count ?? 0);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
+
+  const markAllRead = async () => {
+    await notificationsApi.markAllRead();
+    await loadNotifications();
+  };
+
+  const markRead = async (id: string) => {
+    await notificationsApi.markRead(id);
+    await loadNotifications();
+  };
+
+  const mappedNotifications = apiNotifications.length > 0
+    ? apiNotifications.map((notification) => ({
+        id: notification.id_notification,
+        title: notification.titre,
+        message: notification.message,
+        status: notification.type === 'warning' ? 'warning' : notification.type === 'success' ? 'success' : notification.type === 'evaluation' ? 'info' : notification.type === 'validation' ? 'success' : 'info',
+        read: !!notification.est_lu,
+        createdAt: notification.date_creation ? new Date(notification.date_creation).toLocaleString() : '',
+      }))
+    : notifications;
+
+  const unreadNotifications = mappedNotifications.filter(notification => !notification.read);
   
   return (
     <header className={cn(
@@ -114,9 +157,9 @@ const Header: React.FC<HeaderProps> = ({
               className="relative nav-icon-hover"
             >
               <Bell className="h-5 w-5" />
-              {unreadNotifications.length > 0 && (
+              {unreadCount > 0 && (
                 <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-sabc-red-primary text-[10px] font-bold text-white">
-                  {unreadNotifications.length > 9 ? '9+' : unreadNotifications.length}
+                  {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </Button>
@@ -127,22 +170,31 @@ const Header: React.FC<HeaderProps> = ({
             <div className="absolute right-0 top-full z-10 mt-2 w-80 rounded-md border border-sabc-gray-200 bg-white p-2 shadow-lg dark:border-sabc-gray-800 dark:bg-sabc-gray-900">
               <div className="mb-2 flex items-center justify-between border-b border-sabc-gray-200 pb-2 dark:border-sabc-gray-800">
                 <h3 className="font-medium text-sabc-gray-900 dark:text-white">Notifications</h3>
-                <Button variant="ghost" size="sm" className="nav-icon-hover">
+                <Button variant="ghost" size="sm" className="nav-icon-hover" onClick={() => void markAllRead()}>
                   Tout marquer comme lu
                 </Button>
               </div>
               
-              {notifications.length === 0 ? (
+              {notificationsLoading ? (
+                <div className="py-4 text-center text-sabc-gray-500 dark:text-sabc-gray-400">
+                  Chargement...
+                </div>
+              ) : mappedNotifications.length === 0 ? (
                 <div className="py-4 text-center text-sabc-gray-500 dark:text-sabc-gray-400">
                   Aucune notification
                 </div>
               ) : (
                 <div className="max-h-80 overflow-y-auto">
-                  {notifications.map((notification) => (
+                  {mappedNotifications.map((notification) => (
                     <div
                       key={notification.id}
+                      onClick={() => {
+                        if (!notification.read) {
+                          void markRead(notification.id);
+                        }
+                      }}
                       className={cn(
-                        'mb-2 rounded-md border border-sabc-gray-200 p-2 dark:border-sabc-gray-800 hover:bg-sabc-gray-50 dark:hover:bg-sabc-gray-800/70 transition-colors activity-item-hover',
+                        'mb-2 cursor-pointer rounded-md border border-sabc-gray-200 p-2 dark:border-sabc-gray-800 hover:bg-sabc-gray-50 dark:hover:bg-sabc-gray-800/70 transition-colors activity-item-hover',
                         !notification.read && 'bg-sabc-gray-50 dark:bg-sabc-gray-800/50'
                       )}
                     >

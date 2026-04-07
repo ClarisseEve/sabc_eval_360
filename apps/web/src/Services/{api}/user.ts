@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api, { getToken } from '../api';
 import { User } from '../../types';
 
 const API_URL = '/api/users';
@@ -8,7 +8,7 @@ export const userService = {
    * Récupère tous les utilisateurs avec filtres optionnels
    */
   getAll: async (filters?: { role?: string, region?: string, actif?: boolean, page?: number }) => {
-    const response = await axios.get(API_URL, { params: filters });
+    const response = await api.get(API_URL, { params: filters });
     return response.data;
   },
 
@@ -16,7 +16,7 @@ export const userService = {
    * Récupère un utilisateur spécifique
    */
   getById: async (id: number) => {
-    const response = await axios.get(`${API_URL}/${id}`);
+    const response = await api.get(`${API_URL}/${id}`);
     return response.data;
   },
 
@@ -24,7 +24,7 @@ export const userService = {
    * Crée un nouvel utilisateur
    */
   create: async (user: Partial<User>) => {
-    const response = await axios.post(API_URL, user);
+    const response = await api.post(API_URL, user);
     return response.data;
   },
 
@@ -32,7 +32,7 @@ export const userService = {
    * Met à jour un utilisateur existant
    */
   update: async (id: number, user: Partial<User>) => {
-    const response = await axios.put(`${API_URL}/${id}`, user);
+    const response = await api.put(`${API_URL}/${id}`, user);
     return response.data;
   },
 
@@ -40,7 +40,7 @@ export const userService = {
    * Supprime un utilisateur
    */
   delete: async (id: number) => {
-    const response = await axios.delete(`${API_URL}/${id}`);
+    const response = await api.delete(`${API_URL}/${id}`);
     return response.data;
   },
 
@@ -48,7 +48,7 @@ export const userService = {
    * Change le rôle d'un utilisateur
    */
   changeRole: async (id: number, idRole: number) => {
-    const response = await axios.post(`${API_URL}/${id}/change-role`, { id_role: idRole });
+    const response = await api.post(`${API_URL}/${id}/change-role`, { id_role: idRole });
     return response.data;
   },
 
@@ -56,7 +56,7 @@ export const userService = {
    * Active ou désactive un utilisateur
    */
   toggleStatus: async (id: number) => {
-    const response = await axios.post(`${API_URL}/${id}/toggle-status`);
+    const response = await api.post(`${API_URL}/${id}/toggle-status`);
     return response.data;
   },
 
@@ -64,7 +64,7 @@ export const userService = {
    * Réinitialise le mot de passe d'un utilisateur
    */
   resetPassword: async (id: number) => {
-    const response = await axios.post(`${API_URL}/${id}/reset-password`);
+    const response = await api.post(`${API_URL}/${id}/reset-password`);
     return response.data;
   },
 
@@ -72,7 +72,7 @@ export const userService = {
    * Récupère les statistiques d'un utilisateur
    */
   getUserStats: async (id: number) => {
-    const response = await axios.get(`${API_URL}/${id}/stats`);
+    const response = await api.get(`${API_URL}/${id}/stats`);
     return response.data;
   },
 
@@ -80,11 +80,15 @@ export const userService = {
    * Exporte les données utilisateurs au format CSV/Excel
    */
   export: async (format: 'csv' | 'excel' = 'excel', filters?: { role?: string, region?: string }) => {
-    const response = await axios.get(`${API_URL}/export`, { 
-      params: { format, ...filters },
-      responseType: 'blob'
+    const url = new URL(`${window.location.origin}${API_URL}/export`);
+    url.searchParams.set('format', format);
+    if (filters?.role) url.searchParams.set('role', filters.role);
+    if (filters?.region) url.searchParams.set('region', filters.region);
+
+    const response = await fetch(url.toString(), {
+      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : undefined,
     });
-    return response.data;
+    return response.blob();
   },
 
   /**
@@ -94,11 +98,7 @@ export const userService = {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await axios.post(`${API_URL}/import`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
+    const response = await api.post(`${API_URL}/import`, formData);
     return response.data;
   }
 };

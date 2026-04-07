@@ -1,13 +1,10 @@
 import React, { useMemo } from 'react';
-import { Head, Link } from '@/lib/inertia-shim';
-import AppLayout from '@/Components/Layout/app/AppLayout';
-import { adaptUserForLayout } from '@/utils/userAdapter';
+import { Head } from '@/lib/inertia-shim';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import Badge from '@/Components/UI/Badge';
 import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert';
 import { Button } from '@/Components/UI/Button';
 import { Avatar } from '@/Components/UI/Avatar/Avatar';
-import { cn } from '@/utils/helpers';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -18,6 +15,9 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { useEvaluation } from '@/Hooks/queries';
+import { EvaluationPageLayout, formatDisplayName, formatRole, useEvaluationLayoutUser } from './shared';
 
 interface NoteEntry {
   id?: string | number | null;
@@ -33,11 +33,6 @@ interface CritereEntry {
   poids?: number | null;
   section_label?: string | null;
   section_order?: number | null;
-}
-
-interface EvaluationProps {
-  user: any;
-  evaluation: Record<string, any>;
 }
 
 const STATUS_VARIANTS: Record<string, { label: string; variant: 'primary' | 'secondary' | 'destructive'; helper: string }> = {
@@ -125,9 +120,10 @@ const computeMergedCriteria = (evaluation: Record<string, any>) => {
   });
 };
 
-const ShowEvaluation: React.FC<EvaluationProps> = ({ user, evaluation }) => {
-  const layoutUser = adaptUserForLayout(user);
-  const rawUser = user ?? {};
+const ShowEvaluation: React.FC = () => {
+  const { id = '' } = useParams();
+  const { data: evaluation } = useEvaluation(id);
+  const { authUser: rawUser } = useEvaluationLayoutUser();
   const statusMeta = STATUS_VARIANTS[evaluation?.statut] ?? STATUS_VARIANTS.brouillon;
   const mergedCriteria = useMemo(() => computeMergedCriteria(evaluation), [evaluation]);
   const isEvaluator = evaluation?.evaluateur?.matricule && evaluation.evaluateur.matricule === rawUser?.matricule;
@@ -142,23 +138,23 @@ const ShowEvaluation: React.FC<EvaluationProps> = ({ user, evaluation }) => {
     : null;
 
   return (
-    <AppLayout user={layoutUser} pageTitle="Détail de l'évaluation" notifications={[]}> 
+    <EvaluationPageLayout pageTitle="Détail de l'évaluation">
       <Head title="Détail de l'évaluation" />
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button asChild variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800">
-            <Link href="/common/evaluations/pending">
+          <Button asChild={false} variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800" onClick={() => { window.location.href = '/evaluations/pending'; }}>
+            <span className="inline-flex items-center">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Retour
-            </Link>
+            </span>
           </Button>
           <div className="flex flex-wrap gap-2">
             {canEdit && evaluationId && (
-              <Button asChild size="sm" className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark">
-                <Link href={`/common/evaluations/${evaluationId}/edit`}>
+              <Button asChild={false} size="sm" className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => { window.location.href = `/evaluations/${evaluationId}/edit`; }}>
+                <span className="inline-flex items-center">
                   <Edit3 className="mr-2 h-4 w-4" />
                   Continuer la saisie
-                </Link>
+                </span>
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => window.print()}>
@@ -355,20 +351,8 @@ const ShowEvaluation: React.FC<EvaluationProps> = ({ user, evaluation }) => {
           </CardContent>
         </Card>
       </div>
-    </AppLayout>
+    </EvaluationPageLayout>
   );
 };
-
-const formatDisplayName = (userLike: Record<string, any>) => {
-  if (userLike?.prenom || userLike?.nom) {
-    return `${userLike?.prenom ?? ''} ${userLike?.nom ?? ''}`.trim();
-  }
-  if (userLike?.name) {
-    return userLike.name;
-  }
-  return userLike?.matricule ?? 'Utilisateur';
-};
-
-const formatRole = (userLike: Record<string, any>) => userLike?.role_nom || userLike?.role || 'Rôle non renseigné';
 
 export default ShowEvaluation;

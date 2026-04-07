@@ -5,6 +5,19 @@ import { PrismaService } from '../prisma/prisma.service';
 export class RemplacementsService {
   constructor(private prisma: PrismaService) {}
 
+  private async queryDetailed(whereClause: string, params: any[] = []) {
+    return this.prisma.$queryRawUnsafe<any[]>(
+      `SELECT r.*,
+              t.nom as titulaire_nom, t.prenom as titulaire_prenom, t.email as titulaire_email, t.telephone as titulaire_telephone, t.role as titulaire_role,
+              re.nom as remplacant_nom, re.prenom as remplacant_prenom, re.email as remplacant_email, re.telephone as remplacant_telephone, re.role as remplacant_role
+       FROM replacement_temporaire r
+       LEFT JOIN utilisateurs t ON r.titulaire_matricule = t.matricule
+       LEFT JOIN utilisateurs re ON r.remplacant_matricule = re.matricule
+       ${whereClause}`,
+      ...params,
+    );
+  }
+
   async create(data: {
     titulaire_matricule: string;
     remplacant_matricule: string;
@@ -117,54 +130,77 @@ export class RemplacementsService {
     return { success: true, message: 'Remplacement terminé' };
   }
 
+  async getById(idRemplacement: number) {
+    const rows = await this.queryDetailed('WHERE r.id_remplacement = ? LIMIT 1', [idRemplacement]);
+    if (!rows.length) throw new NotFoundException('Remplacement introuvable');
+    return rows[0];
+  }
+
+  async update(idRemplacement: number, data: {
+    remplacant_matricule?: string;
+    motif?: string;
+    date_debut?: string;
+    date_fin?: string | null;
+    duree_prevue_jours?: number;
+    service_remplacement?: string | null;
+  }) {
+    const existing = await this.getById(idRemplacement);
+
+    if (data.remplacant_matricule && data.remplacant_matricule !== existing.remplacant_matricule) {
+      const remplacant = await this.prisma.utilisateur.findUnique({ where: { matricule: data.remplacant_matricule } });
+      if (!remplacant) throw new NotFoundException('Remplaçant introuvable');
+    }
+
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE replacement_temporaire
+       SET remplacant_matricule = ?,
+           motif = ?,
+           date_debut = ?,
+           date_fin = ?,
+           duree_prevue_jours = ?,
+           service_remplacement = ?,
+           updated_at = NOW()
+       WHERE id_remplacement = ?`,
+      data.remplacant_matricule ?? existing.remplacant_matricule,
+      data.motif ?? existing.motif,
+      data.date_debut ?? existing.date_debut,
+      data.date_fin ?? existing.date_fin,
+      data.duree_prevue_jours ?? existing.duree_prevue_jours,
+      data.service_remplacement ?? existing.service_remplacement,
+      idRemplacement,
+    );
+
+    return this.getById(idRemplacement);
+  }
+
   async getActifs() {
-    return this.prisma.$queryRawUnsafe<any[]>(
-      `SELECT r.*, t.nom as titulaire_nom, t.prenom as titulaire_prenom,
-              re.nom as remplacant_nom, re.prenom as remplacant_prenom
-       FROM replacement_temporaire r
-       LEFT JOIN utilisateurs t ON r.titulaire_matricule = t.matricule
-       LEFT JOIN utilisateurs re ON r.remplacant_matricule = re.matricule
-       WHERE r.est_actif = 1 AND r.date_debut <= NOW()
+    return this.queryDetailed(
+      `WHERE r.est_actif = 1 AND r.date_debut <= NOW()
          AND (r.date_fin IS NULL OR r.date_fin >= NOW())
        ORDER BY r.date_debut DESC`,
     );
   }
 
   async getAVenir() {
-    return this.prisma.$queryRawUnsafe<any[]>(
-      `SELECT r.*, t.nom as titulaire_nom, t.prenom as titulaire_prenom,
-              re.nom as remplacant_nom, re.prenom as remplacant_prenom
-       FROM replacement_temporaire r
-       LEFT JOIN utilisateurs t ON r.titulaire_matricule = t.matricule
-       LEFT JOIN utilisateurs re ON r.remplacant_matricule = re.matricule
-       WHERE r.est_actif = 1 AND r.date_debut > NOW()
+    return this.queryDetailed(
+      `WHERE r.est_actif = 1 AND r.date_debut > NOW()
        ORDER BY r.date_debut ASC`,
     );
   }
 
   async getHistorique(limit = 50) {
-    return this.prisma.$queryRawUnsafe<any[]>(
-      `SELECT r.*, t.nom as titulaire_nom, t.prenom as titulaire_prenom,
-              re.nom as remplacant_nom, re.prenom as remplacant_prenom
-       FROM replacement_temporaire r
-       LEFT JOIN utilisateurs t ON r.titulaire_matricule = t.matricule
-       LEFT JOIN utilisateurs re ON r.remplacant_matricule = re.matricule
-       WHERE r.est_actif = 0 OR (r.est_actif = 1 AND r.date_fin < NOW())
+    return this.queryDetailed(
+      `WHERE r.est_actif = 0 OR (r.est_actif = 1 AND r.date_fin < NOW())
        ORDER BY r.date_fin DESC LIMIT ?`,
-      limit,
+      [limit],
     );
   }
 
   async getPourUtilisateur(matricule: string) {
-    return this.prisma.$queryRawUnsafe<any[]>(
-      `SELECT r.*, t.nom as titulaire_nom, t.prenom as titulaire_prenom,
-              re.nom as remplacant_nom, re.prenom as remplacant_prenom
-       FROM replacement_temporaire r
-       LEFT JOIN utilisateurs t ON r.titulaire_matricule = t.matricule
-       LEFT JOIN utilisateurs re ON r.remplacant_matricule = re.matricule
-       WHERE r.titulaire_matricule = ? OR r.remplacant_matricule = ?
+    return this.queryDetailed(
+      `WHERE r.titulaire_matricule = ? OR r.remplacant_matricule = ?
        ORDER BY r.date_debut DESC`,
-      matricule, matricule,
+      [matricule, matricule],
     );
   }
 }

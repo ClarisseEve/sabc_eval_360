@@ -1,52 +1,75 @@
-import React, { Suspense } from 'react';
+import React from 'react';
 import { Head } from '@/lib/inertia-shim';
-import AppLayout from '@/Components/Layout/app/AppLayout';
-import { useAuthContext } from '@/Contexts/AuthContext';
-import { Card, CardContent } from '@/Components/UI/Card/Card';
-import { Users, Construction } from 'lucide-react';
-
-function TeamOverviewContent() {
-  return (
-    <div className="mx-auto max-w-4xl py-12">
-      <Card className="border-dashed border-2 border-sabc-gray-300 dark:border-sabc-gray-600">
-        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-4 rounded-full bg-sabc-gray-100 p-4 dark:bg-sabc-gray-800">
-            <Construction className="h-12 w-12 text-sabc-gray-400" />
-          </div>
-          <h2 className="mb-2 text-xl font-semibold text-sabc-gray-700 dark:text-sabc-gray-200">
-            Vue d'équipe
-          </h2>
-          <p className="max-w-md text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
-            Cette fonctionnalité sera disponible prochainement.
-            Vous pourrez consulter la liste de vos subordonnés et leur statut d'évaluation.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+import { Badge } from '@/Components/UI/Badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { useSubordonnes } from '@/Hooks/queries';
+import { EvaluationPageLayout } from '@/pages/Common/Evaluations/shared';
 
 export default function TeamOverviewPage() {
-  const { user } = useAuthContext();
+  const { data } = useSubordonnes();
+  const subordonnes = Array.isArray(data) ? data : [];
 
-  const layoutUser = {
-    name: user ? [user.prenom, user.nom].filter(Boolean).join(' ') || 'Utilisateur' : 'Utilisateur',
-    email: user?.email || '',
-    role: user?.role_nom || user?.role || '',
-    avatar: undefined,
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('sabc_access_token');
-    window.location.href = '/login';
-  };
+  const actifs = subordonnes.filter((user: any) => user.est_actif).length;
+  const indisponibles = subordonnes.filter((user: any) => user.est_indisponible || user.statut === 'Indisponible').length;
+  const sansManager = subordonnes.filter((user: any) => !user.manager_matricule).length;
 
   return (
-    <AppLayout user={layoutUser} notifications={[]} pageTitle="Mon équipe" onLogout={handleLogout}>
+    <EvaluationPageLayout pageTitle="Mon équipe">
       <Head title="Mon équipe — SABC Eval360" />
-      <Suspense fallback={<div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-sabc-gray-200 border-t-sabc-red-primary" /></div>}>
-        <TeamOverviewContent />
-      </Suspense>
-    </AppLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-sabc-gray-900">Mon équipe</h1>
+          <p className="text-sm text-sabc-gray-600">Vue réelle des subordonnés remontés par la hiérarchie NestJS.</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Total</div><div className="text-2xl font-bold">{subordonnes.length}</div></CardContent></Card>
+          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Actifs</div><div className="text-2xl font-bold">{actifs}</div></CardContent></Card>
+          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Indisponibles</div><div className="text-2xl font-bold">{indisponibles}</div></CardContent></Card>
+          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Sans manager</div><div className="text-2xl font-bold">{sansManager}</div></CardContent></Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Subordonnés directs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {subordonnes.length === 0 ? (
+              <div className="py-10 text-center text-sm text-sabc-gray-500">
+                Aucun subordonné trouvé pour votre profil.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Matricule</TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Rôle</TableHead>
+                    <TableHead>Région</TableHead>
+                    <TableHead>Statut</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subordonnes.map((user: any) => (
+                    <TableRow key={user.matricule}>
+                      <TableCell>{user.matricule}</TableCell>
+                      <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
+                      <TableCell>{user.role}</TableCell>
+                      <TableCell>{user.id_region || 'N/A'}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.est_actif ? 'default' : 'outline'}>
+                          {user.statut || (user.est_actif ? 'Actif' : 'Inactif')}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </EvaluationPageLayout>
   );
 }

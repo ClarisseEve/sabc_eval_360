@@ -1,9 +1,62 @@
-import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-// ─── Token helpers ───────────────────────────────────────────────────────────
 const TOKEN_KEY = 'sabc_access_token';
+
+export type ApiRequestConfig = {
+  params?: Record<string, string | number | boolean | null | undefined>;
+  headers?: Record<string, string>;
+  timeout?: number;
+};
+
+export type ApiResponse<T = any> = {
+  data: T;
+  status: number;
+  headers: Headers;
+};
+
+class ApiError extends Error {
+  response: {
+    status: number;
+    data: any;
+    headers: Headers;
+  };
+
+  constructor(message: string, response: { status: number; data: any; headers: Headers }) {
+    super(message);
+    this.name = 'ApiError';
+    this.response = response;
+  }
+}
+
+function normalizeUrl(path: string) {
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  if (path.startsWith('/api/')) return `${API_BASE_URL}${path.slice(4)}`;
+  if (path.startsWith('/')) return `${API_BASE_URL}${path}`;
+  return `${API_BASE_URL}/${path}`;
+}
+
+function withQueryString(url: string, params?: ApiRequestConfig['params']) {
+  if (!params) return url;
+
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value == null) return;
+    searchParams.append(key, String(value));
+  });
+
+  const query = searchParams.toString();
+  if (!query) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}${query}`;
+}
+
+async function parseResponseBody(response: Response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+  const text = await response.text();
+  return text;
+}
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -17,40 +70,80 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-// ─── Axios instance ──────────────────────────────────────────────────────────
-const api: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
-  timeout: 30_000,
-});
+async function request<T = any>(
+  method: string,
+  path: string,
+  body?: any,
+  config: ApiRequestConfig = {},
+): Promise<ApiResponse<T>> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), config.timeout ?? 30_000);
 
-// Attach JWT to every request
-api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = getToken();
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+  try {
+    const token = getToken();
+    const headers = new Headers(config.headers || {});
+    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
 
-// Global 401 handler → redirect to login
-api.interceptors.response.use(
-  (res) => res,
-  (error) => {
-    if (error.response?.status === 401) {
+    if (!isFormData && body != null && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    const response = await fetch(withQueryString(normalizeUrl(path), config.params), {
+      method,
+      headers,
+      body: body == null ? undefined : isFormData ? body : JSON.stringify(body),
+      signal: controller.signal,
+      credentials: 'include',
+    });
+
+    const data = await parseResponseBody(response);
+
+    if (response.status === 401) {
       clearToken();
-      // Avoid infinite redirect loop on login page
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
-    return Promise.reject(error);
-  },
-);
+
+    if (!response.ok) {
+      throw new ApiError(
+        typeof data?.message === 'string' ? data.message : `HTTP ${response.status}`,
+        { status: response.status, data, headers: response.headers },
+      );
+    }
+
+    return {
+      data: data as T,
+      status: response.status,
+      headers: response.headers,
+    };
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new ApiError('Request timeout', {
+        status: 408,
+        data: { message: 'Request timeout' },
+        headers: new Headers(),
+      });
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+const api = {
+  get: <T = any>(path: string, config?: ApiRequestConfig) => request<T>('GET', path, undefined, config),
+  post: <T = any>(path: string, body?: any, config?: ApiRequestConfig) => request<T>('POST', path, body, config),
+  put: <T = any>(path: string, body?: any, config?: ApiRequestConfig) => request<T>('PUT', path, body, config),
+  patch: <T = any>(path: string, body?: any, config?: ApiRequestConfig) => request<T>('PATCH', path, body, config),
+  delete: <T = any>(path: string, config?: ApiRequestConfig) => request<T>('DELETE', path, undefined, config),
+};
 
 export default api;
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
 export const authApi = {
   login: (email: string, password: string) =>
     api.post<{ access_token: string; user: any }>('/auth/login', { email, password }),
@@ -60,14 +153,12 @@ export const authApi = {
   logout: () => api.post('/auth/logout'),
 };
 
-// ─── Dashboard ───────────────────────────────────────────────────────────────
 export const dashboardApi = {
   getMy: () => api.get('/dashboard'),
   getStats: () => api.get('/dashboard/stats'),
   getAdmin: () => api.get('/dashboard/admin'),
 };
 
-// ─── Evaluations ─────────────────────────────────────────────────────────────
 export const evaluationsApi = {
   list: () => api.get('/evaluations'),
   create: (data: { evaluateur_matricule: string; evalue_matricule: string; id_periode: string; id_regle: string }) =>
@@ -85,7 +176,6 @@ export const evaluationsApi = {
   rappels: (idPeriode: string) => api.post(`/evaluations/rappels/${idPeriode}`),
 };
 
-// ─── Periodes ────────────────────────────────────────────────────────────────
 export const periodesApi = {
   list: () => api.get('/periodes'),
   get: (id: string) => api.get(`/periodes/${id}`),
@@ -95,7 +185,6 @@ export const periodesApi = {
   toggle: (id: string) => api.post(`/periodes/${id}/toggle`),
 };
 
-// ─── Hierarchy ───────────────────────────────────────────────────────────────
 export const hierarchyApi = {
   getRegion: (idRegion: string) => api.get(`/hierarchy/region/${idRegion}`),
   getRegionStats: (idRegion: string) => api.get(`/hierarchy/region/${idRegion}/stats`),
@@ -111,17 +200,17 @@ export const hierarchyApi = {
     api.post('/hierarchy/assigner-manager', { matricule, manager_matricule: manager }),
 };
 
-// ─── Remplacements ──────────────────────────────────────────────────────────
 export const remplacementsApi = {
   actifs: () => api.get('/remplacements/actifs'),
   aVenir: () => api.get('/remplacements/a-venir'),
   historique: () => api.get('/remplacements/historique'),
   parUtilisateur: () => api.get('/remplacements/par-utilisateur'),
+  get: (id: string) => api.get(`/remplacements/${id}`),
   create: (data: any) => api.post('/remplacements', data),
+  update: (id: string, data: any) => api.put(`/remplacements/${id}`, data),
   terminer: (id: string) => api.post(`/remplacements/${id}/terminer`),
 };
 
-// ─── Templates ───────────────────────────────────────────────────────────────
 export const templatesApi = {
   list: () => api.get('/templates'),
   get: (id: string) => api.get(`/templates/${id}`),
@@ -132,7 +221,6 @@ export const templatesApi = {
   unpublish: (id: string) => api.post(`/templates/${id}/unpublish`),
 };
 
-// ─── Regles ──────────────────────────────────────────────────────────────────
 export const reglesApi = {
   list: () => api.get('/regles'),
   get: (id: string) => api.get(`/regles/${id}`),
@@ -141,7 +229,6 @@ export const reglesApi = {
   delete: (id: string) => api.delete(`/regles/${id}`),
 };
 
-// ─── Admin ───────────────────────────────────────────────────────────────────
 export const adminApi = {
   users: {
     list: (params?: any) => api.get('/admin/utilisateurs', { params }),
@@ -159,6 +246,8 @@ export const adminApi = {
     delete: (id: string) => api.delete(`/admin/roles/${id}`),
     regles: () => api.get('/admin/roles/regles/evaluation'),
     createRegle: (data: any) => api.post('/admin/roles/regles/evaluation', data),
+    updateRegle: (id: string, data: any) => api.put(`/admin/roles/regles/evaluation/${id}`, data),
+    toggleRegle: (id: string) => api.patch(`/admin/roles/regles/evaluation/${id}/toggle`),
   },
   structure: {
     overview: () => api.get('/admin/structure'),
@@ -179,7 +268,6 @@ export const adminApi = {
   },
 };
 
-// ─── Analytics ───────────────────────────────────────────────────────────────
 export const analyticsApi = {
   dashboard: () => api.get('/analytics/dashboard'),
   evaluations: () => api.get('/analytics/evaluations'),
@@ -196,7 +284,6 @@ export const analyticsApi = {
     api.get(matricule ? `/analytics/scores/${matricule}` : '/analytics/scores'),
 };
 
-// ─── Utilisateurs ────────────────────────────────────────────────────────────
 export const utilisateursApi = {
   list: (params?: any) => api.get('/utilisateurs', { params }),
   get: (matricule: string) => api.get(`/utilisateurs/${matricule}`),
@@ -204,7 +291,6 @@ export const utilisateursApi = {
   remplacantsDisponibles: (data: any) => api.post('/utilisateurs/remplacants-disponibles', data),
 };
 
-// ─── Notifications ───────────────────────────────────────────────────────────
 export const notificationsApi = {
   list: (params?: { non_lues?: boolean; limit?: number }) => api.get('/notifications', { params }),
   count: () => api.get<{ count: number }>('/notifications/count'),
@@ -221,7 +307,6 @@ export const notificationsApi = {
   }) => api.post('/notifications/send-bulk', data),
 };
 
-// ─── Profile (self-service) ─────────────────────────────────────────────────
 export const profileApi = {
   update: (data: { nom?: string; prenom?: string; email?: string; telephone?: string }) =>
     api.put('/auth/profile', data),

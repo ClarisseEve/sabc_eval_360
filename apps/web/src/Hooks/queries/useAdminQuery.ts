@@ -22,6 +22,20 @@ export function useAdminRoles() {
   });
 }
 
+export function useAdminRole(id: string) {
+  return useSuspenseQuery({
+    queryKey: ['admin', 'roles', id],
+    queryFn: () => adminApi.roles.get(id).then(r => r.data),
+  });
+}
+
+export function useAdminRoleRules() {
+  return useSuspenseQuery({
+    queryKey: ['admin', 'roles', 'regles'],
+    queryFn: () => adminApi.roles.regles().then(r => r.data),
+  });
+}
+
 export function useAdminStructure() {
   return useSuspenseQuery({
     queryKey: ['admin', 'structure'],

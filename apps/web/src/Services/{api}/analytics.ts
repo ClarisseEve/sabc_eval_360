@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api';
 
 /**
  * Service pour les analyses et rapports avancés
@@ -9,7 +9,7 @@ export const analyticsService = {
    * Récupère les analyses de performance par région
    */
   getPerformanceByRegion: async (filters?: { id_periode?: number }) => {
-    const response = await axios.get('/api/scores/analytics', { 
+    const response = await api.get('/api/scores/analytics', { 
       params: { ...filters, group_by: 'region' } 
     });
     return response.data;
@@ -19,7 +19,7 @@ export const analyticsService = {
    * Récupère les analyses de performance par rôle
    */
   getPerformanceByRole: async (filters?: { id_periode?: number, id_region?: number }) => {
-    const response = await axios.get('/api/scores/analytics', { 
+    const response = await api.get('/api/scores/analytics', { 
       params: { ...filters, group_by: 'role' } 
     });
     return response.data;
@@ -29,7 +29,7 @@ export const analyticsService = {
    * Récupère les analyses de performance par compétence
    */
   getPerformanceByCompetency: async (filters?: { id_periode?: number, id_region?: number, id_role?: number }) => {
-    const response = await axios.get('/api/scores/analytics', { 
+    const response = await api.get('/api/scores/analytics', { 
       params: { ...filters, group_by: 'competence' } 
     });
     return response.data;
@@ -43,7 +43,7 @@ export const analyticsService = {
     id_periode?: number, 
     id_role?: number 
   }) => {
-    const response = await axios.get('/api/evaluations/reports', { params: filters });
+    const response = await api.get('/api/evaluations/reports', { params: filters });
     return response.data;
   },
 
@@ -55,7 +55,7 @@ export const analyticsService = {
     id_role?: number, 
     nb_periodes?: number 
   }) => {
-    const response = await axios.get('/api/scores/trends/global', { params: filters });
+    const response = await api.get('/api/scores/trends/global', { params: filters });
     return response.data;
   },
 
@@ -66,7 +66,7 @@ export const analyticsService = {
     id_region?: number, 
     id_periode?: number 
   }) => {
-    const response = await axios.get('/api/evaluations/stats', { params: filters });
+    const response = await api.get('/api/evaluations/stats', { params: filters });
     return response.data;
   }
 };

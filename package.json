@@ -2,13 +2,17 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
-        "dev": "vite",
-        "demo": "vite --config vite.demo.config.ts",
-        "format": "prettier --write resources/",
-        "format:check": "prettier --check resources/",
-        "lint": "eslint . --fix",
-        "types": "tsc --noEmit"
+        "dev": "pnpm --dir apps/web dev",
+        "build": "pnpm --dir apps/web build",
+        "preview": "pnpm --dir apps/web preview",
+        "dev:web": "pnpm --dir apps/web dev",
+        "build:web": "pnpm --dir apps/web build",
+        "typecheck:web": "pnpm --dir apps/web typecheck",
+        "dev:api": "pnpm --dir apps/api start:dev",
+        "build:api": "pnpm --dir apps/api build",
+        "seed:api": "pnpm --dir apps/api db:seed",
+        "format": "pnpm --dir apps/api format",
+        "lint": "pnpm --dir apps/api lint"
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",

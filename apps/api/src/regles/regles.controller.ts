@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Param } from '@nestjs/common';
 import { ReglesService } from './regles.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ValidateCriteresDto } from './dto/validate-criteres.dto';
@@ -8,6 +8,11 @@ import { ValidateCriteresDto } from './dto/validate-criteres.dto';
 export class ReglesController {
   constructor(private service: ReglesService) {}
 
+  @Get()
+  list() {
+    return this.service.listActives();
+  }
+
   @Get('constraints')
   getConstraints() {
     return this.service.getConstraints();
@@ -16,6 +21,11 @@ export class ReglesController {
   @Get('categories')
   getCategories() {
     return this.service.getCategoriesValides();
+  }
+
+  @Get(':id')
+  show(@Param('id') id: string) {
+    return this.service.findById(id);
   }
 
   @Post('validate')

@@ -1,16 +1,15 @@
-# Data Models — Analytics Service
+# Data Models — Analytics
 
 ## Storage
 
-- ClickHouse (analytics store)
-- Laravel app initializes via SQL scripts: `database/clickhouse/create_analytics_tables.sql`
+Les analytics actifs ne reposent plus sur un microservice Go dédié.
 
-## Known Tables (from project docs)
+## Sources de vérité
 
-- `evaluations_analytics`
-- `performance_region`
-- `performance_branche`
-- `scores_analytics`
+- PostgreSQL business pour les évaluations, périodes, règles et historiques
+- MySQL core pour les utilisateurs, rôles, régions et structure
 
-> The analytics service reads ClickHouse via repository layer (`internal/repository/clickhouse`).
+## Exposition
 
+- agrégations calculées dans `apps/api/src/analytics/analytics.service.ts`
+- consommation principale dans `apps/web/src/pages/Admin/Analytics/Index.tsx`

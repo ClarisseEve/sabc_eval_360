@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DatabasePgService } from '../database/database-pg.service';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AdminUsersService {
@@ -101,6 +101,7 @@ export class AdminUsersService {
     type_region?: string;
     telephone?: string;
     statut?: string;
+    est_actif?: boolean;
   }) {
     const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
     if (!user) throw new NotFoundException('Utilisateur introuvable');

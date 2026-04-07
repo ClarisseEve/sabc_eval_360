@@ -1,10 +1,13 @@
 import { Controller, Post, Put, Get, Body, UseGuards, Request, HttpCode, BadRequestException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersService } from '../users/users.service';
 import { PrismaService } from '../prisma/prisma.service';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -15,6 +18,7 @@ export class AuthController {
   ) {}
 
   @UseGuards(LocalAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
   login(@Request() req: any) {
     return this.authService.login(req.user);
@@ -37,7 +41,7 @@ export class AuthController {
   @Put('profile')
   async updateProfile(
     @Request() req: any,
-    @Body() body: { nom?: string; prenom?: string; email?: string; telephone?: string },
+    @Body() body: UpdateProfileDto,
   ) {
     const data: any = {};
     if (body.nom !== undefined) data.nom = body.nom;
@@ -59,7 +63,7 @@ export class AuthController {
   @Put('password')
   async updatePassword(
     @Request() req: any,
-    @Body() body: { current_password: string; password: string; password_confirmation: string },
+    @Body() body: UpdatePasswordDto,
   ) {
     if (body.password !== body.password_confirmation) {
       throw new BadRequestException('Les mots de passe ne correspondent pas');

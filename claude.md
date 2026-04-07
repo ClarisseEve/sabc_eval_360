@@ -53,21 +53,19 @@
 
 ## Vue d'ensemble
 Système d'évaluation 360° pour la SABC (Société Anonyme des Brasseries du Cameroun).
-Migration en cours d'un monolithe Laravel + React/Inertia vers une architecture microservices NestJS avec des performances de vitesses stables et pour tous les roles et surtout l'admin. C'est une application professionnelle mais assez visuel et ergonomique respectant les valeurs ux et ui. Consulter les briefs bmad pour etre fixer sur les taches et les choses à implementer( dans _bmad-output)et .windsurf .
+L’architecture active est désormais un couple React SPA + NestJS API. Les anciens artefacts Laravel/Inertia et services Go ne sont plus la source de vérité et ne doivent plus orienter les décisions d’implémentation.
 
 ## Stack technique
 
-### Monolithe actuel (Laravel)
-- **Backend**: Laravel 11 (PHP 8.2) + Inertia.js
-- **Frontend**: React 19 + TypeScript + Tailwind CSS + shadcn/ui
-- **Auth**: Sanctum (session-based)
+### Architecture active
+- **Backend**: NestJS 11 (`apps/api`)
+- **Frontend**: React 19 + TypeScript + Vite (`apps/web`)
+- **Auth**: JWT stateless + bcrypt
 - **BDD Core**: MySQL (utilisateurs, branches, régions, rôles, structure org.)
 - **BDD Business**: PostgreSQL (évaluations, périodes, règles, templates)
-- **BDD Analytics**: ClickHouse (scores, anomalies, recommandations)
-- **Cache**: Redis
-- **Tests**: Pest (PHP) + Vitest (JS)
+- **Tests**: Jest + Supertest côté API
 
-### Nouvelle architecture vers NestJS ( microservices) (`apps/api/`)
+### Backend actif (`apps/api/`)
 - **Runtime**: Node.js 20 + NestJS 11
 - **ORM**: Prisma 6 (MySQL core) — à étendre pour PostgreSQL
 - **Auth**: Passport (JWT + Local strategy) + bcrypt
@@ -75,12 +73,10 @@ Migration en cours d'un monolithe Laravel + React/Inertia vers une architecture 
 - **Tests**: Jest + Supertest
 - **Build**: TypeScript 5.9, target ES2023
 
-### Services Go existants
-- `services/evaluation/` — microservice évaluation (Go 1.23)
-- `services/analytics/` — microservice analytics + ClickHouse (Go 1.23)
-
-### Observabilité
-- Prometheus + Grafana + Jaeger (tracing) + redis_exporter + ClickHouse exporter
+### Frontend actif (`apps/web/`)
+- React SPA avec React Query + Suspense
+- Routage React Router
+- Layout applicatif unifié
 
 ## Architecture BDD (3 bases)
 
@@ -92,7 +88,7 @@ Migration en cours d'un monolithe Laravel + React/Inertia vers une architecture 
 
 **Relations cross-DB**: Evaluation (PG) → Utilisateur (MySQL) via matricule — jointure côté application.
 
-## État de la migration NestJS
+## État du projet
 
 ### Modules NestJS existants (`apps/api/src/`)
 - `auth/` — Login (JWT), guards (local + JWT), strategies — **FAIT**
@@ -102,7 +98,7 @@ Migration en cours d'un monolithe Laravel + React/Inertia vers une architecture 
 ### Prisma schema existant (MySQL)
 Modèles: `Branche`, `Region`, `Role`, `Utilisateur` (avec hiérarchie self-ref via manager_matricule)
 
-### Modules à créer pour migration complète
+### Modules backend structurants
 
 | Module NestJS          | Source Laravel                                    | Priorité |
 |------------------------|--------------------------------------------------|----------|
@@ -110,14 +106,14 @@ Modèles: `Branche`, `Region`, `Role`, `Utilisateur` (avec hiérarchie self-ref 
 | `periodes/`            | PeriodeEvaluationService + Controller             | P0       |
 | `hierarchy/`           | HierarchyService + HierarchyController            | P1       |
 | `remplacements/`       | ReplacementService + Controller                   | P1       |
-| `analytics/`           | AnalyticsServiceProxy (→ Go service)              | P2       |
+| `analytics/`           | AnalyticsService                                  | P2       |
 | `templates/`           | TemplateAssignationService + Controllers          | P2       |
 | `regles/`              | RegleEvaluationValidationService + Controller     | P2       |
 | `admin/`               | Admin Controllers (structure, rôles, etc.)        | P3       |
 | `dashboard/`           | DashboardController (40 méthodes par rôle)        | P3       |
 | `notifications/`       | Service placeholder                               | P3       |
 
-### Endpoints API Laravel à porter (~50 routes)
+### Endpoints API principaux (~50 routes)
 
 **Auth** (déjà porté):
 - `POST /api/auth/login` → `POST /api/auth/login`
@@ -165,31 +161,21 @@ Modèles: `Branche`, `Region`, `Role`, `Utilisateur` (avec hiérarchie self-ref 
 ### Nommage
 - Entités/tables en français (utilisateur, evaluation, periode_evaluation, etc.)
 - Code NestJS en anglais (noms de classes, méthodes) avec entités françaises
-- Frontend: pages PascalCase dans `resources/js/pages/`
-- Routes Inertia: résolues depuis `resources/js/pages` (racine minuscule, sous-dossiers PascalCase)
+- Frontend: code SPA dans `apps/web/src/`
 
 ### Patterns
-- **Strangler pattern**: proxy Laravel → microservice (déjà en place pour Analytics et Evaluation Go)
 - **Cross-DB joins**: côté application, jamais en SQL
 - **UUID**: clés primaires pour évaluations et périodes (PostgreSQL)
 - **Matricule**: clé primaire string pour utilisateurs (MySQL)
 
 ### Docker
-- `docker-compose.yml` à la racine — services: core-app, mysql, postgres, clickhouse, redis, jaeger, prometheus, grafana
-- NestJS app pas encore intégré dans docker-compose
-- Dockerfile NestJS: `apps/api/Dockerfile` (multi-stage, node:20-alpine)
+- `docker-compose.yml` à la racine — services actifs: `frontend`, `nestjs-api`, `mysql`, `postgres`
+- Dockerfile API: `apps/api/Dockerfile`
+- Dockerfile frontend: `apps/web/Dockerfile`
 
-## Archives
-- `archives/resources/js/` — anciens routes React Router, dashboards, formulaires, services front/back
-- `archives/database/migrations/clickhouse/`
-- `archives/app/Services/` — services vides
-
-## Prochaines actions (migration NestJS)
-1. **Prisma multi-datasource**: ajouter PostgreSQL au schema Prisma pour évaluations/périodes
-2. **Module Evaluations**: CRUD complet + soumission + validation + policies (guards NestJS)
-3. **Module Périodes**: gestion des périodes d'évaluation avec statuts automatiques
-4. **Module Hierarchy**: arbre hiérarchique, subordonnés, chaîne managériale
-5. **Module Remplacements**: remplacements temporaires
-6. **Intégration Docker Compose**: ajouter service NestJS
-7. **Tests E2E**: couvrir tous les endpoints migrés
-8. **Gateway/BFF**: router le front vers NestJS au lieu de Laravel (strangler progressif)
+## Prochaines actions
+1. **Migrations Prisma**: créer une migration initiale pour le périmètre MySQL
+2. **Seed exécutable**: valider `apps/api/prisma/seed.ts` sur environnement réel
+3. **Tests E2E**: brancher une base de test exploitable
+4. **CI/CD**: build `apps/web`, build `apps/api`, tests
+5. **Documentation**: remettre `docs/` au niveau de l’architecture actuelle

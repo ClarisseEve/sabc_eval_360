@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api';
 import { Evaluation, EvaluationNote, EvaluationStats, EvaluationReport } from '../../types';
 
 const API_URL = '/api/evaluations';
@@ -8,7 +8,7 @@ export const evaluationService = {
    * Récupère toutes les évaluations avec filtres optionnels
    */
   getAll: async (filters?: { periode?: number, statut?: string, page?: number }) => {
-    const response = await axios.get(API_URL, { params: filters });
+    const response = await api.get(API_URL, { params: filters });
     return response.data;
   },
 
@@ -16,7 +16,7 @@ export const evaluationService = {
    * Récupère une évaluation spécifique
    */
   getById: async (id: number) => {
-    const response = await axios.get(`${API_URL}/${id}`);
+    const response = await api.get(`${API_URL}/${id}`);
     return response.data;
   },
 
@@ -24,7 +24,7 @@ export const evaluationService = {
    * Crée une nouvelle évaluation
    */
   create: async (evaluation: { id_evalue: number, id_type_evaluation: number }) => {
-    const response = await axios.post(API_URL, evaluation);
+    const response = await api.post(API_URL, evaluation);
     return response.data;
   },
 
@@ -32,7 +32,7 @@ export const evaluationService = {
    * Met à jour les notes d'une évaluation
    */
   updateNotes: async (id: number, notes: EvaluationNote[]) => {
-    const response = await axios.put(`${API_URL}/${id}/notes`, { notes });
+    const response = await api.put(`${API_URL}/${id}/notes`, { notes });
     return response.data;
   },
 
@@ -40,7 +40,7 @@ export const evaluationService = {
    * Soumet une évaluation pour validation
    */
   submit: async (id: number, commentaire?: string) => {
-    const response = await axios.post(`${API_URL}/${id}/submit`, { commentaire });
+    const response = await api.post(`${API_URL}/${id}/submit`, { commentaire });
     return response.data;
   },
 
@@ -48,7 +48,7 @@ export const evaluationService = {
    * Valide une évaluation
    */
   validate: async (id: number, commentaire?: string) => {
-    const response = await axios.post(`${API_URL}/${id}/validate`, { commentaire });
+    const response = await api.post(`${API_URL}/${id}/validate`, { commentaire });
     return response.data;
   },
 
@@ -56,7 +56,7 @@ export const evaluationService = {
    * Rejette une évaluation
    */
   reject: async (id: number, motif: string) => {
-    const response = await axios.post(`${API_URL}/${id}/reject`, { motif });
+    const response = await api.post(`${API_URL}/${id}/reject`, { motif });
     return response.data;
   },
 
@@ -64,7 +64,7 @@ export const evaluationService = {
    * Récupère les évaluations en attente pour l'utilisateur connecté
    */
   getPendingEvaluations: async () => {
-    const response = await axios.get(`${API_URL}/pending`);
+    const response = await api.get(`${API_URL}/pending`);
     return response.data;
   },
 
@@ -72,7 +72,7 @@ export const evaluationService = {
    * Récupère les évaluations à valider pour l'utilisateur connecté
    */
   getEvaluationsToValidate: async () => {
-    const response = await axios.get(`${API_URL}/to-validate`);
+    const response = await api.get(`${API_URL}/to-validate`);
     return response.data;
   },
 
@@ -80,7 +80,7 @@ export const evaluationService = {
    * Récupère l'historique des évaluations d'un utilisateur
    */
   getEvaluationHistory: async (userId: number, filters?: { page?: number, periode?: number }) => {
-    const response = await axios.get(`${API_URL}/history/${userId}`, { params: filters });
+    const response = await api.get(`${API_URL}/history/${userId}`, { params: filters });
     return response.data;
   },
 
@@ -88,7 +88,7 @@ export const evaluationService = {
    * Envoie des rappels pour les évaluations en retard
    */
   sendReminders: async (options?: { id_periode?: number, jours_retard?: number }) => {
-    const response = await axios.post(`${API_URL}/reminders`, options);
+    const response = await api.post(`${API_URL}/reminders`, options);
     return response.data;
   },
 
@@ -96,7 +96,7 @@ export const evaluationService = {
    * Récupère les utilisateurs éligibles pour évaluation
    */
   getEligibleUsers: async (typeEvaluation?: number) => {
-    const response = await axios.get(`${API_URL}/eligible-users`, { 
+    const response = await api.get(`${API_URL}/eligible-users`, { 
       params: { type_evaluation: typeEvaluation } 
     });
     return response.data;
@@ -110,7 +110,7 @@ export const evaluationService = {
     id_periode?: number, 
     id_role?: number 
   }) => {
-    const response = await axios.get(`${API_URL}/reports`, { params: filters });
+    const response = await api.get(`${API_URL}/reports`, { params: filters });
     return response.data;
   },
 
@@ -121,7 +121,7 @@ export const evaluationService = {
     id_region?: number, 
     id_periode?: number 
   }): Promise<EvaluationStats> => {
-    const response = await axios.get(`${API_URL}/stats`, { params: filters });
+    const response = await api.get(`${API_URL}/stats`, { params: filters });
     return response.data;
   }
 };

@@ -270,6 +270,9 @@ function App() {
                       {/* Legacy paths (redirects from old nav) */}
                       <Route path="/common/evaluations/pending" element={<G><CommonEvaluationsPending /></G>} />
                       <Route path="/common/evaluations/mine" element={<G><CommonEvaluationsMine /></G>} />
+                      <Route path="/common/evaluations/validate" element={<G><CommonEvaluationsToValidate /></G>} />
+                      <Route path="/common/evaluations/:id" element={<G><CommonEvaluationsShow /></G>} />
+                      <Route path="/common/evaluations/:id/edit" element={<G><CommonEvaluationsEdit /></G>} />
 
                       {/* ── Common: Team ── */}
                       <Route path="/equipe/subordonnes" element={<G><TeamOverview /></G>} />

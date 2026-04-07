@@ -1,33 +1,28 @@
-# Architecture — Analytics Service (Go)
+# Architecture — Analytics Domain
 
 ## Overview
 
-Go microservice serving analytics datasets, KPIs, trends, anomalies, and user recommendations. Reads from ClickHouse.
+Le domaine analytics est servi par `apps/api/src/analytics`.
 
-## Components
+## Surface API active
 
-- **Entry point**: `cmd/server/main.go`
-- **Handlers**: `internal/handler/http_handler.go`
-- **Service layer**: `internal/service/*`
-- **Repository**: `internal/repository/clickhouse/*`
-- **Middleware**: `internal/middleware` (tracing, internal auth)
-- **Config**: `config/config.go`
+- `GET /api/analytics/dashboard`
+- `GET /api/analytics/evaluations`
+- `GET /api/analytics/performances`
+- `GET /api/analytics/region/:idRegion`
+- `GET /api/analytics/region/:idRegion/classement`
+- `GET /api/analytics/anomalies`
+- `GET /api/analytics/scores`
+- `GET /api/analytics/recommandations`
+- `GET /api/analytics/axes-amelioration`
 
-## API Surface
+## Sources de données
 
-REST endpoints under `/api/v2/analytics` (see `docs/api-contracts-analytics.md`). Health and metrics are public.
+- PostgreSQL business pour les évaluations, périodes, règles et agrégats
+- MySQL core pour les utilisateurs, rôles, régions et structure
 
-## Storage
+## Runtime
 
-- ClickHouse for analytics aggregates.
-- Tables initialized via SQL scripts in the main app (see `database/clickhouse`).
-
-## Observability
-
-- Prometheus metrics at `/metrics`.
-- Jaeger tracing via OpenTracing.
-
-## Security
-
-- Optional internal service key middleware for `/api/v2`.
-
+- agrégations calculées côté NestJS
+- cache applicatif sur les endpoints lourds
+- exposition directe à `apps/web` via `analyticsApi`

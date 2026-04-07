@@ -1,7 +1,9 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SendBulkNotificationDto } from './dto/send-bulk-notification.dto';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
@@ -50,17 +52,10 @@ export class NotificationsController {
   }
 
   @Post('send-bulk')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async sendBulk(
     @Request() req: any,
-    @Body() body: {
-      titre: string;
-      message: string;
-      type?: string;
-      cible: 'role' | 'region' | 'individu' | 'tous';
-      role?: string;
-      id_region?: string;
-      matricules?: string[];
-    },
+    @Body() body: SendBulkNotificationDto,
   ) {
     const targets: string[] = [];
 

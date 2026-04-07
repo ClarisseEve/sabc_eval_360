@@ -4,7 +4,7 @@ import { dashboardApi, analyticsApi } from '@/Services/api';
 export function useMyDashboard() {
   return useSuspenseQuery({
     queryKey: ['dashboard', 'my'],
-    queryFn: () => dashboardApi.getMy().then(r => r.data),
+    queryFn: () => dashboardApi.getMy().then(r => r.data?.stats ?? r.data),
   });
 }
 

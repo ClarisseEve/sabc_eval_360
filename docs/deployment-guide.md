@@ -2,31 +2,26 @@
 
 ## Overview
 
-Deployment uses Docker Compose for local/preview. Service-specific Dockerfiles are under `docker/` and `services/*/Dockerfile`.
+Le déploiement local et preview repose sur Docker Compose.
 
-## Components
+## Composants actifs
 
-- **App (Laravel + Vite)**: PHP + Nginx containers
-- **Datastores**: MySQL, PostgreSQL, Redis, ClickHouse
-- **Analytics Service**: Go container
-- **Evaluation Service**: Go container
-- **Monitoring**: Prometheus, Grafana, Alertmanager
+- Frontend : `apps/web/Dockerfile`
+- API : `apps/api/Dockerfile`
+- MySQL
+- PostgreSQL
 
-## Local/Preview
+## Démarrage local
 
 ```bash
-# From project root
-make up
-# Or
-Docker Compose up -d
+docker compose up -d
 ```
 
-## Environment
+## Variables d’environnement
 
-Populate `.env` and service env vars (see `MULTI_DATABASE_SETUP.md`).
+Initialiser `.env` à partir de `.env.example`.
 
 ## Notes
 
-- CI pipelines defined in `.github/workflows`.
-- Traefik config is present under `docker/traefik`.
-
+- La stack active est décrite dans `docker-compose.yml`.
+- Les artefacts d’observabilité sous `docker/` sont optionnels par rapport au runtime applicatif minimal.

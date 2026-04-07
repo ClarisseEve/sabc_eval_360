@@ -1,1 +1,0 @@
-export { WelcomeMessage } from './WelcomeMessage';

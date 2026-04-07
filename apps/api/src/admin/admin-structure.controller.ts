@@ -2,6 +2,13 @@ import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nes
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/guards/roles.guard';
 import { AdminStructureService } from './admin-structure.service';
+import {
+  CreateDistrictDto,
+  CreateRegionDto,
+  CreateSecteurDto,
+  CreateServiceDto,
+  UpdateRegionDto,
+} from './dto/structure.dto';
 
 @Controller('admin/structure')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -22,12 +29,12 @@ export class AdminStructureController {
   }
 
   @Post('regions')
-  createRegion(@Body() body: { id_region: string; nom_region: string; est_taniere?: boolean }) {
+  createRegion(@Body() body: CreateRegionDto) {
     return this.structureService.createRegion(body);
   }
 
   @Put('regions/:id')
-  updateRegion(@Param('id') id: string, @Body() body: { nom_region?: string; est_taniere?: boolean }) {
+  updateRegion(@Param('id') id: string, @Body() body: UpdateRegionDto) {
     return this.structureService.updateRegion(id, body);
   }
 
@@ -44,7 +51,7 @@ export class AdminStructureController {
   }
 
   @Post('services')
-  createService(@Body() body: { nom_service: string; id_region: string }) {
+  createService(@Body() body: CreateServiceDto) {
     return this.structureService.createService(body);
   }
 
@@ -61,7 +68,7 @@ export class AdminStructureController {
   }
 
   @Post('districts')
-  createDistrict(@Body() body: { nom_district: string; id_service: string }) {
+  createDistrict(@Body() body: CreateDistrictDto) {
     return this.structureService.createDistrict(body);
   }
 
@@ -78,7 +85,7 @@ export class AdminStructureController {
   }
 
   @Post('secteurs')
-  createSecteur(@Body() body: { nom_secteur: string; id_district: string; id_service?: string }) {
+  createSecteur(@Body() body: CreateSecteurDto) {
     return this.structureService.createSecteur(body);
   }
 

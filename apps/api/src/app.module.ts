@@ -1,4 +1,6 @@
 import { Module, Global } from '@nestjs/common';
+import { APP_GUARD, Reflector } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { CacheService } from './common/cache.service';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,10 +21,15 @@ import { HealthModule } from './health/health.module';
 
 @Global()
 @Module({
-  providers: [CacheService],
-  exports: [CacheService],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60_000,
+        limit: 60,
+      },
+    ]),
     PrismaModule,
     DatabasePgModule,
     AuthModule,
@@ -38,6 +45,15 @@ import { HealthModule } from './health/health.module';
     AdminModule,
     NotificationsModule,
     HealthModule,
+  ],
+  exports: [CacheService],
+  providers: [
+    CacheService,
+    Reflector,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

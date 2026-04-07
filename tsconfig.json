@@ -14,20 +14,16 @@
         "baseUrl": ".",
         "paths": {
             "@/*": [
-                "resources/js/*"
-            ],
-            "ziggy-js": [
-                "vendor/tightenco/ziggy"
+                "apps/web/src/*"
             ]
         }
     },
     "include": [
-        "resources/js/**/*.ts",
-        "resources/js/**/*.tsx",
-        "resources/js/**/*.d.ts"
+        "apps/web/src/**/*.ts",
+        "apps/web/src/**/*.tsx",
+        "apps/web/src/**/*.d.ts"
     ],
     "exclude": [
-        "node_modules",
-        "resources/js/Components/Layout/app/Sidebar_old.tsx"
+        "node_modules"
     ]
 }

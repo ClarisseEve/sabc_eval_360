@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api';
 
 const API_URL = '/api/periodes';
 
@@ -7,7 +7,7 @@ export const periodeService = {
    * Récupère toutes les périodes d'évaluation
    */
   getAll: async (filters?: { active?: boolean, page?: number }) => {
-    const response = await axios.get(API_URL, { params: filters });
+    const response = await api.get(API_URL, { params: filters });
     return response.data;
   },
 
@@ -15,7 +15,7 @@ export const periodeService = {
    * Récupère une période d'évaluation spécifique
    */
   getById: async (id: number) => {
-    const response = await axios.get(`${API_URL}/${id}`);
+    const response = await api.get(`${API_URL}/${id}`);
     return response.data;
   },
 
@@ -29,7 +29,7 @@ export const periodeService = {
     active: boolean,
     description?: string
   }) => {
-    const response = await axios.post(API_URL, periode);
+    const response = await api.post(API_URL, periode);
     return response.data;
   },
 
@@ -43,7 +43,7 @@ export const periodeService = {
     active?: boolean,
     description?: string
   }) => {
-    const response = await axios.put(`${API_URL}/${id}`, periode);
+    const response = await api.put(`${API_URL}/${id}`, periode);
     return response.data;
   },
 
@@ -51,7 +51,7 @@ export const periodeService = {
    * Supprime une période d'évaluation
    */
   delete: async (id: number) => {
-    const response = await axios.delete(`${API_URL}/${id}`);
+    const response = await api.delete(`${API_URL}/${id}`);
     return response.data;
   },
 
@@ -59,7 +59,7 @@ export const periodeService = {
    * Récupère les périodes actives
    */
   getActivePeriodes: async () => {
-    const response = await axios.get(`${API_URL}/active`);
+    const response = await api.get(`${API_URL}/active`);
     return response.data;
   }
 };

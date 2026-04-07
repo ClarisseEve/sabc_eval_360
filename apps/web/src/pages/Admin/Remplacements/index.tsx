@@ -1,172 +1,118 @@
-import React from 'react';
-import { Head } from '@/lib/inertia-shim';
-import { Link } from '@/lib/inertia-shim';
-import AppLayout from '@/Components/Layout/app/AppLayout';
-import { Card, CardHeader, CardContent, CardFooter } from '@/Components/UI/Card/Card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
-import { Button } from '@/Components/UI/Button/Button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/Components/UI/DropdownMenu/DropdownMenu';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { Badge } from '@/Components/UI/Badge';
+import { Button } from '@/Components/UI/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
+import { Input } from '@/Components/UI/Input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { remplacementsApi } from '@/Services/api';
+import { AdminRemplacementsLayout } from './shared';
 
-/**
- * Page d'administration des remplacements temporaires
- * Affiche la liste des remplacements temporaires et permet de les gérer
- */
-interface Remplacement {
-  id: number;
-  remplacant: string;
-  remplace: string;
-  role: string;
-  date_debut: string;
-  date_fin: string;
-  statut: string;
-}
+export default function RemplacementsIndex() {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const { data } = useSuspenseQuery({
+    queryKey: ['admin', 'remplacements', 'all'],
+    queryFn: async () => {
+      const [actifs, aVenir, historique] = await Promise.all([
+        remplacementsApi.actifs(),
+        remplacementsApi.aVenir(),
+        remplacementsApi.historique(),
+      ]);
+      return {
+        actifs: actifs.data,
+        aVenir: aVenir.data,
+        historique: historique.data,
+      };
+    },
+  });
 
-interface RemplacementsProps {
-  remplacements?: Remplacement[];
-  auth: {
-    user: {
-      name: string;
-      email: string;
-      role: string;
-      avatar?: string;
-    }
-  };
-}
+  const terminerMutation = useMutation({
+    mutationFn: async (id: string) => remplacementsApi.terminer(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'remplacements'] });
+    },
+  });
 
-export default function Remplacements({ remplacements = [], auth }: RemplacementsProps) {
-  // Données de démonstration pour les remplacements
-  const replacementsData = remplacements.length > 0 ? remplacements : [
-    { 
-      id: 1, 
-      remplacant: 'Jean Dupont', 
-      remplace: 'Marie Martin', 
-      role: 'CDV', 
-      date_debut: '2025-06-01', 
-      date_fin: '2025-06-30',
-      statut: 'actif'
-    },
-    { 
-      id: 2, 
-      remplacant: 'Paul Dubois', 
-      remplace: 'Sophie Leroy', 
-      role: 'CDS', 
-      date_debut: '2025-06-15', 
-      date_fin: '2025-07-15',
-      statut: 'actif'
-    },
-    { 
-      id: 3, 
-      remplacant: 'Thomas Bernard', 
-      remplace: 'Julie Petit', 
-      role: 'TMO', 
-      date_debut: '2025-05-01', 
-      date_fin: '2025-06-01',
-      statut: 'terminé'
-    },
-  ];
+  const rows = useMemo(() => {
+    const all = [...(data?.actifs || []), ...(data?.aVenir || []), ...(data?.historique || [])];
+    const seen = new Set();
+    return all.filter((row: any) => {
+      if (seen.has(row.id_remplacement)) return false;
+      seen.add(row.id_remplacement);
+      const text = [
+        row.titulaire_matricule,
+        row.remplacant_matricule,
+        row.titulaire_prenom,
+        row.titulaire_nom,
+        row.remplacant_prenom,
+        row.remplacant_nom,
+        row.role_remplace,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return !search.trim() || text.includes(search.trim().toLowerCase());
+    });
+  }, [data, search]);
 
   return (
-    <AppLayout user={auth.user}>
-      <Head title="Gestion des Remplacements" />
-      
-      <div className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-semibold text-gray-900">Gestion des Remplacements Temporaires</h1>
-            <Link href="/admin/remplacements/create">
-              <Button 
-                variant="default"
-                type="button"
-              >
-                Nouveau remplacement
-              </Button>
-            </Link>
-          </div>
-          
-          <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <h2 className="text-lg font-medium">Liste des remplacements</h2>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Remplaçant</TableHead>
-                      <TableHead>Remplacé</TableHead>
-                      <TableHead>Rôle</TableHead>
-                      <TableHead>Date début</TableHead>
-                      <TableHead>Date fin</TableHead>
-                      <TableHead>Statut</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {replacementsData.map((remplacement) => (
-                      <TableRow key={remplacement.id}>
-                        <TableCell>{remplacement.remplacant}</TableCell>
-                        <TableCell>{remplacement.remplace}</TableCell>
-                        <TableCell>{remplacement.role}</TableCell>
-                        <TableCell>{remplacement.date_debut}</TableCell>
-                        <TableCell>{remplacement.date_fin}</TableCell>
-                        <TableCell>
-                          <span 
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              remplacement.statut === 'actif' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {remplacement.statut}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger className="cursor-pointer">Actions</DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <Link href={`/admin/remplacements/${remplacement.id}`}>
-                                <DropdownMenuItem>
-                                  Voir détails
-                                </DropdownMenuItem>
-                              </Link>
-                              <Link href={`/admin/remplacements/${remplacement.id}/edit`}>
-                                <DropdownMenuItem>
-                                  Modifier
-                                </DropdownMenuItem>
-                              </Link>
-                              {remplacement.statut === 'actif' && (
-                                <DropdownMenuItem 
-                                  onClick={() => {
-                                    if (confirm('Êtes-vous sûr de vouloir terminer ce remplacement ?')) {
-                                      // Logique pour terminer le remplacement
-                                    }
-                                  }}
-                                >
-                                  Terminer
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem 
-                                onClick={() => {
-                                  if (confirm('Êtes-vous sûr de vouloir supprimer ce remplacement ?')) {
-                                    // Logique pour supprimer le remplacement
-                                  }
-                                }}
-                                className="text-red-600"
-                              >
-                                Supprimer
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </div>
+    <AdminRemplacementsLayout title="Gestion des remplacements">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-sabc-gray-900">Gestion des remplacements</h1>
+          <p className="text-sm text-sabc-gray-600">Actifs, à venir et historiques sur les données réelles.</p>
         </div>
+        <Link to="/admin/remplacements/create">
+          <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark">Nouveau remplacement</Button>
+        </Link>
       </div>
-    </AppLayout>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Actifs</div><div className="text-2xl font-bold">{data.actifs.length}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">À venir</div><div className="text-2xl font-bold">{data.aVenir.length}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Historique</div><div className="text-2xl font-bold">{data.historique.length}</div></CardContent></Card>
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle>Remplacements</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un titulaire, remplaçant ou rôle" />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Titulaire</TableHead>
+                <TableHead>Remplaçant</TableHead>
+                <TableHead>Rôle</TableHead>
+                <TableHead>Période</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row: any) => {
+                const statut = row.est_actif ? 'Actif' : 'Terminé';
+                return (
+                  <TableRow key={row.id_remplacement}>
+                    <TableCell>{[row.titulaire_prenom, row.titulaire_nom].filter(Boolean).join(' ')} ({row.titulaire_matricule})</TableCell>
+                    <TableCell>{[row.remplacant_prenom, row.remplacant_nom].filter(Boolean).join(' ')} ({row.remplacant_matricule})</TableCell>
+                    <TableCell>{row.role_remplace}</TableCell>
+                    <TableCell>{row.date_debut} {row.date_fin ? `→ ${row.date_fin}` : ''}</TableCell>
+                    <TableCell><Badge variant={row.est_actif ? 'default' : 'outline'}>{statut}</Badge></TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Link to={`/admin/remplacements/${row.id_remplacement}`}><Button variant="outline" size="sm">Voir</Button></Link>
+                        <Link to={`/admin/remplacements/${row.id_remplacement}/edit`}><Button variant="outline" size="sm">Modifier</Button></Link>
+                        {row.est_actif ? (
+                          <Button variant="outline" size="sm" onClick={() => terminerMutation.mutate(String(row.id_remplacement))}>Terminer</Button>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </AdminRemplacementsLayout>
   );
 }

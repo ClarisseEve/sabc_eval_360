@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api';
 
 const API_URL = '/api/regles';
 
@@ -7,7 +7,7 @@ export const regleService = {
    * Récupère toutes les règles d'évaluation
    */
   getAll: async (filters?: { active?: boolean, page?: number }) => {
-    const response = await axios.get(API_URL, { params: filters });
+    const response = await api.get(API_URL, { params: filters });
     return response.data;
   },
 
@@ -15,7 +15,7 @@ export const regleService = {
    * Récupère une règle d'évaluation spécifique
    */
   getById: async (id: number) => {
-    const response = await axios.get(`${API_URL}/${id}`);
+    const response = await api.get(`${API_URL}/${id}`);
     return response.data;
   },
 
@@ -37,7 +37,7 @@ export const regleService = {
       evaluation_manager: number
     }
   }) => {
-    const response = await axios.post(API_URL, regle);
+    const response = await api.post(API_URL, regle);
     return response.data;
   },
 
@@ -60,7 +60,7 @@ export const regleService = {
       evaluation_manager?: number
     }
   }) => {
-    const response = await axios.put(`${API_URL}/${id}`, regle);
+    const response = await api.put(`${API_URL}/${id}`, regle);
     return response.data;
   },
 
@@ -68,7 +68,7 @@ export const regleService = {
    * Supprime une règle d'évaluation
    */
   delete: async (id: number) => {
-    const response = await axios.delete(`${API_URL}/${id}`);
+    const response = await api.delete(`${API_URL}/${id}`);
     return response.data;
   },
 
@@ -76,7 +76,7 @@ export const regleService = {
    * Récupère les règles d'évaluation par rôle
    */
   getReglesByRole: async (idRole: number) => {
-    const response = await axios.get(`${API_URL}/role/${idRole}`);
+    const response = await api.get(`${API_URL}/role/${idRole}`);
     return response.data;
   }
 };

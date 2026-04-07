@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api';
 import { Notification } from '../../types';
 
 const API_URL = '/api/notifications';
@@ -8,7 +8,7 @@ export const notificationService = {
    * Récupère toutes les notifications de l'utilisateur connecté
    */
   getAll: async (filters?: { page?: number }) => {
-    const response = await axios.get(API_URL, { params: filters });
+    const response = await api.get(API_URL, { params: filters });
     return response.data;
   },
 
@@ -16,7 +16,7 @@ export const notificationService = {
    * Récupère les notifications non lues de l'utilisateur connecté
    */
   getUnreadNotifications: async () => {
-    const response = await axios.get(`${API_URL}/unread`);
+    const response = await api.get(`${API_URL}/unread`);
     return response.data;
   },
 
@@ -24,7 +24,7 @@ export const notificationService = {
    * Marque une notification comme lue
    */
   markAsRead: async (id: string) => {
-    const response = await axios.post(`${API_URL}/${id}/mark-as-read`);
+    const response = await api.post(`${API_URL}/${id}/mark-as-read`);
     return response.data;
   },
 
@@ -32,7 +32,7 @@ export const notificationService = {
    * Marque toutes les notifications comme lues
    */
   markAllAsRead: async () => {
-    const response = await axios.post(`${API_URL}/mark-all-as-read`);
+    const response = await api.post(`${API_URL}/mark-all-as-read`);
     return response.data;
   },
 
@@ -40,7 +40,7 @@ export const notificationService = {
    * Supprime une notification
    */
   delete: async (id: string) => {
-    const response = await axios.delete(`${API_URL}/${id}`);
+    const response = await api.delete(`${API_URL}/${id}`);
     return response.data;
   }
 };

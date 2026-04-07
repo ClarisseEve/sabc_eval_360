@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { RemplacementsService } from './remplacements.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateRemplacementDto } from './dto/create-remplacement.dto';
@@ -28,9 +28,19 @@ export class RemplacementsController {
     return this.service.getPourUtilisateur(req.user.matricule);
   }
 
+  @Get(':id')
+  getById(@Param('id') id: string) {
+    return this.service.getById(parseInt(id));
+  }
+
   @Post()
   create(@Body() dto: CreateRemplacementDto, @Request() req: any) {
     return this.service.create({ ...dto, cree_par: req.user.matricule });
+  }
+
+  @Put(':id')
+  update(@Param('id') id: string, @Body() body: any) {
+    return this.service.update(parseInt(id), body);
   }
 
   @Post(':id/terminer')

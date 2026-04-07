@@ -1,45 +1,56 @@
-# Development Guide — App (Laravel + Inertia)
+# Development Guide — App (React SPA)
 
-## Prerequisites
+## Stack active
 
-- PHP 8.2+
-- Composer 2
-- Node 22+ (pnpm)
-- MySQL, PostgreSQL, ClickHouse, Redis
-- Docker / Docker Compose (recommended)
+- Frontend: `apps/web` avec React 19, TypeScript, Vite et React Query
+- Backend: `apps/api` avec NestJS 11
+- Core DB: MySQL via Prisma
+- Business DB: PostgreSQL via `pg`
 
-## Setup
+## Prérequis
+
+- Node.js 20+
+- pnpm 9+
+- MySQL 8+
+- PostgreSQL 16+
+- Docker / Docker Compose en option
+
+## Installation
 
 ```bash
 cp .env.example .env
-composer install
 pnpm install
-php artisan key:generate
 ```
 
-## Database
+## Développement local
 
 ```bash
-php artisan migrate --database=mysql
-php artisan migrate --database=pgsql
-# ClickHouse setup
-./database/clickhouse/run_clickhouse_script.sh database/clickhouse/create_analytics_tables.sql
+pnpm --dir apps/api start:dev
+pnpm --dir apps/web dev
 ```
 
-## Run Locally
+## Build
 
 ```bash
-composer dev
+pnpm --dir apps/api build
+pnpm --dir apps/web build
+```
+
+## Base de données
+
+```bash
+pnpm --dir apps/api db:migrate:deploy
+pnpm --dir apps/api db:seed
 ```
 
 ## Tests
 
 ```bash
-composer test
+pnpm --dir apps/api test
+pnpm --dir apps/api test:e2e
 ```
 
 ## Notes
 
-- Multi-DB details in `MULTI_DATABASE_SETUP.md`.
-- Analytics UI data may come from `AnalyticsServiceProxy` (feature flag).
-
+- `apps/web` est l’unique frontend actif.
+- Les artefacts Laravel/Inertia et Go ne font plus partie de la chaîne runtime.

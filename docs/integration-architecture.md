@@ -2,40 +2,28 @@
 
 ## High-Level Flow
 
-1. **Laravel App** serves UI and orchestrates workflows.
-2. **Evaluation Service** handles evaluation lifecycle via REST (`/api/v2/evaluations`).
-3. **Analytics Service** serves KPIs, trends, anomalies from ClickHouse.
-4. **Pipelines** feed analytics stores from business/core databases.
+1. `apps/web` consomme l’API `apps/api` via HTTP.
+2. `apps/api` orchestre les domaines métier.
+3. MySQL porte le référentiel core.
+4. PostgreSQL porte les données métier.
 
-## Integration Points
+## Intégrations actives
 
-- **App -> Evaluation Service**
-  - Proxy: `app/Services/EvaluationServiceProxy.php`
-  - Feature flags control migration (Strangler pattern)
-  - Routes map to `/api/v2/evaluations`, `/api/v2/periodes`, `/api/v2/scores`
+- `apps/web` -> `apps/api`
+  - JWT bearer
+  - React Query
+  - préfixe `/api`
 
-- **App -> Analytics Service**
-  - Proxy: `app/Services/AnalyticsServiceProxy.php`
-  - Optional internal service key auth
-  - Caching TTLs aligned with perf rules
+- `apps/api` -> MySQL
+  - Prisma
+  - utilisateurs, rôles, régions, branches
 
-- **Pipelines -> ClickHouse**
-  - Batch ingestion (ETL) populates analytics tables
-  - Aggregates support dashboards and anomaly detection
+- `apps/api` -> PostgreSQL
+  - driver `pg`
+  - évaluations, périodes, règles, templates et analytics métier
 
-## Data Sync (per docs)
+## Observabilité
 
-- MySQL -> PostgreSQL sync (scheduled)
-- PostgreSQL -> ClickHouse sync (daily/weekly)
-
-## Observability
-
-- Prometheus metrics exposed by Go services
-- Jaeger tracing across services
-
-## Security and Governance
-
-- Role-based access enforced in Laravel
-- Region/branch constraints enforced in business logic
-- Sensitive data stays in core/business DBs; analytics is aggregated
-
+- intercepteur de logs HTTP dans NestJS
+- healthcheck via `/api/health`
+- Prometheus reste optionnel et hors chaîne critique du runtime local

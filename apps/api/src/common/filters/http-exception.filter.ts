@@ -12,9 +12,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Erreur interne du serveur';
 
-    if (exception instanceof HttpException) {
-      status = exception.getStatus();
-      const body = exception.getResponse();
+    const httpException =
+      exception instanceof HttpException
+        ? exception
+        : exception && typeof (exception as any).getStatus === 'function'
+          ? (exception as HttpException)
+          : null;
+
+    if (httpException) {
+      status = httpException.getStatus();
+      const body = httpException.getResponse();
       message = typeof body === 'string' ? body : (body as any).message ?? message;
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);

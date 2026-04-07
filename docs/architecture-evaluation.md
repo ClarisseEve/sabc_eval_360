@@ -1,36 +1,39 @@
-# Architecture — Evaluation Service (Go)
+# Architecture — Evaluation Domain
 
 ## Overview
 
-Go microservice responsible for the evaluation lifecycle (create, update notes, submit, validate) and read-only scoring. Implements a Strangler migration path from the Laravel monolith.
+Le domaine `evaluation` est implémenté dans `apps/api/src/evaluations`.
 
-## Components
+## Responsabilités
 
-- **Entry point**: `cmd/server/main.go`
-- **Handlers**: `internal/handler/http_handler.go`
-- **Service layer**: `internal/service/*`
-- **Repository**: `internal/repository/postgres/*`
-- **Domain models**: `internal/domain/*`
-- **Config**: `config/config.go`
-- **API specs**: `api/openapi` and `api/proto`
+- création d’évaluations
+- mise à jour des notations
+- soumission
+- validation
+- historique
+- éligibilité
 
-## API Surface
+## Surface API active
 
-REST endpoints under `/api/v2` (see `docs/api-contracts-evaluation.md`).
+- `GET /api/evaluations`
+- `POST /api/evaluations`
+- `GET /api/evaluations/:id`
+- `PUT /api/evaluations/:id`
+- `POST /api/evaluations/:id/submit`
+- `POST /api/evaluations/:id/validate`
+- `GET /api/evaluations/periodes-actives`
+- `GET /api/evaluations/eligibles`
+- `GET /api/evaluations/historique`
 
-## Storage
+## Stockage
 
-- PostgreSQL (service-local schema) with `evaluations` table and JSONB notes.
+- PostgreSQL pour les données métier
+- MySQL pour l’identité et la hiérarchie
+- les jointures inter-bases sont gérées côté application
 
-## Observability
+## Sécurité
 
-- Prometheus metrics and Jaeger tracing.
-
-## Security
-
-- Auth middleware (JWT/headers) configured by environment.
-
-## Migration Strategy
-
-Strangler pattern controlled by feature flags in `EvaluationServiceProxy` (Laravel). The proxy falls back to legacy endpoints if a feature is not migrated or the service is disabled.
-
+- JWT stateless
+- validation DTO
+- guards NestJS
+- filtre d’exception global

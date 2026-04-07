@@ -2,7 +2,7 @@
  * Inertia.js compatibility shim for NestJS migration.
  *
  * Provides drop-in replacements for the most-used @inertiajs/react APIs
- * backed by React Router DOM + axios/JWT so that existing page components
+ * backed by React Router DOM + fetch/JWT so that existing page components
  * require minimal changes.
  *
  * Usage:  replace  import { router, usePage, … } from '@inertiajs/react'

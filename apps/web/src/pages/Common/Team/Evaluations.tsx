@@ -1,52 +1,91 @@
-import React, { Suspense } from 'react';
+import React, { useMemo } from 'react';
 import { Head } from '@/lib/inertia-shim';
-import AppLayout from '@/Components/Layout/app/AppLayout';
-import { useAuthContext } from '@/Contexts/AuthContext';
-import { Card, CardContent } from '@/Components/UI/Card/Card';
-import { Construction } from 'lucide-react';
-
-function TeamEvaluationsContent() {
-  return (
-    <div className="mx-auto max-w-4xl py-12">
-      <Card className="border-dashed border-2 border-sabc-gray-300 dark:border-sabc-gray-600">
-        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-4 rounded-full bg-sabc-gray-100 p-4 dark:bg-sabc-gray-800">
-            <Construction className="h-12 w-12 text-sabc-gray-400" />
-          </div>
-          <h2 className="mb-2 text-xl font-semibold text-sabc-gray-700 dark:text-sabc-gray-200">
-            Évaluations d'équipe
-          </h2>
-          <p className="max-w-md text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
-            Cette fonctionnalité sera disponible prochainement.
-            Vous pourrez suivre l'avancement des évaluations de vos subordonnés.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+import { Badge } from '@/Components/UI/Badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { useSubordonnes } from '@/Hooks/queries';
+import { useEvaluations } from '@/Hooks/queries/useEvaluationsQuery';
+import { EvaluationPageLayout, formatDisplayName } from '@/pages/Common/Evaluations/shared';
 
 export default function TeamEvaluationsPage() {
-  const { user } = useAuthContext();
+  const { data: subordonnesData } = useSubordonnes();
+  const { data: evaluationsData } = useEvaluations();
 
-  const layoutUser = {
-    name: user ? [user.prenom, user.nom].filter(Boolean).join(' ') || 'Utilisateur' : 'Utilisateur',
-    email: user?.email || '',
-    role: user?.role_nom || user?.role || '',
-    avatar: undefined,
-  };
+  const subordonnes = Array.isArray(subordonnesData) ? subordonnesData : [];
+  const evaluations = Array.isArray(evaluationsData) ? evaluationsData : [];
+  const subordonnesSet = useMemo(() => new Set(subordonnes.map((user: any) => user.matricule)), [subordonnes]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('sabc_access_token');
-    globalThis.location.href = '/login';
-  };
+  const teamEvaluations = useMemo(
+    () =>
+      evaluations.filter((evaluation: any) =>
+        subordonnesSet.has(evaluation?.evalue_matricule) ||
+        subordonnesSet.has(evaluation?.evaluateur_matricule) ||
+        subordonnesSet.has(evaluation?.evalue?.matricule) ||
+        subordonnesSet.has(evaluation?.evaluateur?.matricule),
+      ),
+    [evaluations, subordonnesSet],
+  );
+
+  const pending = teamEvaluations.filter((evaluation: any) => evaluation.statut === 'en_attente' || evaluation.statut === 'brouillon').length;
+  const submitted = teamEvaluations.filter((evaluation: any) => evaluation.statut === 'soumis').length;
+  const validated = teamEvaluations.filter((evaluation: any) => evaluation.statut === 'valide').length;
 
   return (
-    <AppLayout user={layoutUser} notifications={[]} pageTitle="Évaluations d'équipe" onLogout={handleLogout}>
+    <EvaluationPageLayout pageTitle="Évaluations d'équipe">
       <Head title="Évaluations d'équipe — SABC Eval360" />
-      <Suspense fallback={<div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-sabc-gray-200 border-t-sabc-red-primary" /></div>}>
-        <TeamEvaluationsContent />
-      </Suspense>
-    </AppLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-sabc-gray-900">Évaluations d'équipe</h1>
+          <p className="text-sm text-sabc-gray-600">Suivi des évaluations liées à vos subordonnés directs.</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Total</div><div className="text-2xl font-bold">{teamEvaluations.length}</div></CardContent></Card>
+          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">En attente</div><div className="text-2xl font-bold">{pending}</div></CardContent></Card>
+          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Soumises</div><div className="text-2xl font-bold">{submitted}</div></CardContent></Card>
+          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Validées</div><div className="text-2xl font-bold">{validated}</div></CardContent></Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Évaluations de l'équipe</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {teamEvaluations.length === 0 ? (
+              <div className="py-10 text-center text-sm text-sabc-gray-500">
+                Aucune évaluation liée à vos subordonnés n’a été trouvée.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Évalué</TableHead>
+                    <TableHead>Évaluateur</TableHead>
+                    <TableHead>Période</TableHead>
+                    <TableHead>Statut</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teamEvaluations.map((evaluation: any) => (
+                    <TableRow key={evaluation.id_evaluation}>
+                      <TableCell>{evaluation.id_evaluation}</TableCell>
+                      <TableCell>{formatDisplayName(evaluation.evalue || { matricule: evaluation.evalue_matricule })}</TableCell>
+                      <TableCell>{formatDisplayName(evaluation.evaluateur || { matricule: evaluation.evaluateur_matricule })}</TableCell>
+                      <TableCell>{evaluation.periode?.nom_periode || evaluation.id_periode || 'N/A'}</TableCell>
+                      <TableCell>
+                        <Badge variant={evaluation.statut === 'valide' ? 'default' : 'outline'}>
+                          {evaluation.statut}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </EvaluationPageLayout>
   );
 }

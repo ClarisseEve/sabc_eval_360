@@ -1,32 +1,10 @@
-# Development Guide — Evaluation Service
+# Development Guide — Evaluation
 
-## Prerequisites
+Le domaine évaluation actif est implémenté dans `apps/api` et consommé par `apps/web`.
 
-- Go 1.23+
-- PostgreSQL 16+
-- Redis 7+
-- Docker / Docker Compose
-
-## Setup
+## Développement local
 
 ```bash
-cd services/evaluation
-go mod download
+pnpm --dir apps/api start:dev
+pnpm --dir apps/web dev
 ```
-
-## Run Locally
-
-```bash
-go run ./cmd/server
-```
-
-## Tests
-
-```bash
-go test ./...
-```
-
-## Notes
-
-- Strangler pattern with feature flags (see `services/evaluation/README.md`).
-

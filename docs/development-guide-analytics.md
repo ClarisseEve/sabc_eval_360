@@ -1,27 +1,15 @@
-# Development Guide — Analytics Service
+# Development Guide — Analytics
 
-## Prerequisites
+L’analytics actif est servi par `apps/api`.
 
-- Go 1.23+
-- ClickHouse
-- Docker (optional)
-
-## Setup
+## Développement local
 
 ```bash
-cd services/analytics
-go mod download
+pnpm --dir apps/api start:dev
 ```
 
-## Run Locally
+## Frontend associé
 
 ```bash
-go run ./cmd/server
+pnpm --dir apps/web dev
 ```
-
-## Tests
-
-```bash
-go test ./...
-```
-

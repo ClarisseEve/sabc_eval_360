@@ -22,7 +22,9 @@ export class DatabasePgService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await this.pool.end();
+    if (this.pool) {
+      await this.pool.end();
+    }
   }
 
   async query<T = any>(sql: string, params: any[] = []): Promise<T[]> {

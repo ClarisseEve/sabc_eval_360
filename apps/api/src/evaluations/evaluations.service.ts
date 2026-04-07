@@ -1,23 +1,42 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { randomUUID } from 'crypto';
+import { createHash } from 'crypto';
 
 export interface Evaluation {
-  id_evaluation: string;
+  id_evaluation: string | number;
   evaluateur_matricule: string;
   evalue_matricule: string;
   id_periode: string;
+  periode_code?: string;
   id_regle: string | null;
-  date_evaluation: string;
+  date_creation: string;
   date_soumission: string | null;
   statut: string;
   notations_json: any;
-  commentaire_general: string | null;
+  commentaire_global: string | null;
   note_globale: number | null;
   type_evaluation: string;
   created_at: Date;
   updated_at: Date;
+}
+
+type EnrichedEvaluation = Evaluation & {
+  evaluateur?: any;
+  evalue?: any;
+  periode?: any;
+  regle?: any;
+  validateur?: any;
+};
+
+const PERIODE_UUID_NAMESPACE = '2d9d2d7e-2c8f-4d5f-9867-334e13ef17d9';
+
+function deterministicUuidFromString(value: string): string {
+  const hex = createHash('sha1').update(`${PERIODE_UUID_NAMESPACE}:${value}`).digest('hex').slice(0, 32);
+  const chars = hex.split('');
+  chars[12] = '5';
+  chars[16] = ((parseInt(chars[16], 16) & 0x3) | 0x8).toString(16);
+  return `${chars.slice(0, 8).join('')}-${chars.slice(8, 12).join('')}-${chars.slice(12, 16).join('')}-${chars.slice(16, 20).join('')}-${chars.slice(20, 32).join('')}`;
 }
 
 @Injectable()
@@ -59,34 +78,40 @@ export class EvaluationsService {
       throw new NotFoundException('Évaluateur ou évalué introuvable');
     }
 
-    const periode = await this.pg.queryOne('SELECT * FROM periodes_evaluation WHERE id_periode = $1', [idPeriode]);
+    const periode = await this.pg.queryOne<any>('SELECT * FROM periodes_evaluation WHERE id_periode = $1', [idPeriode]);
     if (!periode || periode.statut !== 'ouverte' || !periode.est_ouverte) {
       throw new BadRequestException('Période non active');
     }
 
+    const evaluationPeriodeId = deterministicUuidFromString(String(periode.code_periode));
+
     const existing = await this.pg.queryOne(
       `SELECT * FROM evaluations WHERE evaluateur_matricule = $1 AND evalue_matricule = $2 AND id_periode = $3`,
-      [evaluateurMatricule, evalueMatricule, idPeriode],
+      [evaluateurMatricule, evalueMatricule, evaluationPeriodeId],
     );
     if (existing) return existing;
 
-    const id = randomUUID();
     const typeEval = this.determinerType(evaluateur, evalue);
 
-    await this.pg.execute(
-      `INSERT INTO evaluations (id_evaluation, evaluateur_matricule, evalue_matricule, id_periode, id_regle,
-        date_evaluation, statut, notations_json, type_evaluation, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NOW(), 'brouillon', '[]', $6, NOW(), NOW())`,
-      [id, evaluateurMatricule, evalueMatricule, idPeriode, idRegle ?? null, typeEval],
+    const created = await this.pg.queryOne<Evaluation>(
+      `INSERT INTO evaluations (evaluateur_matricule, evalue_matricule, id_periode, id_regle,
+        date_creation, statut, notations_json, type_evaluation, periode_code, created_at, updated_at)
+       SELECT $1, $2, $3, $4, CURRENT_DATE, 'brouillon', '[]', $5, p.code_periode, NOW(), NOW()
+       FROM periodes_evaluation p
+       WHERE p.id_periode = $6
+       RETURNING *`,
+      [evaluateurMatricule, evalueMatricule, evaluationPeriodeId, idRegle ?? null, typeEval, idPeriode],
     );
-
-    return (await this.pg.queryOne('SELECT * FROM evaluations WHERE id_evaluation = $1', [id]))!;
+    if (!created) {
+      throw new BadRequestException("Impossible de créer l'évaluation");
+    }
+    return created;
   }
 
-  async findById(id: string): Promise<Evaluation> {
+  async findById(id: string): Promise<EnrichedEvaluation> {
     const eval_ = await this.pg.queryOne<Evaluation>('SELECT * FROM evaluations WHERE id_evaluation = $1', [id]);
     if (!eval_) throw new NotFoundException('Évaluation introuvable');
-    return eval_;
+    return this.enrichEvaluation(eval_);
   }
 
   async updateNotes(id: string, notes: any[], commentaire?: string): Promise<boolean> {
@@ -96,7 +121,7 @@ export class EvaluationsService {
     }
 
     await this.pg.execute(
-      `UPDATE evaluations SET notations_json = $1, commentaire_general = $2, updated_at = NOW()
+      `UPDATE evaluations SET notations_json = $1, commentaire_global = $2, updated_at = NOW()
        WHERE id_evaluation = $3`,
       [JSON.stringify(notes), commentaire ?? null, id],
     );
@@ -153,15 +178,16 @@ export class EvaluationsService {
     return { success: true, message };
   }
 
-  async getEnAttente(matricule: string): Promise<Evaluation[]> {
-    return this.pg.query<Evaluation>(
+  async getEnAttente(matricule: string): Promise<EnrichedEvaluation[]> {
+    const evaluations = await this.pg.query<Evaluation>(
       `SELECT * FROM evaluations WHERE evaluateur_matricule = $1 AND statut IN ('brouillon', 'soumis')
-       ORDER BY date_evaluation DESC`,
+       ORDER BY date_creation DESC`,
       [matricule],
     );
+    return this.enrichEvaluations(evaluations);
   }
 
-  async getAValider(managerMatricule: string): Promise<Evaluation[]> {
+  async getAValider(managerMatricule: string): Promise<EnrichedEvaluation[]> {
     const subordonnes = await this.prisma.utilisateur.findMany({
       where: { manager_matricule: managerMatricule },
       select: { matricule: true },
@@ -171,11 +197,12 @@ export class EvaluationsService {
     if (!matricules.length) return [];
 
     const placeholders = matricules.map((_, i) => `$${i + 1}`).join(',');
-    return this.pg.query<Evaluation>(
+    const evaluations = await this.pg.query<Evaluation>(
       `SELECT * FROM evaluations WHERE statut = 'soumis' AND evalue_matricule IN (${placeholders})
        ORDER BY date_soumission DESC`,
       matricules,
     );
+    return this.enrichEvaluations(evaluations);
   }
 
   async getPeriodesActives() {
@@ -187,13 +214,14 @@ export class EvaluationsService {
     );
   }
 
-  async getHistorique(matricule: string): Promise<Evaluation[]> {
-    return this.pg.query<Evaluation>(
+  async getHistorique(matricule: string): Promise<EnrichedEvaluation[]> {
+    const evaluations = await this.pg.query<Evaluation>(
       `SELECT * FROM evaluations
        WHERE evaluateur_matricule = $1 OR evalue_matricule = $1
-       ORDER BY date_evaluation DESC`,
+       ORDER BY date_creation DESC`,
       [matricule],
     );
+    return this.enrichEvaluations(evaluations);
   }
 
   async getEligibles(matricule: string) {
@@ -230,7 +258,7 @@ export class EvaluationsService {
     if (!periode) throw new NotFoundException('Période introuvable');
 
     const evaluations = await this.pg.query<Evaluation>(
-      `SELECT * FROM evaluations WHERE id_periode = $1 ORDER BY date_evaluation DESC`,
+      `SELECT * FROM evaluations WHERE id_periode = $1 ORDER BY date_creation DESC`,
       [idPeriode],
     );
 
@@ -331,5 +359,78 @@ export class EvaluationsService {
       }
     }
     return poids > 0 ? Math.round((somme / poids) * 100) / 100 : null;
+  }
+
+  private async enrichEvaluations(evaluations: Evaluation[]): Promise<EnrichedEvaluation[]> {
+    if (!evaluations.length) return [];
+
+    const matricules = Array.from(
+      new Set(
+        evaluations.flatMap((evaluation) => [
+          evaluation.evaluateur_matricule,
+          evaluation.evalue_matricule,
+        ]),
+      ),
+    );
+
+    const periodesCodes = Array.from(
+      new Set(evaluations.map((evaluation) => evaluation.periode_code).filter(Boolean)),
+    ) as string[];
+    const reglesIds = Array.from(new Set(evaluations.map((evaluation) => evaluation.id_regle).filter(Boolean))) as string[];
+
+    const [users, periodes, regles] = await Promise.all([
+      this.prisma.utilisateur.findMany({
+        where: { matricule: { in: matricules } },
+        select: {
+          matricule: true,
+          nom: true,
+          prenom: true,
+          email: true,
+          role: true,
+          role_nom: true,
+          region_nom: true,
+          photo_url: true,
+        },
+      }),
+      periodesCodes.length
+        ? this.pg.query<any>(
+            `SELECT id_periode, nom_periode, code_periode, date_debut, date_fin, statut
+             FROM periodes_evaluation
+             WHERE code_periode IN (${periodesCodes.map((_, index) => `$${index + 1}`).join(',')})`,
+            periodesCodes,
+          )
+        : Promise.resolve([]),
+      reglesIds.length
+        ? this.pg.query<any>(
+            `SELECT
+               id_regle,
+               nom_regle,
+               description,
+               criteres_evaluation_json,
+               est_active
+             FROM regles_evaluation
+             WHERE id_regle IN (${reglesIds.map((_, index) => `$${index + 1}`).join(',')})`,
+            reglesIds,
+          )
+        : Promise.resolve([]),
+    ]);
+
+    const usersByMatricule = new Map(users.map((user) => [user.matricule, { ...user, avatar: user.photo_url }]));
+    const periodesByCode = new Map(periodes.map((periode: any) => [periode.code_periode, periode]));
+    const reglesById = new Map(regles.map((regle: any) => [regle.id_regle, regle]));
+
+    return evaluations.map((evaluation) => ({
+      ...evaluation,
+      evaluateur: usersByMatricule.get(evaluation.evaluateur_matricule) ?? null,
+      evalue: usersByMatricule.get(evaluation.evalue_matricule) ?? null,
+      periode: evaluation.periode_code ? periodesByCode.get(evaluation.periode_code) ?? null : null,
+      regle: evaluation.id_regle ? reglesById.get(evaluation.id_regle) ?? null : null,
+      validateur: null,
+    }));
+  }
+
+  private async enrichEvaluation(evaluation: Evaluation): Promise<EnrichedEvaluation> {
+    const [result] = await this.enrichEvaluations([evaluation]);
+    return result;
   }
 }

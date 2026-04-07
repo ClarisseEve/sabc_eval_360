@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
 
 export class CreateEvaluationDto {
   @IsString()
@@ -7,10 +8,11 @@ export class CreateEvaluationDto {
   @IsString()
   evalue_matricule!: string;
 
-  @IsUUID()
+  @Transform(({ value }) => String(value))
+  @IsNotEmpty()
   id_periode!: string;
 
-  @IsUUID()
   @IsOptional()
+  @Transform(({ value }) => (value === undefined || value === null ? undefined : String(value)))
   id_regle?: string;
 }

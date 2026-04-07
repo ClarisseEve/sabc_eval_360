@@ -7,30 +7,39 @@
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { GlobalExceptionFilter } from '../src/common/filters/http-exception.filter';
 
 describe('Evaluation 360° Flow (e2e)', () => {
   let app: INestApplication;
   let accessToken: string;
   let userProfile: any;
+  jest.setTimeout(30000);
 
   // Test credentials — must exist in seeded DB
-  const TEST_ADMIN = { email: 'admin@sabc.cm', password: 'admin123' };
+  const TEST_ADMIN = { email: 'admin@sabc.local', password: process.env.SEED_PASSWORD || '***REMOVED***' };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(APP_GUARD)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalFilters(new GlobalExceptionFilter());
     await app.init();
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   // ─── 1. Authentication ──────────────────────────────────────────────────────
@@ -126,7 +135,9 @@ describe('Evaluation 360° Flow (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body).toHaveProperty('auto');
+      expect(res.body).toHaveProperty('subordonnes');
+      expect(Array.isArray(res.body.subordonnes)).toBe(true);
     });
   });
 
@@ -148,7 +159,7 @@ describe('Evaluation 360° Flow (e2e)', () => {
 
   describe('Evaluation Lifecycle: create → update → submit → validate', () => {
     let evaluationId: string;
-    let periodeId: string;
+    let periodeId: string | number;
     let evalueMatricule: string;
 
     it('should fetch a valid periode and eligible user (setup)', async () => {
@@ -168,11 +179,16 @@ describe('Evaluation 360° Flow (e2e)', () => {
         .get('/api/evaluations/eligibles')
         .set('Authorization', `Bearer ${accessToken}`);
 
-      if (!eligiblesRes.body.length) {
+      const candidates = [
+        ...(Array.isArray(eligiblesRes.body?.subordonnes) ? eligiblesRes.body.subordonnes : []),
+        ...(Array.isArray(eligiblesRes.body?.pairs) ? eligiblesRes.body.pairs : []),
+      ];
+
+      if (!candidates.length) {
         console.warn('⚠ No eligible users found — skipping lifecycle tests');
         return;
       }
-      evalueMatricule = eligiblesRes.body[0].matricule;
+      evalueMatricule = candidates[0].matricule;
     });
 
     it('should create an evaluation', async () => {
@@ -188,8 +204,8 @@ describe('Evaluation 360° Flow (e2e)', () => {
         });
 
       expect([200, 201]).toContain(res.status);
-      expect(res.body).toHaveProperty('id');
-      evaluationId = res.body.id;
+      expect(res.body).toHaveProperty('id_evaluation');
+      evaluationId = res.body.id_evaluation;
     });
 
     it('should fetch the created evaluation', async () => {
@@ -200,7 +216,7 @@ describe('Evaluation 360° Flow (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.id).toBe(evaluationId);
+      expect(res.body.id_evaluation).toBe(evaluationId);
     });
 
     it('should update evaluation notes', async () => {
@@ -248,12 +264,13 @@ describe('Evaluation 360° Flow (e2e)', () => {
   // ─── 5. Hierarchy ──────────────────────────────────────────────────────────
 
   describe('GET /api/hierarchy', () => {
-    it('should return hierarchy data', async () => {
+    it('should return direct subordinates', async () => {
       const res = await request(app.getHttpServer())
-        .get('/api/hierarchy/regions')
+        .get('/api/hierarchy/subordonnes')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
     });
   });
 

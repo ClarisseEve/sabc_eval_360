@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { router } from '@/lib/inertia-shim';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/Components/UI/Dialog/Dialog';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { evaluationsApi } from '@/Services/api';
 
 type Note = {
   id?: string;
@@ -68,18 +68,17 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
     setSubmitting(true);
     setError(null);
 
-    router.post(
-      `/common/evaluations/${evaluation.id_evaluation}/valider`,
-      { action, commentaire_validation: commentaire },
-      {
-        onSuccess: () => { setSubmitting(false); onClose(); },
-        onError: (errors) => {
-          setSubmitting(false);
-          const first = Object.values(errors)[0];
-          setError(typeof first === 'string' ? first : 'Une erreur est survenue');
-        },
-      }
-    );
+    evaluationsApi
+      .validate(evaluation.id_evaluation, action === 'valide')
+      .then(() => {
+        setSubmitting(false);
+        onClose();
+        window.location.reload();
+      })
+      .catch((err: any) => {
+        setSubmitting(false);
+        setError(err.response?.data?.message || 'Une erreur est survenue');
+      });
   };
 
   return (

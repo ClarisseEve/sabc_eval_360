@@ -1,28 +1,38 @@
 import React from 'react';
 import { Head, Link } from '@/lib/inertia-shim';
-import AppLayout from '@/Components/Layout/app/AppLayout';
-import { adaptUserForLayout } from '@/utils/userAdapter';
 import { ClipboardCheck, Clock } from 'lucide-react';
+import { useEvaluations } from '@/Hooks/queries';
+import { EvaluationPageLayout } from './shared';
 
-const EvaluationsIndex: React.FC<{ user: any; stats?: any }> = ({ user, stats }) => {
-  const layoutUser = adaptUserForLayout(user);
+const EvaluationsIndex: React.FC = () => {
+  const { data } = useEvaluations();
+  const pendingCount = Array.isArray(data?.en_attente) ? data.en_attente.length : 0;
+  const validateCount = Array.isArray(data?.a_valider) ? data.a_valider.length : 0;
   const actions = [
     {
       title: 'Évaluations à compléter',
-      description: 'Liste des évaluations en attente de vos retours.',
-      href: '/common/evaluations/pending',
+      description: `${pendingCount} évaluation(s) en attente de vos retours.`,
+      href: '/evaluations/pending',
       icon: <Clock className="h-5 w-5 text-sabc-red-primary" />,
     },
     {
-      title: 'Mes évaluations',
+      title: 'Mes évaluations et brouillons',
       description: 'Consultez les évaluations que vous avez réalisées ou reçues.',
-      href: '/common/evaluations/mine',
+      href: '/evaluations/mine',
       icon: <ClipboardCheck className="h-5 w-5 text-sabc-red-primary" />,
     },
+    ...(validateCount > 0
+      ? [{
+          title: 'Évaluations à valider',
+          description: `${validateCount} soumission(s) attendent votre décision.`,
+          href: '/evaluations/validate',
+          icon: <ClipboardCheck className="h-5 w-5 text-sabc-red-primary" />,
+        }]
+      : []),
   ];
 
   return (
-    <AppLayout user={layoutUser} pageTitle="Évaluations" notifications={[]}> 
+    <EvaluationPageLayout pageTitle="Évaluations">
       <Head title="Évaluations" />
       <div className="mx-auto max-w-6xl py-6">
         <div className="mb-6 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -50,7 +60,7 @@ const EvaluationsIndex: React.FC<{ user: any; stats?: any }> = ({ user, stats })
           ))}
         </div>
       </div>
-    </AppLayout>
+    </EvaluationPageLayout>
   );
 };
 

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Head, usePage } from '@/lib/inertia-shim';
-import AppLayout from '@/Components/Layout/app/AppLayout';
+import { Head } from '@/lib/inertia-shim';
 import { Card, CardContent } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import ValidationModal from '@/Components/Evaluation/ValidationModal';
+import { useEvaluations } from '@/Hooks/queries';
+import { EvaluationPageLayout } from './shared';
 
 type Cible = {
   matricule: string;
@@ -28,12 +29,6 @@ type EvaluationAValider = {
   evalue: Cible;
 };
 
-interface Props {
-  aValider: EvaluationAValider[];
-  stats: { total: number; urgents: number };
-  user: any;
-}
-
 const typeLabel: Record<string, string> = {
   auto: 'Auto-évaluation',
   descendante: 'Évaluation descendante',
@@ -42,11 +37,18 @@ const typeLabel: Record<string, string> = {
   '360': '360°',
 };
 
-export default function ToValidate({ aValider, stats, user }: Props) {
-  const { props } = usePage<any>();
-  const flash = props.flash as any;
-
+export default function ToValidate() {
+  const { data } = useEvaluations();
   const [selected, setSelected] = useState<EvaluationAValider | null>(null);
+  const aValider = (Array.isArray(data?.a_valider) ? data.a_valider : []) as EvaluationAValider[];
+  const stats = {
+    total: aValider.length,
+    urgents: aValider.filter((ev) =>
+      ev.date_soumission
+        ? Math.floor((Date.now() - new Date(ev.date_soumission).getTime()) / 86400000) > 3
+        : false,
+    ).length,
+  };
 
   const daysAgo = (date: string | null) => {
     if (!date) return null;
@@ -62,7 +64,7 @@ export default function ToValidate({ aValider, stats, user }: Props) {
   };
 
   return (
-    <AppLayout user={user}>
+    <EvaluationPageLayout pageTitle="Évaluations à valider">
       <Head title="Évaluations à valider" />
 
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
@@ -73,13 +75,6 @@ export default function ToValidate({ aValider, stats, user }: Props) {
             Évaluations soumises par vos subordonnés directs en attente de votre décision
           </p>
         </div>
-
-        {/* Flash message */}
-        {flash?.success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-green-800 text-sm">
-            {flash.success}
-          </div>
-        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4">
@@ -184,6 +179,6 @@ export default function ToValidate({ aValider, stats, user }: Props) {
           onClose={() => setSelected(null)}
         />
       )}
-    </AppLayout>
+    </EvaluationPageLayout>
   );
 }

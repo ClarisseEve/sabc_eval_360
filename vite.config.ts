@@ -5,7 +5,6 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
     root: '.',
-    publicDir: 'public',
     plugins: [
         react(),
         tailwindcss(),
@@ -15,7 +14,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            '@': resolve(__dirname, 'resources/js'),
+            '@': resolve(__dirname, 'apps/web/src'),
         },
     },
     build: {

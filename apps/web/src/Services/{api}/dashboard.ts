@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api';
 import { PerformanceMetrics } from '../../types';
 
 /**
@@ -12,8 +12,8 @@ export const dashboardService = {
   getUserDashboard: async () => {
     // Utilise les services existants pour composer le dashboard
     const [evaluationsResponse, statsResponse] = await Promise.all([
-      axios.get('/api/evaluations/pending'),
-      axios.get('/api/scores/user/current')
+      api.get('/api/evaluations/pending'),
+      api.get('/api/scores/user/current')
     ]);
     
     return {
@@ -27,9 +27,9 @@ export const dashboardService = {
    */
   getManagerDashboard: async () => {
     const [teamResponse, evaluationsResponse, regionResponse] = await Promise.all([
-      axios.get('/api/scores/team/current'),
-      axios.get('/api/evaluations/to-validate'),
-      axios.get('/api/hierarchy/stats/region/current')
+      api.get('/api/scores/team/current'),
+      api.get('/api/evaluations/to-validate'),
+      api.get('/api/hierarchy/stats/region/current')
     ]);
     
     return {
@@ -44,9 +44,9 @@ export const dashboardService = {
    */
   getDirectorDashboard: async (idRegion: number) => {
     const [regionScores, hierarchyStats, evaluationStats] = await Promise.all([
-      axios.get(`/api/scores/region/${idRegion}`),
-      axios.get(`/api/hierarchy/stats/region/${idRegion}`),
-      axios.get('/api/evaluations/stats', { params: { id_region: idRegion } })
+      api.get(`/api/scores/region/${idRegion}`),
+      api.get(`/api/hierarchy/stats/region/${idRegion}`),
+      api.get('/api/evaluations/stats', { params: { id_region: idRegion } })
     ]);
     
     return {

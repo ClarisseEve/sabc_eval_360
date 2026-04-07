@@ -1,7 +1,5 @@
-import React, { useMemo } from 'react';
-import { Head, Link, useForm } from '@/lib/inertia-shim';
-import AppLayout from '@/Components/Layout/app/AppLayout';
-import { adaptUserForLayout } from '@/utils/userAdapter';
+import React, { useMemo, useState } from 'react';
+import { Head } from '@/lib/inertia-shim';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import Badge from '@/Components/UI/Badge';
 import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert';
@@ -12,11 +10,15 @@ import { cn } from '@/utils/helpers';
 import {
   ArrowLeft,
   ArrowRight,
-  CheckCircle2,
   MessageSquare,
   Pencil,
   ShieldCheck,
 } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams } from 'react-router-dom';
+import { evaluationsApi } from '@/Services/api';
+import { useEvaluation } from '@/Hooks/queries';
+import { EvaluationPageLayout, formatDisplayName, formatRole } from './shared';
 
 interface CritereEntry {
   id?: string | number | null;
@@ -31,11 +33,6 @@ interface NoteEntry {
   note?: number;
   commentaire?: string | null;
   critere_nom?: string;
-}
-
-interface EvaluationProps {
-  user: any;
-  evaluation: Record<string, any>;
 }
 
 const parseJson = <T,>(payload: unknown): T | null => {
@@ -87,73 +84,103 @@ const computeInitialCriteria = (evaluation: Record<string, any>) => {
   });
 };
 
-const EditEvaluation: React.FC<EvaluationProps> = ({ user, evaluation }) => {
-  const layoutUser = adaptUserForLayout(user);
+const EditEvaluation: React.FC = () => {
+  const { id = '' } = useParams();
+  const { data: evaluation } = useEvaluation(id);
+  const queryClient = useQueryClient();
   const criteria = useMemo(() => computeInitialCriteria(evaluation), [evaluation]);
   const evaluationId = evaluation?.id_evaluation ?? evaluation?.id;
-
-  const form = useForm({
-    notes: criteria.map((critere) => ({
+  const [notes, setNotes] = useState(() =>
+    criteria.map((critere) => ({
       id: critere.id ?? '',
       note: critere.note ?? 3,
       commentaire: critere.commentaire ?? '',
     })),
-    commentaire_general: evaluation?.commentaire_general ?? '',
-    submit: false,
-  });
+  );
+  const [commentaireGeneral, setCommentaireGeneral] = useState(evaluation?.commentaire_general ?? '');
+  const [lastAction, setLastAction] = useState<'draft' | 'submit' | null>(null);
+
+  React.useEffect(() => {
+    setNotes(
+      criteria.map((critere) => ({
+        id: critere.id ?? '',
+        note: critere.note ?? 3,
+        commentaire: critere.commentaire ?? '',
+      })),
+    );
+    setCommentaireGeneral(evaluation?.commentaire_general ?? '');
+  }, [criteria, evaluation?.commentaire_general]);
 
   const completion = useMemo(() => {
-    if (form.data.notes.length === 0) return 0;
-    const completed = form.data.notes.filter((note) => note.note != null).length;
-    return Math.round((completed / form.data.notes.length) * 100);
-  }, [form.data.notes]);
+    if (notes.length === 0) return 0;
+    const completed = notes.filter((note) => note.note != null).length;
+    return Math.round((completed / notes.length) * 100);
+  }, [notes]);
 
-  const requiresJustification = form.data.notes.some(
+  const requiresJustification = notes.some(
     (note) => (note.note ?? 0) < 3 && (!note.commentaire || note.commentaire.trim().length === 0)
   );
 
+  const saveMutation = useMutation({
+    mutationFn: async (submit: boolean) => {
+      await evaluationsApi.update(String(evaluationId), {
+        notes,
+        commentaire_general: commentaireGeneral,
+      });
+      if (submit) {
+        await evaluationsApi.submit(String(evaluationId));
+      }
+    },
+    onSuccess: async (_, submit) => {
+      setLastAction(submit ? 'submit' : 'draft');
+      await queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+      await queryClient.invalidateQueries({ queryKey: ['evaluations', String(evaluationId)] });
+      if (submit) {
+        window.location.href = `/evaluations/${evaluationId}`;
+      }
+    },
+  });
+
   const handleScoreChange = (index: number, value: number) => {
-    const updated = [...form.data.notes];
+    const updated = [...notes];
     updated[index] = {
       ...updated[index],
       note: value,
     };
-    form.setData('notes', updated);
+    setNotes(updated);
   };
 
   const handleCommentChange = (index: number, value: string) => {
-    const updated = [...form.data.notes];
+    const updated = [...notes];
     updated[index] = {
       ...updated[index],
       commentaire: value,
     };
-    form.setData('notes', updated);
+    setNotes(updated);
   };
 
   const handleSave = (submit: boolean) => {
-    form.setData('submit', submit);
-    form.put(`/common/evaluations/${evaluationId}`, {
-      preserveScroll: true,
-    });
+    setLastAction(submit ? 'submit' : 'draft');
+    saveMutation.mutate(submit);
   };
 
   return (
-    <AppLayout user={layoutUser} pageTitle="Éditer une évaluation" notifications={[]}> 
+    <EvaluationPageLayout pageTitle="Éditer une évaluation">
       <Head title="Éditer une évaluation" />
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button asChild variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800">
-            <Link href={`/common/evaluations/${evaluationId}`}>
+          <Button asChild={false} variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800" onClick={() => { window.location.href = `/evaluations/${evaluationId}`; }}>
+            <span className="inline-flex items-center">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Retour au détail
-            </Link>
+            </span>
           </Button>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
               size="sm"
               onClick={() => handleSave(false)}
-              loading={form.processing && !form.data.submit}
+              loading={saveMutation.isPending && lastAction === 'draft'}
             >
               Enregistrer le brouillon
             </Button>
@@ -162,7 +189,7 @@ const EditEvaluation: React.FC<EvaluationProps> = ({ user, evaluation }) => {
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               onClick={() => handleSave(true)}
               disabled={requiresJustification}
-              loading={form.processing && form.data.submit}
+              loading={saveMutation.isPending && lastAction === 'submit'}
             >
               Soumettre l'évaluation
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -263,7 +290,7 @@ const EditEvaluation: React.FC<EvaluationProps> = ({ user, evaluation }) => {
                         onClick={() => handleScoreChange(index, value)}
                         className={cn(
                           'h-9 w-9 rounded-full border text-sm font-semibold transition',
-                          form.data.notes[index]?.note === value
+                          notes[index]?.note === value
                             ? 'border-sabc-red-primary bg-sabc-red-primary text-white'
                             : 'border-sabc-gray-200 bg-white text-sabc-gray-600 hover:border-sabc-red-primary/60 hover:text-sabc-red-primary dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-300'
                         )}
@@ -277,7 +304,7 @@ const EditEvaluation: React.FC<EvaluationProps> = ({ user, evaluation }) => {
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sabc-gray-400">
                       <MessageSquare className="h-3.5 w-3.5" />
                       Commentaire
-                      {(form.data.notes[index]?.note ?? 0) < 3 && (
+                      {(notes[index]?.note ?? 0) < 3 && (
                         <span className="rounded bg-sabc-red-light px-1.5 py-0.5 text-[10px] text-sabc-red-primary">
                           Obligatoire
                         </span>
@@ -285,12 +312,12 @@ const EditEvaluation: React.FC<EvaluationProps> = ({ user, evaluation }) => {
                     </div>
                     <Textarea
                       rows={3}
-                      value={form.data.notes[index]?.commentaire ?? ''}
+                      value={notes[index]?.commentaire ?? ''}
                       onChange={(event) => handleCommentChange(index, event.target.value)}
                       placeholder="Partagez vos observations ou un plan d'action."
                       className={cn(
                         'text-sm',
-                        (form.data.notes[index]?.note ?? 0) < 3 && (!form.data.notes[index]?.commentaire?.trim())
+                        (notes[index]?.note ?? 0) < 3 && (!notes[index]?.commentaire?.trim())
                           ? 'border-sabc-red-primary'
                           : ''
                       )}
@@ -312,8 +339,8 @@ const EditEvaluation: React.FC<EvaluationProps> = ({ user, evaluation }) => {
           <CardContent className="space-y-4">
             <Textarea
               rows={4}
-              value={form.data.commentaire_general ?? ''}
-              onChange={(event) => form.setData('commentaire_general', event.target.value)}
+              value={commentaireGeneral ?? ''}
+              onChange={(event) => setCommentaireGeneral(event.target.value)}
               placeholder="Faites une synthèse des points forts et des axes d'amélioration."
               className="text-sm"
             />
@@ -326,29 +353,26 @@ const EditEvaluation: React.FC<EvaluationProps> = ({ user, evaluation }) => {
           </CardContent>
         </Card>
 
-        {form.recentlySuccessful && (
+        {lastAction && !saveMutation.isPending && !saveMutation.isError && (
           <Alert className="border-sabc-success bg-sabc-success/10 text-sabc-success">
             <AlertTitle>Enregistré</AlertTitle>
             <AlertDescription>
-              Votre évaluation a été {form.data.submit ? 'soumise pour validation.' : 'enregistrée en brouillon.'}
+              Votre évaluation a été {lastAction === 'submit' ? 'soumise pour validation.' : 'enregistrée en brouillon.'}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {saveMutation.isError && (
+          <Alert className="border-red-300 bg-red-50 text-red-700">
+            <AlertTitle>Erreur</AlertTitle>
+            <AlertDescription>
+              Impossible d'enregistrer l'évaluation pour le moment.
             </AlertDescription>
           </Alert>
         )}
       </div>
-    </AppLayout>
+    </EvaluationPageLayout>
   );
 };
-
-const formatDisplayName = (userLike: Record<string, any>) => {
-  if (userLike?.prenom || userLike?.nom) {
-    return `${userLike?.prenom ?? ''} ${userLike?.nom ?? ''}`.trim();
-  }
-  if (userLike?.name) {
-    return userLike.name;
-  }
-  return userLike?.matricule ?? 'Utilisateur';
-};
-
-const formatRole = (userLike: Record<string, any>) => userLike?.role_nom || userLike?.role || 'Rôle non renseigné';
 
 export default EditEvaluation;

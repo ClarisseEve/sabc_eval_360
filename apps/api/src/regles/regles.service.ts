@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DatabasePgService } from '../database/database-pg.service';
 
 const CATEGORIES_VALIDES = [
   'Compétences techniques',
@@ -26,6 +27,40 @@ export interface Critere {
 
 @Injectable()
 export class ReglesService {
+  constructor(private pg: DatabasePgService) {}
+
+  async listActives() {
+    return this.pg.query(
+      `SELECT
+         id_regle,
+         nom_regle,
+         description,
+         criteres_evaluation_json,
+         est_active,
+         created_at,
+         updated_at
+       FROM regles_evaluation
+       WHERE est_active = true
+       ORDER BY created_at DESC`,
+    );
+  }
+
+  async findById(id: string) {
+    return this.pg.queryOne(
+      `SELECT
+         id_regle,
+         nom_regle,
+         description,
+         criteres_evaluation_json,
+         est_active,
+         created_at,
+         updated_at
+       FROM regles_evaluation
+       WHERE id_regle = $1`,
+      [id],
+    );
+  }
+
   validateCriteres(criteres: Critere[]): { valide: boolean; erreurs: string[] } {
     const erreurs: string[] = [];
 
