@@ -94,7 +94,7 @@ export function RadarChart({
   return (
     <div className={cn('w-full', className)}>
       {title && (
-        <h3 className="mb-2 text-lg font-semibold text-sabc-gray-800 dark:text-sabc-gray-100">
+        <h3 className="mb-2 text-sm font-semibold text-sabc-gray-800 dark:text-sabc-gray-100">
           {title}
         </h3>
       )}
@@ -106,12 +106,12 @@ export function RadarChart({
           {showGrid && <PolarGrid stroke="var(--sabc-gray-200)" />}
           <PolarAngleAxis
             dataKey={angleKey}
-            tick={{ fill: 'var(--sabc-gray-400)', fontSize: 12 }}
+            tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
           />
           <PolarRadiusAxis
             angle={90}
             domain={[0, 5]}
-            tick={{ fill: 'var(--sabc-gray-400)', fontSize: 12 }}
+            tick={{ fill: 'var(--sabc-gray-400)', fontSize: 10 }}
           />
           {renderRadars()}
           {showLegend && (

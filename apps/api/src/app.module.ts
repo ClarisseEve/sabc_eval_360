@@ -1,7 +1,8 @@
 import { Module, Global } from '@nestjs/common';
 import { APP_GUARD, Reflector } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheService } from './common/cache.service';
+import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { DatabasePgModule } from './database/database-pg.module';
@@ -27,7 +28,17 @@ import { HealthModule } from './health/health.module';
       {
         name: 'default',
         ttl: 60_000,
-        limit: 60,
+        limit: 300,
+      },
+      {
+        name: 'login',
+        ttl: 60_000,
+        limit: 10,
+      },
+      {
+        name: 'heavy',
+        ttl: 60_000,
+        limit: 30,
       },
     ]),
     PrismaModule,
@@ -52,7 +63,7 @@ import { HealthModule } from './health/health.module';
     Reflector,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: AppThrottlerGuard,
     },
   ],
 })

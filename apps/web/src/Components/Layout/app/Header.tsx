@@ -28,6 +28,8 @@ interface HeaderProps {
   pageTitle?: string; // Titre de la page actuelle
 }
 
+type NotificationStatus = NonNullable<HeaderProps['notifications']>[number]['status'];
+
 const Header: React.FC<HeaderProps> = ({
   user,
   notifications = [],
@@ -104,7 +106,15 @@ const Header: React.FC<HeaderProps> = ({
         id: notification.id_notification,
         title: notification.titre,
         message: notification.message,
-        status: notification.type === 'warning' ? 'warning' : notification.type === 'success' ? 'success' : notification.type === 'evaluation' ? 'info' : notification.type === 'validation' ? 'success' : 'info',
+        status: (
+          notification.type === 'warning'
+            ? 'warning'
+            : notification.type === 'success'
+              ? 'success'
+              : notification.type === 'validation'
+                ? 'success'
+                : 'info'
+        ) as NotificationStatus,
         read: !!notification.est_lu,
         createdAt: notification.date_creation ? new Date(notification.date_creation).toLocaleString() : '',
       }))
@@ -121,7 +131,7 @@ const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center">
         {/* Titre de la page */}
         <div className="flex items-center">
-          <h1 className="text-lg font-bold text-sabc-red-primary dark:text-sabc-red-light hover:text-sabc-red-dark dark:hover:text-sabc-red-primary transition-colors">
+          <h1 className="text-lg font-semibold text-sabc-red-primary dark:text-sabc-red-light hover:text-sabc-red-dark dark:hover:text-sabc-red-primary transition-colors">
             {pageTitle}
           </h1>
         </div>
@@ -167,7 +177,7 @@ const Header: React.FC<HeaderProps> = ({
           
           {/* Menu notifications */}
           {showNotifications && (
-            <div className="absolute right-0 top-full z-10 mt-2 w-80 rounded-md border border-sabc-gray-200 bg-white p-2 shadow-lg dark:border-sabc-gray-800 dark:bg-sabc-gray-900">
+            <div className="absolute right-0 top-full z-10 mt-2 w-80 rounded-2xl border border-sabc-gray-200 bg-white p-3 shadow-xl dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
               <div className="mb-2 flex items-center justify-between border-b border-sabc-gray-200 pb-2 dark:border-sabc-gray-800">
                 <h3 className="font-medium text-sabc-gray-900 dark:text-white">Notifications</h3>
                 <Button variant="ghost" size="sm" className="nav-icon-hover" onClick={() => void markAllRead()}>
@@ -194,7 +204,7 @@ const Header: React.FC<HeaderProps> = ({
                         }
                       }}
                       className={cn(
-                        'mb-2 cursor-pointer rounded-md border border-sabc-gray-200 p-2 dark:border-sabc-gray-800 hover:bg-sabc-gray-50 dark:hover:bg-sabc-gray-800/70 transition-colors activity-item-hover',
+                        'mb-2 cursor-pointer rounded-xl border border-sabc-gray-200 p-2 dark:border-sabc-gray-700 hover:bg-sabc-gray-50 dark:hover:bg-sabc-gray-800/70 transition-colors activity-item-hover',
                         !notification.read && 'bg-sabc-gray-50 dark:bg-sabc-gray-800/50'
                       )}
                     >
@@ -239,7 +249,7 @@ const Header: React.FC<HeaderProps> = ({
         
         {/* Profil utilisateur - version simplifiée sans menu déroulant */}
         {user && (
-          <div className="flex items-center space-x-2 rounded-md px-2 py-1 hover:bg-sabc-gray-100 dark:hover:bg-sabc-gray-800/70 transition-colors cursor-pointer">
+          <div className="flex items-center space-x-2 rounded-xl px-2 py-1 hover:bg-sabc-gray-100 dark:hover:bg-sabc-gray-800/70 transition-colors cursor-pointer">
             <Avatar
               name={user.name}
               src={user.avatar}

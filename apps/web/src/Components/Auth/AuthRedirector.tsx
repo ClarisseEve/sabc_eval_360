@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { usePage } from '@/lib/inertia-shim';
 
 /**
- * Interface pour les propriétés de page Inertia
+ * Interface minimale pour les props partagées du shim de navigation
  */
 interface PageProps {
   auth: {

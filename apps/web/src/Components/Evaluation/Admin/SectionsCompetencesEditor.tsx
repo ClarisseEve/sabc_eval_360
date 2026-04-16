@@ -170,7 +170,7 @@ const SectionsCompetencesEditor: React.FC<SectionsCompetencesEditorProps> = ({
       <CardContent className="p-0">
         <Tabs
           value={currentSection.toString()}
-          onValueChange={(value) => setCurrentSection(parseInt(value))}
+          onValueChange={(value) => setCurrentSection(Number.parseInt(value))}
           className="w-full"
         >
           <div className="flex justify-between items-center p-4 border-b">
@@ -293,7 +293,7 @@ const SectionsCompetencesEditor: React.FC<SectionsCompetencesEditorProps> = ({
                             <Select
                               value=""
                               onValueChange={(value) => {
-                                const toSectionIndex = parseInt(value);
+                                const toSectionIndex = Number.parseInt(value);
                                 if (toSectionIndex !== sectionIndex) {
                                   moveCompetenceToSection(sectionIndex, competenceIndex, toSectionIndex);
                                 }
@@ -353,7 +353,7 @@ const SectionsCompetencesEditor: React.FC<SectionsCompetencesEditorProps> = ({
                       <div>
                         <Select 
                           value={newCompetence.niveau_requis.toString()} 
-                          onValueChange={(value) => setNewCompetence({...newCompetence, niveau_requis: parseInt(value)})}
+                          onValueChange={(value) => setNewCompetence({...newCompetence, niveau_requis: Number.parseInt(value)})}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Niveau requis" />

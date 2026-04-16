@@ -1,11 +1,10 @@
-import React from 'react';
+import React, { FC } from 'react';
 import { createRoot } from 'react-dom/client';
 import Login from './pages/Auth/Login';
 import ForgotPassword from './pages/Auth/ForgotPassword';
 import CSC from './pages/CSC/Dashboard/index';
 import CDS from './pages/CDS/Dashboard/index';
 import CDV from './pages/CDV/Dashboard/index';
-import { FC } from 'react';
 
 // Déclaration des types pour TypeScript
 interface LoginProps {
@@ -80,7 +79,7 @@ const pages: PageConfig = {
       skills: [
         { name: 'Leadership', score: 4.2, average: 3.8 },
         { name: 'Communication', score: 3.9, average: 3.5 },
-        { name: 'Technique', score: 4.5, average: 4.0 },
+        { name: 'Technique', score: 4.5, average: 4 },
       ],
       development: [
         { id: 1, title: 'Formation Leadership', status: 'completed', date: '2025-04-10' },
@@ -99,7 +98,7 @@ const pages: PageConfig = {
         improvement: 0.3
       },
       team: [
-        { id: 1, name: 'Pierre Martin', role: 'CDS', performance: 4.0, region: 'Littoral' },
+        { id: 1, name: 'Pierre Martin', role: 'CDS', performance: 4, region: 'Littoral' },
         { id: 2, name: 'Sophie Leblanc', role: 'CDS', performance: 3.7, region: 'Centre' },
       ]
     }
@@ -108,13 +107,13 @@ const pages: PageConfig = {
 
 // Get the current page from URL
 const getCurrentPage = () => {
-  const path = window.location.pathname.substring(1) || 'login';
+  const path = globalThis.location.pathname.substring(1) || 'login';
   return pages[path as keyof typeof pages] || pages['login'];
 };
 
 // Render the current page
 const renderPage = () => {
-  const path = window.location.pathname.substring(1) || 'login';
+  const path = globalThis.location.pathname.substring(1) || 'login';
   const pageName = path.replace('/', '');
   const page = pages[path as keyof typeof pages] || pages['login'];
   const container = document.getElementById('app');
@@ -158,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Handle navigation
-window.addEventListener('popstate', () => {
+globalThis.addEventListener('popstate', () => {
   renderPage();
 });
 
@@ -170,7 +169,7 @@ declare global {
 }
 
 // Export a navigation function
-window.navigateTo = (path: string) => {
-  window.history.pushState({}, '', path);
+globalThis.navigateTo = (path: string) => {
+  globalThis.history.pushState({}, '', path);
   renderPage();
 };

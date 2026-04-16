@@ -17,7 +17,8 @@ describe('AnalyticsService', () => {
     mockCache = {
       getOrCompute: jest.fn((_key: string, _ttl: number, fn: () => any) => fn()),
     };
-    service = new AnalyticsService(mockConfig, mockPg, mockCache);
+    const mockPrisma = {} as any;
+    service = new AnalyticsService(mockConfig, mockPg, mockCache, mockPrisma);
   });
 
   describe('getEvaluationsStats', () => {

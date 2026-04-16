@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DashboardService } from './dashboard.service';
 
@@ -10,7 +10,7 @@ export class DashboardController {
   @Get()
   async getMyDashboard(@Request() req: any) {
     const user = req.user;
-    const role = (user.role_nom ?? 'admin').toLowerCase();
+    const role = String(user.role_nom ?? user.role ?? 'admin').toLowerCase();
 
     if (role === 'admin') {
       return {
@@ -34,6 +34,11 @@ export class DashboardController {
 
   @Get('admin')
   async getAdminDashboard(@Request() req: any) {
+    const role = String(req.user?.role_nom ?? req.user?.role ?? '').toUpperCase();
+    const isAdmin = Boolean(req.user?.is_admin) || role === 'ADMIN';
+    if (!isAdmin) {
+      throw new ForbiddenException("Accès réservé à l'administrateur");
+    }
     return this.dashboardService.getAdminStats(req.user.matricule);
   }
 }

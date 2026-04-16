@@ -99,7 +99,7 @@ const AccessDenied: React.FC<AccessDeniedProps> = ({
             <Button
               variant="outline"
               size="lg"
-              onClick={() => window.history.back()}
+              onClick={() => globalThis.history.back()}
               className="w-full sm:w-auto"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />

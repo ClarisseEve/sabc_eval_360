@@ -3,6 +3,7 @@ import { Head } from '@/lib/inertia-shim';
 import { Badge } from '@/Components/UI/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { TruncatedTableBody } from '@/Components/UI/TruncatedList/TruncatedList';
 import { useSubordonnes } from '@/Hooks/queries';
 import { useEvaluations } from '@/Hooks/queries/useEvaluationsQuery';
 import { EvaluationPageLayout, formatDisplayName } from '@/pages/Common/Evaluations/shared';
@@ -67,19 +68,25 @@ export default function TeamEvaluationsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {teamEvaluations.map((evaluation: any) => (
-                    <TableRow key={evaluation.id_evaluation}>
-                      <TableCell>{evaluation.id_evaluation}</TableCell>
-                      <TableCell>{formatDisplayName(evaluation.evalue || { matricule: evaluation.evalue_matricule })}</TableCell>
-                      <TableCell>{formatDisplayName(evaluation.evaluateur || { matricule: evaluation.evaluateur_matricule })}</TableCell>
-                      <TableCell>{evaluation.periode?.nom_periode || evaluation.id_periode || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Badge variant={evaluation.statut === 'valide' ? 'default' : 'outline'}>
-                          {evaluation.statut}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  <TruncatedTableBody
+                    items={teamEvaluations}
+                    previewCount={10}
+                    colSpan={5}
+                    keyExtractor={(evaluation: any) => evaluation.id_evaluation}
+                    renderRow={(evaluation: any) => (
+                      <TableRow key={evaluation.id_evaluation}>
+                        <TableCell>{evaluation.id_evaluation}</TableCell>
+                        <TableCell>{formatDisplayName(evaluation.evalue || { matricule: evaluation.evalue_matricule })}</TableCell>
+                        <TableCell>{formatDisplayName(evaluation.evaluateur || { matricule: evaluation.evaluateur_matricule })}</TableCell>
+                        <TableCell>{evaluation.periode?.nom_periode || evaluation.id_periode || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant={evaluation.statut === 'valide' ? 'default' : 'outline'}>
+                            {evaluation.statut}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  />
                 </TableBody>
               </Table>
             )}

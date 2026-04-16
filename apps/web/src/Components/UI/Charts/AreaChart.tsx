@@ -119,7 +119,7 @@ export function AreaChart({
             tickLine={{ stroke: 'var(--sabc-gray-200)' }}
           />
           {tooltip ? (
-            <Tooltip content={tooltip} />
+            <Tooltip content={tooltip as any} />
           ) : (
             <Tooltip
               cursor={{ strokeDasharray: '3 3' }}

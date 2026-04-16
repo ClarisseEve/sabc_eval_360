@@ -1,0 +1,155 @@
+services:
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sabc-scale-network
+
+  api:
+    image: nginx:1.27-alpine
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./docker/nginx-api-gateway/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      nestjs-api-1:
+        condition: service_healthy
+      nestjs-api-2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health/live >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - sabc-scale-network
+
+  nestjs-api-1:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    environment: &api-env
+      NODE_ENV: production
+      PORT: 3000
+      FRONTEND_URL: http://localhost:5173
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME}
+      DATABASE_URL: ${DATABASE_URL:-mysql://sabc_user:secret@mysql:3306/sabc_core}
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${PG_DATABASE:-sabc_business}
+      PG_USER: ${PG_USER:-sabc_user}
+      PG_PASSWORD: ${PG_PASSWORD:-***REMOVED***}
+      CACHE_DRIVER: ${CACHE_DRIVER:-redis}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      CACHE_PREFIX: ${CACHE_PREFIX:-sabc_eval360}
+      ANALYTICS_MICROSERVICE_ENABLED: "false"
+    expose:
+      - "3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - sabc-scale-network
+
+  nestjs-api-2:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    environment: *api-env
+    expose:
+      - "3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - sabc-scale-network
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-***REMOVED***}
+      MYSQL_DATABASE: sabc_core
+      MYSQL_USER: sabc_user
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-***REMOVED***}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-***REMOVED***}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sabc-scale-network
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PG_DATABASE:-sabc_business}
+      POSTGRES_USER: ${PG_USER:-sabc_user}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-***REMOVED***}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-sabc_user} -d ${PG_DATABASE:-sabc_business}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sabc-scale-network
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sabc-scale-network
+
+volumes:
+  mysql-data:
+  postgres-data:
+
+networks:
+  sabc-scale-network:
+    driver: bridge

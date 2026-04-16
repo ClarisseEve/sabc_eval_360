@@ -16,7 +16,7 @@ const tabsRootVariants = cva('', {
 });
 
 const tabsListVariants = cva(
-  'inline-flex items-center justify-center rounded-md bg-sabc-gray-100 p-0.5 dark:bg-sabc-gray-800',
+  'inline-flex items-center justify-center rounded-xl bg-sabc-gray-100 p-0.5 dark:bg-sabc-gray-800',
   {
     variants: {
       variant: {
@@ -32,16 +32,16 @@ const tabsListVariants = cva(
 );
 
 const tabsTriggerVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1.5 text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-sabc-gray-900',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-sabc-gray-900',
   {
     variants: {
       variant: {
         default:
-          'data-[state=active]:bg-white data-[state=active]:text-sabc-gray-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-sabc-gray-900 dark:data-[state=active]:text-sabc-gray-50',
+          'text-sabc-gray-500 data-[state=active]:bg-white data-[state=active]:text-sabc-gray-900 data-[state=active]:shadow-sm data-[state=active]:font-semibold dark:data-[state=active]:bg-sabc-gray-900 dark:data-[state=active]:text-sabc-gray-50',
         primary:
           'relative h-9 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-medium text-sabc-gray-500 shadow-none transition-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:scale-x-0 after:bg-sabc-red-primary after:transition-transform hover:text-sabc-gray-900 data-[state=active]:border-b-0 data-[state=active]:text-sabc-red-primary data-[state=active]:shadow-none data-[state=active]:after:scale-x-100 dark:text-sabc-gray-400 dark:hover:text-sabc-gray-50 dark:data-[state=active]:text-sabc-red-400',
         card:
-          'rounded-md border border-sabc-gray-200 bg-white px-4 py-2 font-medium text-sabc-gray-500 shadow-none transition-colors hover:bg-sabc-gray-50 hover:text-sabc-gray-900 data-[state=active]:border-sabc-red-primary data-[state=active]:bg-sabc-red-primary/10 data-[state=active]:text-sabc-red-primary dark:border-sabc-gray-800 dark:bg-sabc-gray-900 dark:text-sabc-gray-400 dark:hover:bg-sabc-gray-800 dark:hover:text-sabc-gray-50 dark:data-[state=active]:border-sabc-red-400 dark:data-[state=active]:bg-sabc-red-400/10 dark:data-[state=active]:text-sabc-red-400',
+          'rounded-xl border border-sabc-gray-200 bg-white px-4 py-2 font-medium text-sabc-gray-400 shadow-none transition-all duration-200 hover:bg-sabc-gray-50 hover:text-sabc-gray-700 data-[state=active]:border-sabc-red-primary data-[state=active]:bg-sabc-red-primary data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-sabc-red-primary/25 data-[state=active]:font-semibold dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-500 dark:hover:bg-sabc-gray-800 dark:hover:text-sabc-gray-200 dark:data-[state=active]:border-sabc-red-400 dark:data-[state=active]:bg-sabc-red-500 dark:data-[state=active]:text-white dark:data-[state=active]:shadow-sabc-red-500/30',
       },
     },
     defaultVariants: {

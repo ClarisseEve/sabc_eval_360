@@ -5,10 +5,10 @@ import { Sidebar } from '@/Components/Layout/app/Sidebar';
 // Suppression de l'import des breadcrumbs
 
 export interface AppLayoutProps {
-  user: {
-    name: string;
-    email: string;
-    role: string;
+  user?: {
+    name?: string;
+    email?: string;
+    role?: string;
     avatar?: string;
   };
   notifications?: {
@@ -25,6 +25,7 @@ export interface AppLayoutProps {
   onLogout?: () => void;
   children: React.ReactNode;
   className?: string;
+  breadcrumbs?: Array<{ title: string; href?: string }>;
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({
@@ -35,6 +36,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   children,
   className,
 }) => {
+  const resolvedUser = user ?? {
+    name: 'Utilisateur',
+    email: '',
+    role: '',
+    avatar: undefined,
+  };
+
   // État pour contrôler l'affichage du sidebar sur mobile
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   
@@ -47,7 +55,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     <div className="flex h-screen max-w-full overflow-hidden bg-sabc-gray-50 dark:bg-sabc-gray-900">
       {/* Sidebar */}
       <Sidebar
-        user={user}
+        user={resolvedUser as { name: string; email: string; role: string; avatar?: string }}
         isCollapsed={sidebarCollapsed}
         onToggle={toggleSidebar}
         onLogout={onLogout}
@@ -57,10 +65,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       <div className="flex flex-1 flex-col max-w-full overflow-y-auto overflow-x-hidden">
         {/* Header flottant */}
         <Header
-          user={user}
+          user={resolvedUser as { name: string; email: string; role: string; avatar?: string }}
           notifications={notifications}
           pageTitle={pageTitle}
-          className="sticky top-0 z-10 mx-2 mt-2 rounded-lg shadow-md"
+          className="sticky top-0 z-10 mx-2 mt-2 rounded-2xl shadow-md"
         />
         
         {/* Suppression de la section des breadcrumbs */}

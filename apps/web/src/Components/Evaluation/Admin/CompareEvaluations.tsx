@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from '@/lib/inertia-shim';
 import { Button } from '@/Components/UI/Button/Button';
-import { Select } from '@/Components/UI/Select/Select';
 import { Card } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -54,7 +53,7 @@ const CompareEvaluations: React.FC<CompareEvaluationsProps> = ({ evaluations }) 
 
   // Filtrer les évaluations pour le deuxième sélecteur (éviter de comparer la même évaluation)
   const filteredEvaluations = evaluations.filter(
-    (eval) => eval.id !== parseInt(data.evaluation1_id as string, 10)
+    (evaluation) => evaluation.id !== parseInt(data.evaluation1_id as string, 10)
   );
 
   // Mettre à jour les données du formulaire lorsque les sélections changent
@@ -71,7 +70,7 @@ const CompareEvaluations: React.FC<CompareEvaluationsProps> = ({ evaluations }) 
   const compareEvaluations = () => {
     post('/admin/evaluation/compare', {
       preserveScroll: true,
-      onSuccess: (response) => {
+      onSuccess: (response: any) => {
         setComparisonData(response.props.comparison as ComparisonData);
         prepareChartData(response.props.comparison as ComparisonData);
       },
@@ -102,18 +101,18 @@ const CompareEvaluations: React.FC<CompareEvaluationsProps> = ({ evaluations }) 
             <label className="block text-sm font-medium text-sabc-gray-800 mb-2">
               Première évaluation
             </label>
-            <Select
+            <select
               value={data.evaluation1_id as string}
               onChange={(e) => setSelectedEval1(parseInt(e.target.value, 10))}
-              className="w-full"
+              className="w-full rounded-md border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
             >
               <option value="">Sélectionner une évaluation</option>
-              {evaluations.map((eval) => (
-                <option key={`eval1-${eval.id}`} value={eval.id}>
-                  {eval.code} - {eval.evalue.name} ({eval.periode} {eval.annee})
+              {evaluations.map((evaluation) => (
+                <option key={`eval1-${evaluation.id}`} value={evaluation.id}>
+                  {evaluation.code} - {evaluation.evalue.name} ({evaluation.periode} {evaluation.annee})
                 </option>
               ))}
-            </Select>
+            </select>
             {errors.evaluation1_id && (
               <p className="text-sabc-error text-sm mt-1">{errors.evaluation1_id}</p>
             )}
@@ -123,19 +122,19 @@ const CompareEvaluations: React.FC<CompareEvaluationsProps> = ({ evaluations }) 
             <label className="block text-sm font-medium text-sabc-gray-800 mb-2">
               Deuxième évaluation
             </label>
-            <Select
+            <select
               value={data.evaluation2_id as string}
               onChange={(e) => setSelectedEval2(parseInt(e.target.value, 10))}
-              className="w-full"
+              className="w-full rounded-md border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
               disabled={!data.evaluation1_id}
             >
               <option value="">Sélectionner une évaluation</option>
-              {filteredEvaluations.map((eval) => (
-                <option key={`eval2-${eval.id}`} value={eval.id}>
-                  {eval.code} - {eval.evalue.name} ({eval.periode} {eval.annee})
+              {filteredEvaluations.map((evaluation) => (
+                <option key={`eval2-${evaluation.id}`} value={evaluation.id}>
+                  {evaluation.code} - {evaluation.evalue.name} ({evaluation.periode} {evaluation.annee})
                 </option>
               ))}
-            </Select>
+            </select>
             {errors.evaluation2_id && (
               <p className="text-sabc-error text-sm mt-1">{errors.evaluation2_id}</p>
             )}

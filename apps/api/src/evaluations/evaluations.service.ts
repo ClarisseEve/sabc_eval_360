@@ -2,19 +2,23 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createHash } from 'crypto';
+import { normalizeRuleRow, parseRuleEnvelope } from '../regles/rule-schema';
 
 export interface Evaluation {
   id_evaluation: string | number;
   evaluateur_matricule: string;
   evalue_matricule: string;
+  validateur_matricule?: string | null;
   id_periode: string;
   periode_code?: string;
   id_regle: string | null;
   date_creation: string;
   date_soumission: string | null;
+  date_validation?: string | null;
   statut: string;
   notations_json: any;
   commentaire_global: string | null;
+  commentaire_validation?: string | null;
   note_globale: number | null;
   type_evaluation: string;
   created_at: Date;
@@ -78,6 +82,8 @@ export class EvaluationsService {
       throw new NotFoundException('Évaluateur ou évalué introuvable');
     }
 
+    await this.syncUserRefs([evaluateur, evalue]);
+
     const periode = await this.pg.queryOne<any>('SELECT * FROM periodes_evaluation WHERE id_periode = $1', [idPeriode]);
     if (!periode || periode.statut !== 'ouverte' || !periode.est_ouverte) {
       throw new BadRequestException('Période non active');
@@ -91,7 +97,68 @@ export class EvaluationsService {
     );
     if (existing) return existing;
 
-    const typeEval = this.determinerType(evaluateur, evalue);
+    const typeEvalCalcule = this.determinerType(evaluateur, evalue);
+    let typeEval = typeEvalCalcule;
+
+    if (idRegle) {
+      const regle = await this.pg.queryOne<any>(
+        `SELECT
+           id_regle,
+           nom_regle,
+           description,
+           criteres_evaluation_json,
+           est_active,
+           role_evaluateur,
+           role_evalue,
+           type_evaluation
+         FROM regles_evaluation
+         WHERE id_regle = $1`,
+        [idRegle],
+      );
+
+      if (!regle) {
+        throw new BadRequestException("La règle d'évaluation est introuvable");
+      }
+
+      const normalizedRule = normalizeRuleRow(regle);
+      if (!normalizedRule.est_active) {
+        throw new BadRequestException("La règle d'évaluation n'est pas active");
+      }
+
+      const expectedEvaluatorRole = String(normalizedRule.role_evaluateur ?? '').toUpperCase();
+      const expectedTargetRole = String(normalizedRule.role_evalue ?? '').toUpperCase();
+      const actualEvaluatorRole = String(evaluateur.role_nom ?? evaluateur.role ?? '').toUpperCase();
+      const actualTargetRole = String(evalue.role_nom ?? evalue.role ?? '').toUpperCase();
+
+      if (expectedEvaluatorRole && expectedEvaluatorRole !== actualEvaluatorRole) {
+        throw new BadRequestException("Le rôle évaluateur ne correspond pas à la règle sélectionnée");
+      }
+
+      if (expectedTargetRole && expectedTargetRole !== actualTargetRole) {
+        throw new BadRequestException("Le rôle évalué ne correspond pas à la règle sélectionnée");
+      }
+
+      const envelope = parseRuleEnvelope(normalizedRule.criteres_evaluation_json);
+      const constraints = (normalizedRule.criteres_evaluation_json as any)?.constraints ?? {};
+
+      if (constraints.meme_region_obligatoire && evaluateur.id_region !== evalue.id_region) {
+        throw new BadRequestException('Cette règle impose une évaluation dans la même région');
+      }
+
+      if (constraints.meme_branche_obligatoire && evaluateur.id_branche !== evalue.id_branche) {
+        throw new BadRequestException('Cette règle impose une évaluation dans la même branche');
+      }
+
+      typeEval = normalizedRule.type_evaluation ?? typeEvalCalcule;
+
+      if (typeEval && typeEvalCalcule !== '360' && typeEval !== typeEvalCalcule) {
+        throw new BadRequestException("Le type d'évaluation ne correspond pas au contexte hiérarchique");
+      }
+
+      if (envelope.criteres.length === 0) {
+        throw new BadRequestException("La règle sélectionnée ne contient aucun critère exploitable");
+      }
+    }
 
     const created = await this.pg.queryOne<Evaluation>(
       `INSERT INTO evaluations (evaluateur_matricule, evalue_matricule, id_periode, id_regle,
@@ -114,10 +181,24 @@ export class EvaluationsService {
     return this.enrichEvaluation(eval_);
   }
 
+  private canEditEvaluation(eval_: any): boolean {
+    if (eval_.statut === 'brouillon') return true;
+    if (eval_.statut === 'soumis' && eval_.date_soumission) {
+      const submissionDate = new Date(eval_.date_soumission);
+      const hoursSinceSubmission = (Date.now() - submissionDate.getTime()) / (1000 * 60 * 60);
+      return hoursSinceSubmission < 72;
+    }
+    return false;
+  }
+
   async updateNotes(id: string, notes: any[], commentaire?: string): Promise<boolean> {
     const eval_ = await this.findById(id);
-    if (eval_.statut !== 'brouillon') {
-      throw new BadRequestException("L'évaluation n'est pas en brouillon");
+    if (!this.canEditEvaluation(eval_)) {
+      throw new BadRequestException(
+        eval_.statut === 'soumis'
+          ? "Le délai de modification de 72h après soumission est dépassé"
+          : "L'évaluation n'est pas en brouillon",
+      );
     }
 
     await this.pg.execute(
@@ -152,7 +233,12 @@ export class EvaluationsService {
     return { success: true, message: 'Évaluation soumise avec succès' };
   }
 
-  async validate(id: string, validateurMatricule: string, estValidee: boolean): Promise<{ success: boolean; message: string }> {
+  async validate(
+    id: string,
+    validateurMatricule: string,
+    estValidee: boolean,
+    commentaireValidation?: string | null,
+  ): Promise<{ success: boolean; message: string }> {
     const eval_ = await this.findById(id);
 
     if (eval_.statut !== 'soumis') {
@@ -164,10 +250,28 @@ export class EvaluationsService {
       throw new ForbiddenException('Non autorisé à valider cette évaluation');
     }
 
+    const validateur = await this.prisma.utilisateur.findUnique({ where: { matricule: validateurMatricule } });
+    if (!validateur) {
+      throw new NotFoundException('Validateur introuvable');
+    }
+
+    await this.syncUserRefs([validateur]);
+
+    const commentaire = commentaireValidation?.trim() || null;
+    if (!estValidee && !commentaire) {
+      throw new BadRequestException('Un commentaire est obligatoire pour renvoyer en brouillon');
+    }
+
     const nouveauStatut = estValidee ? 'valide' : 'brouillon';
     await this.pg.execute(
-      'UPDATE evaluations SET statut = $1, updated_at = NOW() WHERE id_evaluation = $2',
-      [nouveauStatut, id],
+      `UPDATE evaluations
+       SET statut = $1,
+           validateur_matricule = $2,
+           date_validation = NOW(),
+           commentaire_validation = $3,
+           updated_at = NOW()
+       WHERE id_evaluation = $4`,
+      [nouveauStatut, validateurMatricule, commentaire, id],
     );
 
     if (estValidee) {
@@ -214,14 +318,50 @@ export class EvaluationsService {
     );
   }
 
-  async getHistorique(matricule: string): Promise<EnrichedEvaluation[]> {
-    const evaluations = await this.pg.query<Evaluation>(
-      `SELECT * FROM evaluations
-       WHERE evaluateur_matricule = $1 OR evalue_matricule = $1
-       ORDER BY date_creation DESC`,
-      [matricule],
-    );
-    return this.enrichEvaluations(evaluations);
+  async getHistorique(matricule: string, pagination?: { page?: number; limit?: number }) {
+    const page = Math.max(1, pagination?.page ?? 1);
+    const limit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+    const offset = (page - 1) * limit;
+
+    const [evaluations, countRow] = await Promise.all([
+      this.pg.query<Evaluation>(
+        `SELECT * FROM evaluations
+         WHERE evaluateur_matricule = $1 OR evalue_matricule = $1
+         ORDER BY date_creation DESC LIMIT $2 OFFSET $3`,
+        [matricule, limit, offset],
+      ),
+      this.pg.queryOne<{ total: string }>(
+        `SELECT COUNT(*)::text as total FROM evaluations
+         WHERE evaluateur_matricule = $1 OR evalue_matricule = $1`,
+        [matricule],
+      ),
+    ]);
+
+    const data = await this.enrichEvaluations(evaluations);
+    const total = parseInt(countRow?.total ?? '0');
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async getHistoriqueGlobal(pagination?: { page?: number; limit?: number }) {
+    const page = Math.max(1, pagination?.page ?? 1);
+    const limit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+    const offset = (page - 1) * limit;
+
+    const [evaluations, countRow] = await Promise.all([
+      this.pg.query<Evaluation>(
+        `SELECT * FROM evaluations
+         ORDER BY COALESCE(date_soumission, updated_at, created_at) DESC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset],
+      ),
+      this.pg.queryOne<{ total: string }>(
+        `SELECT COUNT(*)::text as total FROM evaluations`,
+      ),
+    ]);
+
+    const data = await this.enrichEvaluations(evaluations);
+    const total = parseInt(countRow?.total ?? '0');
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
   async getEligibles(matricule: string) {
@@ -369,9 +509,10 @@ export class EvaluationsService {
         evaluations.flatMap((evaluation) => [
           evaluation.evaluateur_matricule,
           evaluation.evalue_matricule,
+          evaluation.validateur_matricule,
         ]),
       ),
-    );
+    ).filter(Boolean) as string[];
 
     const periodesCodes = Array.from(
       new Set(evaluations.map((evaluation) => evaluation.periode_code).filter(Boolean)),
@@ -407,7 +548,10 @@ export class EvaluationsService {
                nom_regle,
                description,
                criteres_evaluation_json,
-               est_active
+               est_active,
+               role_evaluateur,
+               role_evalue,
+               type_evaluation
              FROM regles_evaluation
              WHERE id_regle IN (${reglesIds.map((_, index) => `$${index + 1}`).join(',')})`,
             reglesIds,
@@ -417,7 +561,7 @@ export class EvaluationsService {
 
     const usersByMatricule = new Map(users.map((user) => [user.matricule, { ...user, avatar: user.photo_url }]));
     const periodesByCode = new Map(periodes.map((periode: any) => [periode.code_periode, periode]));
-    const reglesById = new Map(regles.map((regle: any) => [regle.id_regle, regle]));
+    const reglesById = new Map(regles.map((regle: any) => [regle.id_regle, normalizeRuleRow(regle)]));
 
     return evaluations.map((evaluation) => ({
       ...evaluation,
@@ -425,12 +569,74 @@ export class EvaluationsService {
       evalue: usersByMatricule.get(evaluation.evalue_matricule) ?? null,
       periode: evaluation.periode_code ? periodesByCode.get(evaluation.periode_code) ?? null : null,
       regle: evaluation.id_regle ? reglesById.get(evaluation.id_regle) ?? null : null,
-      validateur: null,
+      validateur: evaluation.validateur_matricule
+        ? usersByMatricule.get(evaluation.validateur_matricule) ?? null
+        : null,
     }));
   }
 
   private async enrichEvaluation(evaluation: Evaluation): Promise<EnrichedEvaluation> {
     const [result] = await this.enrichEvaluations([evaluation]);
     return result;
+  }
+
+  private async syncUserRefs(users: Array<{
+    matricule: string;
+    nom: string;
+    prenom: string;
+    email: string;
+    role?: string | null;
+    role_nom?: string | null;
+    id_region?: string | null;
+    id_branche?: string | null;
+    region_nom?: string | null;
+    type_region?: string | null;
+    est_actif?: boolean | null;
+  } | null | undefined>): Promise<void> {
+    const refs = users.filter(Boolean) as Array<{
+      matricule: string;
+      nom: string;
+      prenom: string;
+      email: string;
+      role?: string | null;
+      role_nom?: string | null;
+      id_region?: string | null;
+      id_branche?: string | null;
+      region_nom?: string | null;
+      type_region?: string | null;
+      est_actif?: boolean | null;
+    }>;
+
+    for (const user of refs) {
+      await this.pg.execute(
+        `INSERT INTO utilisateurs_ref (
+           matricule, nom, prenom, email, role, id_region, id_branche,
+           region_nom, type_region, est_actif, created_at, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+         ON CONFLICT (matricule) DO UPDATE SET
+           nom = EXCLUDED.nom,
+           prenom = EXCLUDED.prenom,
+           email = EXCLUDED.email,
+           role = EXCLUDED.role,
+           id_region = EXCLUDED.id_region,
+           id_branche = EXCLUDED.id_branche,
+           region_nom = EXCLUDED.region_nom,
+           type_region = EXCLUDED.type_region,
+           est_actif = EXCLUDED.est_actif,
+           updated_at = NOW()`,
+        [
+          user.matricule,
+          user.nom,
+          user.prenom,
+          user.email,
+          user.role_nom ?? user.role ?? null,
+          user.id_region ?? null,
+          user.id_branche ?? null,
+          user.region_nom ?? null,
+          user.type_region ?? null,
+          user.est_actif ?? true,
+        ],
+      );
+    }
   }
 }

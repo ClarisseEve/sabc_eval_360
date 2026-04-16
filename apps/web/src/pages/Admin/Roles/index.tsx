@@ -6,6 +6,7 @@ import { Badge } from '@/Components/UI/Badge';
 import { Button } from '@/Components/UI/Button';
 import { Input } from '@/Components/UI/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { TruncatedTableBody } from '@/Components/UI/TruncatedList/TruncatedList';
 import { adminApi } from '@/Services/api';
 import { useAdminRoles } from '@/Hooks/queries';
 import { AdminRolesLayout } from './shared';
@@ -79,47 +80,53 @@ export default function RolesIndex() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredRoles.map((role: any) => (
-                <TableRow key={role.id_role}>
-                  <TableCell className="font-medium">{role.id_role}</TableCell>
-                  <TableCell>
-                    <div className="font-medium">{role.nom_role}</div>
-                    <div className="text-xs text-sabc-gray-500">{role.description || 'Aucune description'}</div>
-                  </TableCell>
-                  <TableCell>{role.id_branche}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {role.niveau_taniere != null ? `T ${role.niveau_taniere}` : role.niveau_non_taniere != null ? `NT ${role.niveau_non_taniere}` : 'N/A'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {role.peut_auto_evaluer && <Badge variant="secondary">Auto</Badge>}
-                      {role.peut_evaluer_pairs && <Badge variant="secondary">Pairs</Badge>}
-                      {role.peut_evaluer_subordonnes && <Badge variant="secondary">Subs</Badge>}
-                      {role.peut_cross_branch && <Badge variant="secondary">Cross</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Link to={`/admin/roles/${role.id_role}`}>
-                        <Button variant="outline" size="sm">Voir</Button>
-                      </Link>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (window.confirm(`Supprimer le rôle ${role.nom_role} ?`)) {
-                            deleteMutation.mutate(role.id_role);
-                          }
-                        }}
-                      >
-                        Supprimer
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              <TruncatedTableBody
+                items={filteredRoles}
+                previewCount={10}
+                colSpan={6}
+                keyExtractor={(role: any) => role.id_role}
+                renderRow={(role: any) => (
+                  <TableRow key={role.id_role}>
+                    <TableCell className="font-medium">{role.id_role}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{role.nom_role}</div>
+                      <div className="text-xs text-sabc-gray-500">{role.description || 'Aucune description'}</div>
+                    </TableCell>
+                    <TableCell>{role.id_branche}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {role.niveau_taniere != null ? `T ${role.niveau_taniere}` : role.niveau_non_taniere != null ? `NT ${role.niveau_non_taniere}` : 'N/A'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {role.peut_auto_evaluer && <Badge variant="secondary">Auto</Badge>}
+                        {role.peut_evaluer_pairs && <Badge variant="secondary">Pairs</Badge>}
+                        {role.peut_evaluer_subordonnes && <Badge variant="secondary">Subs</Badge>}
+                        {role.peut_cross_branch && <Badge variant="secondary">Cross</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Link to={`/admin/roles/${role.id_role}`}>
+                          <Button variant="outline" size="sm">Voir</Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (window.confirm(`Supprimer le rôle ${role.nom_role} ?`)) {
+                              deleteMutation.mutate(role.id_role);
+                            }
+                          }}
+                        >
+                          Supprimer
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              />
             </TableBody>
           </Table>
         </CardContent>

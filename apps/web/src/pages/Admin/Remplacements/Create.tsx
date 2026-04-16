@@ -14,8 +14,8 @@ import { AdminRemplacementsLayout } from './shared';
 export default function CreateRemplacement() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data } = useAdminUsers();
-  const users = Array.isArray(data) ? data : [];
+  const { data } = useAdminUsers({ limit: 1000 });
+  const users = data?.data ?? (Array.isArray(data) ? data : []);
   const [form, setForm] = useState({
     titulaire_matricule: '',
     remplacant_matricule: '',

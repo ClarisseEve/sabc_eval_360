@@ -1,9 +1,12 @@
 import { Controller, Get, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AnalyticsService } from './analytics.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles, RolesGuard } from '../auth/guards/roles.guard';
 
 @Controller('analytics')
 @UseGuards(JwtAuthGuard)
+@Throttle({ default: { limit: 30, ttl: 60_000 } })
 export class AnalyticsController {
   constructor(private service: AnalyticsService) {}
 
@@ -48,6 +51,45 @@ export class AnalyticsController {
     @Query('id_region') idRegion?: string,
   ) {
     return this.service.detecterAnomalies(matricule, idRegion);
+  }
+
+  @Get('admin/overview')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  adminOverview() {
+    return this.service.getAdminOverview();
+  }
+
+  @Get('admin/roles')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  adminRoles() {
+    return this.service.getAdminRoleAnalytics();
+  }
+
+  @Get('admin/regions')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  adminRegionsOverview() {
+    return this.service.getAdminRegionsOverview();
+  }
+
+  @Get('admin/regions/:idRegion')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  adminRegionDetail(@Param('idRegion') idRegion: string) {
+    return this.service.getAdminRegionDetail(idRegion);
+  }
+
+  @Get('admin/plans-amelioration')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  improvementPlans(
+    @Query('role') role?: string,
+    @Query('id_region') idRegion?: string,
+    @Query('type') type?: string,
+  ) {
+    return this.service.getImprovementPlans({ role, id_region: idRegion, type });
   }
 
   @Get('recommandations')

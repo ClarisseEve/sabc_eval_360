@@ -17,14 +17,14 @@ function detectGaps(user: any) {
 }
 
 export default function UserGaps() {
-  const { data } = useAdminUsers();
+  const { data } = useAdminUsers({ limit: 1000 });
   const [search, setSearch] = useState('');
-  const users = Array.isArray(data) ? data : [];
+  const users = data?.data ?? (Array.isArray(data) ? data : []);
 
   const rows = useMemo(() => {
     return users
       .map((user: any) => ({ user, gaps: detectGaps(user) }))
-      .filter(({ user, gaps }) => {
+      .filter(({ user, gaps }: { user: any; gaps: string[] }) => {
         if (gaps.length === 0) return false;
         const term = search.trim().toLowerCase();
         if (!term) return true;
@@ -44,7 +44,7 @@ export default function UserGaps() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Utilisateurs audités</div><div className="text-2xl font-bold">{users.length}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Avec gaps</div><div className="text-2xl font-bold">{rows.length}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Total gaps</div><div className="text-2xl font-bold">{rows.reduce((sum, row) => sum + row.gaps.length, 0)}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Total gaps</div><div className="text-2xl font-bold">{rows.reduce((sum: number, row: { user: any; gaps: string[] }) => sum + row.gaps.length, 0)}</div></CardContent></Card>
       </div>
 
       <Card>
@@ -61,7 +61,7 @@ export default function UserGaps() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map(({ user, gaps }) => (
+              {rows.map(({ user, gaps }: { user: any; gaps: string[] }) => (
                 <TableRow key={user.matricule}>
                   <TableCell>{user.matricule}</TableCell>
                   <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>

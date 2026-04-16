@@ -57,7 +57,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     fetchNotifications();
   }, []);
 
-  // Configurer les notifications en temps réel avec Laravel Echo
+  // Configurer les notifications temps réel si un client websocket est injecté
   useEffect(() => {
     // Vérifier si Echo est disponible
     if (window.Echo) {

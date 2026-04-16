@@ -23,11 +23,11 @@ export const UserInsightsDrawer: React.FC<UserInsightsDrawerProps> = ({ user, op
               </DialogTitle>
               <div className="flex flex-wrap items-center gap-2 text-sm text-sabc-gray-600">
                 <Badge variant="secondary">{user.role}</Badge>
-                <Badge variant="outline">{user.region}</Badge>
-                {user.sexe && <Badge variant="outline">Sexe : {user.sexe}</Badge>}
-                {user.age && <Badge variant="outline">Âge : {user.age} ans</Badge>}
+                <Badge variant="info">{user.region}</Badge>
+                {user.sexe && <Badge variant="secondary">Sexe : {user.sexe}</Badge>}
+                {user.age && <Badge variant="secondary">Âge : {user.age} ans</Badge>}
                 {user.anciennete !== undefined && (
-                  <Badge variant="outline">Ancienneté : {user.anciennete} ans</Badge>
+                  <Badge variant="secondary">Ancienneté : {user.anciennete} ans</Badge>
                 )}
               </div>
             </DialogHeader>

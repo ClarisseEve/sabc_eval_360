@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { TruncatedList } from '@/Components/UI/TruncatedList/TruncatedList';
 import { useAdminStructure } from '@/Hooks/queries';
 import { AdminStructureLayout } from './shared';
 
@@ -32,17 +33,26 @@ const AdminStructureIndex: React.FC = () => {
           <CardTitle>Répartition par région</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {regions.map((region: any) => (
-            <div key={region.id_region} className="flex items-center justify-between rounded-lg border border-sabc-gray-200 p-4">
-              <div>
-                <div className="font-medium text-sabc-gray-900">{region.nom_region}</div>
-                <div className="text-xs text-sabc-gray-500">{region.est_taniere ? 'Tanière' : 'Non tanière'}</div>
+          <TruncatedList
+            items={regions}
+            previewCount={8}
+            keyExtractor={(region: any) => region.id_region}
+            modalTitle="Toutes les régions"
+            modalDescription={`${regions.length} région(s)`}
+            className="space-y-3"
+            modalClassName="space-y-3"
+            renderItem={(region: any) => (
+              <div className="flex items-center justify-between rounded-lg border border-sabc-gray-200 p-4">
+                <div>
+                  <div className="font-medium text-sabc-gray-900">{region.nom_region}</div>
+                  <div className="text-xs text-sabc-gray-500">{region.est_taniere ? 'Tanière' : 'Non tanière'}</div>
+                </div>
+                <div className="text-sm text-sabc-gray-500">
+                  {(services.filter((service: any) => service.id_region === region.id_region)).length} service(s)
+                </div>
               </div>
-              <div className="text-sm text-sabc-gray-500">
-                {(services.filter((service: any) => service.id_region === region.id_region)).length} service(s)
-              </div>
-            </div>
-          ))}
+            )}
+          />
         </CardContent>
       </Card>
     </AdminStructureLayout>

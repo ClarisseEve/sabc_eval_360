@@ -8,8 +8,13 @@
   "scripts": {
     "build": "nest build",
     "db:generate": "prisma generate",
+    "db:mysql:baseline": "node ./scripts/run-mysql-baseline.mjs",
+    "db:pg:migrate": "node ./scripts/run-pg-migrations.mjs",
+    "with:ephemeral-redis": "node ./scripts/with-ephemeral-redis.mjs",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:all": "pnpm db:mysql:baseline && pnpm db:migrate:deploy && pnpm db:pg:migrate",
+    "preflight:cutover": "node ./scripts/preflight-cutover.mjs",
     "db:push": "prisma db push",
     "db:reset": "prisma migrate reset --force",
     "db:seed": "ts-node --transpile-only prisma/seed.ts",
@@ -17,8 +22,10 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main.js",
+    "start:prod:redis": "pnpm with:ephemeral-redis pnpm start:prod",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "load:test": "node ./scripts/load-test.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -39,13 +46,16 @@
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "dotenv": "^17.4.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "pg": "^8.20.0",
+    "redis": "^4.7.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -68,6 +78,7 @@
     "jest": "^30.0.0",
     "prettier": "^3.4.2",
     "prisma": "^6.19.2",
+    "redis-memory-server": "^0.16.0",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
@@ -76,6 +87,9 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
+  },
+  "prisma": {
+    "seed": "npx ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "jest": {
     "moduleFileExtensions": [

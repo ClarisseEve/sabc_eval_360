@@ -14,8 +14,15 @@ export class AdminUsersController {
     @Query('statut') statut?: string,
     @Query('role') role?: string,
     @Query('id_region') id_region?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.usersService.getUsers({ statut, role, id_region });
+    return this.usersService.getUsers({
+      statut, role, id_region, search,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get(':matricule')
@@ -26,6 +33,16 @@ export class AdminUsersController {
   @Get(':matricule/subordonnes')
   getSubordonnes(@Param('matricule') matricule: string) {
     return this.usersService.getSubordonnes(matricule);
+  }
+
+  @Get(':matricule/historique')
+  getHistorique(@Param('matricule') matricule: string) {
+    return this.usersService.getHistorique(matricule);
+  }
+
+  @Get(':matricule/chaine')
+  getChaine(@Param('matricule') matricule: string) {
+    return this.usersService.getChaine(matricule);
   }
 
   @Post()

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Button } from '@/Components/UI/Button/Button';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
+import { TruncatedList, TruncatedTableBody } from '@/Components/UI/TruncatedList/TruncatedList';
 import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 
@@ -62,7 +63,7 @@ const RolesTab: React.FC = () => {
       </div>
       
       {/* Hiérarchie des rôles */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Rôles commerciaux */}
         <Card>
           <CardHeader>
@@ -72,9 +73,16 @@ const RolesTab: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {commercialRoles.sort((a, b) => a.niveau - b.niveau).map((role) => (
-                <div key={role.id} className="flex items-center p-2 border-l-4 border-sabc-red-primary pl-4">
+            <TruncatedList
+              items={commercialRoles.sort((a, b) => a.niveau - b.niveau)}
+              previewCount={6}
+              keyExtractor={(role) => role.id}
+              modalTitle="Hiérarchie Commerciale"
+              modalDescription={`${commercialRoles.length} rôle(s)`}
+              className="space-y-4"
+              modalClassName="space-y-4"
+              renderItem={(role) => (
+                <div className="flex items-center p-2 border-l-4 border-sabc-red-primary pl-4">
                   <div className="flex-1">
                     <div className="flex items-center">
                       <h3 className="font-medium">{role.nom}</h3>
@@ -82,16 +90,16 @@ const RolesTab: React.FC = () => {
                     </div>
                     <p className="text-sm text-sabc-gray-600 dark:text-sabc-gray-400">{role.description}</p>
                   </div>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => handleEdit(role)}
                   >
                     Configurer
                   </Button>
                 </div>
-              ))}
-            </div>
+              )}
+            />
           </CardContent>
         </Card>
         
@@ -104,9 +112,16 @@ const RolesTab: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {marketingRoles.sort((a, b) => a.niveau - b.niveau).map((role) => (
-                <div key={role.id} className="flex items-center p-2 border-l-4 border-sabc-accent pl-4">
+            <TruncatedList
+              items={marketingRoles.sort((a, b) => a.niveau - b.niveau)}
+              previewCount={6}
+              keyExtractor={(role) => role.id}
+              modalTitle="Hiérarchie Marketing"
+              modalDescription={`${marketingRoles.length} rôle(s)`}
+              className="space-y-4"
+              modalClassName="space-y-4"
+              renderItem={(role) => (
+                <div className="flex items-center p-2 border-l-4 border-sabc-accent pl-4">
                   <div className="flex-1">
                     <div className="flex items-center">
                       <h3 className="font-medium">{role.nom}</h3>
@@ -114,16 +129,16 @@ const RolesTab: React.FC = () => {
                     </div>
                     <p className="text-sm text-sabc-gray-600 dark:text-sabc-gray-400">{role.description}</p>
                   </div>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => handleEdit(role)}
                   >
                     Configurer
                   </Button>
                 </div>
-              ))}
-            </div>
+              )}
+            />
           </CardContent>
         </Card>
       </div>
@@ -149,38 +164,44 @@ const RolesTab: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {roles.map((role) => (
-                <TableRow key={role.id}>
-                  <TableCell className="font-medium">{role.nom}</TableCell>
-                  <TableCell>
-                    <Badge className={role.nom === 'DR' || role.nom === 'CDTT' ? 'bg-sabc-error text-white' : 'bg-sabc-success text-white'}>
-                      {role.nom === 'DR' || role.nom === 'CDTT' ? '❌' : '✅'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={role.nom === 'DR' || role.nom === 'CDTT' ? 'bg-sabc-error text-white' : 'bg-sabc-success text-white'}>
-                      {role.nom === 'DR' || role.nom === 'CDTT' ? '❌' : '✅'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className="bg-sabc-success text-white">✅</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={role.nom === 'DR' || role.nom === 'CDTT' ? 'bg-sabc-success text-white' : 'bg-sabc-error text-white'}>
-                      {role.nom === 'DR' || role.nom === 'CDTT' ? '✅' : '❌'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleEdit(role)}
-                    >
-                      Modifier
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              <TruncatedTableBody
+                items={roles}
+                previewCount={10}
+                colSpan={6}
+                keyExtractor={(role) => role.id}
+                renderRow={(role) => (
+                  <TableRow key={role.id}>
+                    <TableCell className="font-medium">{role.nom}</TableCell>
+                    <TableCell>
+                      <Badge className={role.nom === 'DR' || role.nom === 'CDTT' ? 'bg-sabc-error text-white' : 'bg-sabc-success text-white'}>
+                        {role.nom === 'DR' || role.nom === 'CDTT' ? '❌' : '✅'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={role.nom === 'DR' || role.nom === 'CDTT' ? 'bg-sabc-error text-white' : 'bg-sabc-success text-white'}>
+                        {role.nom === 'DR' || role.nom === 'CDTT' ? '❌' : '✅'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className="bg-sabc-success text-white">✅</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={role.nom === 'DR' || role.nom === 'CDTT' ? 'bg-sabc-success text-white' : 'bg-sabc-error text-white'}>
+                        {role.nom === 'DR' || role.nom === 'CDTT' ? '✅' : '❌'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(role)}
+                      >
+                        Modifier
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              />
             </TableBody>
           </Table>
         </CardContent>

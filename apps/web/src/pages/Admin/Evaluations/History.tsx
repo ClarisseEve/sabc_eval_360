@@ -1,13 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, ClipboardList, Download, Search } from 'lucide-react';
+import { useSuspenseQuery } from '@tanstack/react-query';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Input } from '@/Components/UI/Input/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
-import { useHistorique } from '@/Hooks/queries/useEvaluationsQuery';
+import { adminApi } from '@/Services/api';
 import { AdminEvaluationsLayout } from './shared';
+import { buildEvaluationContext } from '@/pages/Common/Evaluations/shared';
 
 function formatPerson(user?: any) {
   if (!user) return 'Inconnu';
@@ -37,12 +39,51 @@ function StatusBadge({ status }: { status?: string }) {
   return <Badge variant="outline">{normalized}</Badge>;
 }
 
+function Pagination({ meta, onPageChange }: { meta: { total: number; page: number; limit: number; totalPages: number }; onPageChange: (p: number) => void }) {
+  if (meta.totalPages <= 1) return null;
+
+  const pages: number[] = [];
+  const start = Math.max(1, meta.page - 2);
+  const end = Math.min(meta.totalPages, meta.page + 2);
+  for (let i = start; i <= end; i++) pages.push(i);
+
+  return (
+    <div className="flex items-center justify-between border-t border-sabc-gray-200 pt-4">
+      <p className="text-sm text-sabc-gray-600">
+        {(meta.page - 1) * meta.limit + 1}–{Math.min(meta.page * meta.limit, meta.total)} sur {meta.total} évaluations
+      </p>
+      <div className="flex gap-1">
+        <Button variant="outline" size="sm" disabled={meta.page <= 1} onClick={() => onPageChange(meta.page - 1)}>
+          Précédent
+        </Button>
+        {pages.map((p) => (
+          <Button key={p} variant={p === meta.page ? 'default' : 'outline'} size="sm" onClick={() => onPageChange(p)}
+            className={p === meta.page ? 'bg-sabc-red-primary text-white' : ''}>
+            {p}
+          </Button>
+        ))}
+        <Button variant="outline" size="sm" disabled={meta.page >= meta.totalPages} onClick={() => onPageChange(meta.page + 1)}>
+          Suivant
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function EvaluationHistoryPage() {
-  const { data } = useHistorique();
-  const [search, setSearch] = React.useState('');
+  const [page, setPage] = React.useState(1);
   const [status, setStatus] = React.useState('all');
 
-  const rows = React.useMemo(() => (Array.isArray(data) ? data : []).map((item: any) => ({
+  const params = { page, limit: 30 };
+  const { data: response } = useSuspenseQuery({
+    queryKey: ['admin', 'evaluations', 'history', params],
+    queryFn: () => adminApi.evaluations.history(params).then((r: any) => r.data),
+  });
+
+  const rawData = response?.data ?? (Array.isArray(response) ? response : []);
+  const meta = response?.meta ?? { total: rawData.length, page: 1, limit: 30, totalPages: 1 };
+
+  const rows = React.useMemo(() => rawData.map((item: any) => ({
     id: item.id_evaluation,
     titre: item.regle?.nom_regle || item.type_evaluation || 'Évaluation',
     evaluateur: formatPerson(item.evaluateur),
@@ -51,32 +92,26 @@ export default function EvaluationHistoryPage() {
     note: item.note_globale != null ? Number(item.note_globale) : null,
     periode: item.periode?.nom_periode || item.id_periode,
     date: item.date_soumission || item.date_evaluation || item.updated_at,
-  })), [data]);
+    type: item.type_evaluation || 'autre',
+    detail: buildEvaluationContext(item).visibilityDetail,
+  })), [rawData]);
 
   const filtered = React.useMemo(() => {
-    return rows.filter((row) => {
-      const matchesSearch = !search || [row.titre, row.evaluateur, row.evalue, row.periode]
-        .join(' ')
-        .toLowerCase()
-        .includes(search.toLowerCase());
-      const matchesStatus = status === 'all' || row.statut === status;
-      return matchesSearch && matchesStatus;
-    });
-  }, [rows, search, status]);
+    if (status === 'all') return rows;
+    return rows.filter((row: any) => row.statut === status);
+  }, [rows, status]);
 
   const stats = React.useMemo(() => ({
-    total: rows.length,
-    soumis: rows.filter((row) => row.statut === 'soumis').length,
-    valides: rows.filter((row) => row.statut === 'validé').length,
-    brouillons: rows.filter((row) => row.statut === 'brouillon').length,
-  }), [rows]);
+    total: meta.total,
+    displayed: filtered.length,
+  }), [meta.total, filtered.length]);
 
   return (
     <AdminEvaluationsLayout title="Historique des évaluations">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-sabc-gray-900">Historique des évaluations</h1>
-          <p className="text-sm text-sabc-gray-600">Vue consolidée des évaluations créées, soumises et validées.</p>
+          <p className="text-sm text-sabc-gray-600">{meta.total} évaluation{meta.total > 1 ? 's' : ''} au total</p>
         </div>
         <div className="flex gap-2">
           <Link to="/admin/evaluations/management">
@@ -89,25 +124,14 @@ export default function EvaluationHistoryPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Total</div><div className="text-3xl font-bold">{stats.total}</div></CardContent></Card>
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Soumises</div><div className="text-3xl font-bold text-sabc-accent">{stats.soumis}</div></CardContent></Card>
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Validées</div><div className="text-3xl font-bold text-sabc-success">{stats.valides}</div></CardContent></Card>
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Brouillons</div><div className="text-3xl font-bold text-sabc-gray-700">{stats.brouillons}</div></CardContent></Card>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Filtres</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-[1fr,220px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sabc-gray-400" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une évaluation, un évaluateur ou une période" className="pl-10" />
-          </div>
+        <CardContent>
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             className="rounded-md border border-sabc-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sabc-red-primary"
           >
             <option value="all">Tous les statuts</option>
@@ -123,7 +147,7 @@ export default function EvaluationHistoryPage() {
         <CardHeader>
           <CardTitle>Évaluations ({filtered.length})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {filtered.length === 0 ? (
             <div className="rounded-lg border border-dashed border-sabc-gray-200 p-8 text-center text-sm text-sabc-gray-500">
               Aucune évaluation ne correspond aux filtres courants.
@@ -143,7 +167,7 @@ export default function EvaluationHistoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((row) => (
+                {filtered.map((row: any) => (
                   <TableRow key={row.id}>
                     <TableCell>
                       <div className="font-medium text-sabc-gray-900">{row.titre}</div>
@@ -164,7 +188,7 @@ export default function EvaluationHistoryPage() {
                     </TableCell>
                     <TableCell>{row.note != null ? row.note.toFixed(2) : 'N/A'}</TableCell>
                     <TableCell className="text-right">
-                      <Link to={`/common/evaluations/${row.id}`}>
+                      <Link to={`/admin/evaluations/${row.id}`}>
                         <Button variant="outline" size="sm">Ouvrir</Button>
                       </Link>
                     </TableCell>
@@ -173,6 +197,8 @@ export default function EvaluationHistoryPage() {
               </TableBody>
             </Table>
           )}
+
+          <Pagination meta={meta} onPageChange={setPage} />
         </CardContent>
       </Card>
     </AdminEvaluationsLayout>

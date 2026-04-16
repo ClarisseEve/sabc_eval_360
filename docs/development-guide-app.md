@@ -39,9 +39,13 @@ pnpm --dir apps/web build
 ## Base de données
 
 ```bash
-pnpm --dir apps/api db:migrate:deploy
+pnpm --dir apps/api db:migrate:all
 pnpm --dir apps/api db:seed
 ```
+
+`db:migrate:all` applique:
+- les migrations Prisma pour MySQL core
+- les migrations SQL versionnées pour PostgreSQL business
 
 ## Tests
 

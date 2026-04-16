@@ -6,6 +6,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert';
 import { reglesApi, evaluationsApi } from '@/Services/api';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { usePeriodesActives } from '@/Hooks/queries';
+import { getRuleSummary, normalizePublishedRule } from '@/utils/rules';
+import Badge from '@/Components/UI/Badge';
 
 interface EvaluationModalProps {
   open: boolean;
@@ -40,6 +42,8 @@ export default function EvaluationModal({
   }, [open]);
 
   const activePeriode = Array.isArray(periodes) ? periodes[0] : null;
+  const normalizedTemplate = template ? normalizePublishedRule(template) : null;
+  const templateSummary = template ? getRuleSummary(template) : null;
 
   const handleCreate = async () => {
     if (!user?.matricule || !targetMatricule || !activePeriode?.id_periode) return;
@@ -92,6 +96,13 @@ export default function EvaluationModal({
             <div className="rounded-lg border border-sabc-gray-200 p-4 text-sm text-sabc-gray-700">
               <div className="font-medium text-sabc-gray-900">{template?.nom_regle || 'Template sélectionné'}</div>
               <div className="mt-1 text-sabc-gray-500">{template?.description || 'Aucune description.'}</div>
+              {normalizedTemplate ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge variant="info">{templateSummary?.criteresCount ?? 0} critères</Badge>
+                  <Badge variant="info">{templateSummary?.sections.length ?? 0} sections</Badge>
+                  <Badge variant="warning">visibilité {normalizedTemplate.visibility_policy.detail}</Badge>
+                </div>
+              ) : null}
               <div className="mt-3 text-xs text-sabc-gray-500">
                 Période active: {activePeriode?.nom_periode || activePeriode?.nom || activePeriode?.code_periode || activePeriode?.id_periode}
               </div>

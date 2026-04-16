@@ -32,7 +32,7 @@ export const AlertsRecommendationsSection: React.FC<AlertsRecommendationsSection
                   <AlertTriangle className="h-4 w-4" />
                   {alert.title}
                 </div>
-                <Badge variant="outline" className="mt-2 text-xs uppercase tracking-wide">
+                <Badge variant={alert.severity === 'high' ? 'error' : alert.severity === 'medium' ? 'warning' : 'info'} className="mt-2 text-xs uppercase tracking-wide">
                   Criticité : {alert.severity === 'high' ? 'Élevée' : alert.severity === 'medium' ? 'Modérée' : 'Faible'}
                 </Badge>
                 <p className="mt-2 text-sm text-sabc-gray-700">{alert.description}</p>

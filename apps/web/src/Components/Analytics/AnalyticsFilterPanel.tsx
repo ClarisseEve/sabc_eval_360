@@ -68,6 +68,12 @@ function toggleItem(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 }
 
+function resolveOption<T>(value: T[] | undefined, fallback: T[]): T[] {
+  return value?.length ? value : fallback;
+}
+
+const CHANNEL_LABELS: Record<string, string> = { auto: 'Auto', pairs: 'Pairs', descendante: 'Descendante' };
+
 interface AnalyticsFilterPanelProps {
   options?: {
     roles?: string[];
@@ -89,12 +95,12 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
   const { filters, setFilters, resetFilters } = useAnalyticsFilters();
   const [isOpen, setIsOpen] = React.useState(mode === 'sheet');
 
-  const roleOptions = options?.roles && options.roles.length ? options.roles : DEFAULT_ROLE_OPTIONS;
-  const regionOptions = options?.regions && options.regions.length ? options.regions : DEFAULT_REGION_OPTIONS;
-  const brancheOptions = options?.branches && options.branches.length ? options.branches : DEFAULT_BRANCHE_OPTIONS;
-  const hierarchyOptions = options?.hierarchyLevels && options.hierarchyLevels.length ? options.hierarchyLevels : DEFAULT_HIERARCHY_OPTIONS;
-  const trainingStatusOptions = options?.trainingStatuses && options.trainingStatuses.length ? options.trainingStatuses : DEFAULT_TRAINING_STATUS_OPTIONS;
-  const competencyOptions = options?.competencies && options.competencies.length ? options.competencies : DEFAULT_COMPETENCY_OPTIONS;
+  const roleOptions = resolveOption(options?.roles, DEFAULT_ROLE_OPTIONS);
+  const regionOptions = resolveOption(options?.regions, DEFAULT_REGION_OPTIONS);
+  const brancheOptions = resolveOption(options?.branches, DEFAULT_BRANCHE_OPTIONS);
+  const hierarchyOptions = resolveOption(options?.hierarchyLevels, DEFAULT_HIERARCHY_OPTIONS);
+  const trainingStatusOptions = resolveOption(options?.trainingStatuses, DEFAULT_TRAINING_STATUS_OPTIONS);
+  const competencyOptions = resolveOption(options?.competencies, DEFAULT_COMPETENCY_OPTIONS);
 
   const updateFilters = (update: Partial<AnalyticsFilters>) => {
     setFilters((prev) => ({ ...prev, ...update }));
@@ -120,9 +126,9 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
   const filtersGrid = (
     <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Période</label>
+        <label htmlFor="filter-periode" className="text-sm font-medium text-sabc-gray-700">Période</label>
         <Select value={filters.periode} onValueChange={(value) => updateFilters({ periode: value })}>
-          <SelectTrigger>
+          <SelectTrigger id="filter-periode">
             <SelectValue placeholder="Sélectionner" />
           </SelectTrigger>
           <SelectContent>
@@ -136,7 +142,7 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Rôles ciblés</label>
+        <span className="text-sm font-medium text-sabc-gray-700">Rôles ciblés</span>
         <div className="flex flex-wrap gap-2">
           {roleOptions.map((role) => {
             const active = filters.roles.includes(role);
@@ -160,7 +166,7 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Régions</label>
+        <span className="text-sm font-medium text-sabc-gray-700">Régions</span>
         <div className="flex flex-wrap gap-2">
           {regionOptions.map((region) => {
             const active = filters.regions.includes(region);
@@ -184,7 +190,7 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Branches</label>
+        <span className="text-sm font-medium text-sabc-gray-700">Branches</span>
         <div className="flex flex-wrap gap-2">
           {brancheOptions.map((branche) => {
             const active = filters.branches.includes(branche);
@@ -208,7 +214,7 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Niveaux hiérarchiques</label>
+        <span className="text-sm font-medium text-sabc-gray-700">Niveaux hiérarchiques</span>
         <div className="flex flex-wrap gap-2">
           {hierarchyOptions.map((level) => {
             const active = filters.hierarchyLevels.includes(level.value);
@@ -232,7 +238,7 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Statut de formation</label>
+        <span className="text-sm font-medium text-sabc-gray-700">Statut de formation</span>
         <div className="flex flex-wrap gap-2">
           {trainingStatusOptions.map((status) => {
             const active = filters.trainingStatuses.includes(status.value);
@@ -256,7 +262,7 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Canaux d'évaluation</label>
+        <span className="text-sm font-medium text-sabc-gray-700">Canaux d'évaluation</span>
         <div className="flex flex-wrap gap-2">
           {['auto', 'pairs', 'descendante'].map((channel) => {
             const active = filters.evaluationChannels.includes(channel as AnalyticsFilters['evaluationChannels'][number]);
@@ -281,7 +287,7 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
                   });
                 }}
               >
-                {channel === 'auto' ? 'Auto' : channel === 'pairs' ? 'Pairs' : 'Descendante'}
+                {CHANNEL_LABELS[channel] ?? channel}
               </Badge>
             );
           })}
@@ -289,7 +295,7 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Sexe</label>
+        <span className="text-sm font-medium text-sabc-gray-700">Sexe</span>
         <div className="flex flex-wrap gap-2">
           {SEXE_OPTIONS.map((sexe) => {
             const active = filters.sexes.includes(sexe);
@@ -313,12 +319,12 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Structure</label>
+        <label htmlFor="filter-structure" className="text-sm font-medium text-sabc-gray-700">Structure</label>
         <Select
           value={filters.structureScope}
           onValueChange={(value) => updateFilters({ structureScope: value as AnalyticsFilters['structureScope'] })}
         >
-          <SelectTrigger>
+          <SelectTrigger id="filter-structure">
             <SelectValue placeholder="Toutes" />
           </SelectTrigger>
           <SelectContent>
@@ -332,7 +338,7 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Familles de compétences</label>
+        <span className="text-sm font-medium text-sabc-gray-700">Familles de compétences</span>
         <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1">
           {competencyOptions.map((competency) => {
             const active = filters.competencies.includes(competency);
@@ -356,13 +362,13 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Tranche d'âge (ans)</label>
+        <span className="text-sm font-medium text-sabc-gray-700">Tranche d'âge (ans)</span>
         <div className="rounded-lg border border-sabc-gray-200 p-4">
           <RangeSlider
             min={20}
             max={60}
             step={1}
-            value={filters.ageRange as [number, number]}
+            value={filters.ageRange}
             marks={AGE_MARKS}
             onChange={(next) => updateFilters({ ageRange: next })}
           />
@@ -370,13 +376,13 @@ export const AnalyticsFilterPanel: React.FC<AnalyticsFilterPanelProps> = ({
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-sabc-gray-700">Ancienneté (années)</label>
+        <span className="text-sm font-medium text-sabc-gray-700">Ancienneté (années)</span>
         <div className="rounded-lg border border-sabc-gray-200 p-4">
           <RangeSlider
             min={0}
             max={20}
             step={1}
-            value={filters.anciennete as [number, number]}
+            value={filters.anciennete}
             marks={SENIORITY_MARKS}
             onChange={(next) => updateFilters({ anciennete: next })}
           />

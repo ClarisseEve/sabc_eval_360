@@ -1,45 +1,102 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Head } from '@/lib/inertia-shim';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert';
 import Badge from '@/Components/UI/Badge';
 import { Button } from '@/Components/UI/Button';
 import EvaluationModal from '@/Components/Evaluation/EvaluationModal';
-import { evaluationsApi, reglesApi } from '@/Services/api';
-import { useEligibles, useHistorique } from '@/Hooks/queries';
+import { useEvaluationWorkflowData, findWorkflowTarget } from '@/Hooks/queries';
 import { EvaluationPageLayout, formatDisplayName, formatRole } from './shared';
-import { CheckCircle2, ClipboardList, PlayCircle, Users2 } from 'lucide-react';
+import {
+  ActiveRulesCard,
+  QuickActionsCard,
+  formatDateLabel,
+  formatEvaluationType,
+} from '@/Components/Dashboard/RoleDashboardShared';
+import {
+  CalendarClock,
+  CheckCircle2,
+  ClipboardList,
+  Layers3,
+  PlayCircle,
+  Users2,
+} from 'lucide-react';
+import { filterApplicableRules, getRuleSummary } from '@/utils/rules';
+import { useAuthContext } from '@/Contexts/AuthContext';
 
 type Target = Record<string, any>;
 
-const TARGET_LABELS: Record<string, string> = {
-  auto: 'Auto-évaluation',
-  pairs: 'Pairs',
-  subordonnes: 'Subordonnés',
-  ascendante: 'Ascendante',
-};
+function MetricTile({
+  label,
+  value,
+  caption,
+  icon: Icon,
+}: {
+  label: string;
+  value: React.ReactNode;
+  caption: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-3 p-6">
+        <Icon className="h-8 w-8 text-sabc-red-primary" />
+        <div>
+          <div className="text-2xl font-semibold text-sabc-gray-900">{value}</div>
+          <div className="text-sm text-sabc-gray-500">{label}</div>
+          <div className="mt-1 text-xs text-sabc-gray-400">{caption}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 const Mine: React.FC = () => {
-  const { data: eligibles } = useEligibles();
-  const { data: historique } = useHistorique();
-  const { data: templates = [] } = useQuery({
-    queryKey: ['regles', 'active-list'],
-    queryFn: () => reglesApi.list().then((r) => r.data ?? []),
-  });
+  const { user } = useAuthContext();
+  const { data } = useEvaluationWorkflowData();
 
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const eligibleGroups = useMemo(() => {
-    if (!eligibles || typeof eligibles !== 'object') return [];
-    return Object.entries(eligibles)
-      .map(([key, value]) => [key, Array.isArray(value) ? value : value ? [value] : []] as const)
-      .filter(([, list]) => list.length > 0);
-  }, [eligibles]);
+  const selectedTargetData = useMemo(
+    () => findWorkflowTarget(data.eligibleGroups, selectedTarget),
+    [data.eligibleGroups, selectedTarget],
+  );
 
-  const historyList = Array.isArray(historique) ? historique : [];
+  const selectedTargetType = selectedTargetData?.workflowType ?? null;
+  const applicableRules = useMemo(
+    () => filterApplicableRules(
+      data.rules,
+      user?.role_nom || user?.role,
+      selectedTargetData?.role_nom || selectedTargetData?.role,
+      selectedTargetType,
+    ),
+    [data.rules, selectedTargetData, selectedTargetType, user?.role, user?.role_nom],
+  );
+
+  useEffect(() => {
+    if (applicableRules.length === 0) {
+      setSelectedTemplate(null);
+      return;
+    }
+
+    setSelectedTemplate((current) => (
+      current && applicableRules.some((rule) => rule.id_regle === current)
+        ? current
+        : applicableRules[0].id_regle
+    ));
+  }, [applicableRules]);
+
+  const selectedRule = useMemo(
+    () => applicableRules.find((rule) => rule.id_regle === selectedTemplate) ?? applicableRules[0] ?? null,
+    [applicableRules, selectedTemplate],
+  );
+
+  const selectedRuleSummary = useMemo(
+    () => (selectedRule ? getRuleSummary(selectedRule) : null),
+    [selectedRule],
+  );
 
   const launchEvaluation = (targetMatricule: string) => {
     setSelectedTarget(targetMatricule);
@@ -54,109 +111,185 @@ const Mine: React.FC = () => {
         <Card className="border-none bg-white shadow-lg">
           <CardContent className="flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-2">
-              <Badge variant="outline" className="border-sabc-red-primary bg-sabc-red-primary/10 text-sabc-red-primary">
-                Cycle d’évaluation
+              <Badge variant="primary">
+                Workflow d’évaluation
               </Badge>
               <h1 className="text-2xl font-semibold text-sabc-gray-900">Démarrer ou reprendre vos évaluations</h1>
               <p className="max-w-2xl text-sm text-sabc-gray-600">
-                Sélectionnez un template actif, puis démarrez un brouillon pour une cible éligible. Votre historique validé et vos brouillons restent accessibles ci-dessous.
+                Le flux repose maintenant sur la période ouverte et les règles publiées compatibles avec la cible sélectionnée.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-lg bg-sabc-red-primary/5 p-4">
-                <div className="text-xs uppercase text-sabc-gray-500">Templates actifs</div>
-                <div className="mt-1 text-2xl font-semibold text-sabc-gray-900">{templates.length}</div>
+            <div className="rounded-xl border border-sabc-gray-200 bg-sabc-gray-50 p-4 text-sm">
+              <div className="text-xs uppercase tracking-wide text-sabc-gray-500">Période active</div>
+              <div className="mt-1 text-base font-semibold text-sabc-gray-900">
+                {data.activePeriod?.nom_periode || data.activePeriod?.code_periode || 'Aucune période ouverte'}
               </div>
-              <div className="rounded-lg bg-sabc-red-primary/5 p-4">
-                <div className="text-xs uppercase text-sabc-gray-500">Historique</div>
-                <div className="mt-1 text-2xl font-semibold text-sabc-gray-900">{historyList.length}</div>
+              <div className="mt-1 text-xs text-sabc-gray-500">
+                {data.activePeriod?.date_fin ? `Clôture le ${formatDateLabel(data.activePeriod.date_fin)}` : 'Le démarrage est bloqué tant qu’aucune période n’est ouverte.'}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-[340px,1fr]">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ClipboardList className="h-5 w-5 text-sabc-red-primary" />
-                Templates actifs
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {templates.length === 0 ? (
-                <Alert>
-                  <AlertTitle>Aucun template actif</AlertTitle>
-                  <AlertDescription>
-                    La création d’évaluation est indisponible tant qu’aucune règle active n’est publiée.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                templates.map((template: any) => {
-                  const active = selectedTemplate === template.id_regle;
-                  return (
-                    <button
-                      key={template.id_regle}
-                      type="button"
-                      onClick={() => setSelectedTemplate(template.id_regle)}
-                      className={`w-full rounded-lg border p-4 text-left transition ${active ? 'border-sabc-red-primary bg-sabc-red-primary/5' : 'border-sabc-gray-200 hover:border-sabc-red-primary/40'}`}
-                    >
-                      <div className="font-medium text-sabc-gray-900">{template.nom_regle}</div>
-                      <div className="mt-1 text-xs text-sabc-gray-500">{template.description || 'Sans description.'}</div>
-                    </button>
-                  );
-                })
-              )}
-            </CardContent>
-          </Card>
+        {!data.activePeriod ? (
+          <Alert>
+            <AlertTitle>Aucune période active</AlertTitle>
+            <AlertDescription>
+              Les règles peuvent être publiées, mais aucune création d’évaluation ne doit être lancée tant qu’une période n’est pas ouverte.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricTile
+            label="Périodes ouvertes"
+            value={data.summary.activePeriods}
+            caption="Cycles actuellement disponibles"
+            icon={CalendarClock}
+          />
+          <MetricTile
+            label="Cibles éligibles"
+            value={data.summary.eligibleTargets}
+            caption="Auto, pairs et subordonnés selon la hiérarchie"
+            icon={Users2}
+          />
+          <MetricTile
+            label="Règles actives"
+            value={data.summary.activeRules}
+            caption="Cadres publiés exploitables par le workflow"
+            icon={Layers3}
+          />
+          <MetricTile
+            label="Historique"
+            value={data.summary.historyEntries}
+            caption="Évaluations reçues ou données déjà enregistrées"
+            icon={CheckCircle2}
+          />
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
+          <ActiveRulesCard
+            rules={applicableRules}
+            description="Les règles compatibles sont filtrées par rôle évaluateur, rôle évalué et type d’évaluation."
+            emptyMessage={selectedTargetData
+              ? 'Aucune règle active ne couvre ce couple évaluateur / évalué / type.'
+              : 'Sélectionnez une cible pour voir les règles réellement applicables.'}
+          />
 
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Users2 className="h-5 w-5 text-sabc-red-primary" />
-                Cibles éligibles
+                <ClipboardList className="h-5 w-5 text-sabc-red-primary" />
+                Cadrage de la sélection courante
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-5">
-              {eligibleGroups.length === 0 ? (
+            <CardContent className="space-y-4">
+              {!selectedTargetData ? (
                 <Alert>
-                  <AlertTitle>Aucune cible disponible</AlertTitle>
+                  <AlertTitle>Sélectionnez une cible</AlertTitle>
                   <AlertDescription>
-                    Vous n’avez actuellement aucune cible éligible selon la hiérarchie et les règles actives.
+                    Le workflow déduit ensuite le type d’évaluation attendu et les règles actives compatibles.
                   </AlertDescription>
                 </Alert>
               ) : (
-                eligibleGroups.map(([group, list]) => (
-                  <div key={group} className="space-y-3">
-                    <div className="text-sm font-semibold text-sabc-gray-900">
-                      {TARGET_LABELS[group] || group}
-                      <span className="ml-2 text-xs font-normal text-sabc-gray-500">({list.length})</span>
+                <>
+                  <div className="rounded-lg border border-sabc-gray-200 p-4">
+                    <div className="font-medium text-sabc-gray-900">{formatDisplayName(selectedTargetData)}</div>
+                    <div className="text-sm text-sabc-gray-500">{formatRole(selectedTargetData)}</div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge variant="primary">{formatEvaluationType(selectedTargetType)}</Badge>
+                      <Badge variant="info">
+                        {selectedRuleSummary ? `${selectedRuleSummary.criteresCount} critères` : 'Aucune règle'}
+                      </Badge>
+                      {selectedRule ? <Badge variant="warning">visibilité {selectedRule.visibility_policy.detail}</Badge> : null}
                     </div>
-                    {list.map((target: Target) => (
-                      <Card key={target.matricule || `${group}-${target.nom}-${target.prenom}`} className="border-sabc-gray-200 shadow-sm">
-                        <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <div className="font-medium text-sabc-gray-900">{formatDisplayName(target)}</div>
-                            <div className="text-sm text-sabc-gray-500">{formatRole(target)}</div>
-                          </div>
+                  </div>
+
+                  {selectedRuleSummary ? (
+                    <div className="space-y-3 rounded-lg border border-sabc-gray-200 p-4">
+                      <div className="font-medium text-sabc-gray-900">{selectedRuleSummary.name}</div>
+                      <div className="text-sm text-sabc-gray-500">
+                        {selectedRuleSummary.description || 'Règle publiée sans description métier.'}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedRuleSummary.sections.slice(0, 5).map((section) => (
+                          <Badge key={`${selectedRuleSummary.id}-${section.id}`} variant="outline">
+                            {section.titre}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <Alert>
+                      <AlertTitle>Aucune règle exploitable</AlertTitle>
+                      <AlertDescription>
+                        Cette cible est visible, mais aucun formulaire publié ne peut être lancé dans le contexte actuel.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users2 className="h-5 w-5 text-sabc-red-primary" />
+              Cibles éligibles
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {data.eligibleGroups.length === 0 ? (
+              <Alert>
+                <AlertTitle>Aucune cible disponible</AlertTitle>
+                <AlertDescription>
+                  Vous n’avez actuellement aucune cible éligible selon la hiérarchie et les règles actives.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              data.eligibleGroups.map((group) => (
+                <div key={group.key} className="space-y-3">
+                  <div className="text-sm font-semibold text-sabc-gray-900">
+                    {group.label}
+                    <span className="ml-2 text-xs font-normal text-sabc-gray-500">({group.targets.length})</span>
+                  </div>
+                  {group.targets.map((target: Target) => (
+                    <Card key={target.matricule || `${group.key}-${target.nom}-${target.prenom}`} className="border-sabc-gray-200 shadow-sm">
+                      <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <div className="font-medium text-sabc-gray-900">{formatDisplayName(target)}</div>
+                          <div className="text-sm text-sabc-gray-500">{formatRole(target)}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {selectedTarget === target.matricule ? <Badge variant="success">Cible sélectionnée</Badge> : null}
+                          <Button
+                            size="sm"
+                            variant={selectedTarget === target.matricule ? 'outline' : 'default'}
+                            className={selectedTarget === target.matricule ? '' : 'bg-sabc-red-primary text-white hover:bg-sabc-red-dark'}
+                            onClick={() => setSelectedTarget(target.matricule)}
+                          >
+                            Sélectionner
+                          </Button>
                           <Button
                             size="sm"
                             className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-                            disabled={!selectedTemplate}
+                            disabled={!data.activePeriod || !selectedTemplate || selectedTarget !== target.matricule}
                             onClick={() => launchEvaluation(target.matricule)}
                           >
                             <PlayCircle className="mr-2 h-4 w-4" />
                             Démarrer
                           </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -166,7 +299,7 @@ const Mine: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {historyList.length === 0 ? (
+            {data.historyList.length === 0 ? (
               <Alert>
                 <AlertTitle>Aucun historique</AlertTitle>
                 <AlertDescription>
@@ -174,7 +307,7 @@ const Mine: React.FC = () => {
                 </AlertDescription>
               </Alert>
             ) : (
-              historyList.slice(0, 12).map((evaluation: any) => (
+              data.historyList.slice(0, 12).map((evaluation: any) => (
                 <div key={evaluation.id_evaluation} className="flex flex-col gap-3 rounded-lg border border-sabc-gray-200 p-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="font-medium text-sabc-gray-900">
@@ -186,7 +319,9 @@ const Mine: React.FC = () => {
                     <div className="text-xs text-sabc-gray-400">Statut: {evaluation.statut}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">{evaluation.note_globale != null ? `${Number(evaluation.note_globale).toFixed(1)}/5` : '—'}</Badge>
+                    <Badge variant="info">
+                      {evaluation.note_globale != null ? `${Number(evaluation.note_globale).toFixed(1)}/5` : '—'}
+                    </Badge>
                     <Button variant="outline" size="sm" onClick={() => { window.location.href = `/evaluations/${evaluation.id_evaluation}`; }}>
                       Voir
                     </Button>
@@ -196,6 +331,14 @@ const Mine: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        <QuickActionsCard
+          actions={[
+            { label: 'À compléter', href: '/evaluations/pending' },
+            { label: 'Axes d’amélioration', href: '/axes-amelioration', variant: 'secondary' },
+            { label: 'Mon profil', href: '/common/settings', variant: 'outline' },
+          ]}
+        />
       </div>
 
       <EvaluationModal

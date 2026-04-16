@@ -41,16 +41,13 @@ const AdminUtilisateursGaps = lazy(() => import('./pages/Admin/Utilisateurs/Gaps
 const AdminEvaluationsPeriodes = lazy(() => import('./pages/Admin/Evaluations/Periodes'));
 const AdminEvaluationsManagement = lazy(() => import('./pages/Admin/Evaluations/Management'));
 const AdminEvaluationsHistory = lazy(() => import('./pages/Admin/Evaluations/History'));
+const AdminEvaluationsShow = lazy(() => import('./pages/Admin/Evaluations/Show'));
 const AdminEvaluationsForm = lazy(() => import('./pages/Admin/Evaluations/Form'));
 
 // Admin: Évaluations — Règles
 const AdminReglesIndex = lazy(() => import('./pages/Admin/Evaluations/Regles/Index'));
 const AdminReglesCreate = lazy(() => import('./pages/Admin/Evaluations/Regles/Create'));
 const AdminReglesEdit = lazy(() => import('./pages/Admin/Evaluations/Regles/Edit'));
-
-// Admin: Évaluations — Templates
-const AdminTemplates = lazy(() => import('./pages/Evaluation/Admin/Templates'));
-const AdminTemplateEdit = lazy(() => import('./pages/Admin/Evaluations/EditTemplate'));
 
 // Admin: Remplacements
 const AdminRemplacements = lazy(() => import('./pages/Admin/Remplacements/index'));
@@ -123,6 +120,7 @@ const CommonSettings = lazy(() => import('./pages/Common/Settings'));
 // Common: Team
 const TeamOverview = lazy(() => import('./pages/Common/Team/Overview'));
 const TeamEvaluations = lazy(() => import('./pages/Common/Team/Evaluations'));
+const AxesAmeliorationPage = lazy(() => import('./pages/Common/AxesAmelioration/index'));
 
 // Settings
 const SettingsProfile = lazy(() => import('./pages/Settings/profile'));
@@ -154,6 +152,35 @@ function RouterInit({ children }: { children: React.ReactNode }) {
 // ─── AuthGuard shorthand ────────────────────────────────────────────────────
 function G({ children }: { children: React.ReactNode }) {
   return <AuthGuard>{children}</AuthGuard>;
+}
+
+function buildLegacyLayoutUser(user: ReturnType<typeof useAuthContext>['user']) {
+  if (!user) {
+    return {
+      name: 'Utilisateur',
+      email: '',
+      role: '',
+      avatar: undefined,
+    };
+  }
+
+  const fullName = user.name || [user.prenom, user.nom].filter(Boolean).join(' ').trim();
+
+  return {
+    name: fullName || user.email,
+    email: user.email,
+    role: user.role_nom || user.role,
+    avatar: user.avatar,
+  };
+}
+
+function LegacyAuthRoute({ component: Component }: { component: React.ElementType }) {
+  const { user } = useAuthContext();
+  return <Component auth={{ user: buildLegacyLayoutUser(user) }} />;
+}
+
+function RulesRedirect() {
+  return <Navigate to="/admin/evaluations/regles" replace />;
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
@@ -189,6 +216,7 @@ function App() {
                       <Route path="/admin/evaluations/periodes" element={<G><AdminEvaluationsPeriodes /></G>} />
                       <Route path="/admin/evaluations/management" element={<G><AdminEvaluationsManagement /></G>} />
                       <Route path="/admin/evaluations/history" element={<G><AdminEvaluationsHistory /></G>} />
+                      <Route path="/admin/evaluations/:id" element={<G><AdminEvaluationsShow /></G>} />
                       <Route path="/admin/evaluations/form" element={<G><AdminEvaluationsForm /></G>} />
 
                       {/* ── Admin: Règles d'évaluation ── */}
@@ -197,8 +225,8 @@ function App() {
                       <Route path="/admin/evaluations/regles/:id/edit" element={<G><AdminReglesEdit /></G>} />
 
                       {/* ── Admin: Templates ── */}
-                      <Route path="/admin/evaluations/templates" element={<G><AdminTemplates /></G>} />
-                      <Route path="/admin/evaluations/templates/:id/edit" element={<G><AdminTemplateEdit /></G>} />
+                      <Route path="/admin/evaluations/templates" element={<G><RulesRedirect /></G>} />
+                      <Route path="/admin/evaluations/templates/:id/edit" element={<G><RulesRedirect /></G>} />
 
                       {/* ── Admin: Remplacements ── */}
                       <Route path="/admin/remplacements" element={<G><AdminRemplacements /></G>} />
@@ -238,24 +266,24 @@ function App() {
                       <Route path="/as/dashboard" element={<G><ASDashboard /></G>} />
 
                       {/* ── Role sub-pages (transition pages, not all in sidebar) ── */}
-                      <Route path="/dr/teams" element={<G><DRTeams /></G>} />
-                      <Route path="/dr/performance" element={<G><DRPerformance /></G>} />
-                      <Route path="/cdtt/commercial" element={<G><CDTTCommercial /></G>} />
-                      <Route path="/cdtt/marketing" element={<G><CDTTMarketing /></G>} />
-                      <Route path="/cds/objectives" element={<G><CDSObjectives /></G>} />
-                      <Route path="/cds/performance" element={<G><CDSPerformance /></G>} />
-                      <Route path="/cdv/performance" element={<G><CDVPerformance /></G>} />
-                      <Route path="/cdv/sectors" element={<G><CDVSectors /></G>} />
-                      <Route path="/csc/districts" element={<G><CSCDistricts /></G>} />
+                      <Route path="/dr/teams" element={<G><LegacyAuthRoute component={DRTeams} /></G>} />
+                      <Route path="/dr/performance" element={<G><LegacyAuthRoute component={DRPerformance} /></G>} />
+                      <Route path="/cdtt/commercial" element={<G><LegacyAuthRoute component={CDTTCommercial} /></G>} />
+                      <Route path="/cdtt/marketing" element={<G><LegacyAuthRoute component={CDTTMarketing} /></G>} />
+                      <Route path="/cds/objectives" element={<G><LegacyAuthRoute component={CDSObjectives} /></G>} />
+                      <Route path="/cds/performance" element={<G><LegacyAuthRoute component={CDSPerformance} /></G>} />
+                      <Route path="/cdv/performance" element={<G><LegacyAuthRoute component={CDVPerformance} /></G>} />
+                      <Route path="/cdv/sectors" element={<G><LegacyAuthRoute component={CDVSectors} /></G>} />
+                      <Route path="/csc/districts" element={<G><LegacyAuthRoute component={CSCDistricts} /></G>} />
                       <Route path="/csc/performance" element={<G><CSCPerformance /></G>} />
-                      <Route path="/tmo/activities" element={<G><TMOActivities /></G>} />
-                      <Route path="/tmo/performance" element={<G><TMOPerformance /></G>} />
-                      <Route path="/ss/assistants" element={<G><SSAssistants /></G>} />
-                      <Route path="/ss/events" element={<G><SSEvents /></G>} />
-                      <Route path="/rtm/campaigns" element={<G><RTMCampaigns /></G>} />
-                      <Route path="/rtm/operators" element={<G><RTMOperators /></G>} />
-                      <Route path="/srmo/campaigns" element={<G><SRMOCampaigns /></G>} />
-                      <Route path="/srmo/operators" element={<G><SRMOOperators /></G>} />
+                      <Route path="/tmo/activities" element={<G><LegacyAuthRoute component={TMOActivities} /></G>} />
+                      <Route path="/tmo/performance" element={<G><LegacyAuthRoute component={TMOPerformance} /></G>} />
+                      <Route path="/ss/assistants" element={<G><LegacyAuthRoute component={SSAssistants} /></G>} />
+                      <Route path="/ss/events" element={<G><LegacyAuthRoute component={SSEvents} /></G>} />
+                      <Route path="/rtm/campaigns" element={<G><LegacyAuthRoute component={RTMCampaigns} /></G>} />
+                      <Route path="/rtm/operators" element={<G><LegacyAuthRoute component={RTMOperators} /></G>} />
+                      <Route path="/srmo/campaigns" element={<G><LegacyAuthRoute component={SRMOCampaigns} /></G>} />
+                      <Route path="/srmo/operators" element={<G><LegacyAuthRoute component={SRMOOperators} /></G>} />
                       <Route path="/as/events" element={<G><ASEvents /></G>} />
                       <Route path="/as/reports" element={<G><ASReports /></G>} />
 
@@ -277,6 +305,7 @@ function App() {
                       {/* ── Common: Team ── */}
                       <Route path="/equipe/subordonnes" element={<G><TeamOverview /></G>} />
                       <Route path="/equipe/evaluations" element={<G><TeamEvaluations /></G>} />
+                      <Route path="/axes-amelioration" element={<G><AxesAmeliorationPage /></G>} />
                       {/* Legacy paths */}
                       <Route path="/common/team/overview" element={<G><TeamOverview /></G>} />
                       <Route path="/common/team/evaluations" element={<G><TeamEvaluations /></G>} />

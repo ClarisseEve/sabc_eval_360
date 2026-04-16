@@ -1,9 +1,21 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { ArrowRight, BarChart3, Calendar, ClipboardList, ListChecks } from 'lucide-react';
+import {
+  ArrowUpRight,
+  BarChart3,
+  Calendar,
+  CalendarClock,
+  ClipboardList,
+  History,
+  ListChecks,
+  Radar,
+  Sparkles,
+} from 'lucide-react';
+import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { Progress } from '@/Components/UI/Progress/Progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
 import { analyticsApi } from '@/Services/api';
 import { usePeriodes } from '@/Hooks/queries/useEvaluationsQuery';
@@ -14,6 +26,90 @@ function formatDate(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'N/A';
   return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function normalizeLabel(value: unknown) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function formatChannelLabel(value: unknown) {
+  const channel = normalizeLabel(value);
+  if (channel === 'auto') return 'Auto-évaluation';
+  if (channel === 'descendante') return 'Manager → collaborateur';
+  if (channel === 'pairs') return 'Pairs';
+  return String(value ?? 'Canal non défini');
+}
+
+function getStatusPresentation(value: unknown) {
+  const status = normalizeLabel(value);
+
+  if (status === 'valide') {
+    return {
+      label: 'Validées',
+      badgeVariant: 'success' as const,
+      progressVariant: 'success' as const,
+      accentClassName: 'bg-emerald-50 text-emerald-700',
+    };
+  }
+
+  if (status === 'soumis') {
+    return {
+      label: 'Soumises',
+      badgeVariant: 'info' as const,
+      progressVariant: 'info' as const,
+      accentClassName: 'bg-sky-50 text-sky-700',
+    };
+  }
+
+  if (status === 'brouillon') {
+    return {
+      label: 'Brouillons',
+      badgeVariant: 'warning' as const,
+      progressVariant: 'warning' as const,
+      accentClassName: 'bg-amber-50 text-amber-700',
+    };
+  }
+
+  return {
+    label: String(value ?? 'Statut inconnu'),
+    badgeVariant: 'secondary' as const,
+    progressVariant: 'default' as const,
+    accentClassName: 'bg-sabc-gray-100 text-sabc-gray-700',
+  };
+}
+
+function getChannelPresentation(value: unknown) {
+  const channel = normalizeLabel(value);
+
+  if (channel === 'auto') {
+    return {
+      label: 'Auto-évaluation',
+      badgeVariant: 'secondary' as const,
+      progressVariant: 'default' as const,
+    };
+  }
+
+  if (channel === 'descendante') {
+    return {
+      label: 'Manager → collaborateur',
+      badgeVariant: 'info' as const,
+      progressVariant: 'info' as const,
+    };
+  }
+
+  if (channel === 'pairs') {
+    return {
+      label: 'Pairs',
+      badgeVariant: 'warning' as const,
+      progressVariant: 'warning' as const,
+    };
+  }
+
+  return {
+    label: formatChannelLabel(value),
+    badgeVariant: 'secondary' as const,
+    progressVariant: 'default' as const,
+  };
 }
 
 export default function EvaluationManagementPage() {
@@ -35,6 +131,29 @@ export default function EvaluationManagementPage() {
   const statuses = Array.isArray(evaluations) ? evaluations : [];
   const channels = Array.isArray(performances) ? performances : [];
   const activePeriodes = periodes.filter((periode: any) => periode.est_ouverte || String(periode.statut).toLowerCase() === 'ouverte');
+  const statusTotal = statuses.reduce((sum: number, row: any) => sum + Number(row.count ?? 0), 0);
+  const channelTotal = channels.reduce((sum: number, row: any) => sum + Number(row.total ?? row.count ?? 0), 0);
+
+  const quickActions = [
+    {
+      to: '/admin/evaluations/periodes',
+      title: 'Périodes',
+      description: 'Ouvrir, fermer et planifier les campagnes.',
+      icon: CalendarClock,
+    },
+    {
+      to: '/admin/evaluations/history',
+      title: 'Historique',
+      description: 'Vérifier les flux soumis, validés et rejetés.',
+      icon: History,
+    },
+    {
+      to: '/admin/dashboard?tab=overview',
+      title: 'Analytics',
+      description: 'Contrôler les tendances, graphes et anomalies.',
+      icon: Radar,
+    },
+  ];
 
   return (
     <AdminEvaluationsLayout title="Pilotage des évaluations">
@@ -57,102 +176,121 @@ export default function EvaluationManagementPage() {
         <Card><CardContent className="p-5"><div className="mb-2 flex items-center gap-2 text-sm text-sabc-gray-600"><Calendar className="h-4 w-4" />Périodes ouvertes</div><div className="text-3xl font-bold text-sabc-success">{activePeriodes.length}</div></CardContent></Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.3fr,0.9fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Périodes en cours</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {periodes.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-sabc-gray-200 p-8 text-center text-sm text-sabc-gray-500">
-                Aucune période disponible.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Période</TableHead>
-                    <TableHead>Dates</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Progression</TableHead>
+      <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
+        <CardHeader className="border-b border-sabc-gray-100 bg-gradient-to-r from-sabc-gray-50 via-white to-sabc-red-primary/5">
+          <CardTitle>Périodes en cours</CardTitle>
+          <CardDescription>Vue consolidée des périodes actives et de leur progression réelle.</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {periodes.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-sabc-gray-200 p-8 text-center text-sm text-sabc-gray-500">
+              Aucune période disponible.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Période</TableHead>
+                  <TableHead>Dates</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Progression</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {periodes.slice(0, 6).map((periode: any) => (
+                  <TableRow key={periode.id_periode}>
+                    <TableCell>
+                      <div className="font-medium text-sabc-gray-900">{periode.nom_periode}</div>
+                      <div className="text-xs text-sabc-gray-500">{periode.code_periode}</div>
+                    </TableCell>
+                    <TableCell>{formatDate(periode.date_debut)} - {formatDate(periode.date_fin)}</TableCell>
+                    <TableCell>{periode.est_ouverte ? 'Ouverte' : periode.est_cloturee ? 'Fermée' : 'Planifiée'}</TableCell>
+                    <TableCell>{Number(periode.taux_completion ?? 0).toFixed(0)}%</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {periodes.slice(0, 6).map((periode: any) => (
-                    <TableRow key={periode.id_periode}>
-                      <TableCell>
-                        <div className="font-medium text-sabc-gray-900">{periode.nom_periode}</div>
-                        <div className="text-xs text-sabc-gray-500">{periode.code_periode}</div>
-                      </TableCell>
-                      <TableCell>{formatDate(periode.date_debut)} - {formatDate(periode.date_fin)}</TableCell>
-                      <TableCell>{periode.est_ouverte ? 'Ouverte' : periode.est_cloturee ? 'Fermée' : 'Planifiée'}</TableCell>
-                      <TableCell>{Number(periode.taux_completion ?? 0).toFixed(0)}%</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-sabc-gray-200/80 shadow-sm">
+          <CardContent className="p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-sabc-red-primary" />
+              <span className="text-sm font-semibold text-sabc-gray-900">Statuts</span>
+            </div>
+            <div className="space-y-2">
+              {statuses.length === 0 ? (
+                <p className="text-xs text-sabc-gray-500">Aucune donnée.</p>
+              ) : statuses.map((row: any, index: number) => {
+                const count = Number(row.count ?? 0);
+                const ratio = statusTotal > 0 ? (count / statusTotal) * 100 : 0;
+                const presentation = getStatusPresentation(row.statut);
+                return (
+                  <div key={`${row.statut}-${index}`} className="flex items-center gap-2">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${presentation.accentClassName}`}>
+                      {presentation.label}
+                    </span>
+                    <Progress value={ratio} className="h-1.5 flex-1" indicatorVariant={presentation.progressVariant} />
+                    <span className="min-w-[28px] text-right text-xs font-medium text-sabc-gray-700">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Statuts d’évaluation</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {statuses.length === 0 ? (
-                <p className="text-sm text-sabc-gray-500">Aucune donnée disponible.</p>
-              ) : statuses.map((row: any, index: number) => (
-                <div key={`${row.statut}-${index}`} className="flex items-center justify-between rounded-lg border border-sabc-gray-200 p-3">
-                  <span className="font-medium text-sabc-gray-900">{row.statut}</span>
-                  <span className="text-sm text-sabc-gray-600">{row.count}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Canaux de performance</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+        <Card className="border-sabc-gray-200/80 shadow-sm">
+          <CardContent className="p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-sabc-red-primary" />
+              <span className="text-sm font-semibold text-sabc-gray-900">Canaux</span>
+            </div>
+            <div className="space-y-2">
               {channels.length === 0 ? (
-                <p className="text-sm text-sabc-gray-500">Aucune donnée disponible.</p>
-              ) : channels.slice(0, 5).map((row: any, index: number) => (
-                <div key={`${row.channel}-${index}`} className="rounded-lg border border-sabc-gray-200 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sabc-gray-900">{row.channel}</span>
-                    <span className="text-sm text-sabc-gray-600">{row.total ?? row.count ?? 0}</span>
+                <p className="text-xs text-sabc-gray-500">Aucune donnée.</p>
+              ) : channels.slice(0, 4).map((row: any, index: number) => {
+                const score = row.average_score != null ? Number(row.average_score) : Number(row.moyenne ?? 0);
+                const total = Number(row.total ?? row.count ?? 0);
+                const presentation = getChannelPresentation(row.channel);
+                return (
+                  <div key={`${row.channel}-${index}`} className="flex items-center gap-2">
+                    <span className="min-w-[80px] truncate text-xs font-medium text-sabc-gray-700">{presentation.label}</span>
+                    <Progress value={score} max={5} className="h-1.5 flex-1" indicatorVariant={presentation.progressVariant} />
+                    <span className="min-w-[36px] text-right text-xs font-medium text-sabc-gray-700">{score.toFixed(1)}/5</span>
                   </div>
-                  <div className="mt-1 text-sm text-sabc-gray-500">
-                    Score moyen: {row.average_score != null ? Number(row.average_score).toFixed(2) : Number(row.moyenne ?? 0).toFixed(2)}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Actions rapides</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Link to="/admin/evaluations/periodes" className="flex items-center justify-between rounded-lg border border-sabc-gray-200 px-4 py-3 text-sm text-sabc-gray-800 hover:bg-sabc-gray-50">
-                Gérer les périodes
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link to="/admin/evaluations/history" className="flex items-center justify-between rounded-lg border border-sabc-gray-200 px-4 py-3 text-sm text-sabc-gray-800 hover:bg-sabc-gray-50">
-                Consulter l’historique
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link to="/analytics/dashboard" className="flex items-center justify-between rounded-lg border border-sabc-gray-200 px-4 py-3 text-sm text-sabc-gray-800 hover:bg-sabc-gray-50">
-                Ouvrir les analytics
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="border-sabc-gray-200/80 shadow-sm">
+          <CardContent className="p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <ArrowUpRight className="h-4 w-4 text-sabc-red-primary" />
+              <span className="text-sm font-semibold text-sabc-gray-900">Actions rapides</span>
+            </div>
+            <div className="space-y-1.5">
+              {quickActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <Link
+                    key={action.to}
+                    to={action.to}
+                    className="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sabc-gray-700 transition-colors hover:bg-sabc-gray-50 hover:text-sabc-red-primary"
+                  >
+                    <Icon className="h-4 w-4 shrink-0 text-sabc-gray-400 group-hover:text-sabc-red-primary" />
+                    <span className="font-medium">{action.title}</span>
+                    <ArrowUpRight className="ml-auto h-3.5 w-3.5 text-sabc-gray-300 group-hover:text-sabc-red-primary" />
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </AdminEvaluationsLayout>
   );

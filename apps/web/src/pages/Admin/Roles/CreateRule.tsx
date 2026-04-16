@@ -291,7 +291,7 @@ export default function CreateRule({ auth, pageTitle, roles }: CreateRuleProps) 
                           onChange={() => toggleRole(role.id_role)}
                         />
                         <div>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="secondary" className="text-xs">
                             {role.nom_role}
                           </Badge>
                           <p className="text-xs text-sabc-gray-600 mt-1 truncate">
@@ -302,8 +302,8 @@ export default function CreateRule({ auth, pageTitle, roles }: CreateRuleProps) 
                     </div>
                   ))}
                 </div>
-                {errors.roles_autorises && (
-                  <p className="text-sm text-sabc-error mt-2">{errors.roles_autorises}</p>
+                {(errors as any).roles_autorises && (
+                  <p className="text-sm text-sabc-error mt-2">{(errors as any).roles_autorises}</p>
                 )}
               </CardContent>
             </Card>

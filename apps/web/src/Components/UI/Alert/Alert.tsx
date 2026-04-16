@@ -21,7 +21,7 @@ export const Alert: React.FC<AlertProps> = ({
   return (
     <div
       className={cn(
-        "rounded-md border p-4",
+        "rounded-xl border p-4",
         variantClasses[variant],
         className
       )}

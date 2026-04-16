@@ -7,6 +7,7 @@ import { Button } from '@/Components/UI/Button';
 import { Avatar } from '@/Components/UI/Avatar/Avatar';
 import {
   ArrowLeft,
+  CalendarClock,
   CheckCircle2,
   Download,
   Edit3,
@@ -17,23 +18,14 @@ import {
 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { useEvaluation } from '@/Hooks/queries';
-import { EvaluationPageLayout, formatDisplayName, formatRole, useEvaluationLayoutUser } from './shared';
-
-interface NoteEntry {
-  id?: string | number | null;
-  note?: number;
-  commentaire?: string | null;
-  critere_nom?: string;
-}
-
-interface CritereEntry {
-  id?: string | number | null;
-  libelle?: string;
-  description?: string | null;
-  poids?: number | null;
-  section_label?: string | null;
-  section_order?: number | null;
-}
+import {
+  buildEvaluationContext,
+  EvaluationPageLayout,
+  formatDisplayName,
+  formatRole,
+  useEvaluationLayoutUser,
+} from './shared';
+import { ActiveRulesCard, formatDateLabel, formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
 
 const STATUS_VARIANTS: Record<string, { label: string; variant: 'primary' | 'secondary' | 'destructive'; helper: string }> = {
   brouillon: {
@@ -58,21 +50,6 @@ const STATUS_VARIANTS: Record<string, { label: string; variant: 'primary' | 'sec
   },
 };
 
-const parseJson = <T,>(payload: unknown): T | null => {
-  if (!payload) return null;
-  if (Array.isArray(payload)) return payload as unknown as T;
-  if (typeof payload === 'object') return payload as unknown as T;
-  if (typeof payload === 'string') {
-    try {
-      return JSON.parse(payload) as T;
-    } catch (error) {
-      console.warn('Impossible de parser le JSON d\'évaluation', error);
-      return null;
-    }
-  }
-  return null;
-};
-
 const formatDate = (value?: string | null, withTime = false) => {
   if (!value) return null;
   const date = new Date(value);
@@ -85,57 +62,23 @@ const formatDate = (value?: string | null, withTime = false) => {
   }).format(date);
 };
 
-const computeMergedCriteria = (evaluation: Record<string, any>) => {
-  const rawCriteres = parseJson<CritereEntry[]>(evaluation?.regle?.criteres_evaluation_json);
-  const rawNotes = parseJson<NoteEntry[]>(evaluation?.notations_json) ?? [];
-
-  if (!rawCriteres || rawCriteres.length === 0) {
-    return rawNotes.map((note, index) => ({
-      id: note.id ?? index,
-      libelle: note.critere_nom ?? `Critère ${index + 1}`,
-      description: null,
-      note: note.note ?? null,
-      commentaire: note.commentaire ?? '',
-    }));
-  }
-
-  return rawCriteres.map((critere, index) => {
-    const matched = rawNotes.find((note) => {
-      if (!note) return false;
-      if (note.id != null && critere.id != null) {
-        return String(note.id) === String(critere.id);
-      }
-      return index === rawNotes.indexOf(note);
-    });
-
-    return {
-      id: critere.id ?? index,
-      libelle: critere.libelle ?? `Critère ${index + 1}`,
-      description: critere.description ?? null,
-      note: matched?.note ?? null,
-      commentaire: matched?.commentaire ?? '',
-      section: critere.section_label ?? 'Compétences',
-      poids: critere.poids ?? null,
-    };
-  });
-};
-
 const ShowEvaluation: React.FC = () => {
   const { id = '' } = useParams();
   const { data: evaluation } = useEvaluation(id);
   const { authUser: rawUser } = useEvaluationLayoutUser();
   const statusMeta = STATUS_VARIANTS[evaluation?.statut] ?? STATUS_VARIANTS.brouillon;
-  const mergedCriteria = useMemo(() => computeMergedCriteria(evaluation), [evaluation]);
+  const context = useMemo(() => buildEvaluationContext(evaluation), [evaluation]);
+  const mergedCriteria = context.criteria;
   const isEvaluator = evaluation?.evaluateur?.matricule && evaluation.evaluateur.matricule === rawUser?.matricule;
-  const canEdit = isEvaluator && evaluation?.statut === 'brouillon';
+  const canEditDraft = isEvaluator && evaluation?.statut === 'brouillon';
+  const submissionDate = evaluation?.date_soumission ? new Date(evaluation.date_soumission) : null;
+  const hoursLeftToEdit = submissionDate ? Math.max(0, 72 - (Date.now() - submissionDate.getTime()) / 3_600_000) : 0;
+  const canEditSubmitted = isEvaluator && evaluation?.statut === 'soumis' && hoursLeftToEdit > 0;
+  const canEdit = canEditDraft || canEditSubmitted;
   const evaluationId = evaluation?.id_evaluation ?? evaluation?.id;
   const overallScore = evaluation?.note_globale ? Number(evaluation.note_globale) : null;
   const hasComments = Boolean(evaluation?.commentaire_general);
-
-  const periodLabel = evaluation?.periode?.nom_periode ?? evaluation?.periode?.code_periode ?? 'Période active';
-  const periodRange = evaluation?.periode?.date_debut && evaluation?.periode?.date_fin
-    ? `${formatDate(evaluation.periode.date_debut)} — ${formatDate(evaluation.periode.date_fin)}`
-    : null;
+  const decisionDateLabel = evaluation?.statut === 'valide' ? 'Validée le' : 'Dernier retour le';
 
   return (
     <EvaluationPageLayout pageTitle="Détail de l'évaluation">
@@ -148,14 +91,21 @@ const ShowEvaluation: React.FC = () => {
               Retour
             </span>
           </Button>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canEdit && evaluationId && (
-              <Button asChild={false} size="sm" className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => { window.location.href = `/evaluations/${evaluationId}/edit`; }}>
-                <span className="inline-flex items-center">
-                  <Edit3 className="mr-2 h-4 w-4" />
-                  Continuer la saisie
-                </span>
-              </Button>
+              <>
+                <Button asChild={false} size="sm" className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => { window.location.href = `/evaluations/${evaluationId}/edit`; }}>
+                  <span className="inline-flex items-center">
+                    <Edit3 className="mr-2 h-4 w-4" />
+                    {canEditDraft ? 'Continuer la saisie' : 'Éditer'}
+                  </span>
+                </Button>
+                {canEditSubmitted && (
+                  <span className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700">
+                    Modifiable encore {hoursLeftToEdit >= 1 ? `${Math.floor(hoursLeftToEdit)}h` : `${Math.ceil(hoursLeftToEdit * 60)}min`}
+                  </span>
+                )}
+              </>
             )}
             <Button variant="outline" size="sm" onClick={() => window.print()}>
               <Download className="mr-2 h-4 w-4" />
@@ -170,9 +120,10 @@ const ShowEvaluation: React.FC = () => {
               <div className="flex flex-wrap items-center gap-3">
                 <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
                 <span className="text-xs text-sabc-gray-500">ID {evaluationId}</span>
+                {context.rule.type_evaluation ? <Badge variant="primary">{formatEvaluationType(context.rule.type_evaluation)}</Badge> : null}
               </div>
               <h1 className="text-2xl font-semibold text-sabc-gray-900 dark:text-white">
-                Évaluation 360° {evaluation?.regle?.nom_regle ? `— ${evaluation.regle.nom_regle}` : ''}
+                Évaluation 360° {context.summary.name ? `— ${context.summary.name}` : ''}
               </h1>
               <p className="text-sm text-sabc-gray-600 dark:text-sabc-gray-300">{statusMeta.helper}</p>
             </div>
@@ -181,8 +132,12 @@ const ShowEvaluation: React.FC = () => {
                 <FileText className="h-4 w-4" />
                 Période d'évaluation
               </div>
-              <div className="text-base font-semibold text-sabc-gray-900 dark:text-white">{periodLabel}</div>
-              {periodRange && <div className="text-xs text-sabc-gray-500">{periodRange}</div>}
+              <div className="text-base font-semibold text-sabc-gray-900 dark:text-white">{context.periodLabel}</div>
+              {context.periodRange && (
+                <div className="text-xs text-sabc-gray-500">
+                  {`${formatDateLabel(context.periodRange.start)} — ${formatDateLabel(context.periodRange.end)}`}
+                </div>
+              )}
               {evaluation?.deadline && (
                 <div className="rounded-md bg-sabc-red-light/60 px-3 py-1 text-xs text-sabc-red-primary">
                   Échéance : {formatDate(evaluation.deadline)}
@@ -240,49 +195,85 @@ const ShowEvaluation: React.FC = () => {
         </div>
 
         <div className="grid gap-6 md:grid-cols-[340px,1fr]">
-          <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ShieldCheck className="h-5 w-5 text-sabc-success" />
-                Synthèse générale
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-xl bg-sabc-red-light/60 p-4 text-center">
-                <div className="text-xs uppercase tracking-wide text-sabc-red-primary/80">Note globale</div>
-                <div className="mt-2 text-4xl font-bold text-sabc-red-primary">
-                  {overallScore != null ? overallScore.toFixed(2) : '—'}
-                </div>
-              </div>
-
-              <div className="space-y-3 text-sm text-sabc-gray-600 dark:text-sabc-gray-300">
-                <div>
-                  <div className="text-xs font-semibold uppercase text-sabc-gray-400">Créée le</div>
-                  <div>{formatDate(evaluation?.created_at, true) ?? 'Non renseigné'}</div>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold uppercase text-sabc-gray-400">Soumise le</div>
-                  <div>{formatDate(evaluation?.date_soumission, true) ?? 'En attente'}</div>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold uppercase text-sabc-gray-400">Validée le</div>
-                  <div>{formatDate(evaluation?.date_validation, true) ?? 'En cours'}</div>
-                </div>
-              </div>
-
-              {evaluation?.validateur && (
-                <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-3 text-xs text-sabc-gray-600 dark:border-sabc-gray-700 dark:bg-sabc-gray-800 dark:text-sabc-gray-300">
-                  <div className="flex items-center gap-2 text-sabc-gray-500">
-                    <CheckCircle2 className="h-4 w-4 text-sabc-success" />
-                    Validation manager
-                  </div>
-                  <div className="mt-1 font-medium text-sabc-gray-900 dark:text-white">
-                    {formatDisplayName(evaluation.validateur)}
+          <div className="space-y-6">
+            <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ShieldCheck className="h-5 w-5 text-sabc-success" />
+                  Synthèse générale
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-xl bg-sabc-red-light/60 p-4 text-center">
+                  <div className="text-xs uppercase tracking-wide text-sabc-red-primary/80">Note globale</div>
+                  <div className="mt-2 text-4xl font-bold text-sabc-red-primary">
+                    {overallScore != null ? overallScore.toFixed(2) : '—'}
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-sabc-gray-200 p-3 text-sm">
+                    <div className="text-xs font-semibold uppercase text-sabc-gray-400">Cadre</div>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <Badge variant="info">{context.criteriaCount} critères</Badge>
+                      <Badge variant="info">{context.sections.length} sections</Badge>
+                      <Badge variant="warning">visibilité {context.visibilityDetail}</Badge>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-sabc-gray-200 p-3 text-sm">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sabc-gray-400">
+                      <CalendarClock className="h-4 w-4" />
+                      Cycle
+                    </div>
+                    <div className="mt-1 font-medium text-sabc-gray-900 dark:text-white">{context.periodLabel}</div>
+                    {context.periodRange ? (
+                      <div className="text-xs text-sabc-gray-500">
+                        {`${formatDateLabel(context.periodRange.start)} — ${formatDateLabel(context.periodRange.end)}`}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="space-y-3 text-sm text-sabc-gray-600 dark:text-sabc-gray-300">
+                  <div>
+                    <div className="text-xs font-semibold uppercase text-sabc-gray-400">Créée le</div>
+                    <div>{formatDate(evaluation?.created_at, true) ?? 'Non renseigné'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase text-sabc-gray-400">Soumise le</div>
+                    <div>{formatDate(evaluation?.date_soumission, true) ?? 'En attente'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase text-sabc-gray-400">{decisionDateLabel}</div>
+                    <div>{formatDate(evaluation?.date_validation, true) ?? 'En cours'}</div>
+                  </div>
+                </div>
+
+                {evaluation?.validateur && (
+                  <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-3 text-xs text-sabc-gray-600 dark:border-sabc-gray-700 dark:bg-sabc-gray-800 dark:text-sabc-gray-300">
+                    <div className="flex items-center gap-2 text-sabc-gray-500">
+                      <CheckCircle2 className="h-4 w-4 text-sabc-success" />
+                      Validation manager
+                    </div>
+                    <div className="mt-1 font-medium text-sabc-gray-900 dark:text-white">
+                      {formatDisplayName(evaluation.validateur)}
+                    </div>
+                    {evaluation?.commentaire_validation ? (
+                      <div className="mt-2 text-xs leading-relaxed text-sabc-gray-600 dark:text-sabc-gray-300">
+                        {evaluation.commentaire_validation}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <ActiveRulesCard
+              rules={evaluation?.regle ? [context.rule] : []}
+              maxItems={1}
+              description="Règle publiée qui a cadré la saisie et la visibilité de cette évaluation."
+            />
+          </div>
 
           <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
             <CardHeader>
@@ -306,7 +297,13 @@ const ShowEvaluation: React.FC = () => {
                     className="rounded-lg border border-sabc-gray-200 p-4 transition hover:border-sabc-red-primary/40 dark:border-sabc-gray-700"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-semibold text-sabc-gray-900 dark:text-white">{critere.libelle}</div>
+                      <div>
+                        <div className="font-semibold text-sabc-gray-900 dark:text-white">{critere.libelle}</div>
+                        <div className="mt-1 flex flex-wrap gap-2 text-[10px] uppercase">
+                          <Badge variant="secondary">{critere.section}</Badge>
+                          {critere.poids != null ? <Badge variant="secondary">Poids {critere.poids}</Badge> : null}
+                        </div>
+                      </div>
                       <Badge variant="secondary" className="text-[10px] uppercase">
                         Note {critere.note != null ? critere.note : '—'} / 5
                       </Badge>

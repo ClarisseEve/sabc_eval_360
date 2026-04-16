@@ -1,12 +1,12 @@
 import React, { Suspense } from 'react';
-import RoleDashboardPage from '@/Components/Dashboard/RoleDashboardPage';
+import RoleManagerDashboardPage from '@/Components/Dashboard/RoleManagerDashboardPage';
 import { ErrorBoundary } from '@/Components/ErrorBoundary';
 import { DashboardSkeleton } from '@/Components/Dashboard/DashboardSkeleton';
 
 const SSDashboard: React.FC = () => (
   <ErrorBoundary>
     <Suspense fallback={<DashboardSkeleton />}>
-      <RoleDashboardPage
+      <RoleManagerDashboardPage
         fallbackRole="SS"
         title="Tableau de bord Superviseur Sponsoring"
         subtitle="Suivi des évaluations, des scores et de l'encadrement sponsoring."

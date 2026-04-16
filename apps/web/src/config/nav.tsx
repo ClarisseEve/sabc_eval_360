@@ -33,6 +33,7 @@ const ROLES_WITH_SUBS: Role[] = ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO
 const ROLES_WITH_ANALYTICS: Role[] = ['ADMIN', 'DR', 'CDTT'];
 // All non-admin roles
 const ALL_OPERATIONAL: Role[] = ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'CDS', 'SS', 'AS'];
+const ALL_WITH_ADMIN: Role[] = ['ADMIN', ...ALL_OPERATIONAL];
 
 export const NAV_ITEMS: NavItem[] = [
   {
@@ -123,22 +124,47 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       {
         title: 'Vue d\'ensemble',
-        href: '/analytics/dashboard',
+        href: '/admin/dashboard?tab=overview',
         icon: <ChevronRight className="h-4 w-4" />,
       },
       {
         title: 'Par région',
-        href: '/analytics/regions',
+        href: '/admin/dashboard?tab=regions',
         icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN', 'DR'],
       },
       {
+        title: 'Par rôle',
+        href: '/admin/dashboard?tab=roles',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ['ADMIN'],
+      },
+      {
         title: 'Anomalies',
-        href: '/analytics/anomalies',
+        href: '/admin/dashboard?tab=anomalies',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ['ADMIN'],
+      },
+      {
+        title: 'Recherche individuelle',
+        href: '/admin/dashboard?tab=individual',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ['ADMIN'],
+      },
+      {
+        title: 'Plans d\'amélioration',
+        href: '/admin/dashboard?tab=improvement',
         icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN'],
       },
     ],
+  },
+
+  {
+    title: 'Axes d’amélioration',
+    href: '/axes-amelioration',
+    icon: <Target className="h-5 w-5" />,
+    roles: ALL_WITH_ADMIN,
   },
 
   // ── Admin: Utilisateurs ──

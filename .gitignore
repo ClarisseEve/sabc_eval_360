@@ -28,3 +28,5 @@ yarn-error.log
 # Local artifacts
 cookies.txt
 /backups/
+playwright-report/
+test-results/

@@ -68,7 +68,7 @@ export class HierarchyService {
       where: { manager_matricule: matricule, est_actif: true },
       select: {
         matricule: true, nom: true, prenom: true, email: true,
-        role: true, role_nom: true, niveau_hierarchique: true, id_region: true,
+        role: true, role_nom: true, manager_matricule: true, niveau_hierarchique: true, id_region: true,
       },
     });
   }

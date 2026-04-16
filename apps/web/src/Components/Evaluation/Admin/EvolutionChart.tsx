@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from '@/lib/inertia-shim';
 import { Button } from '@/Components/UI/Button/Button';
-import { Select } from '@/Components/UI/Select/Select';
 import { Card } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -82,7 +81,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
   const fetchEvolution = () => {
     post('/admin/evaluation/evolution', {
       preserveScroll: true,
-      onSuccess: (response) => {
+      onSuccess: (response: any) => {
         setEvolutionData(response.props.evolution as EvolutionData);
         prepareChartData(response.props.evolution as EvolutionData);
       },
@@ -117,14 +116,14 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <h2 className="text-xl font-semibold mb-4 text-sabc-gray-900">Évolution des évaluations</h2>
+        <h2 className="text-base font-semibold mb-3 text-sabc-gray-900">Évolution des évaluations</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-sabc-gray-800 mb-2">
               Région
             </label>
-            <Select
+            <select
               value={data.region as string}
               onChange={(e) => {
                 setSelectedRegion(e.target.value);
@@ -133,7 +132,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
                 setData('departement', '');
                 setData('user_id', '');
               }}
-              className="w-full"
+              className="w-full rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
             >
               <option value="">Toutes les régions</option>
               {regions.map((region) => (
@@ -141,21 +140,21 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
                   {region}
                 </option>
               ))}
-            </Select>
+            </select>
           </div>
           
           <div>
             <label className="block text-sm font-medium text-sabc-gray-800 mb-2">
               Département
             </label>
-            <Select
+            <select
               value={data.departement as string}
               onChange={(e) => {
                 setSelectedDepartement(e.target.value);
                 setSelectedUser(null); // Réinitialiser l'utilisateur
                 setData('user_id', '');
               }}
-              className="w-full"
+              className="w-full rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
               disabled={!selectedRegion}
             >
               <option value="">Tous les départements</option>
@@ -166,17 +165,17 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
                     {dept}
                   </option>
                 ))}
-            </Select>
+            </select>
           </div>
           
           <div>
             <label className="block text-sm font-medium text-sabc-gray-800 mb-2">
               Utilisateur
             </label>
-            <Select
+            <select
               value={data.user_id as string}
               onChange={(e) => setSelectedUser(parseInt(e.target.value, 10))}
-              className="w-full"
+              className="w-full rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
             >
               <option value="">Sélectionner un utilisateur</option>
               {filteredUsers.map((user) => (
@@ -184,7 +183,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
                   {user.name} ({user.role})
                 </option>
               ))}
-            </Select>
+            </select>
             {errors.user_id && (
               <p className="text-sabc-error text-sm mt-1">{errors.user_id}</p>
             )}
@@ -194,10 +193,10 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
             <label className="block text-sm font-medium text-sabc-gray-800 mb-2">
               Année
             </label>
-            <Select
+            <select
               value={data.annee as string}
               onChange={(e) => setSelectedAnnee(e.target.value ? parseInt(e.target.value, 10) : null)}
-              className="w-full"
+              className="w-full rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
             >
               <option value="">Toutes les années</option>
               {annees.map((annee) => (
@@ -205,7 +204,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
                   {annee}
                 </option>
               ))}
-            </Select>
+            </select>
           </div>
         </div>
         
@@ -222,7 +221,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
 
       {evolutionData && (
         <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4 text-sabc-gray-900">
+          <h2 className="text-base font-semibold mb-3 text-sabc-gray-900">
             Évolution des évaluations de {evolutionData.userName}
           </h2>
           
@@ -232,20 +231,30 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={chartData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                    margin={{ top: 12, right: 24, left: 16, bottom: 12 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="periode" />
-                    <YAxis domain={[0, 5]} />
-                    <Tooltip />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="score" 
-                      name="Score moyen" 
-                      stroke="#E53E3E" 
-                      activeDot={{ r: 8 }} 
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
+                    <XAxis dataKey="periode" tick={{ fill: '#616161', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+                    <YAxis domain={[0, 5]} tick={{ fill: '#616161', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #E0E0E0',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    <Line
+                      type="monotone"
+                      dataKey="score"
+                      name="Score moyen"
+                      stroke="#E53E3E"
+                      activeDot={{ r: 6 }}
+                      dot={{ r: 3 }}
                       strokeWidth={2}
+                      animationDuration={500}
                     />
                   </LineChart>
                 </ResponsiveContainer>

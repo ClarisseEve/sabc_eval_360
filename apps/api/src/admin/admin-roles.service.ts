@@ -1,7 +1,15 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DatabasePgService } from '../database/database-pg.service';
-import { randomUUID } from 'crypto';
+import {
+  normalizeRuleRow,
+  serializeRuleEnvelope,
+  validateRuleEnvelope,
+  type RuleAnalyticsMetadata,
+  type RuleSection,
+  type RuleVisibilityPolicy,
+  type RuleCriterion,
+} from '../regles/rule-schema';
 
 @Injectable()
 export class AdminRolesService {
@@ -67,47 +75,195 @@ export class AdminRolesService {
   // ── Evaluation Rules (PostgreSQL) ──
 
   async getReglesEvaluation() {
-    return this.pg.query(
-      `SELECT * FROM regles_evaluation ORDER BY created_at DESC`,
+    const rows = await this.pg.query(
+      `SELECT
+         id_regle,
+         nom_regle,
+         description,
+         criteres_evaluation_json,
+         est_active,
+         role_evaluateur,
+         role_evalue,
+         type_evaluation,
+         created_at,
+         updated_at
+       FROM regles_evaluation
+       ORDER BY created_at DESC`,
     );
+    return rows.map((row) => normalizeRuleRow(row as any));
+  }
+
+  async getRegleEvaluationById(id: string) {
+    const row = await this.pg.queryOne(
+      `SELECT
+         id_regle,
+         nom_regle,
+         description,
+         criteres_evaluation_json,
+         est_active,
+         role_evaluateur,
+         role_evalue,
+         type_evaluation,
+         created_at,
+         updated_at
+       FROM regles_evaluation
+       WHERE id_regle = $1`,
+      [id],
+    );
+    if (!row) throw new NotFoundException('Règle introuvable');
+    return normalizeRuleRow(row as any);
   }
 
   async createRegleEvaluation(data: {
-    nom: string;
+    nom_regle: string;
     description?: string;
-    criteres: any[];
+    role_evaluateur: string;
+    role_evalue: string;
+    type_evaluation: string;
+    criteres: RuleCriterion[];
+    sections?: RuleSection[];
+    visibility_policy?: Partial<RuleVisibilityPolicy>;
+    analytics_metadata?: Partial<RuleAnalyticsMetadata>;
     est_active?: boolean;
+    meme_region_obligatoire?: boolean;
+    meme_branche_obligatoire?: boolean;
   }) {
-    const id = randomUUID();
-    await this.pg.execute(
-      `INSERT INTO regles_evaluation (id_regle, nom, description, criteres, est_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-      [id, data.nom, data.description ?? null, JSON.stringify(data.criteres), data.est_active ?? true],
+    const envelope = serializeRuleEnvelope({
+      sections: data.sections,
+      criteres: data.criteres,
+      visibility_policy: {
+        ...data.visibility_policy,
+      },
+      analytics_metadata: data.analytics_metadata,
+    });
+    const validationErrors = validateRuleEnvelope(envelope);
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(validationErrors);
+    }
+
+    const payload = {
+      ...envelope,
+      constraints: {
+        meme_region_obligatoire: data.meme_region_obligatoire ?? true,
+        meme_branche_obligatoire: data.meme_branche_obligatoire ?? true,
+      },
+    };
+
+    const row = await this.pg.queryOne(
+      `INSERT INTO regles_evaluation (
+         nom_regle,
+         description,
+         criteres_evaluation_json,
+         est_active,
+         role_evaluateur,
+         role_evalue,
+         type_evaluation,
+         created_at,
+         updated_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+       RETURNING
+         id_regle,
+         nom_regle,
+         description,
+         criteres_evaluation_json,
+         est_active,
+         role_evaluateur,
+         role_evalue,
+         type_evaluation,
+         created_at,
+         updated_at`,
+      [
+        data.nom_regle,
+        data.description ?? null,
+        JSON.stringify(payload),
+        data.est_active ?? true,
+        data.role_evaluateur,
+        data.role_evalue,
+        data.type_evaluation,
+      ],
     );
-    return this.pg.queryOne('SELECT * FROM regles_evaluation WHERE id_regle = $1', [id]);
+    return normalizeRuleRow(row as any);
   }
 
-  async updateRegleEvaluation(id: string, data: { nom?: string; description?: string; criteres?: any[]; est_active?: boolean }) {
-    const existing = await this.pg.queryOne('SELECT * FROM regles_evaluation WHERE id_regle = $1', [id]);
+  async updateRegleEvaluation(id: string, data: {
+    nom_regle?: string;
+    description?: string;
+    role_evaluateur?: string;
+    role_evalue?: string;
+    type_evaluation?: string;
+    criteres?: RuleCriterion[];
+    sections?: RuleSection[];
+    visibility_policy?: Partial<RuleVisibilityPolicy>;
+    analytics_metadata?: Partial<RuleAnalyticsMetadata>;
+    est_active?: boolean;
+    meme_region_obligatoire?: boolean;
+    meme_branche_obligatoire?: boolean;
+  }) {
+    const existing = await this.getRegleEvaluationById(id);
     if (!existing) throw new NotFoundException('Règle introuvable');
 
-    const sets: string[] = [];
-    const params: any[] = [];
-    let idx = 1;
+    const envelope = serializeRuleEnvelope({
+      sections: data.sections ?? (existing as any).sections,
+      criteres: data.criteres ?? (existing as any).criteres,
+      visibility_policy: {
+        ...((existing as any).visibility_policy ?? {}),
+        ...(data.visibility_policy ?? {}),
+      },
+      analytics_metadata: {
+        ...((existing as any).analytics_metadata ?? {}),
+        ...(data.analytics_metadata ?? {}),
+      },
+    });
+    const validationErrors = validateRuleEnvelope(envelope);
+    if (validationErrors.length > 0) {
+      throw new BadRequestException(validationErrors);
+    }
 
-    if (data.nom !== undefined) { sets.push(`nom = $${idx++}`); params.push(data.nom); }
-    if (data.description !== undefined) { sets.push(`description = $${idx++}`); params.push(data.description); }
-    if (data.criteres !== undefined) { sets.push(`criteres = $${idx++}`); params.push(JSON.stringify(data.criteres)); }
-    if (data.est_active !== undefined) { sets.push(`est_active = $${idx++}`); params.push(data.est_active); }
+    const existingConstraints = ((existing as any).criteres_evaluation_json?.constraints ?? {}) as Record<string, any>;
+    const payload = {
+      ...envelope,
+      constraints: {
+        meme_region_obligatoire: data.meme_region_obligatoire ?? existingConstraints.meme_region_obligatoire ?? true,
+        meme_branche_obligatoire: data.meme_branche_obligatoire ?? existingConstraints.meme_branche_obligatoire ?? true,
+      },
+    };
 
-    sets.push(`updated_at = NOW()`);
-    params.push(id);
-
-    await this.pg.execute(
-      `UPDATE regles_evaluation SET ${sets.join(', ')} WHERE id_regle = $${idx}`,
-      params,
+    const row = await this.pg.queryOne(
+      `UPDATE regles_evaluation
+       SET
+         nom_regle = $1,
+         description = $2,
+         criteres_evaluation_json = $3,
+         est_active = $4,
+         role_evaluateur = $5,
+         role_evalue = $6,
+         type_evaluation = $7,
+         updated_at = NOW()
+       WHERE id_regle = $8
+       RETURNING
+         id_regle,
+         nom_regle,
+         description,
+         criteres_evaluation_json,
+         est_active,
+         role_evaluateur,
+         role_evalue,
+         type_evaluation,
+         created_at,
+         updated_at`,
+      [
+        data.nom_regle ?? (existing as any).nom_regle,
+        data.description ?? (existing as any).description ?? null,
+        JSON.stringify(payload),
+        data.est_active ?? (existing as any).est_active ?? true,
+        data.role_evaluateur ?? (existing as any).role_evaluateur,
+        data.role_evalue ?? (existing as any).role_evalue,
+        data.type_evaluation ?? (existing as any).type_evaluation,
+        id,
+      ],
     );
-    return this.pg.queryOne('SELECT * FROM regles_evaluation WHERE id_regle = $1', [id]);
+    return normalizeRuleRow(row as any);
   }
 
   async toggleRegleActive(id: string) {

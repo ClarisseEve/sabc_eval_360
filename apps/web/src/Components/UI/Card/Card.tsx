@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/utils/helpers';
 
 const cardVariants = cva(
-  'rounded-lg border shadow-sm transition-colors',
+  'rounded-2xl border shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] transition-all duration-200',
   {
     variants: {
       variant: {
@@ -53,7 +53,7 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('flex flex-col space-y-1.5 p-6', className)}
+    className={cn('flex flex-col space-y-1.5 px-5 py-4', className)}
     {...props}
   />
 ));
@@ -66,7 +66,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'text-lg font-semibold leading-none tracking-tight',
+      'text-base font-semibold leading-none tracking-tight text-sabc-gray-900 dark:text-white',
       className
     )}
     {...props}
@@ -80,7 +80,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn('text-sm text-sabc-gray-500 dark:text-sabc-gray-400', className)}
+    className={cn('text-xs text-sabc-gray-400 dark:text-sabc-gray-500', className)}
     {...props}
   />
 ));
@@ -90,7 +90,7 @@ const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('p-6 pt-0', className)} {...props} />
+  <div ref={ref} className={cn('px-5 pb-5 pt-0', className)} {...props} />
 ));
 CardContent.displayName = 'CardContent';
 
@@ -100,7 +100,7 @@ const CardFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('flex items-center p-6 pt-0', className)}
+    className={cn('flex items-center px-5 pb-5 pt-0', className)}
     {...props}
   />
 ));

@@ -134,6 +134,10 @@ export function WaterfallChart({
     const { x = 0, y = 0, width = 0, height: barHeight = 0, index = 0 } = props;
     const item = processedData[index];
     if (!item) return null;
+    const safeX = Number(x);
+    const safeY = Number(y);
+    const safeWidth = Number(width);
+    const safeBarHeight = Number(barHeight);
 
     const defaultLabel = item.type === 'total'
       ? item.cumulative
@@ -143,12 +147,12 @@ export function WaterfallChart({
       : `${item.type !== 'total' && item.net >= 0 ? '+' : ''}${defaultLabel.toLocaleString()}`;
 
     const labelY = item.type === 'decrease'
-      ? y + (barHeight || 0) + 14
-      : y - 8;
+      ? safeY + safeBarHeight + 14
+      : safeY - 8;
 
     return (
       <text
-        x={x + (width || 0) / 2}
+        x={safeX + safeWidth / 2}
         y={labelY}
         fill="var(--sabc-gray-700)"
         textAnchor="middle"

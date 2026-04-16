@@ -59,6 +59,7 @@ export function usePage<T = Record<string, any>>(): {
 // A stateless helper that mirrors Inertia's router.visit / router.post / etc.
 // Components that need navigation should use this OR useNavigate() directly.
 let _navigate: ReturnType<typeof useNavigate> | null = null;
+type NavigateHandler = (to: string, options?: { replace?: boolean }) => void;
 
 /** Must be called once inside the Router tree (e.g. in App root) */
 export function useInitRouter() {
@@ -68,14 +69,16 @@ export function useInitRouter() {
   }, [nav]);
 }
 
-function ensureNavigate() {
+function ensureNavigate(): NavigateHandler {
   if (!_navigate) {
     // Fallback to location change
     return (to: string) => {
       globalThis.location.href = to;
     };
   }
-  return _navigate;
+  return (to: string, options?: { replace?: boolean }) => {
+    _navigate?.(to, options);
+  };
 }
 
 type RouterOptions = {
@@ -168,7 +171,7 @@ export const router = {
 
 // ─── useForm() shim ─────────────────────────────────────────────────────────
 export function useForm<T extends Record<string, any>>(initialValues: T) {
-  const [data, setDataState] = useState<T>({ ...initialValues });
+  const [data, setData_] = useState<T>({ ...initialValues });
   const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({});
   const [processing, setProcessing] = useState(false);
   const [recentlySuccessful, setRecentlySuccessful] = useState(false);
@@ -176,9 +179,9 @@ export function useForm<T extends Record<string, any>>(initialValues: T) {
   const setData = useCallback(
     (key: keyof T | T, value?: any) => {
       if (typeof key === 'object') {
-        setDataState(key as T);
+        setData_(key);
       } else {
-        setDataState((prev) => ({ ...prev, [key]: value }));
+        setData_((prev) => ({ ...prev, [key]: value }));
       }
     },
     [],
@@ -187,9 +190,9 @@ export function useForm<T extends Record<string, any>>(initialValues: T) {
   const reset = useCallback(
     (...keys: (keyof T)[]) => {
       if (keys.length === 0) {
-        setDataState({ ...initialValues });
+        setData_({ ...initialValues });
       } else {
-        setDataState((prev) => {
+        setData_((prev) => {
           const next = { ...prev };
           keys.forEach((k) => {
             (next as any)[k] = (initialValues as any)[k];
@@ -214,14 +217,42 @@ export function useForm<T extends Record<string, any>>(initialValues: T) {
     }
   }, []);
 
+  const isRouterOptions = (value: any): value is RouterOptions => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return false;
+    }
+
+    const optionKeys: Array<keyof RouterOptions> = [
+      'method',
+      'data',
+      'replace',
+      'preserveScroll',
+      'preserveState',
+      'onSuccess',
+      'onError',
+      'onFinish',
+    ];
+
+    return optionKeys.some((key) => key in value);
+  };
+
   const submit = useCallback(
-    async (method: 'get' | 'post' | 'put' | 'patch' | 'delete', url: string, options?: RouterOptions) => {
+    async (
+      method: 'get' | 'post' | 'put' | 'patch' | 'delete',
+      url: string,
+      payload?: any,
+      options?: RouterOptions,
+    ) => {
       setProcessing(true);
       setErrors({});
       try {
-        const res = method === 'get' || method === 'delete'
-          ? await api[method](url, method === 'get' ? { params: data } : undefined)
-          : await api[method](url, data);
+        const requestData = payload ?? data;
+        let res;
+        if (method === 'get' || method === 'delete') {
+          res = await api[method](url, method === 'get' ? { params: requestData } : undefined);
+        } else {
+          res = await api[method](url, requestData);
+        }
         setRecentlySuccessful(true);
         setTimeout(() => setRecentlySuccessful(false), 2000);
         options?.onSuccess?.(res.data);
@@ -244,22 +275,26 @@ export function useForm<T extends Record<string, any>>(initialValues: T) {
   );
 
   const post = useCallback(
-    (url: string, options?: RouterOptions) => submit('post', url, options),
+    (url: string, dataOrOptions?: any, maybeOptions?: RouterOptions) =>
+      submit('post', url, isRouterOptions(dataOrOptions) ? undefined : dataOrOptions, isRouterOptions(dataOrOptions) ? dataOrOptions : maybeOptions),
     [submit],
   );
 
   const put = useCallback(
-    (url: string, options?: RouterOptions) => submit('put', url, options),
+    (url: string, dataOrOptions?: any, maybeOptions?: RouterOptions) =>
+      submit('put', url, isRouterOptions(dataOrOptions) ? undefined : dataOrOptions, isRouterOptions(dataOrOptions) ? dataOrOptions : maybeOptions),
     [submit],
   );
 
   const patch = useCallback(
-    (url: string, options?: RouterOptions) => submit('patch', url, options),
+    (url: string, dataOrOptions?: any, maybeOptions?: RouterOptions) =>
+      submit('patch', url, isRouterOptions(dataOrOptions) ? undefined : dataOrOptions, isRouterOptions(dataOrOptions) ? dataOrOptions : maybeOptions),
     [submit],
   );
 
   const get = useCallback(
-    (url: string, options?: RouterOptions) => submit('get', url, options),
+    (url: string, dataOrOptions?: any, maybeOptions?: RouterOptions) =>
+      submit('get', url, isRouterOptions(dataOrOptions) ? undefined : dataOrOptions, isRouterOptions(dataOrOptions) ? dataOrOptions : maybeOptions),
     [submit],
   );
 
@@ -282,7 +317,7 @@ export function useForm<T extends Record<string, any>>(initialValues: T) {
     get,
     delete: deleteMethod,
     submit,
-    transform: (cb: (data: T) => T) => setDataState(cb(data)),
+    transform: (cb: (data: T) => T) => setData_(cb(data)),
   };
 }
 

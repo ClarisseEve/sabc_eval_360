@@ -57,21 +57,33 @@ export const PerformanceBarChart: React.FC<PerformanceBarChartProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={data}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                margin={{ top: 12, right: 24, left: 16, bottom: 5 }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis domain={yAxisDomain} />
-                <Tooltip formatter={formatTooltip} />
-                <Legend />
-                
-                {series.map((s, index) => (
-                  <Bar 
+                <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
+                <XAxis dataKey="name" tick={{ fill: '#616161', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+                <YAxis domain={yAxisDomain} tick={{ fill: '#616161', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+                <Tooltip
+                  formatter={formatTooltip}
+                  contentStyle={{
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #E0E0E0',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    fontSize: '12px',
+                    padding: '8px 12px',
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
+
+                {series.map((s) => (
+                  <Bar
                     key={s.dataKey}
                     dataKey={s.dataKey}
                     name={s.name}
                     fill={s.color}
+                    radius={[4, 4, 0, 0]}
                     stackId={stacked ? 'stack' : undefined}
+                    animationDuration={500}
                   />
                 ))}
               </BarChart>

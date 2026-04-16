@@ -17,7 +17,7 @@ interface UseApiDataReturn<T> {
 
 /**
  * Generic hook to fetch data from the NestJS API.
- * Replaces the Inertia `usePage().props` pattern.
+ * Replaces the old shared-props access pattern with direct API fetching.
  *
  * @example
  * const { data, loading } = useApiData<DashboardStats>('/dashboard');

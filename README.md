@@ -29,3 +29,13 @@ Le `docker-compose.yml` racine lance désormais uniquement:
 - `nestjs-api`
 - `mysql`
 - `postgres`
+- `redis`
+
+## Cutover NestJS
+
+- Checklist d'exploitation: [docs/operations/nestjs-cutover-checklist.md](./docs/operations/nestjs-cutover-checklist.md)
+- Préflight automatisé:
+
+```bash
+pnpm --dir apps/api preflight:cutover
+```

@@ -26,12 +26,17 @@ services:
       PG_DATABASE: ${PG_DATABASE:-sabc_business}
       PG_USER: ${PG_USER:-sabc_user}
       PG_PASSWORD: ${PG_PASSWORD:-***REMOVED***}
+      CACHE_DRIVER: ${CACHE_DRIVER:-redis}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      CACHE_PREFIX: ${CACHE_PREFIX:-sabc_eval360}
     ports:
       - "3000:3000"
     depends_on:
       mysql:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - sabc-network
@@ -59,7 +64,7 @@ services:
       - sabc-network
 
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: sabc-postgres
     restart: unless-stopped
     environment:
@@ -73,6 +78,20 @@ services:
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-sabc_user} -d ${PG_DATABASE:-sabc_business}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sabc-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: sabc-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10

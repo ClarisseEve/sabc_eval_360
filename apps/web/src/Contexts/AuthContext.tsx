@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import api, { authApi, getToken, setToken, clearToken } from '@/services/api';
+import api, { authApi, getToken, setToken, clearToken } from '@/Services/api';
 
 // Types pour l'authentification
 export interface User {

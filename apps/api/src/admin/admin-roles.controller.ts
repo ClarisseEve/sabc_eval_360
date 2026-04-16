@@ -46,8 +46,13 @@ export class AdminRolesController {
     return this.rolesService.getReglesEvaluation();
   }
 
+  @Get('regles/evaluation/:id')
+  getRegle(@Param('id') id: string) {
+    return this.rolesService.getRegleEvaluationById(id);
+  }
+
   @Post('regles/evaluation')
-  createRegle(@Body() body: { nom: string; description?: string; criteres: any[]; est_active?: boolean }) {
+  createRegle(@Body() body: any) {
     return this.rolesService.createRegleEvaluation(body);
   }
 

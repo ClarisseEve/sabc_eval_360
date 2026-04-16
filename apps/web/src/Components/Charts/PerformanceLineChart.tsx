@@ -91,23 +91,34 @@ export const PerformanceLineChart: React.FC<PerformanceLineChartProps> = ({
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={data}
-          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+          margin={{ top: 12, right: 24, left: 16, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" />
-          <YAxis domain={yAxisDomain} />
-          <Tooltip formatter={formatTooltip} />
-          <Legend />
-          
+          <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
+          <XAxis dataKey="date" tick={{ fill: '#616161', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+          <YAxis domain={yAxisDomain} tick={{ fill: '#616161', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+          <Tooltip
+            formatter={formatTooltip}
+            contentStyle={{
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E0E0E0',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              fontSize: '12px',
+            }}
+          />
+          <Legend wrapperStyle={{ fontSize: '12px' }} />
+
           {series.map((s) => (
-            <Line 
+            <Line
               key={s.dataKey}
               type={s.type || 'monotone'}
               dataKey={s.dataKey}
               name={s.name}
               stroke={s.color}
               strokeWidth={s.strokeWidth || 2}
-              activeDot={{ r: 8 }}
+              activeDot={{ r: 6 }}
+              dot={{ r: 3 }}
+              animationDuration={500}
             />
           ))}
         </LineChart>

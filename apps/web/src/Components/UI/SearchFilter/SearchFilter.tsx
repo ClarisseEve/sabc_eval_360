@@ -14,20 +14,42 @@ export interface FilterOption {
 }
 
 interface SearchFilterProps {
+  id?: string;
+  label?: string;
+  options?: { value: string; label: string }[];
+  isMulti?: boolean;
   placeholder?: string;
   filters?: FilterOption[];
   onSearch?: (value: string) => void;
   onFilterChange?: (filterId: string, values: string[]) => void;
+  onChange?: (values: string[]) => void;
   className?: string;
 }
 
 export const SearchFilter: React.FC<SearchFilterProps> = ({
+  id,
+  label,
+  options,
+  isMulti,
   placeholder = 'Rechercher...',
   filters = [],
   onSearch,
   onFilterChange,
+  onChange,
   className,
 }) => {
+  const resolvedFilters = React.useMemo<FilterOption[]>(() => {
+    if (filters.length > 0) {
+      return filters;
+    }
+
+    if (id && label) {
+      return [{ id, label, options, isMulti }];
+    }
+
+    return [];
+  }, [filters, id, isMulti, label, options]);
+
   const [searchValue, setSearchValue] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
   const [showFilters, setShowFilters] = useState(false);
@@ -46,7 +68,7 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
 
   const handleFilterToggle = (filterId: string, value: string) => {
     const currentValues = activeFilters[filterId] || [];
-    const filter = filters.find(f => f.id === filterId);
+    const filter = resolvedFilters.find(f => f.id === filterId);
     
     let newValues: string[];
     
@@ -69,6 +91,9 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
     
     setActiveFilters(updatedFilters);
     onFilterChange?.(filterId, newValues);
+    if (id === filterId) {
+      onChange?.(newValues);
+    }
   };
 
   const clearFilter = (filterId: string) => {
@@ -76,13 +101,17 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
     delete updatedFilters[filterId];
     setActiveFilters(updatedFilters);
     onFilterChange?.(filterId, []);
+    if (id === filterId) {
+      onChange?.([]);
+    }
   };
 
   const clearAllFilters = () => {
     setActiveFilters({});
-    filters.forEach(filter => {
+    resolvedFilters.forEach(filter => {
       onFilterChange?.(filter.id, []);
     });
+    onChange?.([]);
   };
 
   return (
@@ -114,7 +143,7 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
         </div>
 
         {/* Bouton de filtres */}
-        {filters.length > 0 && (
+        {resolvedFilters.length > 0 && (
           <DropdownMenu open={showFilters} onOpenChange={setShowFilters}>
             <DropdownMenuTrigger asChild>
               <Button 
@@ -132,7 +161,7 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64 max-h-[350px] overflow-y-auto scrollbar-thin scrollbar-thumb-sabc-gray-300 dark:scrollbar-thumb-sabc-gray-700">
-              {filters.map((filter) => (
+              {resolvedFilters.map((filter) => (
                 <div key={filter.id} className="px-2 py-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{filter.label}</span>
@@ -199,7 +228,7 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
           {Object.entries(activeFilters).map(([filterId, values]) => {
             if (values.length === 0) return null;
             
-            const filter = filters.find(f => f.id === filterId);
+            const filter = resolvedFilters.find(f => f.id === filterId);
             
             return values.map(value => {
               const option = filter?.options?.find(o => o.value === value);

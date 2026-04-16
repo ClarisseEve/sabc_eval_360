@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from '@/lib/inertia-shim';
-import { LogOut, ChevronDown, ChevronRight, AlignLeft, Menu, Users } from 'lucide-react';
+import { LogOut, ChevronDown, ChevronRight, AlignLeft, Menu } from 'lucide-react';
 import { cn } from '@/utils/helpers';
 import { Button } from '@/Components/UI/Button/Button';
 import { NAV_ITEMS, NAV_BOTTOM_ITEMS, resolveHref } from '@/config/nav';
@@ -45,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   
   // Détecter le chemin actif
   useEffect(() => {
-    const currentPath = window.location.pathname;
+    const currentPath = globalThis.location.pathname;
     setActivePath(currentPath);
   }, []);
 
@@ -98,121 +98,125 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }));
   };
 
+  const getActiveClassName = (hasActiveChild: boolean) =>
+    hasActiveChild
+      ? "text-sabc-red-primary/80 dark:text-sabc-red-light/80"
+      : "text-sabc-gray-800 dark:text-sabc-gray-200";
+
+  const hoverClassName = "hover:bg-sabc-gray-100/50 dark:hover:bg-sabc-gray-800/40 hover:text-sabc-red-primary dark:hover:text-sabc-red-light transition-all duration-150";
+
+  const renderChevron = (expanded: boolean) =>
+    expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />;
+
+  const renderCollapsedParent = (item: NavItem, hasActiveChild: boolean) => (
+    <button
+      type="button"
+      className={cn(
+        "flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out",
+        getActiveClassName(hasActiveChild),
+        hoverClassName
+      )}
+      onClick={() => toggleExpand(item.title)}
+    >
+      {item.icon}
+    </button>
+  );
+
+  const renderExpandedParent = (item: NavItem, hasActiveChild: boolean, isSectionToggle: boolean, isExpanded: boolean) => (
+    <div
+      className={cn(
+        "flex items-center rounded-md bg-transparent px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out",
+        getActiveClassName(hasActiveChild),
+        hoverClassName
+      )}
+    >
+      {isSectionToggle ? (
+        <button
+          type="button"
+          className="flex w-full items-center justify-between bg-transparent text-inherit focus:outline-none"
+          onClick={() => toggleExpand(item.title)}
+          aria-expanded={isExpanded}
+        >
+          <span className="flex items-center">
+            {item.icon}
+            <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
+          </span>
+          {renderChevron(isExpanded)}
+        </button>
+      ) : (
+        <>
+          <Link
+            href={item.href}
+            className="flex flex-1 items-center text-inherit transition-colors"
+          >
+            {item.icon}
+            <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
+          </Link>
+          <button
+            type="button"
+            className="ml-2 text-sabc-gray-500 transition-colors hover:text-sabc-red-primary"
+            onClick={(e) => {
+              e.preventDefault();
+              toggleExpand(item.title);
+            }}
+            aria-label={isExpanded ? `Replier ${item.title}` : `Déplier ${item.title}`}
+          >
+            {renderChevron(isExpanded)}
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  const renderLeafItem = (item: NavItem, isActive: boolean) => (
+    <Link
+      href={item.href}
+      className={cn(
+        "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out",
+        isCollapsed ? "justify-center" : "justify-start",
+        isActive
+          ? "text-sabc-red-primary dark:text-sabc-red-light font-semibold"
+          : "text-sabc-gray-800 dark:text-sabc-gray-200",
+        hoverClassName
+      )}
+    >
+      <span className="flex items-center">
+        {item.icon}
+        {!isCollapsed && (
+          <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
+        )}
+      </span>
+    </Link>
+  );
+
   // Fonction pour rendre un élément de navigation
   const renderNavItem = (item: NavItem, level: number = 0): React.ReactElement => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedItems[item.title] || false;
     const isSectionToggle = hasChildren && (!item.href || item.href === '#');
-    
-    // Vérifier si l'élément est actif
     const isActive = activePath === item.href || activePath.startsWith(item.href + "/");
-    // Vérifier si un enfant est actif
     const hasActiveChild = hasChildren && item.children!.some(
       child => activePath === child.href || activePath.startsWith(child.href + "/")
     );
-    
+
+    let content: React.ReactNode;
+    if (hasChildren) {
+      content = isCollapsed
+        ? renderCollapsedParent(item, !!hasActiveChild)
+        : renderExpandedParent(item, !!hasActiveChild, !!isSectionToggle, isExpanded);
+    } else {
+      content = renderLeafItem(item, isActive);
+    }
+
     return (
       <li key={item.title} className={cn(
-        "rounded-md relative",
-        (isActive || hasActiveChild) && "bg-sabc-red-primary/10 dark:bg-sabc-red-primary/20"
+        "rounded-xl relative",
+        (isActive || hasActiveChild) && "bg-sabc-red-primary/8 dark:bg-sabc-red-primary/15"
       )}>
-        {/* Indicateur visuel pour l'élément actif */}
         {(isActive || hasActiveChild) && (
-          <div className="absolute left-0 top-0 bottom-0 w-1 bg-sabc-red-primary rounded-l-md" />
+          <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-sabc-red-primary rounded-full" />
         )}
-        
-        {hasChildren ? (
-          isCollapsed ? (
-            <button
-              type="button"
-              className={cn(
-                "flex w-full items-center justify-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out",
-                hasActiveChild
-                  ? "text-sabc-red-primary/80 dark:text-sabc-red-light/80"
-                  : "text-sabc-gray-800 dark:text-sabc-gray-200",
-                "hover:bg-sabc-gray-100/50 dark:hover:bg-sabc-gray-800/40 hover:text-sabc-red-primary dark:hover:text-sabc-red-light transition-all duration-300 ease-out"
-              )}
-              onClick={() => toggleExpand(item.title)}
-            >
-              {item.icon}
-            </button>
-          ) : (
-            <div
-              className={cn(
-                "flex items-center rounded-md bg-transparent px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out",
-                hasActiveChild
-                  ? "text-sabc-red-primary/80 dark:text-sabc-red-light/80"
-                  : "text-sabc-gray-800 dark:text-sabc-gray-200",
-                "hover:bg-sabc-gray-100/50 dark:hover:bg-sabc-gray-800/40 hover:text-sabc-red-primary dark:hover:text-sabc-red-light transition-all duration-300 ease-out"
-              )}
-            >
-              {isSectionToggle ? (
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between bg-transparent text-inherit focus:outline-none"
-                  onClick={() => toggleExpand(item.title)}
-                  aria-expanded={isExpanded}
-                >
-                  <span className="flex items-center">
-                    {item.icon}
-                    <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
-                  </span>
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </button>
-              ) : (
-                <>
-                  <Link
-                    href={item.href}
-                    className="flex flex-1 items-center text-inherit transition-colors"
-                  >
-                    {item.icon}
-                    <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
-                  </Link>
-                  <button
-                    type="button"
-                    className="ml-2 text-sabc-gray-500 transition-colors hover:text-sabc-red-primary"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      toggleExpand(item.title);
-                    }}
-                    aria-label={isExpanded ? `Replier ${item.title}` : `Déplier ${item.title}`}
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
-          )
-        ) : (
-          <Link
-            href={item.href}
-            className={cn(
-              "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out",
-              isCollapsed ? "justify-center" : "justify-start",
-              isActive
-                ? "text-sabc-red-primary dark:text-sabc-red-light font-semibold"
-                : "text-sabc-gray-800 dark:text-sabc-gray-200",
-              "hover:bg-sabc-gray-100/50 dark:hover:bg-sabc-gray-800/40 hover:text-sabc-red-primary dark:hover:text-sabc-red-light transition-all duration-300 ease-out"
-            )}
-          >
-            <span className="flex items-center">
-              {item.icon}
-              {!isCollapsed && (
-                <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
-              )}
-            </span>
-          </Link>
-        )}
-        
-        {/* Sous-éléments */}
+        {content}
         {hasChildren && isExpanded && !isCollapsed && (
           <ul className="ml-4 mt-1 space-y-1 border-l border-sabc-gray-200 pl-4 dark:border-sabc-gray-700">
             {item.children!.map((child) => renderNavItem(child, level + 1))}
@@ -226,8 +230,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside
       className={cn(
         // Hauteur complète et position sticky pour grands écrans
-        "h-screen sticky top-0 flex flex-col bg-white dark:bg-sabc-gray-900 border-r border-sabc-gray-200 dark:border-sabc-gray-800 transition-all duration-300 ease-in-out",
-        isCollapsed ? "w-16" : "w-64",
+        "h-screen sticky top-0 flex flex-col bg-white dark:bg-sabc-gray-900 shadow-[1px_0_3px_rgba(0,0,0,0.04)] dark:shadow-[1px_0_3px_rgba(0,0,0,0.2)] transition-all duration-300 ease-in-out",
+        isCollapsed ? "w-16" : "w-60",
         className
       )}
     >
@@ -282,7 +286,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => {
               if (onLogout) onLogout();
               localStorage.removeItem('sabc_access_token');
-              window.location.href = '/login';
+              globalThis.location.href = '/login';
             }}
             type="button"
             title={isCollapsed ? "Déconnexion" : undefined}

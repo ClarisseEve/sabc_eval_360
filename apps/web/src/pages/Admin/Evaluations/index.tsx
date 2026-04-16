@@ -5,9 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Button } from '@/Components/UI/Button/Button';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
-import { Input } from '@/Components/UI/Input/Input';
-import { Label } from '@/Components/UI/Label/Label';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/Components/UI/Select';
+import { TruncatedTableBody } from '@/Components/UI/TruncatedList/TruncatedList';
 import { SearchFilter } from '@/Components/UI/SearchFilter';
 
 /**
@@ -415,75 +413,81 @@ const EvaluationsAdminPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEvaluations.map((evaluation) => (
-                  <TableRow key={evaluation.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{evaluation.evaluateur}</p>
-                        <p className="text-xs text-sabc-gray-400">{evaluation.role_evaluateur}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{evaluation.evalue}</p>
-                        <p className="text-xs text-sabc-gray-400">{evaluation.role_evalue}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getTypeBadgeColor(evaluation.type)}>
-                        {getTypeLabel(evaluation.type)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{evaluation.region}</TableCell>
-                    <TableCell>{evaluation.date_creation}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusBadgeColor(evaluation.statut)}>
-                        {evaluation.statut.charAt(0).toUpperCase() + evaluation.statut.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <span className={`font-medium ${
-                          evaluation.score_moyen >= 4 ? 'text-sabc-success' : 
-                          evaluation.score_moyen >= 3 ? 'text-sabc-accent' : 
-                          'text-sabc-error'
-                        }`}>
-                          {evaluation.score_moyen.toFixed(1)}
-                        </span>
-                        <span className="text-xs text-sabc-gray-400 ml-1">/5</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleViewDetails(evaluation)}
-                        >
-                          Détails
-                        </Button>
-                        {evaluation.statut === 'soumis' && (
-                          <>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              className="text-sabc-success hover:bg-sabc-success/10"
-                            >
-                              Valider
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              className="text-sabc-error hover:bg-sabc-error/10"
-                            >
-                              Rejeter
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                <TruncatedTableBody
+                  items={filteredEvaluations}
+                  previewCount={10}
+                  colSpan={8}
+                  keyExtractor={(evaluation) => evaluation.id}
+                  renderRow={(evaluation) => (
+                    <TableRow key={evaluation.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{evaluation.evaluateur}</p>
+                          <p className="text-xs text-sabc-gray-400">{evaluation.role_evaluateur}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{evaluation.evalue}</p>
+                          <p className="text-xs text-sabc-gray-400">{evaluation.role_evalue}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getTypeBadgeColor(evaluation.type)}>
+                          {getTypeLabel(evaluation.type)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{evaluation.region}</TableCell>
+                      <TableCell>{evaluation.date_creation}</TableCell>
+                      <TableCell>
+                        <Badge className={getStatusBadgeColor(evaluation.statut)}>
+                          {evaluation.statut.charAt(0).toUpperCase() + evaluation.statut.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <span className={`font-medium ${
+                            evaluation.score_moyen >= 4 ? 'text-sabc-success' :
+                            evaluation.score_moyen >= 3 ? 'text-sabc-accent' :
+                            'text-sabc-error'
+                          }`}>
+                            {evaluation.score_moyen.toFixed(1)}
+                          </span>
+                          <span className="text-xs text-sabc-gray-400 ml-1">/5</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewDetails(evaluation)}
+                          >
+                            Détails
+                          </Button>
+                          {evaluation.statut === 'soumis' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-sabc-success hover:bg-sabc-success/10"
+                              >
+                                Valider
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-sabc-error hover:bg-sabc-error/10"
+                              >
+                                Rejeter
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                />
               </TableBody>
             </Table>
           </CardContent>

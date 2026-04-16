@@ -167,8 +167,8 @@ export const evaluationsApi = {
   update: (id: string, data: { notes: any; commentaire_general?: string }) =>
     api.put(`/evaluations/${id}`, data),
   submit: (id: string) => api.post(`/evaluations/${id}/submit`),
-  validate: (id: string, est_validee: boolean) =>
-    api.post(`/evaluations/${id}/validate`, { est_validee }),
+  validate: (id: string, est_validee: boolean, commentaire_validation?: string) =>
+    api.post(`/evaluations/${id}/validate`, { est_validee, commentaire_validation }),
   periodesActives: () => api.get('/evaluations/periodes-actives'),
   eligibles: () => api.get('/evaluations/eligibles'),
   historique: () => api.get('/evaluations/historique'),
@@ -224,6 +224,8 @@ export const templatesApi = {
 export const reglesApi = {
   list: () => api.get('/regles'),
   get: (id: string) => api.get(`/regles/${id}`),
+  constraints: () => api.get('/regles/constraints'),
+  categories: () => api.get('/regles/categories'),
   create: (data: any) => api.post('/regles', data),
   update: (id: string, data: any) => api.put(`/regles/${id}`, data),
   delete: (id: string) => api.delete(`/regles/${id}`),
@@ -233,6 +235,8 @@ export const adminApi = {
   users: {
     list: (params?: any) => api.get('/admin/utilisateurs', { params }),
     get: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}`),
+    historique: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}/historique`),
+    chaine: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}/chaine`),
     create: (data: any) => api.post('/admin/utilisateurs', data),
     update: (matricule: string, data: any) => api.put(`/admin/utilisateurs/${matricule}`, data),
     delete: (matricule: string) => api.delete(`/admin/utilisateurs/${matricule}`),
@@ -245,6 +249,7 @@ export const adminApi = {
     update: (id: string, data: any) => api.put(`/admin/roles/${id}`, data),
     delete: (id: string) => api.delete(`/admin/roles/${id}`),
     regles: () => api.get('/admin/roles/regles/evaluation'),
+    getRegle: (id: string) => api.get(`/admin/roles/regles/evaluation/${id}`),
     createRegle: (data: any) => api.post('/admin/roles/regles/evaluation', data),
     updateRegle: (id: string, data: any) => api.put(`/admin/roles/regles/evaluation/${id}`, data),
     toggleRegle: (id: string) => api.patch(`/admin/roles/regles/evaluation/${id}/toggle`),
@@ -266,14 +271,24 @@ export const adminApi = {
     deleteSecteur: (id: string) => api.delete(`/admin/structure/secteurs/${id}`),
     branches: () => api.get('/admin/structure/branches'),
   },
+  evaluations: {
+    history: (params?: any) => api.get('/admin/evaluations/history', { params }),
+    get: (id: string) => api.get(`/admin/evaluations/${id}`),
+  },
 };
 
 export const analyticsApi = {
   dashboard: () => api.get('/analytics/dashboard'),
   evaluations: () => api.get('/analytics/evaluations'),
   performances: () => api.get('/analytics/performances'),
+  adminOverview: () => api.get('/analytics/admin/overview'),
+  adminRoles: () => api.get('/analytics/admin/roles'),
+  adminRegionsOverview: () => api.get('/analytics/admin/regions'),
+  adminRegionDetail: (idRegion: string) => api.get(`/analytics/admin/regions/${idRegion}`),
   region: (idRegion: string) => api.get(`/analytics/region/${idRegion}`),
   classementRegional: (idRegion: string) => api.get(`/analytics/region/${idRegion}/classement`),
+  improvementPlans: (params?: { role?: string; id_region?: string; type?: string }) =>
+    api.get('/analytics/admin/plans-amelioration', { params }),
   axesAmelioration: (matricule?: string) =>
     api.get(matricule ? `/analytics/axes-amelioration/${matricule}` : '/analytics/axes-amelioration'),
   anomalies: (params?: { matricule?: string; id_region?: string }) =>

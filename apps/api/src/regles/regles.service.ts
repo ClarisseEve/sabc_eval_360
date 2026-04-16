@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
+import {
+  normalizeRuleRow,
+  parseRuleEnvelope,
+  type RuleCriterion,
+} from './rule-schema';
 
 const CATEGORIES_VALIDES = [
   'Compétences techniques',
@@ -30,58 +35,68 @@ export class ReglesService {
   constructor(private pg: DatabasePgService) {}
 
   async listActives() {
-    return this.pg.query(
+    const rows = await this.pg.query(
       `SELECT
          id_regle,
          nom_regle,
          description,
          criteres_evaluation_json,
          est_active,
+         role_evaluateur,
+         role_evalue,
+         type_evaluation,
          created_at,
          updated_at
        FROM regles_evaluation
        WHERE est_active = true
        ORDER BY created_at DESC`,
     );
+    return rows.map((row) => normalizeRuleRow(row as any));
   }
 
   async findById(id: string) {
-    return this.pg.queryOne(
+    const row = await this.pg.queryOne(
       `SELECT
          id_regle,
          nom_regle,
          description,
          criteres_evaluation_json,
          est_active,
+         role_evaluateur,
+         role_evalue,
+         type_evaluation,
          created_at,
          updated_at
        FROM regles_evaluation
        WHERE id_regle = $1`,
       [id],
     );
+    return row ? normalizeRuleRow(row as any) : null;
   }
 
-  validateCriteres(criteres: Critere[]): { valide: boolean; erreurs: string[] } {
+  validateCriteres(criteres: Array<Critere | RuleCriterion>): { valide: boolean; erreurs: string[] } {
     const erreurs: string[] = [];
+    const normalized = parseRuleEnvelope({ criteres }).criteres;
 
-    if (criteres.length < MIN_CRITERES) {
-      erreurs.push(`Minimum ${MIN_CRITERES} critères requis (actuellement: ${criteres.length})`);
+    if (normalized.length < MIN_CRITERES) {
+      erreurs.push(`Minimum ${MIN_CRITERES} critères requis (actuellement: ${normalized.length})`);
     }
 
-    const totalPonderation = criteres.reduce((sum, c) => sum + c.ponderation, 0);
+    const totalPonderation = normalized.reduce((sum, c) => sum + c.poids, 0);
     if (totalPonderation !== TOTAL_PONDERATION) {
       erreurs.push(`Somme des pondérations doit être ${TOTAL_PONDERATION}% (actuelle: ${totalPonderation}%)`);
     }
 
-    criteres.forEach((c, i) => {
-      const requiredFields = ['nom', 'description', 'ponderation', 'echelle', 'categorie'] as const;
+    normalized.forEach((c, i) => {
+      const rawCritere = criteres[i] as Partial<Critere> | undefined;
+      const requiredFields = ['libelle', 'description', 'poids', 'echelle', 'section_label'] as const;
       for (const field of requiredFields) {
         if (c[field] === undefined || c[field] === null) {
           erreurs.push(`Critère #${i}: champ '${field}' manquant`);
         }
       }
 
-      if (c.ponderation !== undefined && (typeof c.ponderation !== 'number' || c.ponderation <= 0)) {
+      if (c.poids !== undefined && (typeof c.poids !== 'number' || c.poids <= 0)) {
         erreurs.push(`Critère #${i}: pondération doit être un nombre positif`);
       }
 
@@ -91,8 +106,12 @@ export class ReglesService {
         }
       }
 
-      if (c.categorie && !CATEGORIES_VALIDES.includes(c.categorie)) {
-        erreurs.push(`Critère #${i}: catégorie '${c.categorie}' invalide`);
+      if (rawCritere?.categorie && !CATEGORIES_VALIDES.includes(rawCritere.categorie)) {
+        erreurs.push(`Critère #${i}: catégorie invalide`);
+      }
+
+      if (c.section_label && !CATEGORIES_VALIDES.includes(c.section_label) && c.section_label.length > 80) {
+        erreurs.push(`Critère #${i}: libellé de section trop long`);
       }
     });
 
@@ -110,6 +129,7 @@ export class ReglesService {
       echelle_min: ECHELLE_MIN,
       echelle_max: ECHELLE_MAX,
       categories_valides: CATEGORIES_VALIDES,
+      visibility_detail_options: ['aggregated', 'detailed'],
     };
   }
 }

@@ -1,21 +1,76 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createClient } from 'redis';
 
 interface CacheEntry<T> {
   data: T;
   expiresAt: number;
 }
 
-/**
- * Simple in-memory cache with TTL.
- * Avoids recalculating heavy dashboard/analytics queries on every request.
- * For production at scale, swap with Redis (same interface).
- */
 @Injectable()
-export class CacheService {
+export class CacheService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CacheService.name);
-  private store = new Map<string, CacheEntry<any>>();
+  private readonly store = new Map<string, CacheEntry<any>>();
+  private readonly inflight = new Map<string, Promise<any>>();
+  private redisClient: ReturnType<typeof createClient> | null = null;
+  private redisReady = false;
+  private readonly cacheDriver: 'auto' | 'memory' | 'redis';
+  private readonly redisUrl: string | null;
+  private readonly keyPrefix: string;
 
-  get<T>(key: string): T | null {
+  constructor(private readonly configService: ConfigService) {
+    const driver = this.configService.get<string>('CACHE_DRIVER', 'auto').toLowerCase();
+    this.cacheDriver = driver === 'redis' || driver === 'memory' ? driver : 'auto';
+    this.redisUrl = this.configService.get<string>('REDIS_URL') ?? null;
+    this.keyPrefix = this.configService.get<string>('CACHE_PREFIX', 'sabc_eval360');
+  }
+
+  async onModuleInit(): Promise<void> {
+    if (this.cacheDriver === 'memory') {
+      this.logger.log('Cache driver: memory');
+      return;
+    }
+
+    if (!this.redisUrl) {
+      if (this.cacheDriver === 'redis') {
+        throw new Error('CACHE_DRIVER=redis requires REDIS_URL');
+      }
+      this.logger.warn('REDIS_URL not configured, using in-memory cache');
+      return;
+    }
+
+    const client = createClient({ url: this.redisUrl });
+    client.on('error', (error) => {
+      this.redisReady = false;
+      this.logger.error(`Redis error: ${error.message}`);
+    });
+
+    try {
+      await client.connect();
+      this.redisClient = client;
+      this.redisReady = true;
+      this.logger.log(`Cache driver: redis (${this.redisUrl})`);
+    } catch (error: any) {
+      this.redisClient = null;
+      this.redisReady = false;
+      if (this.cacheDriver === 'redis') {
+        throw error;
+      }
+      this.logger.warn(`Redis unavailable, falling back to in-memory cache: ${error?.message ?? error}`);
+    }
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.redisClient?.isOpen) {
+      await this.redisClient.quit();
+    }
+  }
+
+  private buildKey(key: string): string {
+    return `${this.keyPrefix}:${key}`;
+  }
+
+  private getFromMemory<T>(key: string): T | null {
     const entry = this.store.get(key);
     if (!entry) return null;
     if (Date.now() > entry.expiresAt) {
@@ -25,26 +80,69 @@ export class CacheService {
     return entry.data as T;
   }
 
-  set<T>(key: string, data: T, ttlSeconds: number): void {
+  private setInMemory<T>(key: string, data: T, ttlSeconds: number): void {
     this.store.set(key, {
       data,
       expiresAt: Date.now() + ttlSeconds * 1000,
     });
   }
 
-  /**
-   * Get-or-compute: returns cached value if fresh, otherwise calls fn() and caches the result.
-   */
-  async getOrCompute<T>(key: string, ttlSeconds: number, fn: () => Promise<T>): Promise<T> {
-    const cached = this.get<T>(key);
-    if (cached !== null) return cached;
+  async get<T>(key: string): Promise<T | null> {
+    if (this.redisReady && this.redisClient) {
+      const raw = await this.redisClient.get(this.buildKey(key));
+      if (!raw) return null;
+      return JSON.parse(raw) as T;
+    }
 
-    const data = await fn();
-    this.set(key, data, ttlSeconds);
-    return data;
+    return this.getFromMemory<T>(key);
   }
 
-  invalidate(pattern: string): void {
+  async set<T>(key: string, data: T, ttlSeconds: number): Promise<void> {
+    if (this.redisReady && this.redisClient) {
+      await this.redisClient.set(this.buildKey(key), JSON.stringify(data), { EX: ttlSeconds });
+      return;
+    }
+
+    this.setInMemory(key, data, ttlSeconds);
+  }
+
+  async getOrCompute<T>(key: string, ttlSeconds: number, fn: () => Promise<T>): Promise<T> {
+    const cached = await this.get<T>(key);
+    if (cached !== null) return cached;
+
+    const existing = this.inflight.get(key);
+    if (existing) return existing as Promise<T>;
+
+    const promise = fn()
+      .then(async (data) => {
+        await this.set(key, data, ttlSeconds);
+        return data;
+      })
+      .finally(() => {
+        this.inflight.delete(key);
+      });
+
+    this.inflight.set(key, promise);
+    return promise;
+  }
+
+  async invalidate(pattern: string): Promise<void> {
+    if (this.redisReady && this.redisClient) {
+      const match = this.buildKey(`*${pattern}*`);
+      let count = 0;
+
+      for await (const redisKey of this.redisClient.scanIterator({ MATCH: match, COUNT: 100 })) {
+        const keys = Array.isArray(redisKey) ? redisKey : [redisKey];
+        if (keys.length > 0) {
+          count += keys.length;
+          await this.redisClient.del(keys);
+        }
+      }
+
+      if (count > 0) this.logger.debug(`Invalidated ${count} redis cache entries matching "${pattern}"`);
+      return;
+    }
+
     const keys = [...this.store.keys()];
     let count = 0;
     for (const key of keys) {
@@ -56,7 +154,30 @@ export class CacheService {
     if (count > 0) this.logger.debug(`Invalidated ${count} cache entries matching "${pattern}"`);
   }
 
-  clear(): void {
+  async clear(): Promise<void> {
+    if (this.redisReady && this.redisClient) {
+      const match = this.buildKey('*');
+      for await (const redisKey of this.redisClient.scanIterator({ MATCH: match, COUNT: 100 })) {
+        const keys = Array.isArray(redisKey) ? redisKey : [redisKey];
+        if (keys.length > 0) {
+          await this.redisClient.del(keys);
+        }
+      }
+    }
+
     this.store.clear();
+  }
+
+  async healthCheck(): Promise<'redis' | 'memory' | 'error'> {
+    if (this.redisReady && this.redisClient) {
+      try {
+        const pong = await this.redisClient.ping();
+        return pong === 'PONG' ? 'redis' : 'error';
+      } catch {
+        return 'error';
+      }
+    }
+
+    return 'memory';
   }
 }

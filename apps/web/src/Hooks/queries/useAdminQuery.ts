@@ -15,6 +15,20 @@ export function useAdminUser(matricule: string) {
   });
 }
 
+export function useAdminUserHistory(matricule: string) {
+  return useSuspenseQuery({
+    queryKey: ['admin', 'users', matricule, 'historique'],
+    queryFn: () => adminApi.users.historique(matricule).then(r => r.data),
+  });
+}
+
+export function useAdminUserChain(matricule: string) {
+  return useSuspenseQuery({
+    queryKey: ['admin', 'users', matricule, 'chaine'],
+    queryFn: () => adminApi.users.chaine(matricule).then(r => r.data),
+  });
+}
+
 export function useAdminRoles() {
   return useSuspenseQuery({
     queryKey: ['admin', 'roles'],

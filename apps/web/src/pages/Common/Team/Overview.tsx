@@ -3,6 +3,7 @@ import { Head } from '@/lib/inertia-shim';
 import { Badge } from '@/Components/UI/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { TruncatedTableBody } from '@/Components/UI/TruncatedList/TruncatedList';
 import { useSubordonnes } from '@/Hooks/queries';
 import { EvaluationPageLayout } from '@/pages/Common/Evaluations/shared';
 
@@ -51,19 +52,25 @@ export default function TeamOverviewPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {subordonnes.map((user: any) => (
-                    <TableRow key={user.matricule}>
-                      <TableCell>{user.matricule}</TableCell>
-                      <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
-                      <TableCell>{user.role}</TableCell>
-                      <TableCell>{user.id_region || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Badge variant={user.est_actif ? 'default' : 'outline'}>
-                          {user.statut || (user.est_actif ? 'Actif' : 'Inactif')}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  <TruncatedTableBody
+                    items={subordonnes}
+                    previewCount={10}
+                    colSpan={5}
+                    keyExtractor={(user: any) => user.matricule}
+                    renderRow={(user: any) => (
+                      <TableRow key={user.matricule}>
+                        <TableCell>{user.matricule}</TableCell>
+                        <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
+                        <TableCell>{user.role}</TableCell>
+                        <TableCell>{user.id_region || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant={user.est_actif ? 'default' : 'outline'}>
+                            {user.statut || (user.est_actif ? 'Actif' : 'Inactif')}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  />
                 </TableBody>
               </Table>
             )}

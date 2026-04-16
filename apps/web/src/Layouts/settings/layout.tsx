@@ -11,7 +11,7 @@ interface SettingsLayoutProps {
  * Layout pour les pages de paramètres
  * Respecte les règles graphiques SABC
  */
-export default function SettingsLayout({ children }: SettingsLayoutProps) {
+export default function SettingsLayout({ children }: Readonly<SettingsLayoutProps>) {
   const { url } = usePage();
 
   // Définition des liens de navigation des paramètres

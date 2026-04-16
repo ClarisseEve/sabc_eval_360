@@ -23,7 +23,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('admin123');
+  const [password, setPassword] = useState('***REMOVED***');
   const [showPassword, setShowPassword] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [errors, setErrors] = useState<{ identifier?: string; password?: string }>({});
@@ -38,26 +38,34 @@ const Login: React.FC = () => {
   const testAccounts: TestAccount[] = [
     { 
       label: 'Admin', 
-      description: 'Accès administrateur pour la création des utilisateurs', 
-      email: 'admin@sabc.cm',
-      username: 'US-01',
+      description: 'Console 360°, règles, analytics et supervision globale', 
+      email: 'admin@sabc.local',
+      username: 'A0001',
       badge: 'Admin',
       badgeColor: 'bg-sabc-red-primary'
     },
     { 
       label: 'DR Littoral', 
-      description: 'Directeur Régional - Région Littoral (Tanière)', 
-      email: 'jean.mbarga@sabc.cm',
-      username: 'US-02',
+      description: 'Pilotage régional et supervision des équipes Littoral', 
+      email: 'dr.littoral@sabc.local',
+      username: 'D1010',
       badge: 'DR',
       badgeColor: 'bg-sabc-red-dark'
     },
     { 
-      label: 'DR Centre', 
-      description: 'Directeur Régional - Région Centre (Tanière)', 
-      email: 'marie.nkomo@sabc.cm',
-      username: 'US-03',
-      badge: 'DR',
+      label: 'CDS Littoral', 
+      description: 'Management de proximité, équipe commerciale et validations', 
+      email: 'cds.littoral@sabc.local',
+      username: 'S1110',
+      badge: 'CDS',
+      badgeColor: 'bg-sabc-red-dark'
+    },
+    { 
+      label: 'TMO Littoral', 
+      description: 'Vue individuelle, auto-évaluation et axes d’amélioration', 
+      email: 'tmo.littoral@sabc.local',
+      username: 'T1230',
+      badge: 'TMO',
       badgeColor: 'bg-sabc-red-dark'
     }
   ];
@@ -132,7 +140,7 @@ const Login: React.FC = () => {
                 </div>
               ))}
             </div>
-            <p className="text-xs text-sabc-gray-400 mt-1">Cliquez sur un compte pour remplir le matricule automatiquement</p>
+            <p className="text-xs text-sabc-gray-400 mt-1">Cliquez sur un compte pour remplir un identifiant local cohérent</p>
           </div>
           
           <form onSubmit={handleSubmit}>
@@ -147,7 +155,7 @@ const Login: React.FC = () => {
                   required
                   autoFocus
                   className={`h-11 rounded-lg ${errors.identifier ? 'border-sabc-error' : 'border-sabc-gray-200'}`}
-                  placeholder="US-XX ou email@sabc.cm"
+                  placeholder="A0001 ou utilisateur@sabc.local"
                 />
                 {errors.identifier && (
                   <p className="text-sm text-sabc-error font-medium">{errors.identifier}</p>

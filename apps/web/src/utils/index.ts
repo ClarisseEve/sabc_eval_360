@@ -1,5 +1,5 @@
 // Export all utility functions
 export * from './helpers';
-export * from './formatters';
+export { formatNumber, formatFileSize } from './formatters';
 export * from './validators';
 export * from './constants';

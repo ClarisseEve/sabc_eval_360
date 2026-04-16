@@ -166,13 +166,15 @@ export function PieChart({
             ))}
           </Pie>
           {tooltip ? tooltip : (
-            <Tooltip 
-              cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
-              contentStyle={{ 
+            <Tooltip
+              cursor={{ fill: 'rgba(0, 0, 0, 0.04)' }}
+              contentStyle={{
                 backgroundColor: '#FFFFFF',
                 border: '1px solid #E0E0E0',
-                borderRadius: '4px',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+                fontSize: '12px',
+                padding: '8px 12px',
               }}
             />
           )}

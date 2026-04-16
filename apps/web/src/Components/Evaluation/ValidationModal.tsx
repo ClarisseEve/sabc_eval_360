@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/Components/UI/Dialog/Dialog';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert/Alert';
+import Badge from '@/Components/UI/Badge';
 import { evaluationsApi } from '@/Services/api';
+import { buildEvaluationContext, isCriterionCommentRequired } from '@/pages/Common/Evaluations/shared';
+import { formatEvaluationType, formatDateLabel } from '@/Components/Dashboard/RoleDashboardShared';
 
 type Note = {
   id?: string;
@@ -57,7 +61,7 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const notes: Note[] = evaluation.notations_json ?? [];
+  const context = buildEvaluationContext(evaluation as any);
 
   const handleSubmit = () => {
     if (!action) return;
@@ -69,7 +73,7 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
     setError(null);
 
     evaluationsApi
-      .validate(evaluation.id_evaluation, action === 'valide')
+      .validate(evaluation.id_evaluation, action === 'valide', commentaire)
       .then(() => {
         setSubmitting(false);
         onClose();
@@ -95,6 +99,25 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-gray-700">Cadre de validation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-gray-700">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="primary">{context.summary.name || formatEvaluationType(evaluation.type_evaluation)}</Badge>
+                <Badge variant="info">{context.periodLabel}</Badge>
+                <Badge variant="info">{context.criteriaCount} critères</Badge>
+                <Badge variant="warning">visibilité {context.visibilityDetail}</Badge>
+              </div>
+              {context.periodRange ? (
+                <div className="text-xs text-gray-500">
+                  {`${formatDateLabel(context.periodRange.start)} — ${formatDateLabel(context.periodRange.end)}`}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
           {/* Note globale */}
           {evaluation.note_globale !== null && (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -106,21 +129,34 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
           )}
 
           {/* Critères notés */}
-          {notes.length > 0 && (
+          {context.criteria.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-gray-600">Détail des critères ({notes.length})</CardTitle>
+                <CardTitle className="text-sm text-gray-600">Détail des critères ({context.criteria.length})</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {notes.map((n, i) => (
-                  <div key={n.id ?? i} className="flex items-start gap-3 p-2 border rounded-md">
-                    <span className={`text-sm font-bold px-2 py-1 rounded flex-shrink-0 ${noteColor(n.note)}`}>
-                      {n.note}/5
+                {context.criteria.map((criterion, i) => (
+                  <div key={String(criterion.id ?? i)} className="flex items-start gap-3 p-2 border rounded-md">
+                    <span className={`text-sm font-bold px-2 py-1 rounded flex-shrink-0 ${noteColor(criterion.note ?? 0)}`}>
+                      {criterion.note ?? '—'}/5
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs text-gray-500">{noteLabel(n.note)}</div>
-                      {n.commentaire && (
-                        <div className="text-xs text-gray-700 mt-1 italic">"{n.commentaire}"</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-xs font-medium text-gray-700">{criterion.libelle}</div>
+                        <Badge variant="secondary" className="text-[10px]">{criterion.section}</Badge>
+                        {criterion.poids != null ? <Badge variant="secondary" className="text-[10px]">Poids {criterion.poids}</Badge> : null}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">{noteLabel(criterion.note ?? 0)}</div>
+                      {isCriterionCommentRequired(criterion) ? (
+                        <Alert className="mt-2">
+                          <AlertTitle>Seuil critique</AlertTitle>
+                          <AlertDescription>
+                            Note sous le seuil de justification ({criterion.commentaireRequisSiNoteLt ?? 3}).
+                          </AlertDescription>
+                        </Alert>
+                      ) : null}
+                      {criterion.commentaire && (
+                        <div className="text-xs text-gray-700 mt-1 italic">"{criterion.commentaire}"</div>
                       )}
                     </div>
                   </div>

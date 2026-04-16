@@ -56,7 +56,7 @@ const RoleCompetencyDetailsSection: React.FC<RoleCompetencyDetailsSectionProps> 
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge variant="secondary">Taux global {formatPercent(overallAcquisitionRate)}</Badge>
-                <Badge variant="outline">Score moyen {overallAverageScore.toFixed(2)}/5</Badge>
+                <Badge variant="info">Score moyen {overallAverageScore.toFixed(2)}/5</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">

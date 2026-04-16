@@ -9,6 +9,20 @@ export class UsersService {
     return this.prisma.utilisateur.findUnique({ where: { email } });
   }
 
+  async findByIdentifier(identifier: string) {
+    const value = identifier.trim();
+    if (!value) return null;
+
+    return this.prisma.utilisateur.findFirst({
+      where: {
+        OR: [
+          { email: value },
+          { matricule: value.toUpperCase() },
+        ],
+      },
+    });
+  }
+
   async findByMatricule(matricule: string) {
     return this.prisma.utilisateur.findUnique({
       where: { matricule },

@@ -14,7 +14,7 @@ interface DeleteConfirmModalProps {
 }
 
 export default function DeleteConfirmModal({ isOpen, onClose, periode }: DeleteConfirmModalProps) {
-    const { delete: destroy, processing } = useForm();
+    const { delete: destroy, processing } = useForm({});
 
     const handleDelete = () => {
         destroy(`/admin/evaluations/periodes/${periode.id_periode}`, {

@@ -10,6 +10,7 @@ import { cn } from '@/utils/helpers';
 import {
   ArrowLeft,
   ArrowRight,
+  CalendarClock,
   MessageSquare,
   Pencil,
   ShieldCheck,
@@ -18,77 +19,21 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { evaluationsApi } from '@/Services/api';
 import { useEvaluation } from '@/Hooks/queries';
-import { EvaluationPageLayout, formatDisplayName, formatRole } from './shared';
-
-interface CritereEntry {
-  id?: string | number | null;
-  libelle?: string;
-  description?: string | null;
-  section_label?: string | null;
-  section_order?: number | null;
-}
-
-interface NoteEntry {
-  id?: string | number | null;
-  note?: number;
-  commentaire?: string | null;
-  critere_nom?: string;
-}
-
-const parseJson = <T,>(payload: unknown): T | null => {
-  if (!payload) return null;
-  if (Array.isArray(payload)) return payload as unknown as T;
-  if (typeof payload === 'object') return payload as unknown as T;
-  if (typeof payload === 'string') {
-    try {
-      return JSON.parse(payload) as T;
-    } catch (error) {
-      console.warn('Impossible de parser le JSON', error);
-    }
-  }
-  return null;
-};
-
-const computeInitialCriteria = (evaluation: Record<string, any>) => {
-  const rawCriteres = parseJson<CritereEntry[]>(evaluation?.regle?.criteres_evaluation_json);
-  const rawNotes = parseJson<NoteEntry[]>(evaluation?.notations_json) ?? [];
-
-  if (!rawCriteres || rawCriteres.length === 0) {
-    return rawNotes.map((note, index) => ({
-      id: note.id ?? index,
-      libelle: note.critere_nom ?? `Critère ${index + 1}`,
-      description: null,
-      note: note.note ?? 3,
-      commentaire: note.commentaire ?? '',
-      section: 'Compétences',
-    }));
-  }
-
-  return rawCriteres.map((critere, index) => {
-    const matched = rawNotes.find((note) => {
-      if (!note) return false;
-      if (note.id != null && critere.id != null) {
-        return String(note.id) === String(critere.id);
-      }
-      return index === rawNotes.indexOf(note);
-    });
-
-    return {
-      id: critere.id ?? index,
-      libelle: critere.libelle ?? `Critère ${index + 1}`,
-      description: critere.description ?? null,
-      note: matched?.note ?? 3,
-      commentaire: matched?.commentaire ?? '',
-      section: critere.section_label ?? 'Compétences',
-    };
-  });
-};
+import {
+  buildEvaluationContext,
+  EvaluationPageLayout,
+  formatDisplayName,
+  formatRole,
+  isCriterionCommentRequired,
+} from './shared';
+import { ActiveRulesCard, formatDateLabel, formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
 
 const EditEvaluation: React.FC = () => {
   const { id = '' } = useParams();
   const { data: evaluation } = useEvaluation(id);
   const queryClient = useQueryClient();
-  const criteria = useMemo(() => computeInitialCriteria(evaluation), [evaluation]);
+  const context = useMemo(() => buildEvaluationContext(evaluation), [evaluation]);
+  const criteria = context.criteria;
   const evaluationId = evaluation?.id_evaluation ?? evaluation?.id;
   const [notes, setNotes] = useState(() =>
     criteria.map((critere) => ({
@@ -118,7 +63,11 @@ const EditEvaluation: React.FC = () => {
   }, [notes]);
 
   const requiresJustification = notes.some(
-    (note) => (note.note ?? 0) < 3 && (!note.commentaire || note.commentaire.trim().length === 0)
+    (note, index) => isCriterionCommentRequired({
+      note: note.note,
+      commentaire: note.commentaire,
+      commentaireRequisSiNoteLt: criteria[index]?.commentaireRequisSiNoteLt ?? 3,
+    })
   );
 
   const saveMutation = useMutation({
@@ -206,11 +155,11 @@ const EditEvaluation: React.FC = () => {
               <div>
                 <div className="text-xs uppercase text-sabc-gray-400">Template</div>
                 <div className="font-semibold text-sabc-gray-900 dark:text-white">
-                  {evaluation?.regle?.nom_regle ?? 'Non défini'}
+                  {context.summary.name || 'Non défini'}
                 </div>
-                {evaluation?.regle?.type_evaluation && (
+                {context.rule.type_evaluation && (
                   <Badge variant="secondary" className="mt-1 text-[10px] uppercase">
-                    {evaluation.regle.type_evaluation}
+                    {formatEvaluationType(context.rule.type_evaluation)}
                   </Badge>
                 )}
               </div>
@@ -250,83 +199,139 @@ const EditEvaluation: React.FC = () => {
                 <Alert className="border-sabc-warning bg-sabc-warning/10 text-xs text-sabc-warning">
                   <AlertTitle>Commentaires requis</AlertTitle>
                   <AlertDescription>
-                    Toute note inférieure à 3 doit obligatoirement être accompagnée d'un commentaire.
+                    Les seuils de justification sont imposés par la règle publiée. Toute note sous le seuil d’un critère doit être commentée.
                   </AlertDescription>
                 </Alert>
               )}
             </CardContent>
           </Card>
 
-          <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Pencil className="h-5 w-5 text-sabc-red-primary" />
-                Saisie des critères
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {criteria.map((critere, index) => (
-                <div
-                  key={String(critere.id ?? index)}
-                  className="rounded-lg border border-sabc-gray-200 p-4 transition hover:border-sabc-red-primary/40 dark:border-sabc-gray-700"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold text-sabc-gray-900 dark:text-white">{critere.libelle}</div>
-                      {critere.description && (
-                        <div className="mt-1 text-xs text-sabc-gray-500">{critere.description}</div>
-                      )}
-                    </div>
-                    <Badge variant="secondary" className="text-[10px] uppercase">
-                      Critère {index + 1}
-                    </Badge>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {[1, 2, 3, 4, 5].map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => handleScoreChange(index, value)}
-                        className={cn(
-                          'h-9 w-9 rounded-full border text-sm font-semibold transition',
-                          notes[index]?.note === value
-                            ? 'border-sabc-red-primary bg-sabc-red-primary text-white'
-                            : 'border-sabc-gray-200 bg-white text-sabc-gray-600 hover:border-sabc-red-primary/60 hover:text-sabc-red-primary dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-300'
-                        )}
-                      >
-                        {value}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sabc-gray-400">
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      Commentaire
-                      {(notes[index]?.note ?? 0) < 3 && (
-                        <span className="rounded bg-sabc-red-light px-1.5 py-0.5 text-[10px] text-sabc-red-primary">
-                          Obligatoire
-                        </span>
-                      )}
-                    </div>
-                    <Textarea
-                      rows={3}
-                      value={notes[index]?.commentaire ?? ''}
-                      onChange={(event) => handleCommentChange(index, event.target.value)}
-                      placeholder="Partagez vos observations ou un plan d'action."
-                      className={cn(
-                        'text-sm',
-                        (notes[index]?.note ?? 0) < 3 && (!notes[index]?.commentaire?.trim())
-                          ? 'border-sabc-red-primary'
-                          : ''
-                      )}
-                    />
+          <div className="space-y-6">
+            <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CalendarClock className="h-5 w-5 text-sabc-info" />
+                  Cycle actif
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-lg border border-sabc-gray-200 p-4">
+                  <div className="text-xs uppercase text-sabc-gray-400">Période</div>
+                  <div className="mt-1 font-semibold text-sabc-gray-900 dark:text-white">{context.periodLabel}</div>
+                  <div className="mt-1 text-xs text-sabc-gray-500">
+                    {context.periodRange
+                      ? `${formatDateLabel(context.periodRange.start)} — ${formatDateLabel(context.periodRange.end)}`
+                      : 'Période non renseignée'}
                   </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+                <div className="rounded-lg border border-sabc-gray-200 p-4">
+                  <div className="text-xs uppercase text-sabc-gray-400">Cadre</div>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <Badge variant="info">{context.criteriaCount} critères</Badge>
+                    <Badge variant="info">{context.sections.length} sections</Badge>
+                    <Badge variant="warning">visibilité {context.visibilityDetail}</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {evaluation?.commentaire_validation ? (
+              <Alert className="border-sabc-warning bg-sabc-warning/10">
+                <AlertTitle>Retour manager</AlertTitle>
+                <AlertDescription className="space-y-1">
+                  {evaluation?.validateur ? (
+                    <div className="text-xs text-sabc-gray-500">
+                      {`Dernière décision par ${formatDisplayName(evaluation.validateur)}`}
+                    </div>
+                  ) : null}
+                  <div>{evaluation.commentaire_validation}</div>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            <ActiveRulesCard
+              rules={evaluation?.regle ? [context.rule] : []}
+              maxItems={1}
+              description="La saisie suit exactement la règle publiée attachée à cette évaluation."
+            />
+
+            <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Pencil className="h-5 w-5 text-sabc-red-primary" />
+                  Saisie des critères
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {criteria.map((critere, index) => (
+                  <div
+                    key={String(critere.id ?? index)}
+                    className="rounded-lg border border-sabc-gray-200 p-4 transition hover:border-sabc-red-primary/40 dark:border-sabc-gray-700"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-sabc-gray-900 dark:text-white">{critere.libelle}</div>
+                        <div className="mt-1 flex flex-wrap gap-2 text-[10px] uppercase">
+                          <Badge variant="secondary">{critere.section}</Badge>
+                          {critere.poids != null ? <Badge variant="secondary">Poids {critere.poids}</Badge> : null}
+                          <Badge variant="secondary">Critère {index + 1}</Badge>
+                        </div>
+                        {critere.description && (
+                          <div className="mt-2 text-xs text-sabc-gray-500">{critere.description}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => handleScoreChange(index, value)}
+                          className={cn(
+                            'h-9 w-9 rounded-full border text-sm font-semibold transition',
+                            notes[index]?.note === value
+                              ? 'border-sabc-red-primary bg-sabc-red-primary text-white'
+                              : 'border-sabc-gray-200 bg-white text-sabc-gray-600 hover:border-sabc-red-primary/60 hover:text-sabc-red-primary dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-300'
+                          )}
+                        >
+                          {value}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sabc-gray-400">
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        Commentaire
+                        {((notes[index]?.note ?? 0) < (critere.commentaireRequisSiNoteLt ?? 3)) && (
+                          <span className="rounded bg-sabc-red-light px-1.5 py-0.5 text-[10px] text-sabc-red-primary">
+                            Obligatoire sous {critere.commentaireRequisSiNoteLt ?? 3}
+                          </span>
+                        )}
+                      </div>
+                      <Textarea
+                        rows={3}
+                        value={notes[index]?.commentaire ?? ''}
+                        onChange={(event) => handleCommentChange(index, event.target.value)}
+                        placeholder="Partagez vos observations ou un plan d'action."
+                        className={cn(
+                          'text-sm',
+                          isCriterionCommentRequired({
+                            note: notes[index]?.note,
+                            commentaire: notes[index]?.commentaire,
+                            commentaireRequisSiNoteLt: critere.commentaireRequisSiNoteLt,
+                          })
+                            ? 'border-sabc-red-primary'
+                            : ''
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">

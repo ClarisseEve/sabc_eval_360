@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, ArrowRight, ClipboardList, UserRound } from 'lucide-react';
+import { AlertCircle, ArrowRight, Calendar, ClipboardList, UserRound } from 'lucide-react';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
@@ -9,11 +9,13 @@ import { reglesApi, evaluationsApi } from '@/Services/api';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { useEligibles, usePeriodesActives } from '@/Hooks/queries/useEvaluationsQuery';
 import { AdminEvaluationsLayout } from './shared';
+import { filterApplicableRules } from '@/utils/rules';
 
 type EligibleOption = {
   matricule: string;
   label: string;
   bucket: string;
+  role: string;
 };
 
 function normalizeEligibles(data: any): EligibleOption[] {
@@ -23,10 +25,16 @@ function normalizeEligibles(data: any): EligibleOption[] {
     matricule: item.matricule,
     label: [item.prenom, item.nom].filter(Boolean).join(' ').trim() || item.matricule,
     bucket,
+    role: item.role_nom || item.role,
   }));
 
   const rows = [
-    ...(data.auto ? [{ matricule: data.auto.matricule, label: [data.auto.prenom, data.auto.nom].filter(Boolean).join(' ').trim() || data.auto.matricule, bucket: 'Auto-évaluation' }] : []),
+    ...(data.auto ? [{
+      matricule: data.auto.matricule,
+      label: [data.auto.prenom, data.auto.nom].filter(Boolean).join(' ').trim() || data.auto.matricule,
+      bucket: 'Auto-évaluation',
+      role: data.auto.role_nom || data.auto.role,
+    }] : []),
     ...push(Array.isArray(data.subordonnes) ? data.subordonnes : [], 'Subordonnés'),
     ...push(Array.isArray(data.pairs) ? data.pairs : [], 'Pairs'),
   ];
@@ -66,8 +74,29 @@ export default function EvaluationFormPage() {
   }, [regles, selectedRegle]);
 
   const selectedEligible = eligibles.find((item) => item.matricule === selectedTarget);
-  const selectedRule = regles.find((item: any) => item.id_regle === selectedRegle);
+  const evaluationType = selectedEligible?.bucket === 'Auto-évaluation'
+    ? 'auto'
+    : selectedEligible?.bucket === 'Pairs'
+      ? 'pairs'
+      : selectedEligible?.bucket === 'Subordonnés'
+        ? 'descendante'
+        : null;
+  const applicableRules = React.useMemo(
+    () => filterApplicableRules(regles, user?.role_nom || user?.role, selectedEligible?.role, evaluationType),
+    [regles, user?.role_nom, user?.role, selectedEligible?.role, evaluationType],
+  );
+  const selectedRule = applicableRules.find((item) => item.id_regle === selectedRegle);
   const selectedPeriodeData = periodes.find((item: any) => item.id_periode === selectedPeriode);
+
+  React.useEffect(() => {
+    if (applicableRules.length > 0) {
+      setSelectedRegle((current) => current && applicableRules.some((rule) => rule.id_regle === current)
+        ? current
+        : applicableRules[0].id_regle);
+      return;
+    }
+    setSelectedRegle('');
+  }, [applicableRules]);
 
   const createMutation = useMutation({
     mutationFn: () => {
@@ -160,7 +189,7 @@ export default function EvaluationFormPage() {
                   <SelectValue placeholder="Sélectionner une règle" />
                 </SelectTrigger>
                 <SelectContent>
-                  {regles.map((regle: any) => (
+                  {applicableRules.map((regle: any) => (
                     <SelectItem key={regle.id_regle} value={regle.id_regle}>
                       {regle.nom_regle}
                     </SelectItem>
@@ -211,6 +240,11 @@ export default function EvaluationFormPage() {
                 </div>
                 <div>{selectedRule?.nom_regle || 'Aucune règle sélectionnée'}</div>
                 <div className="text-xs text-sabc-gray-500">{selectedRule?.description || ''}</div>
+                {selectedRule ? (
+                  <div className="mt-2 text-xs text-sabc-gray-500">
+                    {selectedRule.criteres?.length || 0} critères · {selectedRule.sections?.length || 0} section(s)
+                  </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>

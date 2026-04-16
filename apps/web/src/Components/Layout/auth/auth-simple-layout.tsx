@@ -3,7 +3,6 @@ import { Link } from '@/lib/inertia-shim';
 import { type PropsWithChildren } from 'react';
 
 interface AuthLayoutProps {
-    name?: string;
     title?: string;
     description?: string;
 }

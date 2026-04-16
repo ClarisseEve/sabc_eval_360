@@ -6,6 +6,7 @@ import { Button } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Input } from '@/Components/UI/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { TruncatedTableBody } from '@/Components/UI/TruncatedList/TruncatedList';
 import { remplacementsApi } from '@/Services/api';
 import { AdminRemplacementsLayout } from './shared';
 
@@ -88,27 +89,33 @@ export default function RemplacementsIndex() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row: any) => {
-                const statut = row.est_actif ? 'Actif' : 'Terminé';
-                return (
-                  <TableRow key={row.id_remplacement}>
-                    <TableCell>{[row.titulaire_prenom, row.titulaire_nom].filter(Boolean).join(' ')} ({row.titulaire_matricule})</TableCell>
-                    <TableCell>{[row.remplacant_prenom, row.remplacant_nom].filter(Boolean).join(' ')} ({row.remplacant_matricule})</TableCell>
-                    <TableCell>{row.role_remplace}</TableCell>
-                    <TableCell>{row.date_debut} {row.date_fin ? `→ ${row.date_fin}` : ''}</TableCell>
-                    <TableCell><Badge variant={row.est_actif ? 'default' : 'outline'}>{statut}</Badge></TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Link to={`/admin/remplacements/${row.id_remplacement}`}><Button variant="outline" size="sm">Voir</Button></Link>
-                        <Link to={`/admin/remplacements/${row.id_remplacement}/edit`}><Button variant="outline" size="sm">Modifier</Button></Link>
-                        {row.est_actif ? (
-                          <Button variant="outline" size="sm" onClick={() => terminerMutation.mutate(String(row.id_remplacement))}>Terminer</Button>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              <TruncatedTableBody
+                items={rows}
+                previewCount={10}
+                colSpan={6}
+                keyExtractor={(row: any) => row.id_remplacement}
+                renderRow={(row: any) => {
+                  const statut = row.est_actif ? 'Actif' : 'Terminé';
+                  return (
+                    <TableRow key={row.id_remplacement}>
+                      <TableCell>{[row.titulaire_prenom, row.titulaire_nom].filter(Boolean).join(' ')} ({row.titulaire_matricule})</TableCell>
+                      <TableCell>{[row.remplacant_prenom, row.remplacant_nom].filter(Boolean).join(' ')} ({row.remplacant_matricule})</TableCell>
+                      <TableCell>{row.role_remplace}</TableCell>
+                      <TableCell>{row.date_debut} {row.date_fin ? `→ ${row.date_fin}` : ''}</TableCell>
+                      <TableCell><Badge variant={row.est_actif ? 'default' : 'outline'}>{statut}</Badge></TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Link to={`/admin/remplacements/${row.id_remplacement}`}><Button variant="outline" size="sm">Voir</Button></Link>
+                          <Link to={`/admin/remplacements/${row.id_remplacement}/edit`}><Button variant="outline" size="sm">Modifier</Button></Link>
+                          {row.est_actif ? (
+                            <Button variant="outline" size="sm" onClick={() => terminerMutation.mutate(String(row.id_remplacement))}>Terminer</Button>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }}
+              />
             </TableBody>
           </Table>
         </CardContent>

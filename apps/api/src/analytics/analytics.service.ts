@@ -2,6 +2,42 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabasePgService } from '../database/database-pg.service';
 import { CacheService } from '../common/cache.service';
+import { PrismaService } from '../prisma/prisma.service';
+
+type ImprovementPlanFilters = {
+  role?: string;
+  id_region?: string;
+  type?: string;
+};
+
+type AdminRegionAggregate = {
+  id_region: string;
+  nom_region: string;
+  est_taniere: boolean;
+  utilisateurs: number;
+  evaluations: number;
+  average_score: number;
+  completion_rate: number;
+  badgeColor: string;
+  badgeText: string;
+};
+
+type ImprovementPlanSnapshot = {
+  user: {
+    matricule: string;
+    nom: string | null;
+    prenom: string | null;
+    role: string | null;
+    role_nom: string | null;
+    region_nom: string | null;
+  };
+  axes: any[];
+  recommandations: any[];
+};
+
+const EVALUATION_EFFECTIVE_TS_SQL = `COALESCE(date_validation, date_soumission, created_at, date_creation::timestamp)`;
+const EVALUATION_EFFECTIVE_DATE_SQL = `COALESCE(date_validation::date, date_soumission::date, created_at::date, date_creation)`;
+const USER_REF_TABLE = 'utilisateurs_ref';
 
 @Injectable()
 export class AnalyticsService {
@@ -14,6 +50,7 @@ export class AnalyticsService {
     private config: ConfigService,
     private pg: DatabasePgService,
     private cache: CacheService,
+    private prisma: PrismaService,
   ) {
     this.serviceUrl = config.get('ANALYTICS_SERVICE_URL', 'http://analytics-service:8080');
     this.serviceKey = config.get('ANALYTICS_SERVICE_KEY', 'internal-service-key');
@@ -49,7 +86,7 @@ export class AnalyticsService {
     return this.pg.query(
       `SELECT statut, COUNT(*) as count
        FROM evaluations
-       WHERE date_evaluation BETWEEN $1 AND $2
+       WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2
        GROUP BY statut`,
       [startDate, endDate],
     );
@@ -64,7 +101,7 @@ export class AnalyticsService {
               AVG(note_globale) as average_score,
               COUNT(*) as count
        FROM evaluations
-       WHERE date_evaluation BETWEEN $1 AND $2 AND note_globale IS NOT NULL
+       WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2 AND note_globale IS NOT NULL
        GROUP BY type_evaluation`,
       [startDate, endDate],
     );
@@ -78,10 +115,152 @@ export class AnalyticsService {
          AVG(note_globale) FILTER (WHERE note_globale IS NOT NULL) as score_moyen
        FROM evaluations
        WHERE evalue_matricule IN (
-         SELECT matricule FROM utilisateurs WHERE id_region = $1
+         SELECT matricule FROM ${USER_REF_TABLE} WHERE id_region = $1
        )`,
       [idRegion],
     );
+  }
+
+  async getAdminOverview() {
+    return this.cache.getOrCompute('analytics:admin:overview', 120, () => this._getAdminOverview());
+  }
+
+  private async _getAdminOverview() {
+    const [dashboard, userStats, evaluationStatus, remplacements, regionsOverview, roleAnalytics] = await Promise.all([
+      this.getDashboard(),
+      (async () => ({
+        total_users: String(await this.prisma.utilisateur.count()),
+        active_users: String(await this.prisma.utilisateur.count({ where: { est_actif: true } })),
+      }))(),
+      this.pg.queryOne<any>(
+        `SELECT
+           COUNT(*)::text as total_evaluations,
+           COUNT(*) FILTER (WHERE statut = 'valide')::text as validated_evaluations,
+           COUNT(*) FILTER (WHERE statut = 'soumis')::text as submitted_evaluations,
+           COUNT(*) FILTER (WHERE statut = 'brouillon')::text as draft_evaluations
+         FROM evaluations`,
+      ),
+      this.pg.queryOne<any>(
+        `SELECT COUNT(*)::text as active_replacements
+         FROM remplacements_temporaires
+         WHERE est_actif = true AND (date_fin IS NULL OR date_fin >= CURRENT_DATE)`,
+      ),
+      this.getAdminRegionsOverview(),
+      this.getAdminRoleAnalytics(),
+    ]);
+
+    const totalEvaluations = Number(evaluationStatus?.total_evaluations ?? dashboard?.kpis?.total_evaluations ?? 0);
+    const validatedEvaluations = Number(evaluationStatus?.validated_evaluations ?? 0);
+    const submittedEvaluations = Number(evaluationStatus?.submitted_evaluations ?? 0);
+    const draftEvaluations = Number(evaluationStatus?.draft_evaluations ?? 0);
+    const completionRate = totalEvaluations > 0
+      ? Math.round((validatedEvaluations / totalEvaluations) * 10000) / 100
+      : 0;
+
+    return {
+      kpis: {
+        total_evaluations: totalEvaluations,
+        unique_users: Number(dashboard?.kpis?.unique_users ?? 0),
+        average_score: Number(dashboard?.kpis?.average_score ?? 0),
+        completion_rate: completionRate,
+        validated_evaluations: validatedEvaluations,
+        active_users: Number(userStats?.active_users ?? 0),
+        total_users: Number(userStats?.total_users ?? 0),
+        active_replacements: Number(remplacements?.active_replacements ?? 0),
+      },
+      status_distribution: [
+        { name: 'Validées', value: validatedEvaluations, color: '#48BB78' },
+        { name: 'Soumises', value: submittedEvaluations, color: '#3182CE' },
+        { name: 'Brouillons', value: draftEvaluations, color: '#D69E2E' },
+      ].filter((entry) => entry.value > 0),
+      channel_distribution: Array.isArray(dashboard?.channel_distribution) ? dashboard.channel_distribution : [],
+      performance_trend: Array.isArray(dashboard?.performance_trend) ? dashboard.performance_trend : [],
+      regions: regionsOverview.inter_region,
+      top_roles: roleAnalytics.roles.slice(0, 6),
+      generated_at: new Date().toISOString(),
+    };
+  }
+
+  async getAdminRoleAnalytics() {
+    return this.cache.getOrCompute('analytics:admin:roles', 120, () => this._getAdminRoleAnalytics());
+  }
+
+  private async _getAdminRoleAnalytics() {
+    const [roles, channels] = await Promise.all([
+      this.getAdminRolePerformance(),
+      this.getPerformances(),
+    ]);
+
+    const globalAverage = roles.length > 0
+      ? Math.round((roles.reduce((sum, role) => sum + role.avgScore, 0) / roles.length) * 100) / 100
+      : 0;
+
+    return {
+      global_average: globalAverage,
+      roles: roles.map((role) => ({
+        ...role,
+        delta_vs_global: Math.round((role.avgScore - globalAverage) * 100) / 100,
+      })),
+      channels: Array.isArray(channels)
+        ? channels.map((channel: any) => ({
+            channel: String(channel?.channel ?? 'autre'),
+            average_score: Number(channel?.average_score ?? 0),
+            count: Number(channel?.count ?? 0),
+          }))
+        : [],
+      generated_at: new Date().toISOString(),
+    };
+  }
+
+  async getAdminRegionsOverview() {
+    return this.cache.getOrCompute('analytics:admin:regions', 120, () => this._getAdminRegionsOverview());
+  }
+
+  private async _getAdminRegionsOverview() {
+    const rows = await this.getAdminRegionAggregates();
+
+    return {
+      regions: rows,
+      inter_region: rows.map((region) => ({
+        id_region: region.id_region,
+        region: region.nom_region,
+        utilisateurs: region.utilisateurs,
+        evaluations: region.evaluations,
+        average_score: region.average_score,
+        completion_rate: region.completion_rate,
+      })),
+      generated_at: new Date().toISOString(),
+    };
+  }
+
+  async getAdminRegionDetail(idRegion: string) {
+    return this.cache.getOrCompute(`analytics:admin:region:${idRegion}`, 120, () => this._getAdminRegionDetail(idRegion));
+  }
+
+  private async _getAdminRegionDetail(idRegion: string) {
+    const [overview, statsRows, classement] = await Promise.all([
+      this.getAdminRegionsOverview(),
+      this.getRegionAnalytics(idRegion),
+      this.getClassementRegional(idRegion),
+    ]);
+
+    const region = Array.isArray(overview.regions)
+      ? overview.regions.find((entry: any) => String(entry.id_region) === String(idRegion)) ?? null
+      : null;
+    const stats = Array.isArray(statsRows) ? statsRows[0] ?? null : statsRows ?? null;
+
+    return {
+      region,
+      stats: stats
+        ? {
+            total_evaluations: Number(stats.total_evaluations ?? 0),
+            validees: Number(stats.validees ?? 0),
+            score_moyen: stats.score_moyen != null ? Number(stats.score_moyen) : null,
+          }
+        : null,
+      classement,
+      generated_at: new Date().toISOString(),
+    };
   }
 
   // Fallback when microservice is unavailable
@@ -95,24 +274,24 @@ export class AnalyticsService {
          COUNT(DISTINCT evalue_matricule) as unique_users,
          AVG(note_globale) as average_score
        FROM evaluations
-       WHERE date_evaluation BETWEEN $1 AND $2`,
+       WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2`,
       [startDate, endDate],
     );
 
     const channels = await this.pg.query(
       `SELECT type_evaluation as channel, COUNT(*) as total, AVG(note_globale) as average_score
        FROM evaluations
-       WHERE date_evaluation BETWEEN $1 AND $2
+       WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2
        GROUP BY type_evaluation`,
       [startDate, endDate],
     );
 
     const trends = await this.pg.query(
-      `SELECT TO_CHAR(date_evaluation, 'YYYY-MM') as period,
+      `SELECT TO_CHAR(${EVALUATION_EFFECTIVE_DATE_SQL}, 'YYYY-MM') as period,
               AVG(note_globale) as score, COUNT(*) as count
        FROM evaluations
-       WHERE date_evaluation BETWEEN $1 AND $2
-       GROUP BY TO_CHAR(date_evaluation, 'YYYY-MM')
+       WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2
+       GROUP BY TO_CHAR(${EVALUATION_EFFECTIVE_DATE_SQL}, 'YYYY-MM')
        ORDER BY period`,
       [startDate, endDate],
     );
@@ -138,7 +317,7 @@ export class AnalyticsService {
       `SELECT notations_json, type_evaluation, note_globale
        FROM evaluations
        WHERE evalue_matricule = $1 AND statut = 'valide' AND notations_json IS NOT NULL
-       ORDER BY date_evaluation DESC LIMIT 20`,
+       ORDER BY ${EVALUATION_EFFECTIVE_TS_SQL} DESC LIMIT 20`,
       [matricule],
     );
 
@@ -193,6 +372,85 @@ export class AnalyticsService {
       .sort((a, b) => b.moyenne - a.moyenne);
 
     return { axes_amelioration: suggestions, forces, total_criteres: Object.keys(criteriaScores).length };
+  }
+
+  async getImprovementPlans(filters: ImprovementPlanFilters = {}) {
+    const key = `analytics:improvement-plans:${filters.role ?? 'all'}:${filters.id_region ?? 'all'}:${filters.type ?? 'all'}`;
+    return this.cache.getOrCompute(key, 180, () => this._getImprovementPlans(filters));
+  }
+
+  private async _getImprovementPlans(filters: ImprovementPlanFilters = {}) {
+    const users = await this.prisma.utilisateur.findMany({
+      where: {
+        est_actif: true,
+        ...(filters.id_region ? { id_region: filters.id_region } : {}),
+        ...(filters.role
+          ? {
+              OR: [
+                { role: filters.role },
+                { role_nom: filters.role },
+              ],
+            }
+          : {}),
+      },
+      select: {
+        matricule: true,
+        nom: true,
+        prenom: true,
+        role: true,
+        role_nom: true,
+        region_nom: true,
+      },
+      orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
+    });
+
+    const snapshots = await this.mapWithConcurrency(users, 8, async (user) => this.buildImprovementPlanSnapshot(user));
+    const allRows = this.buildImprovementRows(snapshots);
+    const filteredRows = filters.type ? allRows.filter((row) => row.type === filters.type) : allRows;
+    const groupedByType = new Map<string, { total: number; highPriority: number; users: Set<string> }>();
+
+    allRows.forEach((row) => {
+      const current = groupedByType.get(row.type) ?? { total: 0, highPriority: 0, users: new Set<string>() };
+      current.total += 1;
+      current.users.add(row.matricule);
+      if (String(row.priorite).toLowerCase() === 'haute') {
+        current.highPriority += 1;
+      }
+      groupedByType.set(row.type, current);
+    });
+
+    const byType = Array.from(groupedByType.entries())
+      .map(([type, aggregate]) => ({
+        type,
+        total: aggregate.total,
+        highPriority: aggregate.highPriority,
+        users: aggregate.users.size,
+      }))
+      .sort((left, right) => right.total - left.total);
+
+    const topAxes = this.buildImprovementTopAxes(snapshots);
+    const highPriorityCount = allRows.filter((row) => String(row.priorite).toLowerCase() === 'haute').length;
+    const usersWithRecommendations = new Set(allRows.map((row) => row.matricule)).size;
+
+    return {
+      filters: {
+        role: filters.role ?? null,
+        id_region: filters.id_region ?? null,
+        type: filters.type ?? null,
+      },
+      totals: {
+        users_filtered: users.length,
+        users_analyzed: snapshots.length,
+        recommendations_total: filteredRows.length,
+        recommendations_total_all_types: allRows.length,
+        high_priority: highPriorityCount,
+        users_with_recommendations: usersWithRecommendations,
+      },
+      by_type: byType,
+      top_axes: topAxes,
+      rows: filteredRows,
+      generated_at: new Date().toISOString(),
+    };
   }
 
   // ─── Détection d'anomalies ───────────────────────────────────────────────
@@ -252,7 +510,7 @@ export class AnalyticsService {
          SELECT evalue_matricule, AVG(note_globale) as score_recent
          FROM evaluations
          WHERE statut = 'valide' AND note_globale IS NOT NULL
-           AND date_evaluation >= NOW() - INTERVAL '3 months'
+           AND ${EVALUATION_EFFECTIVE_TS_SQL} >= NOW() - INTERVAL '3 months'
            ${matricule ? 'AND evalue_matricule = $1' : ''}
          GROUP BY evalue_matricule
        ),
@@ -260,8 +518,8 @@ export class AnalyticsService {
          SELECT evalue_matricule, AVG(note_globale) as score_ancien
          FROM evaluations
          WHERE statut = 'valide' AND note_globale IS NOT NULL
-           AND date_evaluation < NOW() - INTERVAL '3 months'
-           AND date_evaluation >= NOW() - INTERVAL '6 months'
+           AND ${EVALUATION_EFFECTIVE_TS_SQL} < NOW() - INTERVAL '3 months'
+           AND ${EVALUATION_EFFECTIVE_TS_SQL} >= NOW() - INTERVAL '6 months'
            ${matricule ? 'AND evalue_matricule = $1' : ''}
          GROUP BY evalue_matricule
        )
@@ -369,13 +627,20 @@ export class AnalyticsService {
 
   private async _getRecommandations(matricule: string) {
     const [axes, scores, user] = await Promise.all([
-      this._getAxesAmelioration(matricule),
-      this._getScoresUtilisateur(matricule),
-      this.pg.queryOne<any>(
-        `SELECT u.matricule, u.nom, u.prenom, u.role, u.id_region, u.niveau_hierarchique
-         FROM utilisateurs u WHERE u.matricule = $1`,
-        [matricule],
-      ),
+      this.getAxesAmelioration(matricule),
+      this.getScoresUtilisateur(matricule),
+      this.prisma.utilisateur.findUnique({
+        where: { matricule },
+        select: {
+          matricule: true,
+          nom: true,
+          prenom: true,
+          role: true,
+          role_nom: true,
+          id_region: true,
+          niveau_hierarchique: true,
+        },
+      }),
     ]);
 
     const recommandations: Array<{
@@ -409,7 +674,7 @@ export class AnalyticsService {
         `SELECT DISTINCT e.evalue_matricule as matricule, u.nom, u.prenom, u.role,
                 AVG(e.note_globale) as score_moyen
          FROM evaluations e
-         JOIN utilisateurs u ON e.evalue_matricule = u.matricule
+         JOIN ${USER_REF_TABLE} u ON e.evalue_matricule = u.matricule
          WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
            AND u.id_region = $1 AND u.est_actif = true
            AND e.evalue_matricule != $2
@@ -448,7 +713,7 @@ export class AnalyticsService {
         details: {
           score_global: scores.score_global,
           progression: scores.progression,
-          suggestion: user?.niveau_hierarchique > 1
+          suggestion: Number(user?.niveau_hierarchique ?? 0) > 1
             ? 'Considérer pour un poste de niveau supérieur'
             : 'Proposer des missions transversales ou inter-régions',
         },
@@ -497,7 +762,7 @@ export class AnalyticsService {
       `SELECT AVG(note_globale) as score_recent
        FROM evaluations
        WHERE evalue_matricule = $1 AND statut = 'valide' AND note_globale IS NOT NULL
-         AND date_evaluation >= NOW() - INTERVAL '6 months'`,
+         AND ${EVALUATION_EFFECTIVE_TS_SQL} >= NOW() - INTERVAL '6 months'`,
       [matricule],
     );
 
@@ -505,8 +770,8 @@ export class AnalyticsService {
       `SELECT AVG(note_globale) as score_ancien
        FROM evaluations
        WHERE evalue_matricule = $1 AND statut = 'valide' AND note_globale IS NOT NULL
-         AND date_evaluation < NOW() - INTERVAL '6 months'
-         AND date_evaluation >= NOW() - INTERVAL '12 months'`,
+         AND ${EVALUATION_EFFECTIVE_TS_SQL} < NOW() - INTERVAL '6 months'
+         AND ${EVALUATION_EFFECTIVE_TS_SQL} >= NOW() - INTERVAL '12 months'`,
       [matricule],
     );
 
@@ -560,7 +825,7 @@ export class AnalyticsService {
          AVG(e.note_globale) as score_moyen,
          COUNT(*) as nb_evaluations
        FROM evaluations e
-       JOIN utilisateurs u ON e.evalue_matricule = u.matricule
+       JOIN ${USER_REF_TABLE} u ON e.evalue_matricule = u.matricule
        WHERE u.id_region = $1 AND e.statut = 'valide' AND e.note_globale IS NOT NULL
        GROUP BY e.evalue_matricule
        HAVING COUNT(*) >= 2
@@ -619,5 +884,155 @@ export class AnalyticsService {
     const d = new Date();
     d.setMonth(d.getMonth() - 6);
     return d.toISOString().split('T')[0];
+  }
+
+  private async buildImprovementPlanSnapshot(user: any): Promise<ImprovementPlanSnapshot> {
+    const [axes, recommandations] = await Promise.all([
+      this.getAxesAmelioration(String(user.matricule)),
+      this.getRecommandations(String(user.matricule)),
+    ]);
+
+    return {
+      user: {
+        matricule: String(user.matricule),
+        nom: user.nom ?? null,
+        prenom: user.prenom ?? null,
+        role: user.role ?? null,
+        role_nom: user.role_nom ?? null,
+        region_nom: user.region_nom ?? null,
+      },
+      axes: Array.isArray((axes as any)?.axes_amelioration) ? (axes as any).axes_amelioration : [],
+      recommandations: Array.isArray((recommandations as any)?.recommandations) ? (recommandations as any).recommandations : [],
+    };
+  }
+
+  private buildImprovementRows(snapshots: ImprovementPlanSnapshot[]) {
+    return snapshots.flatMap((snapshot) =>
+      snapshot.recommandations.map((recommendation) => ({
+        matricule: snapshot.user.matricule,
+        nomComplet: `${snapshot.user.prenom ?? ''} ${snapshot.user.nom ?? ''}`.trim() || snapshot.user.matricule,
+        role: snapshot.user.role_nom || snapshot.user.role || 'Rôle non renseigné',
+        region: snapshot.user.region_nom || 'Région non renseignée',
+        type: String(recommendation?.type || 'recommandation'),
+        priorite: String(recommendation?.priorite || 'moyenne'),
+        titre: String(recommendation?.titre || 'Recommandation'),
+        description: String(recommendation?.description || ''),
+        axeDominant: snapshot.axes[0]?.critere || '—',
+      })),
+    );
+  }
+
+  private buildImprovementTopAxes(snapshots: ImprovementPlanSnapshot[]) {
+    const grouped = new Map<string, { count: number; scoreTotal: number; priorite: string }>();
+
+    snapshots.forEach((snapshot) => {
+      snapshot.axes.slice(0, 3).forEach((axis: any) => {
+        const critere = String(axis?.critere || 'Critère');
+        const scoreActuel = Number(axis?.score_actuel ?? axis?.moyenne ?? 0);
+        const priorite = String(axis?.priorite || 'moyenne');
+        const current = grouped.get(critere) ?? { count: 0, scoreTotal: 0, priorite };
+        current.count += 1;
+        current.scoreTotal += scoreActuel;
+        if (priorite.toLowerCase() === 'haute') {
+          current.priorite = 'haute';
+        }
+        grouped.set(critere, current);
+      });
+    });
+
+    return Array.from(grouped.entries())
+      .map(([critere, aggregate]) => ({
+        critere,
+        count: aggregate.count,
+        priorite: aggregate.priorite,
+        scoreMoyen: aggregate.count > 0 ? Math.round((aggregate.scoreTotal / aggregate.count) * 100) / 100 : 0,
+      }))
+      .sort((left, right) => right.count - left.count || left.scoreMoyen - right.scoreMoyen)
+      .slice(0, 10);
+  }
+
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    mapper: (item: T, index: number) => Promise<R>,
+  ): Promise<R[]> {
+    if (items.length === 0) return [];
+
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+
+    const worker = async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex++;
+        results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+    );
+
+    return results;
+  }
+
+  private async getAdminRegionAggregates(): Promise<AdminRegionAggregate[]> {
+    const rows = await this.pg.query<any>(
+      `SELECT
+         COALESCE(NULLIF(TRIM(u.id_region), ''), 'unknown') as id_region,
+         COALESCE(NULLIF(TRIM(u.region_nom), ''), COALESCE(NULLIF(TRIM(u.id_region), ''), 'Région non renseignée')) as nom_region,
+         BOOL_OR(LOWER(COALESCE(u.type_region, '')) = 'taniere') as est_taniere,
+         COUNT(DISTINCT u.matricule)::int as utilisateurs,
+         COUNT(e.id_evaluation)::int as evaluations,
+         COALESCE(ROUND(AVG(e.note_globale) FILTER (WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL)::numeric, 2), 0)::float as average_score,
+         CASE
+           WHEN COUNT(e.id_evaluation) > 0
+             THEN ROUND((COUNT(e.id_evaluation) FILTER (WHERE e.statut = 'valide'))::numeric / COUNT(e.id_evaluation)::numeric * 100, 0)::float
+           ELSE 0
+         END as completion_rate
+       FROM ${USER_REF_TABLE} u
+       LEFT JOIN evaluations e ON e.evalue_matricule = u.matricule
+       WHERE COALESCE(u.est_actif, true) = true
+       GROUP BY COALESCE(NULLIF(TRIM(u.id_region), ''), 'unknown'),
+                COALESCE(NULLIF(TRIM(u.region_nom), ''), COALESCE(NULLIF(TRIM(u.id_region), ''), 'Région non renseignée'))
+       ORDER BY nom_region ASC`,
+    );
+
+    return rows.map((row: any) => ({
+      id_region: String(row.id_region),
+      nom_region: String(row.nom_region),
+      est_taniere: Boolean(row.est_taniere),
+      utilisateurs: Number(row.utilisateurs ?? 0),
+      evaluations: Number(row.evaluations ?? 0),
+      average_score: Number(row.average_score ?? 0),
+      completion_rate: Number(row.completion_rate ?? 0),
+      badgeColor: row.est_taniere ? '#E53E3E' : '#FF9800',
+      badgeText: row.est_taniere ? 'Taniere' : 'Non-taniere',
+    }));
+  }
+
+  private async getAdminRolePerformance() {
+    const rows = await this.pg.query<any>(
+      `SELECT
+         COALESCE(NULLIF(TRIM(u.role), ''), 'Rôle non renseigné') as role,
+         COUNT(DISTINCT u.matricule)::int as count,
+         COALESCE(ROUND(AVG(e.note_globale) FILTER (WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL)::numeric, 2), 0)::float as avg_score,
+         CASE
+           WHEN COUNT(e.id_evaluation) > 0
+             THEN ROUND((COUNT(e.id_evaluation) FILTER (WHERE e.statut = 'valide'))::numeric / COUNT(e.id_evaluation)::numeric * 100, 0)::float
+           ELSE 0
+         END as completion
+       FROM ${USER_REF_TABLE} u
+       LEFT JOIN evaluations e ON e.evalue_matricule = u.matricule
+       WHERE COALESCE(u.est_actif, true) = true
+       GROUP BY COALESCE(NULLIF(TRIM(u.role), ''), 'Rôle non renseigné')
+       ORDER BY avg_score DESC NULLS LAST, count DESC`,
+    );
+
+    return rows.map((row: any) => ({
+      role: String(row.role),
+      count: Number(row.count ?? 0),
+      avgScore: Number(row.avg_score ?? 0),
+      completion: Number(row.completion ?? 0),
+    }));
   }
 }

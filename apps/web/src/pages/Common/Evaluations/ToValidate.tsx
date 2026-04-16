@@ -4,8 +4,9 @@ import { Card, CardContent } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import ValidationModal from '@/Components/Evaluation/ValidationModal';
-import { useEvaluations } from '@/Hooks/queries';
-import { EvaluationPageLayout } from './shared';
+import { useEvaluationWorkflowData } from '@/Hooks/queries';
+import { buildEvaluationContext, EvaluationPageLayout } from './shared';
+import { formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
 
 type Cible = {
   matricule: string;
@@ -38,9 +39,9 @@ const typeLabel: Record<string, string> = {
 };
 
 export default function ToValidate() {
-  const { data } = useEvaluations();
+  const { data } = useEvaluationWorkflowData();
   const [selected, setSelected] = useState<EvaluationAValider | null>(null);
-  const aValider = (Array.isArray(data?.a_valider) ? data.a_valider : []) as EvaluationAValider[];
+  const aValider = data.validations as EvaluationAValider[];
   const stats = {
     total: aValider.length,
     urgents: aValider.filter((ev) =>
@@ -108,6 +109,7 @@ export default function ToValidate() {
             {aValider.map((ev) => {
               const isUrgent = ev.date_soumission &&
                 Math.floor((Date.now() - new Date(ev.date_soumission).getTime()) / 86400000) > 3;
+              const context = buildEvaluationContext(ev as any);
 
               return (
                 <Card
@@ -127,15 +129,20 @@ export default function ToValidate() {
                             {ev.evalue.prenom} {ev.evalue.nom}
                           </div>
                           <div className="text-xs text-gray-500 mt-0.5">
-                            {ev.evalue.role_nom} · Évalué par {ev.evaluateur.prenom} {ev.evaluateur.nom}
+                            {ev.evalue.role_nom} · {context.summary.name || formatEvaluationType(ev.type_evaluation)} · Évalué par {ev.evaluateur.prenom} {ev.evaluateur.nom}
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-2 text-[10px] uppercase">
+                            <Badge variant="info">{context.periodLabel}</Badge>
+                            <Badge variant="info">{context.criteriaCount} critères</Badge>
+                            <Badge variant="warning">visibilité {context.visibilityDetail}</Badge>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-4">
                         {/* Type */}
-                        <Badge variant="outline" className="text-xs hidden sm:block">
-                          {typeLabel[ev.type_evaluation] ?? ev.type_evaluation}
+                        <Badge variant="primary" className="text-xs hidden sm:block">
+                          {typeLabel[ev.type_evaluation] ?? formatEvaluationType(ev.type_evaluation)}
                         </Badge>
 
                         {/* Note */}

@@ -71,7 +71,7 @@ export function BarChart({
   
   // Rendu des barres du graphique
   const renderBars = () => {
-    const radius = layout === 'vertical' ? [0, 4, 4, 0] : [4, 4, 0, 0];
+    const radius: [number, number, number, number] = layout === 'vertical' ? [0, 4, 4, 0] : [4, 4, 0, 0];
 
     if (!bars || bars.length === 0) {
       // Si aucune barre n'est spécifiée, créer une barre par défaut basée sur la première propriété non-xAxis
@@ -107,8 +107,8 @@ export function BarChart({
 
   return (
     <div className={`w-full ${className}`}>
-      {title && <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>}
-      {subtitle && <p className="text-sm text-gray-500 mb-4">{subtitle}</p>}
+      {title && <h3 className="text-sm font-semibold text-sabc-gray-800 dark:text-sabc-gray-100 mb-1">{title}</h3>}
+      {subtitle && <p className="text-xs text-sabc-gray-500 mb-3">{subtitle}</p>}
       
       <ResponsiveContainer width="100%" height={height}>
         <RechartsBarChart
@@ -135,11 +135,11 @@ export function BarChart({
             <>
               <XAxis 
                 dataKey={xAxisDataKey} 
-                tick={{ fill: '#424242', fontSize: 12 }}
+                tick={{ fill: '#616161', fontSize: 11 }}
                 axisLine={{ stroke: '#E0E0E0' }}
               />
               <YAxis 
-                tick={{ fill: '#424242', fontSize: 12 }}
+                tick={{ fill: '#616161', fontSize: 11 }}
                 axisLine={{ stroke: '#E0E0E0' }}
               />
             </>
@@ -147,13 +147,13 @@ export function BarChart({
             <>
               <XAxis 
                 type="number"
-                tick={{ fill: '#424242', fontSize: 12 }}
+                tick={{ fill: '#616161', fontSize: 11 }}
                 axisLine={{ stroke: '#E0E0E0' }}
               />
               <YAxis 
                 dataKey={xAxisDataKey}
                 type="category"
-                tick={{ fill: '#424242', fontSize: 12 }}
+                tick={{ fill: '#616161', fontSize: 11 }}
                 width={140}
                 axisLine={{ stroke: '#E0E0E0' }}
               />
@@ -163,13 +163,15 @@ export function BarChart({
           {tooltip ? (
             tooltip
           ) : (
-            <Tooltip 
-              cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
-              contentStyle={{ 
+            <Tooltip
+              cursor={{ fill: 'rgba(0, 0, 0, 0.04)' }}
+              contentStyle={{
                 backgroundColor: '#FFFFFF',
                 border: '1px solid #E0E0E0',
-                borderRadius: '4px',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+                fontSize: '12px',
+                padding: '8px 12px',
               }}
             />
           )}

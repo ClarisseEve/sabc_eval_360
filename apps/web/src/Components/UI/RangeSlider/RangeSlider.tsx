@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '@/utils/helpers';
 
-export interface RangeSliderProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface RangeSliderProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onChange'> {
   min?: number;
   max?: number;
   step?: number;

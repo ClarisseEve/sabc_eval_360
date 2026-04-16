@@ -111,11 +111,11 @@ const EvaluationsTab: React.FC = () => {
         <CardContent>
           {/* KPIs de supervision */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            {supervisionMetrics.map((metric, index) => {
+            {supervisionMetrics.map((metric) => {
               const IconComponent = metric.icon;
               const priorityColor = metric.priority === 'high' ? 'border-l-red-500' : 'border-l-green-500';
               return (
-                <div key={index} className={`bg-white border border-sabc-gray-200 rounded-lg p-4 border-l-4 ${priorityColor} hover:shadow-md transition-shadow`}>
+                <div key={metric.label} className={`bg-white border border-sabc-gray-200 rounded-lg p-4 border-l-4 ${priorityColor} hover:shadow-md transition-shadow`}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: metric.color + '20' }}>
@@ -148,7 +148,7 @@ const EvaluationsTab: React.FC = () => {
           </div>
 
           {/* Graphiques de supervision */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {globalCompetencyMatrix.length > 0 && (
               <div className="bg-sabc-gray-50 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Matrice de Competences</h3>
@@ -218,7 +218,7 @@ const EvaluationsTab: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {supervisorPerformance.length > 0 && (
                 <div className="bg-sabc-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Performance par Role</h3>
@@ -306,7 +306,7 @@ const EvaluationsTab: React.FC = () => {
               </div>
             </Link>
 
-            <Link href="/admin/analytics" className="group">
+            <Link href="/admin/dashboard?tab=overview" className="group">
               <div className="w-full h-20 border border-sabc-gray-200 rounded-lg p-4 hover:border-sabc-red-primary hover:shadow-md transition-all flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <BarChart3 className="w-6 h-6 text-sabc-success" />

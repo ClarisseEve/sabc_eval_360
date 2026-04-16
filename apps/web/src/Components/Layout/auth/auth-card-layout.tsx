@@ -8,7 +8,6 @@ export default function AuthCardLayout({
     title,
     description,
 }: PropsWithChildren<{
-    name?: string;
     title?: string;
     description?: string;
 }>) {

@@ -15,8 +15,8 @@ export default function EditRemplacement() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: usersData } = useAdminUsers();
-  const users = Array.isArray(usersData) ? usersData : [];
+  const { data: usersData } = useAdminUsers({ limit: 1000 });
+  const users = usersData?.data ?? (Array.isArray(usersData) ? usersData : []);
   const { data } = useSuspenseQuery({
     queryKey: ['admin', 'remplacements', id],
     queryFn: () => remplacementsApi.get(id).then((r) => r.data),

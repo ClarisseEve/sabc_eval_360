@@ -4,7 +4,8 @@ describe('ReglesService', () => {
   let service: ReglesService;
 
   beforeEach(() => {
-    service = new ReglesService();
+    const mockPg = { query: jest.fn(), queryOne: jest.fn() } as any;
+    service = new ReglesService(mockPg);
   });
 
   const validCritere = (override = {}) => ({

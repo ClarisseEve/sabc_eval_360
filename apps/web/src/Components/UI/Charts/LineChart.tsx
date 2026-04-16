@@ -141,12 +141,12 @@ export function LineChart({
           {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />}
           <XAxis 
             dataKey={xAxisDataKey} 
-            tick={{ fill: 'var(--sabc-gray-400)', fontSize: 12 }}
+            tick={{ fill: 'var(--sabc-gray-400)', fontSize: 11 }}
             tickLine={{ stroke: 'var(--sabc-gray-200)' }}
             axisLine={{ stroke: 'var(--sabc-gray-200)' }}
           />
           <YAxis 
-            tick={{ fill: 'var(--sabc-gray-400)', fontSize: 12 }}
+            tick={{ fill: 'var(--sabc-gray-400)', fontSize: 11 }}
             tickLine={{ stroke: 'var(--sabc-gray-200)' }}
             axisLine={{ stroke: 'var(--sabc-gray-200)' }}
           />

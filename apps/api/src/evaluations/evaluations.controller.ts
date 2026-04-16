@@ -36,8 +36,15 @@ export class EvaluationsController {
   }
 
   @Get('historique')
-  async historique(@Request() req: any) {
-    return this.service.getHistorique(req.user.matricule);
+  async historique(
+    @Request() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getHistorique(req.user.matricule, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get('rapport/:idPeriode')
@@ -68,6 +75,6 @@ export class EvaluationsController {
 
   @Post(':id/validate')
   async validate(@Param('id') id: string, @Body() dto: ValidateEvaluationDto, @Request() req: any) {
-    return this.service.validate(id, req.user.matricule, dto.est_validee);
+    return this.service.validate(id, req.user.matricule, dto.est_validee, dto.commentaire_validation);
   }
 }

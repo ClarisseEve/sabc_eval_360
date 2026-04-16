@@ -33,7 +33,11 @@ interface EvaluationTemplate {
   updated_at: string;
 }
 
-const TemplateShowPage = ({ id }) => {
+interface TemplateShowPageProps {
+  id: string;
+}
+
+const TemplateShowPage: React.FC<TemplateShowPageProps> = ({ id }) => {
   const { user, isLoading } = useAuth();
   const [template, setTemplate] = useState<EvaluationTemplate | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -130,7 +134,7 @@ const TemplateShowPage = ({ id }) => {
   }
 
   return (
-    <AppLayout user={user}>
+    <AppLayout user={user || undefined}>
       <Head title={`Template: ${template?.title || 'Chargement...'}`} />
       
       <div className="container mx-auto py-6 px-4 md:px-6">

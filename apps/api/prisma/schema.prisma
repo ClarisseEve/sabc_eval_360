@@ -1,107 +1,280 @@
-// =============================================================================
-// SABC Eval360 — Prisma Schema
-// MySQL (core): utilisateurs, branches, regions, roles
-// PostgreSQL (business): evaluations, periodes, regles
-// =============================================================================
-
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
 }
 
-// Base core : utilisateurs, structure org
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-// =============================================================================
-// CORE (MySQL)
-// =============================================================================
-
 model Branche {
-  id_branche   String   @id @db.VarChar(5)
-  nom_branche  String   @unique @db.VarChar(50)
-  description  String?  @db.Text
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
-
-  roles        Role[]
-  utilisateurs Utilisateur[]
+  id_branche  String    @id @db.VarChar(5)
+  nom_branche String    @unique(map: "unq_branche_nom") @db.VarChar(50)
+  description String?   @db.Text
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @updatedAt @db.Timestamp(0)
+  roles       Role[]
 
   @@map("branches")
 }
 
 model Region {
-  id_region   String   @id @db.VarChar(5)
-  nom_region  String   @unique @db.VarChar(100)
-  est_taniere Boolean  @default(false)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id_region           String              @id @db.VarChar(5)
+  nom_region          String              @unique(map: "regions_nom_region_unique") @db.VarChar(100)
+  est_taniere         Boolean             @default(false)
+  created_at          DateTime            @default(now()) @db.Timestamp(0)
+  updated_at          DateTime            @default(now()) @updatedAt @db.Timestamp(0)
+  servicesCommerciaux ServiceCommercial[]
 
-  utilisateurs Utilisateur[]
-
+  @@index([est_taniere], map: "idx_region_taniere")
   @@map("regions")
 }
 
 model Role {
-  id_role                   String   @id @db.VarChar(5)
-  nom_role                  String   @unique @db.VarChar(50)
-  description               String?  @db.Text
-  id_branche                String   @db.VarChar(5)
+  id_role                   String    @id @db.VarChar(5)
+  nom_role                  String    @unique(map: "roles_nom_role_unique") @db.VarChar(50)
+  description               String?   @db.Text
+  id_branche                String?   @db.VarChar(10)
   niveau_taniere            Int?
   niveau_non_taniere        Int?
-  peut_auto_evaluer         Boolean  @default(true)
-  peut_evaluer_pairs        Boolean  @default(true)
-  peut_evaluer_subordonnes  Boolean  @default(false)
-  peut_cross_branch         Boolean  @default(false)
-  role_principal_equivalent String?  @db.VarChar(50)
-  peut_remplacer_roles      String?  @db.Text
-  portee_geographique       String   @default("region") @db.VarChar(20)
-  created_at                DateTime @default(now())
-  updated_at                DateTime @updatedAt
+  peut_auto_evaluer         Boolean   @default(true)
+  peut_evaluer_pairs        Boolean   @default(true)
+  peut_evaluer_subordonnes  Boolean   @default(false)
+  peut_cross_branch         Boolean   @default(false)
+  role_principal_equivalent String?   @db.VarChar(50)
+  peut_remplacer_roles      String?   @db.Text
+  portee_geographique       String    @default("region") @db.VarChar(20)
+  created_at                DateTime? @db.Timestamp(0)
+  updated_at                DateTime? @updatedAt @db.Timestamp(0)
+  branche                   Branche?  @relation(fields: [id_branche], references: [id_branche], onDelete: NoAction, onUpdate: NoAction, map: "roles_id_branche_foreign")
 
-  branche Branche @relation(fields: [id_branche], references: [id_branche])
-
+  @@index([niveau_taniere, niveau_non_taniere], map: "idx_niveaux")
+  @@index([role_principal_equivalent], map: "idx_role_equivalent")
+  @@index([id_branche, niveau_taniere, niveau_non_taniere], map: "roles_id_branche_niveau_taniere_niveau_non_taniere_index")
   @@map("roles")
 }
 
 model Utilisateur {
-  matricule                  String    @id @db.VarChar(5)
-  nom                        String    @db.VarChar(100)
-  prenom                     String    @db.VarChar(100)
-  email                      String    @unique @db.VarChar(100)
-  telephone                  String?   @db.VarChar(20)
-  password                   String
-  role                       String    @db.VarChar(50)
-  manager_matricule          String?   @db.VarChar(5)
-  niveau_hierarchique        Int       @default(0)
-  id_region                  String    @db.VarChar(5)
-  id_branche                 String    @db.VarChar(5)
-  est_actif                  Boolean   @default(true)
-  est_admin                  Boolean   @default(false)
-  est_indisponible           Boolean   @default(false)
-  photo_url                  String?
-  remember_token             String?   @db.VarChar(100)
-  email_verified_at          DateTime?
-  statut                     String    @default("Actif") @db.VarChar(20)
-  date_debut_indisponibilite DateTime? @db.Date
-  date_fin_indisponibilite   DateTime? @db.Date
-  motif_indisponibilite      String?   @db.VarChar(100)
-  region_nom                 String    @db.VarChar(100)
-  role_nom                   String    @db.VarChar(50)
-  type_region                String    @db.VarChar(20)
-  roles_support_json         String?   @db.Text
-  created_at                 DateTime  @default(now())
-  updated_at                 DateTime  @updatedAt
+  matricule                  String              @id @db.VarChar(5)
+  nom                        String              @db.VarChar(100)
+  prenom                     String              @db.VarChar(100)
+  email                      String              @unique(map: "utilisateurs_email_unique") @db.VarChar(100)
+  telephone                  String?             @db.VarChar(20)
+  date_naissance             DateTime?           @db.Date
+  sexe                       String?             @db.VarChar(10)
+  password                   String              @db.VarChar(255)
+  role                       String              @db.VarChar(50)
+  manager_matricule          String?             @db.VarChar(5)
+  niveau_hierarchique        Int                 @default(0)
+  id_region                  String?             @db.VarChar(5)
+  id_service                 String?             @db.VarChar(10)
+  id_district                String?             @db.VarChar(10)
+  id_secteur                 String?             @db.VarChar(10)
+  id_branche                 String?             @db.VarChar(5)
+  est_actif                  Boolean             @default(true)
+  est_admin                  Boolean             @default(false)
+  est_indisponible           Boolean             @default(false)
+  photo_url                  String?             @db.VarChar(255)
+  remember_token             String?             @db.VarChar(100)
+  email_verified_at          DateTime?           @db.Timestamp(0)
+  statut                     String              @default("Actif") @db.VarChar(20)
+  date_debut_indisponibilite DateTime?           @db.Date
+  date_fin_indisponibilite   DateTime?           @db.Date
+  motif_indisponibilite      String?             @db.VarChar(100)
+  region_nom                 String              @db.VarChar(100)
+  role_nom                   String              @db.VarChar(50)
+  type_region                String              @db.VarChar(20)
+  roles_support_json         String?             @db.Text
+  created_at                 DateTime?           @db.Timestamp(0)
+  updated_at                 DateTime?           @updatedAt @db.Timestamp(0)
+  logsAdministration         LogAdministration[]
+  district                   District?           @relation(fields: [id_district], references: [id_district], onUpdate: NoAction, map: "utilisateurs_id_district_foreign")
+  secteur                    Secteur?            @relation(fields: [id_secteur], references: [id_secteur], onUpdate: NoAction, map: "utilisateurs_id_secteur_foreign")
+  serviceCommerciale         ServiceCommercial?  @relation(fields: [id_service], references: [id_service], onUpdate: NoAction, map: "utilisateurs_id_service_foreign")
+  manager                    Utilisateur?        @relation("hierarchy", fields: [manager_matricule], references: [matricule], onUpdate: NoAction, map: "utilisateurs_manager_matricule_foreign")
+  subordonnes                Utilisateur[]       @relation("hierarchy")
 
-  region  Region  @relation(fields: [id_region], references: [id_region])
-  branche Branche @relation(fields: [id_branche], references: [id_branche])
-  manager Utilisateur?  @relation("hierarchy", fields: [manager_matricule], references: [matricule])
-  subordonnes Utilisateur[] @relation("hierarchy")
-
-  @@index([role, id_region], name: "idx_user_role_region")
-  @@index([manager_matricule], name: "idx_hierarchy")
-  @@index([statut], name: "idx_user_statut")
+  @@index([role, id_region], map: "idx_user_role_region")
+  @@index([manager_matricule], map: "idx_hierarchy")
+  @@index([statut], map: "idx_user_statut")
+  @@index([date_debut_indisponibilite, date_fin_indisponibilite], map: "idx_indisponibilite")
+  @@index([id_region, id_service, id_district, id_secteur], map: "utilisateurs_id_region_id_service_id_district_id_secteur_index")
+  @@index([id_service, est_actif], map: "utilisateurs_id_service_est_actif_index")
+  @@index([id_district, est_actif], map: "utilisateurs_id_district_est_actif_index")
+  @@index([id_secteur, est_actif], map: "utilisateurs_id_secteur_est_actif_index")
+  @@index([id_branche], map: "utilisateurs_id_branche_foreign")
   @@map("utilisateurs")
+}
+
+model ServiceCommercial {
+  id_service   String        @id @db.VarChar(10)
+  nom_service  String        @unique(map: "services_commerciaux_nom_service_unique") @db.VarChar(100)
+  id_region    String        @db.VarChar(10)
+  description  String?       @db.Text
+  est_actif    Boolean       @default(true)
+  created_at   DateTime?     @db.Timestamp(0)
+  updated_at   DateTime?     @db.Timestamp(0)
+  districts    District[]
+  secteurs     Secteur[]
+  region       Region        @relation(fields: [id_region], references: [id_region], onDelete: Cascade, onUpdate: NoAction, map: "services_commerciaux_id_region_foreign")
+  utilisateurs Utilisateur[]
+
+  @@index([id_region, est_actif], map: "services_commerciaux_id_region_est_actif_index")
+  @@index([nom_service], map: "services_commerciaux_nom_service_index")
+  @@map("services_commerciaux")
+}
+
+model District {
+  id_district        String            @id @db.VarChar(10)
+  nom_district       String            @db.VarChar(100)
+  id_service         String            @db.VarChar(10)
+  description        String?           @db.Text
+  est_actif          Boolean           @default(true)
+  created_at         DateTime?         @db.Timestamp(0)
+  updated_at         DateTime?         @db.Timestamp(0)
+  serviceCommerciale ServiceCommercial @relation(fields: [id_service], references: [id_service], onDelete: Cascade, onUpdate: NoAction, map: "districts_id_service_foreign")
+  secteurs           Secteur[]
+  utilisateurs       Utilisateur[]
+
+  @@unique([nom_district, id_service], map: "districts_nom_district_id_service_unique")
+  @@index([id_service, est_actif], map: "districts_id_service_est_actif_index")
+  @@index([nom_district], map: "districts_nom_district_index")
+  @@map("districts")
+}
+
+model Secteur {
+  id_secteur         String            @id @db.VarChar(10)
+  nom_secteur        String            @db.VarChar(100)
+  id_service         String            @db.VarChar(10)
+  id_district        String?           @db.VarChar(10)
+  description        String?           @db.Text
+  est_actif          Boolean           @default(true)
+  created_at         DateTime?         @db.Timestamp(0)
+  updated_at         DateTime?         @db.Timestamp(0)
+  district           District?         @relation(fields: [id_district], references: [id_district], onUpdate: NoAction, map: "secteurs_id_district_foreign")
+  serviceCommerciale ServiceCommercial @relation(fields: [id_service], references: [id_service], onDelete: Cascade, onUpdate: NoAction, map: "secteurs_id_service_foreign")
+  utilisateurs       Utilisateur[]
+
+  @@unique([nom_secteur, id_service], map: "secteurs_nom_secteur_id_service_unique")
+  @@index([id_service, est_actif], map: "secteurs_id_service_est_actif_index")
+  @@index([id_district, est_actif], map: "secteurs_id_district_est_actif_index")
+  @@index([nom_secteur], map: "secteurs_nom_secteur_index")
+  @@map("secteurs")
+}
+
+model LogAdministration {
+  id_log                String       @id @db.VarChar(5)
+  matricule_utilisateur String?      @db.VarChar(5)
+  action                String       @db.VarChar(100)
+  entite                String       @db.VarChar(50)
+  id_entite             String?      @db.VarChar(20)
+  details_json          Json?
+  adresse_ip            String?      @db.VarChar(45)
+  user_agent            String?      @db.VarChar(255)
+  created_at            DateTime?    @db.Timestamp(0)
+  updated_at            DateTime?    @db.Timestamp(0)
+  utilisateur           Utilisateur? @relation(fields: [matricule_utilisateur], references: [matricule], onUpdate: NoAction, map: "logs_administration_matricule_utilisateur_foreign")
+
+  @@index([matricule_utilisateur], map: "idx_log_utilisateur")
+  @@index([entite, id_entite], map: "idx_log_entite")
+  @@index([created_at], map: "idx_log_date")
+  @@map("logs_administration")
+}
+
+model cache {
+  key        String @id @db.VarChar(255)
+  value      String @db.MediumText
+  expiration Int
+}
+
+model cache_locks {
+  key        String @id @db.VarChar(255)
+  owner      String @db.VarChar(255)
+  expiration Int
+}
+
+model failed_jobs {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid       String   @unique(map: "failed_jobs_uuid_unique") @db.VarChar(255)
+  connection String   @db.Text
+  queue      String   @db.Text
+  payload    String   @db.LongText
+  exception  String   @db.LongText
+  failed_at  DateTime @default(now()) @db.Timestamp(0)
+}
+
+model migrations {
+  id        Int    @id @default(autoincrement()) @db.UnsignedInt
+  migration String @db.VarChar(255)
+  batch     Int
+}
+
+model notifications_utilisateurs {
+  id_notification        String    @id @db.VarChar(36)
+  destinataire_matricule String    @db.VarChar(5)
+  titre                  String    @db.VarChar(150)
+  message                String    @db.Text
+  type                   String    @db.VarChar(30)
+  lien                   String?   @db.VarChar(255)
+  donnees_json           Json?
+  id_evaluation          String?   @db.VarChar(36)
+  id_remplacement        BigInt?
+  expediteur_matricule   String?   @db.VarChar(5)
+  est_lu                 Boolean   @default(false)
+  date_creation          DateTime  @default(now()) @db.DateTime(0)
+  date_lecture           DateTime? @db.DateTime(0)
+
+  @@index([destinataire_matricule, est_lu, date_creation], map: "idx_notifications_destinataire")
+}
+
+model personal_access_tokens {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  tokenable_type String    @db.VarChar(255)
+  tokenable_id   BigInt    @db.UnsignedBigInt
+  name           String    @db.Text
+  token          String    @unique(map: "personal_access_tokens_token_unique") @db.VarChar(64)
+  abilities      String?   @db.Text
+  last_used_at   DateTime? @db.Timestamp(0)
+  expires_at     DateTime? @db.Timestamp(0)
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+
+  @@index([expires_at], map: "personal_access_tokens_expires_at_index")
+  @@index([tokenable_type, tokenable_id], map: "personal_access_tokens_tokenable_type_tokenable_id_index")
+}
+
+model replacement_temporaire {
+  id_remplacement        BigInt    @id @default(autoincrement())
+  titulaire_matricule    String    @db.VarChar(5)
+  remplacant_matricule   String    @db.VarChar(5)
+  role_remplace          String    @db.VarChar(50)
+  region_remplacement    String    @db.VarChar(100)
+  service_remplacement   String?   @db.VarChar(100)
+  date_debut             DateTime  @db.Date
+  date_fin               DateTime? @db.Date
+  date_fin_effective     DateTime? @db.Date
+  duree_prevue_jours     Int
+  motif                  String    @db.VarChar(255)
+  cree_par               String    @db.VarChar(5)
+  est_actif              Boolean   @default(true)
+  notifications_envoyees Boolean   @default(false)
+  equipe_notifiee        Boolean   @default(false)
+  created_at             DateTime  @default(now()) @db.DateTime(0)
+  updated_at             DateTime  @default(now()) @db.DateTime(0)
+
+  @@index([remplacant_matricule, est_actif], map: "idx_replacement_remplacant")
+  @@index([titulaire_matricule, est_actif], map: "idx_replacement_titulaire")
+}
+
+model sessions {
+  id            String  @id @db.VarChar(255)
+  user_id       String? @db.VarChar(5)
+  ip_address    String? @db.VarChar(45)
+  user_agent    String? @db.Text
+  payload       String  @db.LongText
+  last_activity Int
+
+  @@index([last_activity], map: "sessions_last_activity_index")
+  @@index([user_id], map: "sessions_user_id_index")
 }

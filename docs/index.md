@@ -15,6 +15,7 @@
 - [Source Tree Analysis](./source-tree-analysis.md)
 - [Architecture App](./architecture-app.md)
 - [Analytics README](./analytics/README.md)
+- [NestJS Cutover Checklist](./operations/nestjs-cutover-checklist.md)
 
 ## Notes
 

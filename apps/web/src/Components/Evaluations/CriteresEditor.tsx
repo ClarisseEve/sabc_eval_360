@@ -1,211 +1,242 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/Components/UI/Button/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
-import { Trash2, Plus } from 'lucide-react';
-
-interface Critere {
-    id?: string;
-    nom: string;
-    description: string;
-    ponderation: number;
-    echelle: {
-        min: number;
-        max: number;
-    };
-    categorie: string;
-}
+import type { RuleCriterion } from '@/types/rules';
 
 interface CriteresEditorProps {
-    value: Critere[];
-    onChange: (criteres: Critere[]) => void;
-    categories: string[];
-    errors?: string;
+  value: RuleCriterion[];
+  onChange: (criteres: RuleCriterion[]) => void;
+  categories: string[];
+  errors?: string;
 }
 
-export default function CriteresEditor({ value, onChange, categories, errors }: CriteresEditorProps) {
-    const [criteres, setCriteres] = useState<Critere[]>(value || []);
-    
-    useEffect(() => {
-        onChange(criteres);
-    }, [criteres]);
-    
-    const totalPonderation = criteres.reduce((sum, c) => sum + (Number(c.ponderation) || 0), 0);
-    const isValid = totalPonderation === 100 && criteres.length >= 5;
-    
-    const addCritere = () => {
-        setCriteres([
-            ...criteres,
-            {
-                nom: '',
-                description: '',
-                ponderation: 0,
-                echelle: { min: 1, max: 5 },
-                categorie: categories[0] || '',
-            },
-        ]);
-    };
-    
-    const removeCritere = (index: number) => {
-        setCriteres(criteres.filter((_, i) => i !== index));
-    };
-    
-    const updateCritere = (index: number, field: string, value: any) => {
-        const updated = [...criteres];
-        if (field.includes('.')) {
-            const [parent, child] = field.split('.');
-            updated[index] = {
-                ...updated[index],
-                [parent]: {
-                    ...(updated[index][parent as keyof Critere] as any),
-                    [child]: value,
-                },
-            };
-        } else {
-            updated[index] = { ...updated[index], [field]: value };
-        }
-        setCriteres(updated);
-    };
-    
-    return (
-        <div className="space-y-4">
-            {/* Indicateur progression pondérations */}
-            <Card>
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-sabc-gray-800">
-                            Total Pondérations
-                        </span>
-                        <span className={`text-lg font-bold ${
-                            totalPonderation === 100 ? 'text-sabc-success' : 'text-sabc-error'
-                        }`}>
-                            {totalPonderation}%
-                        </span>
-                    </div>
-                    
-                    <div className="w-full bg-sabc-gray-200 rounded-full h-3">
-                        <div 
-                            className={`h-3 rounded-full transition-all ${
-                                totalPonderation === 100 ? 'bg-sabc-success' : 
-                                totalPonderation > 100 ? 'bg-sabc-error' : 'bg-sabc-accent'
-                            }`}
-                            style={{ width: `${Math.min(totalPonderation, 100)}%` }}
-                        />
-                    </div>
-                    
-                    {criteres.length < 5 && (
-                        <p className="text-sm text-sabc-error mt-2">
-                            Minimum 5 critères requis (actuellement : {criteres.length})
-                        </p>
-                    )}
-                    
-                    {totalPonderation !== 100 && criteres.length >= 5 && (
-                        <p className="text-sm text-sabc-error mt-2">
-                            La somme des pondérations doit être égale à 100%
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
-            
-            {/* Liste critères */}
-            {criteres.map((critere, index) => (
-                <Card key={index}>
-                    <CardHeader className="flex flex-row items-center justify-between pb-4">
-                        <CardTitle className="text-lg font-semibold text-sabc-gray-900">
-                            Critère {index + 1}
-                        </CardTitle>
-                        <Button
-                            type="button"
-                            onClick={() => removeCritere(index)}
-                            variant="destructive"
-                            size="sm"
-                            disabled={criteres.length <= 5}
-                        >
-                            <Trash2 size={16} />
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <Label htmlFor={`nom-${index}`}>Nom du critère</Label>
-                                <Input
-                                    id={`nom-${index}`}
-                                    type="text"
-                                    value={critere.nom}
-                                    onChange={(e) => updateCritere(index, 'nom', e.target.value)}
-                                    required
-                                />
-                            </div>
-                            
-                            <div>
-                                <Label htmlFor={`categorie-${index}`}>Catégorie</Label>
-                                <Select
-                                    value={critere.categorie}
-                                    onValueChange={(value) => updateCritere(index, 'categorie', value)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Sélectionner une catégorie" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {categories.map((cat) => (
-                                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            
-                            <div className="md:col-span-2">
-                                <Label htmlFor={`description-${index}`}>Description</Label>
-                                <textarea
-                                    id={`description-${index}`}
-                                    value={critere.description}
-                                    onChange={(e) => updateCritere(index, 'description', e.target.value)}
-                                    className="w-full border border-sabc-gray-200 rounded-lg p-2 min-h-[80px]"
-                                    required
-                                />
-                            </div>
-                            
-                            <div>
-                                <Label htmlFor={`ponderation-${index}`}>Pondération (%)</Label>
-                                <Input
-                                    id={`ponderation-${index}`}
-                                    type="number"
-                                    value={critere.ponderation}
-                                    onChange={(e) => updateCritere(index, 'ponderation', Number(e.target.value))}
-                                    min={1}
-                                    max={100}
-                                    required
-                                />
-                            </div>
-                            
-                            <div>
-                                <Label>Échelle de notation</Label>
-                                <div className="flex items-center space-x-2">
-                                    <Input type="number" value={1} disabled className="w-20" />
-                                    <span>à</span>
-                                    <Input type="number" value={5} disabled className="w-20" />
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            ))}
-            
-            {/* Bouton ajouter critère */}
+function createEmptyCriterion(sectionLabel: string, index: number): RuleCriterion {
+  return {
+    id: `critere-${Date.now()}-${index}`,
+    libelle: '',
+    description: '',
+    poids: 0,
+    section_label: sectionLabel,
+    section_order: 1,
+    niveau_requis: 3,
+    improvement_axis_code: null,
+    recommendation_tags: [],
+    commentaire_requis_si_note_lt: 3,
+    echelle: { min: 1, max: 5 },
+  };
+}
+
+function getPonderationColorClass(total: number): string {
+  if (total === 100) return 'bg-sabc-success';
+  if (total > 100) return 'bg-sabc-error';
+  return 'bg-sabc-accent';
+}
+
+export default function CriteresEditor({ value, onChange, categories, errors }: Readonly<CriteresEditorProps>) {
+  const [criteres, setCriteres] = useState<RuleCriterion[]>(value || []);
+
+  useEffect(() => {
+    setCriteres(value || []);
+  }, [value]);
+
+  useEffect(() => {
+    onChange(criteres);
+  }, [criteres, onChange]);
+
+  const totalPonderation = criteres.reduce((sum, critere) => sum + (Number(critere.poids) || 0), 0);
+
+  const addCritere = () => {
+    setCriteres((prev) => [
+      ...prev,
+      createEmptyCriterion(categories[0] || 'Compétences', prev.length + 1),
+    ]);
+  };
+
+  const removeCritere = (index: number) => {
+    setCriteres((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const updateCritere = (index: number, patch: Partial<RuleCriterion>) => {
+    setCriteres((prev) => prev.map((critere, currentIndex) => (
+      currentIndex === index ? { ...critere, ...patch } : critere
+    )));
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="space-y-2 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-sabc-gray-800">Total des poids</span>
+            <span className={`text-lg font-bold ${totalPonderation === 100 ? 'text-sabc-success' : 'text-sabc-error'}`}>
+              {totalPonderation}%
+            </span>
+          </div>
+          <div className="h-3 w-full rounded-full bg-sabc-gray-200">
+            <div
+              className={`h-3 rounded-full transition-all ${getPonderationColorClass(totalPonderation)}`}
+              style={{ width: `${Math.min(totalPonderation, 100)}%` }}
+            />
+          </div>
+          {criteres.length < 5 ? (
+            <p className="text-sm text-sabc-error">Minimum 5 critères requis (actuellement: {criteres.length})</p>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {criteres.map((critere, index) => (
+        <Card key={critere.id || index}>
+          <CardHeader className="flex flex-row items-center justify-between pb-4">
+            <CardTitle className="text-lg font-semibold text-sabc-gray-900">Critère {index + 1}</CardTitle>
             <Button
-                type="button"
-                onClick={addCritere}
-                className="w-full bg-sabc-accent hover:bg-sabc-accent-light text-white"
+              type="button"
+              onClick={() => removeCritere(index)}
+              variant="destructive"
+              size="sm"
+              disabled={criteres.length <= 5}
             >
-                <Plus size={16} className="mr-2" />
-                Ajouter un critère
+              <Trash2 size={16} />
             </Button>
-            
-            {errors && (
-                <p className="text-sm text-sabc-error">{errors}</p>
-            )}
-        </div>
-    );
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor={`libelle-${index}`}>Libellé</Label>
+                <Input
+                  id={`libelle-${index}`}
+                  value={critere.libelle}
+                  onChange={(e) => updateCritere(index, { libelle: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor={`poids-${index}`}>Poids (%)</Label>
+                <Input
+                  id={`poids-${index}`}
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={critere.poids}
+                  onChange={(e) => updateCritere(index, { poids: Number(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor={`description-${index}`}>Description</Label>
+                <textarea
+                  id={`description-${index}`}
+                  value={critere.description}
+                  onChange={(e) => updateCritere(index, { description: e.target.value })}
+                  className="min-h-[80px] w-full rounded-lg border border-sabc-gray-200 p-2"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor={`section-${index}`}>Section</Label>
+                <Select
+                  value={critere.section_label}
+                  onValueChange={(value) => updateCritere(index, { section_label: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor={`section-order-${index}`}>Ordre de section</Label>
+                <Input
+                  id={`section-order-${index}`}
+                  type="number"
+                  min={1}
+                  value={critere.section_order}
+                  onChange={(e) => updateCritere(index, { section_order: Number(e.target.value) || 1 })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor={`niveau-${index}`}>Niveau requis</Label>
+                <Input
+                  id={`niveau-${index}`}
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={critere.niveau_requis}
+                  onChange={(e) => updateCritere(index, { niveau_requis: Number(e.target.value) || 3 })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor={`threshold-${index}`}>Commentaire requis si note &lt;</Label>
+                <Input
+                  id={`threshold-${index}`}
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={critere.commentaire_requis_si_note_lt ?? 3}
+                  onChange={(e) => updateCritere(index, { commentaire_requis_si_note_lt: Number(e.target.value) || 3 })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor={`axis-${index}`}>Code axe d'amélioration</Label>
+                <Input
+                  id={`axis-${index}`}
+                  value={critere.improvement_axis_code ?? ''}
+                  onChange={(e) => updateCritere(index, { improvement_axis_code: e.target.value || null })}
+                  placeholder="ex: leadership, execution, reporting"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor={`tags-${index}`}>Tags recommandations</Label>
+                <Input
+                  id={`tags-${index}`}
+                  value={critere.recommendation_tags.join(', ')}
+                  onChange={(e) => updateCritere(index, {
+                    recommendation_tags: e.target.value
+                      .split(',')
+                      .map((tag) => tag.trim())
+                      .filter(Boolean),
+                  })}
+                  placeholder="formation, mentorat, coaching"
+                />
+              </div>
+
+              <div>
+                <Label>Échelle</Label>
+                <div className="flex items-center gap-2">
+                  <Input disabled value={critere.echelle.min} />
+                  <span>à</span>
+                  <Input disabled value={critere.echelle.max} />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
+      <Button
+        type="button"
+        onClick={addCritere}
+        className="w-full bg-sabc-accent text-white hover:bg-sabc-accent-light"
+      >
+        <Plus size={16} className="mr-2" />
+        Ajouter un critère
+      </Button>
+
+      {errors ? <p className="text-sm text-sabc-error">{errors}</p> : null}
+    </div>
+  );
 }
