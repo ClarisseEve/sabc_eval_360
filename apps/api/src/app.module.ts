@@ -19,6 +19,9 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthModule } from './health/health.module';
+import { CommonModule } from './common/common.module';
+import { EligibilityModule } from './eligibility/eligibility.module';
+import { EvaluationPermissionModule } from './evaluation-permission/evaluation-permission.module';
 
 @Global()
 @Module({
@@ -41,6 +44,7 @@ import { HealthModule } from './health/health.module';
         limit: 30,
       },
     ]),
+    CommonModule,
     PrismaModule,
     DatabasePgModule,
     AuthModule,
@@ -56,6 +60,8 @@ import { HealthModule } from './health/health.module';
     AdminModule,
     NotificationsModule,
     HealthModule,
+    EligibilityModule,
+    EvaluationPermissionModule,
   ],
   exports: [CacheService],
   providers: [
