@@ -1,0 +1,36 @@
+# Workflow Status Template
+
+# This tracks progress through BMM methodology Analysis, Planning, and Solutioning phases.
+# Implementation phase is tracked separately in sprint-status.yaml
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met (e.g., if_has_ui)
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+#   - skipped: Optional/conditional workflow that was skipped
+
+generated: "2026-01-13T14:43:26Z"
+project: "sabc_eval360"
+project_type: "web_app"
+project_level: 3
+selected_track: "method"
+field_type: "brownfield"
+workflow_path: "/Users/macbook/Documents/SABC/sabc_eval360/_bmad/bmm/workflows/workflow-status/paths/method-brownfield.yaml"
+workflow_status:
+  document-project: skipped
+  brainstorm-project: "/Users/macbook/Documents/SABC/sabc_eval360/_bmad-output/analysis/brainstorming-session-2026-01-08.md"
+  research: skipped
+  product-brief: skipped
+  prd: "/Users/macbook/Documents/SABC/sabc_eval360/_bmad-output/planning-artifacts/prd.md"
+  create-ux-design: "/Users/macbook/Documents/SABC/sabc_eval360/_bmad-output/planning-artifacts/ux-design-specification.md"
+  create-architecture: "/Users/macbook/Documents/SABC/sabc_eval360/_bmad-output/planning-artifacts/architecture.md"
+  create-epics-and-stories: required
+  test-design: optional
+  implementation-readiness: required
+  sprint-planning: required
