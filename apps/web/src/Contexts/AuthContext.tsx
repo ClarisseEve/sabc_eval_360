@@ -30,6 +30,7 @@ export interface User {
   type_region?: string;
   id_branche?: string;
   branche_nom?: string;
+  branche?: { nom_branche: string } | null;
   id_service?: string | null;
   id_district?: string | null;
   id_secteur?: string | null;

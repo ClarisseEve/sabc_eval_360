@@ -23,6 +23,7 @@ export default function Profile() {
   const [preferences, setPreferences] = useState({
     notifications_email: user?.preferences_json?.notifications_email ?? true,
     notifications_app: user?.preferences_json?.notifications_app ?? true,
+    langue: (user?.preferences_json?.langue ?? 'fr') as 'fr' | 'en',
   });
 
   const [processing, setProcessing] = useState(false);
@@ -84,7 +85,7 @@ export default function Profile() {
               </div>
               <div>
                 <dt className="text-sabc-gray-500 font-medium">Branche</dt>
-                <dd className="text-sabc-gray-800">{user?.id_branche || '—'}</dd>
+                <dd className="text-sabc-gray-800">{user?.branche?.nom_branche ?? user?.id_branche ?? '—'}</dd>
               </div>
               {user?.manager_matricule && (
                 <div>
@@ -190,6 +191,21 @@ export default function Profile() {
                   />
                   Recevoir les notifications dans l'application
                 </label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Langue de l'interface
+                  </label>
+                  <select
+                    value={preferences.langue}
+                    onChange={(e) =>
+                      setPreferences((p) => ({ ...p, langue: e.target.value as 'fr' | 'en' }))
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm"
+                  >
+                    <option value="fr">Français</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
               </div>
 
               {/* Actions */}

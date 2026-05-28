@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { DatabasePgService } from '../database/database-pg.service';
 import * as bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 import { EvaluationsService } from '../evaluations/evaluations.service';
 import { HierarchyService } from '../hierarchy/hierarchy.service';
 import { AuditLogService } from '../common/services/audit-log.service';
@@ -117,8 +118,7 @@ export class AdminUsersService {
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    // Use unchecked create to pass raw FK fields directly
-    const createData: Parameters<typeof this.prisma.utilisateur.create>[0]['data'] = {
+    const createData: Prisma.UtilisateurUncheckedCreateInput = {
       matricule: data.matricule,
       nom: data.nom,
       prenom: data.prenom,
@@ -129,13 +129,13 @@ export class AdminUsersService {
       id_region: data.id_region,
       region_nom: data.region_nom,
       type_region: data.type_region,
-      id_branche: data.id_branche,
-      manager_matricule: data.manager_matricule,
-      telephone: data.telephone,
-      id_service: data.id_service,
-      id_district: data.id_district,
-      id_secteur: data.id_secteur,
-      sexe: data.sexe,
+      ...(data.id_branche !== undefined && { id_branche: data.id_branche }),
+      ...(data.manager_matricule !== undefined && { manager_matricule: data.manager_matricule }),
+      ...(data.telephone !== undefined && { telephone: data.telephone }),
+      ...(data.id_service !== undefined && { id_service: data.id_service }),
+      ...(data.id_district !== undefined && { id_district: data.id_district }),
+      ...(data.id_secteur !== undefined && { id_secteur: data.id_secteur }),
+      ...(data.sexe !== undefined && { sexe: data.sexe }),
       est_admin: data.est_admin ?? false,
       statut: 'Actif',
       est_actif: true,

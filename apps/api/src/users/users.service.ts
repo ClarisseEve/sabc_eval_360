@@ -24,7 +24,7 @@ export class UsersService {
   }
 
   async findByMatricule(matricule: string) {
-    return this.prisma.utilisateur.findUnique({
+    const utilisateur = await this.prisma.utilisateur.findUnique({
       where: { matricule },
       select: {
         matricule: true,
@@ -50,5 +50,17 @@ export class UsersService {
         created_at: true,
       },
     });
+
+    if (!utilisateur) return null;
+
+    let branche: { nom_branche: string } | null = null;
+    if (utilisateur.id_branche) {
+      branche = await this.prisma.branche.findUnique({
+        where: { id_branche: utilisateur.id_branche },
+        select: { nom_branche: true },
+      });
+    }
+
+    return { ...utilisateur, branche };
   }
 }
