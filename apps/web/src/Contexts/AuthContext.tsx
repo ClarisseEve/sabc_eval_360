@@ -12,7 +12,15 @@ export interface User {
   prenom: string;
   name?: string;
   telephone?: string;
+  date_naissance?: string | null;
+  sexe?: string | null;
   avatar?: string;
+  preferences_json?: {
+    langue?: string;
+    notifications_email?: boolean;
+    notifications_app?: boolean;
+    theme?: string;
+  } | null;
 
   // Informations organisationnelles
   role: string;
@@ -22,10 +30,13 @@ export interface User {
   type_region?: string;
   id_branche?: string;
   branche_nom?: string;
+  id_service?: string | null;
+  id_district?: string | null;
+  id_secteur?: string | null;
 
   // Hiérarchie
   niveau_hierarchique: number;
-  manager_matricule?: string;
+  manager_matricule?: string | null;
 
   // Statuts
   est_actif: boolean;

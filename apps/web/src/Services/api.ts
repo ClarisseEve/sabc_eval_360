@@ -323,8 +323,19 @@ export const notificationsApi = {
 };
 
 export const profileApi = {
-  update: (data: { nom?: string; prenom?: string; email?: string; telephone?: string }) =>
-    api.put('/auth/profile', data),
+  update: (data: {
+    nom?: string;
+    prenom?: string;
+    email?: string;
+    telephone?: string;
+    date_naissance?: string;
+    preferences?: {
+      langue?: string;
+      notifications_email?: boolean;
+      notifications_app?: boolean;
+      theme?: string;
+    };
+  }) => api.put('/auth/profile', data),
   changePassword: (data: { current_password: string; password: string; password_confirmation: string }) =>
     api.put('/auth/password', data),
 };
