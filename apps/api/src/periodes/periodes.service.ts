@@ -74,23 +74,32 @@ export class PeriodesService {
       await this.validateNoChevauchement(debut, fin, id);
     }
 
+    // Whitelist of columns allowed in UPDATE to prevent SQL injection via key names
+    const ALLOWED_COLUMNS: Record<string, string> = {
+      nom_periode: 'nom_periode',
+      description: 'description',
+      date_debut: 'date_debut',
+      date_fin: 'date_fin',
+    };
+
     const sets: string[] = [];
     const params: any[] = [];
     let idx = 1;
 
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined) {
-        sets.push(`${key} = $${idx}`);
+        const col = ALLOWED_COLUMNS[key];
+        if (!col) continue; // skip unknown/disallowed keys
+        sets.push(`${col} = $${idx}`);
         params.push(value);
         idx++;
       }
     }
 
     if (sets.length) {
-      sets.push(`updated_at = NOW()`);
       params.push(id);
       await this.pg.execute(
-        `UPDATE periodes_evaluation SET ${sets.join(', ')} WHERE id_periode = $${idx}`,
+        `UPDATE periodes_evaluation SET ${sets.join(', ')}, updated_at = NOW() WHERE id_periode = $${idx}`,
         params,
       );
     }
@@ -112,12 +121,42 @@ export class PeriodesService {
   async fermer(id: string): Promise<PeriodeEvaluation> {
     const p = await this.findById(id);
     if (p.est_cloturee) throw new BadRequestException('Période déjà fermée');
-    await this.calculateStatistiques(id);
-    await this.pg.execute(
-      `UPDATE periodes_evaluation SET est_ouverte = false, est_cloturee = true, statut = 'fermee', updated_at = NOW()
-       WHERE id_periode = $1`,
-      [id],
-    );
+
+    // calculateStatistiques + state transition must be atomic to avoid a permanently
+    // half-closed period if the process crashes between the two statements.
+    await this.pg.withTransaction(async (client) => {
+      // 1. Compute and persist statistics within the transaction
+      const stats = await client.query(
+        `SELECT
+           COUNT(*) as nb_total,
+           COUNT(*) FILTER (WHERE statut = 'brouillon') as nb_brouillon,
+           COUNT(*) FILTER (WHERE statut = 'soumis') as nb_soumises,
+           COUNT(*) FILTER (WHERE statut = 'valide') as nb_validees,
+           COUNT(*) FILTER (WHERE statut = 'rejete') as nb_rejetees
+         FROM evaluations WHERE id_periode = $1`,
+        [id],
+      );
+      const row = stats.rows[0] ?? {};
+      const nbTotal = parseInt(row.nb_total ?? '0');
+      const nbValidees = parseInt(row.nb_validees ?? '0');
+      const tauxCompletion = nbTotal > 0 ? Math.round((nbValidees / nbTotal) * 10000) / 100 : 0;
+
+      await client.query(
+        `UPDATE periodes_evaluation SET
+           nb_evaluations_attendues = $1, nb_evaluations_completees = $2, taux_completion = $3,
+           statistiques_json = $4, updated_at = NOW()
+         WHERE id_periode = $5`,
+        [nbTotal, nbValidees, tauxCompletion, JSON.stringify(row), id],
+      );
+
+      // 2. Close the period in the same transaction
+      await client.query(
+        `UPDATE periodes_evaluation SET est_ouverte = false, est_cloturee = true, statut = 'fermee', updated_at = NOW()
+         WHERE id_periode = $1`,
+        [id],
+      );
+    });
+
     return this.findById(id);
   }
 

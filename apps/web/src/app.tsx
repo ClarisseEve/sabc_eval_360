@@ -110,6 +110,8 @@ const CommonEvaluationsIndex = lazy(() => import('./pages/Common/Evaluations/ind
 const CommonEvaluationsMine = lazy(() => import('./pages/Common/Evaluations/Mine'));
 const CommonEvaluationsPending = lazy(() => import('./pages/Common/Evaluations/Pending'));
 const CommonEvaluationsToValidate = lazy(() => import('./pages/Common/Evaluations/ToValidate'));
+const CommonEvaluationsRecues = lazy(() => import('./pages/Common/Evaluations/Recues'));
+const CommonEvaluationsDonnees = lazy(() => import('./pages/Common/Evaluations/Donnees'));
 const CommonEvaluationsShow = lazy(() => import('./pages/Common/Evaluations/Show'));
 const CommonEvaluationsEdit = lazy(() => import('./pages/Common/Evaluations/Edit'));
 
@@ -292,6 +294,8 @@ function App() {
                       <Route path="/evaluations/mine" element={<G><CommonEvaluationsMine /></G>} />
                       <Route path="/evaluations/pending" element={<G><CommonEvaluationsPending /></G>} />
                       <Route path="/evaluations/validate" element={<G><CommonEvaluationsToValidate /></G>} />
+                      <Route path="/evaluations/recues" element={<G><CommonEvaluationsRecues /></G>} />
+                      <Route path="/evaluations/donnees" element={<G><CommonEvaluationsDonnees /></G>} />
                       <Route path="/evaluations/history" element={<G><CommonEvaluationsIndex /></G>} />
                       <Route path="/evaluations/:id" element={<G><CommonEvaluationsShow /></G>} />
                       <Route path="/evaluations/:id/edit" element={<G><CommonEvaluationsEdit /></G>} />

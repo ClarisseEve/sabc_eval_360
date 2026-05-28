@@ -41,4 +41,25 @@ export class DatabasePgService implements OnModuleInit, OnModuleDestroy {
     const result = await this.pool.query(sql, params);
     return result.rowCount ?? 0;
   }
+
+  /**
+   * Runs `fn` inside a PostgreSQL transaction.
+   * Commits on success, rolls back on any thrown error.
+   */
+  async withTransaction<T>(fn: (client: { query: (sql: string, params?: any[]) => Promise<any> }) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await fn({
+        query: (sql: string, params: any[] = []) => client.query(sql, params),
+      });
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
 }

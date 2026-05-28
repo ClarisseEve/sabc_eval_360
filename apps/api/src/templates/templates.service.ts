@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomUUID } from 'crypto';
@@ -6,6 +6,8 @@ import { CreateTemplateDto, UpdateTemplateDto } from './dto/template.dto';
 
 @Injectable()
 export class TemplatesService {
+  private readonly logger = new Logger(TemplatesService.name);
+
   constructor(
     private pg: DatabasePgService,
     private prisma: PrismaService,
@@ -191,7 +193,8 @@ export class TemplatesService {
       'SELECT est_ouverte, est_cloturee FROM periodes_evaluation WHERE id_periode = $1',
       [idPeriode],
     );
-    if (periode?.est_ouverte || periode?.est_cloturee) {
+    if (!periode) throw new NotFoundException(`Période introuvable: ${idPeriode}`);
+    if (periode.est_ouverte || periode.est_cloturee) {
       throw new BadRequestException('Impossible de modifier les assignations: période ouverte ou fermée');
     }
 
@@ -255,15 +258,18 @@ export class TemplatesService {
   }
 
   async assignBulk(idPeriode: string, assignations: Array<{ id_role: string; id_template: string }>) {
+    const errors: Array<{ id_role: string; id_template: string; reason: string }> = [];
     let count = 0;
     for (const a of assignations) {
       try {
         await this.assignTemplate(a.id_template, a.id_role, idPeriode);
         count++;
       } catch (e: any) {
-        // Log but continue
+        const reason: string = e?.message ?? String(e);
+        errors.push({ id_role: a.id_role, id_template: a.id_template, reason });
+        this.logger.warn(`assignBulk: skipping role=${a.id_role} template=${a.id_template} — ${reason}`);
       }
     }
-    return { assigned: count, total: assignations.length };
+    return { assigned: count, total: assignations.length, errors };
   }
 }

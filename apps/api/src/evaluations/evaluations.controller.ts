@@ -21,8 +21,10 @@ export class EvaluationsController {
   }
 
   @Post()
-  async create(@Body() dto: CreateEvaluationDto) {
-    return this.service.create(dto.evaluateur_matricule, dto.evalue_matricule, dto.id_periode, dto.id_regle);
+  async create(@Body() dto: CreateEvaluationDto, @Request() req: any) {
+    // Always use authenticated user's matricule — never trust the body for evaluateur_matricule
+    const evaluateurMatricule = req.user.matricule;
+    return this.service.create(evaluateurMatricule, dto.evalue_matricule, dto.id_periode, dto.id_regle);
   }
 
   @Get('periodes-actives')
@@ -75,6 +77,6 @@ export class EvaluationsController {
 
   @Post(':id/validate')
   async validate(@Param('id') id: string, @Body() dto: ValidateEvaluationDto, @Request() req: any) {
-    return this.service.validate(id, req.user.matricule, dto.est_validee, dto.commentaire_validation);
+    return this.service.validate(id, req.user.matricule, dto.est_validee, dto.motif_rejet, dto.commentaire_validation);
   }
 }

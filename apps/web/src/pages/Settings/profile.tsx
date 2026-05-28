@@ -28,6 +28,7 @@ export default function Profile() {
 
   const [processing, setProcessing] = useState(false);
   const [recentlySuccessful, setRecentlySuccessful] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const layoutUser = {
     name: user
@@ -43,6 +44,7 @@ export default function Profile() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setProcessing(true);
     try {
       const payload: Record<string, any> = { ...formData };
@@ -51,6 +53,9 @@ export default function Profile() {
       await updateProfile(payload as any);
       setRecentlySuccessful(true);
       window.setTimeout(() => setRecentlySuccessful(false), 2500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Une erreur est survenue. Veuillez réessayer.';
+      setError(msg);
     } finally {
       setProcessing(false);
     }
@@ -224,6 +229,11 @@ export default function Profile() {
               </div>
 
             </form>
+            {error && (
+              <div className="mt-4 p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-700">
+                {error}
+              </div>
+            )}
           </CardContent>
         </Card>
 

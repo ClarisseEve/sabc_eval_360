@@ -6,6 +6,10 @@ describe('EvaluationsService', () => {
   let mockPg: any;
   let mockPrisma: any;
 
+  let mockValidationNotation: any;
+  let mockValidationManager: any;
+  let mockNotifications: any;
+
   beforeEach(() => {
     mockPg = {
       query: jest.fn().mockResolvedValue([]),
@@ -18,7 +22,19 @@ describe('EvaluationsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
-    service = new EvaluationsService(mockPg, mockPrisma);
+    mockValidationNotation = {
+      validateBornes: jest.fn().mockReturnValue({ valid: true, errors: [] }),
+      validateCommentaires: jest.fn().mockReturnValue({ valid: true, errors: [] }),
+      validatePourSoumission: jest.fn().mockReturnValue({ valid: true, errors: [] }),
+      calculerNoteGlobale: jest.fn().mockReturnValue(4),
+    };
+    mockValidationManager = {
+      canValidate: jest.fn().mockResolvedValue(true),
+    };
+    mockNotifications = {
+      create: jest.fn().mockResolvedValue({}),
+    };
+    service = new EvaluationsService(mockPg, mockPrisma, mockValidationNotation, mockValidationManager, mockNotifications);
   });
 
   describe('findById', () => {
@@ -58,14 +74,13 @@ describe('EvaluationsService', () => {
 
   describe('submit', () => {
     it('should submit brouillon with notes', async () => {
-      mockPg.queryOne.mockResolvedValue({
-        id_evaluation: 'uuid-1',
-        statut: 'brouillon',
-        notations_json: JSON.stringify([{ note: 4 }]),
-        evaluateur_matricule: 'M1',
-        evalue_matricule: 'M2',
-      });
+      const evalRow = { id_evaluation: 'uuid-1', statut: 'brouillon', notations_json: JSON.stringify([{ note: 4, id_critere: 'c1', poids: 100 }]), evaluateur_matricule: 'M1', evalue_matricule: 'M2', id_periode: 'p1', id_regle: null };
+      mockPg.queryOne
+        .mockResolvedValueOnce(evalRow)          // findById inner queryOne
+        .mockResolvedValueOnce({ statut: 'ouverte' }); // period check
       mockPg.query.mockResolvedValue([]);
+      mockPrisma.utilisateur.findMany.mockResolvedValue([]);
+      mockPrisma.utilisateur.findUnique.mockResolvedValue(null);
       mockPg.execute.mockResolvedValue(1);
       const result = await service.submit('uuid-1');
       expect(result.success).toBe(true);

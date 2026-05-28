@@ -51,7 +51,10 @@ export class AuthController {
     @Request() req: any,
     @Body() body: UpdateProfileDto,
   ) {
-    const data: any = {};
+    const data: Partial<{
+      nom: string; prenom: string; email: string; telephone: string;
+      date_naissance: Date; preferences_json: unknown;
+    }> = {};
     if (body.nom !== undefined) data.nom = body.nom;
     if (body.prenom !== undefined) data.prenom = body.prenom;
     if (body.email !== undefined) {

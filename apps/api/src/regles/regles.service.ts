@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { DatabasePgService } from '../database/database-pg.service';
 import {
   normalizeRuleRow,
   parseRuleEnvelope,
+  serializeRuleEnvelope,
+  validateRuleEnvelope,
   type RuleCriterion,
 } from './rule-schema';
+import type { CreateRegleDto } from './dto/create-regle.dto';
+import type { UpdateRegleDto } from './dto/update-regle.dto';
 
 const CATEGORIES_VALIDES = [
   'Compétences techniques',
@@ -83,7 +88,9 @@ export class ReglesService {
     }
 
     const totalPonderation = normalized.reduce((sum, c) => sum + c.poids, 0);
-    if (totalPonderation !== TOTAL_PONDERATION) {
+    // Use a tolerance of 0.01 to guard against floating-point rounding errors
+    // (e.g. 33.33 + 33.33 + 33.34 = 100.00 exactly but naive float sums can drift).
+    if (Math.abs(totalPonderation - TOTAL_PONDERATION) > 0.01) {
       erreurs.push(`Somme des pondérations doit être ${TOTAL_PONDERATION}% (actuelle: ${totalPonderation}%)`);
     }
 
@@ -110,12 +117,146 @@ export class ReglesService {
         erreurs.push(`Critère #${i}: catégorie invalide`);
       }
 
-      if (c.section_label && !CATEGORIES_VALIDES.includes(c.section_label) && c.section_label.length > 80) {
-        erreurs.push(`Critère #${i}: libellé de section trop long`);
+      // These are two independent validations — an invalid category is always
+      // flagged regardless of length, and a label that exceeds 80 chars is
+      // always flagged regardless of whether it is in the valid list.
+      if (c.section_label) {
+        if (!CATEGORIES_VALIDES.includes(c.section_label)) {
+          erreurs.push(`Critère #${i}: catégorie de section invalide ('${c.section_label}')`);
+        }
+        if (c.section_label.length > 80) {
+          erreurs.push(`Critère #${i}: libellé de section trop long (max 80 caractères)`);
+        }
       }
     });
 
     return { valide: erreurs.length === 0, erreurs };
+  }
+
+  async listAll() {
+    const rows = await this.pg.query(
+      `SELECT id_regle, nom_regle, description, criteres_evaluation_json, est_active,
+              role_evaluateur, role_evalue, type_evaluation, created_at, updated_at
+       FROM regles_evaluation ORDER BY created_at DESC`,
+    );
+    return rows.map((row) => normalizeRuleRow(row as any));
+  }
+
+  async create(dto: CreateRegleDto) {
+    const envelope = serializeRuleEnvelope({ criteres: dto.criteres.map((c) => ({
+      libelle: c.nom,
+      description: c.description,
+      poids: c.ponderation,
+      echelle: c.echelle,
+      section_label: c.categorie,
+      section_order: 1,
+      niveau_requis: 3,
+      improvement_axis_code: null,
+      recommendation_tags: [],
+      commentaire_requis_si_note_lt: null,
+    } as any)) });
+
+    const errors = validateRuleEnvelope(envelope);
+    if (errors.length > 0) {
+      throw new BadRequestException(errors.join('; '));
+    }
+
+    const id = randomUUID();
+    await this.pg.execute(
+      `INSERT INTO regles_evaluation
+         (id_regle, nom_regle, description, criteres_evaluation_json, est_active,
+          role_evaluateur, role_evalue, type_evaluation, created_at, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, NOW(), NOW())`,
+      [
+        id,
+        dto.nom_regle,
+        dto.description ?? null,
+        JSON.stringify(envelope),
+        dto.est_active ?? true,
+        dto.role_evaluateur ?? null,
+        dto.role_evalue ?? null,
+        dto.type_evaluation ?? null,
+      ],
+    );
+
+    return this.findById(id);
+  }
+
+  async update(id: string, dto: UpdateRegleDto) {
+    const existing = await this.findById(id);
+    if (!existing) throw new NotFoundException(`Règle introuvable: ${id}`);
+
+    const sets: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (dto.nom_regle !== undefined) { sets.push(`nom_regle = $${idx++}`); params.push(dto.nom_regle); }
+    if (dto.description !== undefined) { sets.push(`description = $${idx++}`); params.push(dto.description); }
+    if (dto.role_evaluateur !== undefined) { sets.push(`role_evaluateur = $${idx++}`); params.push(dto.role_evaluateur); }
+    if (dto.role_evalue !== undefined) { sets.push(`role_evalue = $${idx++}`); params.push(dto.role_evalue); }
+    if (dto.type_evaluation !== undefined) { sets.push(`type_evaluation = $${idx++}`); params.push(dto.type_evaluation); }
+    if (dto.est_active !== undefined) { sets.push(`est_active = $${idx++}`); params.push(dto.est_active); }
+
+    if (dto.criteres !== undefined) {
+      const envelope = serializeRuleEnvelope({ criteres: dto.criteres.map((c) => ({
+        libelle: c.nom,
+        description: c.description,
+        poids: c.ponderation,
+        echelle: c.echelle,
+        section_label: c.categorie,
+        section_order: 1,
+        niveau_requis: 3,
+        improvement_axis_code: null,
+        recommendation_tags: [],
+        commentaire_requis_si_note_lt: null,
+      } as any)) });
+      const errors = validateRuleEnvelope(envelope);
+      if (errors.length > 0) throw new BadRequestException(errors.join('; '));
+      sets.push(`criteres_evaluation_json = $${idx++}::jsonb`);
+      params.push(JSON.stringify(envelope));
+    }
+
+    if (sets.length > 0) {
+      params.push(id);
+      await this.pg.execute(
+        `UPDATE regles_evaluation SET ${sets.join(', ')}, updated_at = NOW() WHERE id_regle = $${idx}`,
+        params,
+      );
+    }
+
+    return this.findById(id);
+  }
+
+  async toggleActive(id: string) {
+    const existing = await this.findById(id);
+    if (!existing) throw new NotFoundException(`Règle introuvable: ${id}`);
+    await this.pg.execute(
+      `UPDATE regles_evaluation SET est_active = NOT est_active, updated_at = NOW() WHERE id_regle = $1`,
+      [id],
+    );
+    return this.findById(id);
+  }
+
+  async delete(id: string) {
+    const existing = await this.findById(id);
+    if (!existing) throw new NotFoundException(`Règle introuvable: ${id}`);
+
+    const ref = await this.pg.queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM evaluations WHERE id_regle = $1`,
+      [id],
+    );
+
+    if (Number(ref?.count ?? 0) > 0) {
+      // Soft delete — rule is referenced by existing evaluations
+      await this.pg.execute(
+        `UPDATE regles_evaluation SET est_active = false, updated_at = NOW() WHERE id_regle = $1`,
+        [id],
+      );
+      return { deleted: false, deactivated: true };
+    }
+
+    await this.pg.execute(`DELETE FROM regles_evaluation WHERE id_regle = $1`, [id]);
+    return { deleted: true, deactivated: false };
   }
 
   getCategoriesValides(): string[] {

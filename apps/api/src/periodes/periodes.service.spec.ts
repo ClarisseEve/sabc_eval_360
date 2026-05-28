@@ -10,6 +10,7 @@ describe('PeriodesService', () => {
       query: jest.fn(),
       queryOne: jest.fn(),
       execute: jest.fn(),
+      withTransaction: jest.fn(),
     };
     service = new PeriodesService(mockPg);
   });
@@ -74,6 +75,42 @@ describe('PeriodesService', () => {
     it('should reject already closed period', async () => {
       mockPg.queryOne.mockResolvedValue({ id_periode: 'uuid-1', est_cloturee: true });
       await expect(service.fermer('uuid-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should run stats + state update inside a transaction on success', async () => {
+      const mockClient = { query: jest.fn().mockResolvedValue({ rows: [{ nb_total: '5', nb_validees: '4' }] }) };
+      mockPg.queryOne.mockResolvedValue({ id_periode: 'uuid-1', est_cloturee: false });
+      mockPg.withTransaction.mockImplementation((fn: (c: any) => Promise<any>) => fn(mockClient));
+      // findById after transaction
+      mockPg.queryOne.mockResolvedValueOnce({ id_periode: 'uuid-1', est_cloturee: false })
+                     .mockResolvedValueOnce({ id_periode: 'uuid-1', est_cloturee: true, statut: 'fermee' });
+
+      const result = await service.fermer('uuid-1');
+
+      expect(mockPg.withTransaction).toHaveBeenCalledTimes(1);
+      // client.query called: stats SELECT + stats UPDATE + state UPDATE = 3 times
+      expect(mockClient.query).toHaveBeenCalledTimes(3);
+      expect(result.statut).toBe('fermee');
+    });
+  });
+
+  describe('update', () => {
+    it('should reject update when period is not in planifiee state', async () => {
+      mockPg.queryOne.mockResolvedValue({ id_periode: 'uuid-1', statut: 'ouverte', est_ouverte: true, est_cloturee: false });
+      await expect(service.update('uuid-1', { nom_periode: 'New name' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('should ignore unknown keys to prevent SQL injection via column names', async () => {
+      const periode = { id_periode: 'uuid-1', statut: 'planifiee', est_ouverte: false, est_cloturee: false, date_debut: '2027-06-01', date_fin: '2027-07-01' };
+      mockPg.queryOne.mockResolvedValue(periode);
+      mockPg.execute.mockResolvedValue(1);
+
+      // Inject a malicious key — should be stripped by whitelist
+      await service.update('uuid-1', { nom_periode: 'Safe name', ...(({ 'DROP TABLE periodes_evaluation --': 'x' }) as any) });
+
+      const executeSql: string = mockPg.execute.mock.calls[0][0];
+      expect(executeSql).not.toContain('DROP TABLE');
+      expect(executeSql).toContain('nom_periode');
     });
   });
 
