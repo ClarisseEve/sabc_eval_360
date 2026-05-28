@@ -4,6 +4,7 @@ describe('PeriodesSchedulerService', () => {
   let scheduler: PeriodesSchedulerService;
   let mockPg: any;
   let mockPeriodesService: any;
+  let mockNotificationsRappelService: any;
 
   beforeEach(() => {
     mockPg = { query: jest.fn() };
@@ -12,7 +13,18 @@ describe('PeriodesSchedulerService', () => {
       fermer: jest.fn().mockResolvedValue({}),
       calculateStatistiques: jest.fn().mockResolvedValue({ taux_completion: 80 }),
     };
-    scheduler = new PeriodesSchedulerService(mockPg as any, mockPeriodesService);
+    mockNotificationsRappelService = {
+      envoyerRappelsPeriode: jest.fn().mockResolvedValue(1),
+    };
+    const mockNotificationsOuvertureService = {
+      notifierOuverturePeriode: jest.fn().mockResolvedValue(0),
+    };
+    scheduler = new PeriodesSchedulerService(
+      mockPg as any,
+      mockPeriodesService,
+      mockNotificationsRappelService,
+      mockNotificationsOuvertureService as any,
+    );
   });
 
   describe('ouvrirPeriodes', () => {
