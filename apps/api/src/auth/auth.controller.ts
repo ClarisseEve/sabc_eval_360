@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
+import { AuditLogService } from '../common/services/audit-log.service';
 
 @Controller('auth')
 export class AuthController {
@@ -15,6 +16,7 @@ export class AuthController {
     private authService: AuthService,
     private usersService: UsersService,
     private prisma: PrismaService,
+    private auditLog: AuditLogService,
   ) {}
 
   @UseGuards(LocalAuthGuard)
@@ -33,7 +35,13 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(200)
-  logout() {
+  async logout(@Request() req: any) {
+    await this.auditLog.log({
+      matricule_utilisateur: req.user?.sub ?? req.user?.matricule ?? null,
+      action: 'logout',
+      entite: 'auth',
+      adresse_ip: req.ip || 'unknown',
+    });
     return { message: 'Déconnexion réussie' };
   }
 
