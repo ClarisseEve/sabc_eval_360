@@ -141,6 +141,9 @@ describe('AuthService', () => {
         service.validateUser('unknown@sabc.cm', 'any-password', '192.168.1.1'),
       ).rejects.toThrow(UnauthorizedException);
 
+      // Counter incremented even for unknown users (null ?? 0) + 1 = 1
+      expect(cache.set).toHaveBeenCalledWith('login_attempts:unknown@sabc.cm', 1, 900);
+
       expect(auditLog.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'login_failed',

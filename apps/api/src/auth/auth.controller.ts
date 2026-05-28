@@ -62,6 +62,8 @@ export class AuthController {
       data.email = body.email;
     }
     if (body.telephone !== undefined) data.telephone = body.telephone;
+    if (body.date_naissance !== undefined) data.date_naissance = new Date(body.date_naissance);
+    if (body.preferences !== undefined) data.preferences_json = body.preferences;
 
     await this.prisma.utilisateur.update({ where: { matricule: req.user.matricule }, data });
     return this.usersService.findByMatricule(req.user.matricule);
