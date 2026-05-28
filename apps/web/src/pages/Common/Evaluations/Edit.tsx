@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Head } from '@/lib/inertia-shim';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import Badge from '@/Components/UI/Badge';
@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Pencil,
   ShieldCheck,
+  WifiOff,
 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
@@ -27,6 +28,7 @@ import {
   isCriterionCommentRequired,
 } from './shared';
 import { ActiveRulesCard, formatDateLabel, formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
+import { useOfflineSync } from '@/Hooks/useOfflineSync';
 
 const EditEvaluation: React.FC = () => {
   const { id = '' } = useParams();
@@ -45,6 +47,9 @@ const EditEvaluation: React.FC = () => {
   const [commentaireGeneral, setCommentaireGeneral] = useState(evaluation?.commentaire_general ?? '');
   const [lastAction, setLastAction] = useState<'draft' | 'submit' | null>(null);
 
+  const { saveDraft, getDraft, isOnline, pendingCount, isSyncing } = useOfflineSync();
+  const draftRestoredRef = useRef(false);
+
   React.useEffect(() => {
     setNotes(
       criteria.map((critere) => ({
@@ -54,7 +59,33 @@ const EditEvaluation: React.FC = () => {
       })),
     );
     setCommentaireGeneral(evaluation?.commentaire_general ?? '');
+    draftRestoredRef.current = false;
   }, [criteria, evaluation?.commentaire_general]);
+
+  // Restore local draft once after evaluation data loads
+  React.useEffect(() => {
+    if (!id || !evaluation || draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    getDraft(id).then((draft) => {
+      if (!draft || draft.saved_at < new Date(evaluation.updated_at ?? 0).getTime()) return;
+      setNotes(criteria.map((critere, idx) => ({
+        id: critere.id ?? '',
+        note: (draft.notes[idx]?.note as number) ?? critere.note ?? 3,
+        commentaire: (draft.notes[idx]?.commentaire as string) ?? critere.commentaire ?? '',
+      })));
+      if (draft.commentaire_general) setCommentaireGeneral(draft.commentaire_general);
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evaluation]);
+
+  // Auto-save to IndexedDB every 30 seconds
+  React.useEffect(() => {
+    if (!evaluationId) return;
+    const interval = setInterval(() => {
+      saveDraft(String(evaluationId), notes, commentaireGeneral).catch(() => {});
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [evaluationId, notes, commentaireGeneral, saveDraft]);
 
   const completion = useMemo(() => {
     if (notes.length === 0) return 0;
@@ -117,6 +148,20 @@ const EditEvaluation: React.FC = () => {
     <EvaluationPageLayout pageTitle="Éditer une évaluation">
       <Head title="Éditer une évaluation" />
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
+        {(!isOnline || pendingCount > 0) && (
+          <Alert className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+            <WifiOff className="h-4 w-4" />
+            <AlertTitle>{isOnline ? 'Envoi en attente' : 'Hors ligne'}</AlertTitle>
+            <AlertDescription className="text-xs">
+              {isOnline
+                ? isSyncing
+                  ? 'Synchronisation en cours…'
+                  : `${pendingCount} brouillon(s) non synchronisé(s). Reprise auto dès la connexion.`
+                : 'Vous êtes hors ligne. Les modifications sont sauvegardées localement et envoyées à la reconnexion.'}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button asChild={false} variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800" onClick={() => { window.location.href = `/evaluations/${evaluationId}`; }}>
             <span className="inline-flex items-center">

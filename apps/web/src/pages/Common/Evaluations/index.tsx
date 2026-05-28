@@ -1,6 +1,6 @@
 import React from 'react';
 import { Head, Link } from '@/lib/inertia-shim';
-import { ClipboardCheck, Clock } from 'lucide-react';
+import { ClipboardCheck, Clock, Inbox, Send } from 'lucide-react';
 import { useEvaluations } from '@/Hooks/queries';
 import { EvaluationPageLayout } from './shared';
 
@@ -29,6 +29,18 @@ const EvaluationsIndex: React.FC = () => {
           icon: <ClipboardCheck className="h-5 w-5 text-sabc-red-primary" />,
         }]
       : []),
+    {
+      title: 'Évaluations reçues',
+      description: 'Consultez les évaluations dont vous êtes la personne évaluée.',
+      href: '/evaluations/recues',
+      icon: <Inbox className="h-5 w-5 text-sabc-red-primary" />,
+    },
+    {
+      title: 'Évaluations données',
+      description: 'Retrouvez toutes les évaluations que vous avez réalisées.',
+      href: '/evaluations/donnees',
+      icon: <Send className="h-5 w-5 text-sabc-red-primary" />,
+    },
   ];
 
   return (

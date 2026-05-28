@@ -29,7 +29,6 @@ export interface User {
   region_nom?: string;
   type_region?: string;
   id_branche?: string;
-  branche_nom?: string;
   branche?: { nom_branche: string } | null;
   id_service?: string | null;
   id_district?: string | null;
@@ -140,7 +139,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialUse
   }, []);
 
   const updateProfile = useCallback(async (data: Partial<User>) => {
-    const res = await api.put('/auth/profile', data);
+    const res = await api.patch('/auth/profile', data);
     if (user) {
       setUser({ ...user, ...data, ...res.data });
     }
