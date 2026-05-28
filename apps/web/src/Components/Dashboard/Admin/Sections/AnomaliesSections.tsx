@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, AlertTriangle, ArrowUpRight, Info, RefreshCw, Shield, Siren, TriangleAlert } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowUpRight, CheckCircle2, Info, RefreshCw, Shield, Siren, TriangleAlert, Zap } from 'lucide-react';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
@@ -11,11 +11,13 @@ import { cn } from '@/utils/helpers';
 type AlertFilter = 'all' | 'critical' | 'warning' | 'info';
 
 type AnomalyRow = {
+  id?: string;
   type: string;
   description: string;
   severite: 'critical' | 'warning' | 'info';
+  resolue?: boolean;
   matricule?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 };
 
 const SEVERITY_CONFIG: Record<string, { icon: React.ElementType; color: string; badgeVariant: 'destructive' | 'secondary' | 'outline' }> = {
@@ -301,12 +303,20 @@ export function AnomaliesTableSection({
   activeFilter,
   onRefresh,
   isFetching,
+  onAcknowledge,
+  acknowledgeLoading,
+  onRunDetection,
+  isRunningDetection,
 }: {
   rows: AnomalyRow[];
   totalRows: AnomalyRow[];
   activeFilter: AlertFilter;
   onRefresh: () => void;
   isFetching: boolean;
+  onAcknowledge: (id: string) => void;
+  acknowledgeLoading: string | null;
+  onRunDetection: () => void;
+  isRunningDetection: boolean;
 }) {
   return (
     <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
@@ -322,10 +332,21 @@ export function AnomaliesTableSection({
               {activeFilter !== 'all' ? ` sur ${totalRows.length}` : ''} pour le filtre courant.
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={onRefresh} disabled={isFetching}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-            Rafraîchir
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRunDetection}
+              disabled={isRunningDetection}
+            >
+              <Zap className={`mr-2 h-4 w-4 ${isRunningDetection ? 'animate-pulse' : ''}`} />
+              {isRunningDetection ? 'Détection...' : 'Lancer détection'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={onRefresh} disabled={isFetching}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Rafraîchir
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-0">
@@ -348,18 +369,22 @@ export function AnomaliesTableSection({
                 <TableHead>Collaborateur</TableHead>
                 <TableHead>Indicateur</TableHead>
                 <TableHead>Action recommandée</TableHead>
+                <TableHead>Statut</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((row, index) => {
                 const config = SEVERITY_CONFIG[row.severite] || SEVERITY_CONFIG.info;
                 const IconComp = config.icon;
+                const rowKey = `${row.type}-${row.matricule ?? 'global'}-${index}`;
+                const isAcknowledging = acknowledgeLoading !== null && row.id === acknowledgeLoading;
                 return (
                   <TableRow
-                    key={`${row.type}-${row.matricule ?? 'global'}-${index}`}
+                    key={rowKey}
                     className={cn(
-                      row.severite === 'critical' && 'bg-red-50/40',
-                      row.severite === 'warning' && 'bg-amber-50/30',
+                      row.resolue && 'opacity-60',
+                      !row.resolue && row.severite === 'critical' && 'bg-red-50/40',
+                      !row.resolue && row.severite === 'warning' && 'bg-amber-50/30',
                     )}
                   >
                     <TableCell>
@@ -382,6 +407,27 @@ export function AnomaliesTableSection({
                     <TableCell>{row.matricule || 'Analyse globale'}</TableCell>
                     <TableCell className="font-medium text-sabc-gray-700">{buildSignalMetric(row)}</TableCell>
                     <TableCell className="max-w-md text-sabc-gray-600">{buildActionLabel(row)}</TableCell>
+                    <TableCell>
+                      {row.resolue === true ? (
+                        <Badge variant="secondary" className="gap-1 bg-sabc-gray-100 text-sabc-gray-500">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Résolu
+                        </Badge>
+                      ) : row.id ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isAcknowledging}
+                          onClick={() => onAcknowledge(row.id!)}
+                          className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {isAcknowledging ? 'En cours…' : 'Marquer résolu'}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-sabc-gray-400">—</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 );
               })}

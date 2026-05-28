@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
 import { Badge } from '@/Components/UI/Badge/Badge';
+import { Button } from '@/Components/UI/Button/Button';
 import { EmptyState, getPriorityBadgeVariant } from '@/Components/Dashboard/RoleDashboardShared';
 import { TeamAxisFrequencyChartCard } from '@/Components/Dashboard/TeamAnalyticsCards';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -168,10 +169,18 @@ export function ImprovementRowsSection({
   rows,
   usersWithRecommendations,
   usersAnalyzed,
+  onValidate,
+  onReject,
+  validateLoading,
+  rejectLoading,
 }: Readonly<{
   rows: any[];
   usersWithRecommendations: number;
   usersAnalyzed: number;
+  onValidate: (id: string) => void;
+  onReject: (id: string) => void;
+  validateLoading: string | null;
+  rejectLoading: string | null;
 }>) {
   return (
     <Card>
@@ -195,26 +204,64 @@ export function ImprovementRowsSection({
                 <TableHead>Priorité</TableHead>
                 <TableHead>Action</TableHead>
                 <TableHead>Axe dominant</TableHead>
+                <TableHead>Décision</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row: any) => (
-                <TableRow key={`${row.matricule}-${row.type}-${row.titre}`}>
-                  <TableCell>
-                    <div className="font-medium text-sabc-gray-900 dark:text-white">{row.nomComplet}</div>
-                    <div className="text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{row.matricule}</div>
-                  </TableCell>
-                  <TableCell>{row.role}</TableCell>
-                  <TableCell>{row.region}</TableCell>
-                  <TableCell><Badge variant="secondary">{row.type}</Badge></TableCell>
-                  <TableCell><Badge variant={getPriorityBadgeVariant(row.priorite)}>{row.priorite}</Badge></TableCell>
-                  <TableCell>
-                    <div className="font-medium text-sabc-gray-900 dark:text-white">{row.titre}</div>
-                    <div className="text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{row.description || 'Sans description'}</div>
-                  </TableCell>
-                  <TableCell>{row.axeDominant}</TableCell>
-                </TableRow>
-              ))}
+              {rows.map((row: any) => {
+                const rowKey = `${row.matricule}-${row.type}-${row.titre}`;
+                const isValidating = validateLoading !== null && row.id === validateLoading;
+                const isRejecting = rejectLoading !== null && row.id === rejectLoading;
+                const isPersisted = Boolean(row.id);
+
+                return (
+                  <TableRow key={rowKey}>
+                    <TableCell>
+                      <div className="font-medium text-sabc-gray-900 dark:text-white">{row.nomComplet}</div>
+                      <div className="text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{row.matricule}</div>
+                    </TableCell>
+                    <TableCell>{row.role}</TableCell>
+                    <TableCell>{row.region}</TableCell>
+                    <TableCell><Badge variant="secondary">{row.type}</Badge></TableCell>
+                    <TableCell><Badge variant={getPriorityBadgeVariant(row.priorite)}>{row.priorite}</Badge></TableCell>
+                    <TableCell>
+                      <div className="font-medium text-sabc-gray-900 dark:text-white">{row.titre}</div>
+                      <div className="text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{row.description || 'Sans description'}</div>
+                    </TableCell>
+                    <TableCell>{row.axeDominant}</TableCell>
+                    <TableCell>
+                      {row.statut === 'validee' ? (
+                        <Badge variant="success" className="whitespace-nowrap">Validé</Badge>
+                      ) : row.statut === 'rejetee' ? (
+                        <Badge variant="destructive" className="whitespace-nowrap">Rejeté</Badge>
+                      ) : isPersisted ? (
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isValidating || isRejecting}
+                            onClick={() => onValidate(row.id)}
+                            className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
+                          >
+                            {isValidating ? 'En cours…' : 'Valider'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isValidating || isRejecting}
+                            onClick={() => onReject(row.id)}
+                            className="gap-1 border-red-300 text-red-700 hover:bg-red-50"
+                          >
+                            {isRejecting ? 'En cours…' : 'Rejeter'}
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-sabc-gray-400" title="Exécuter le batch d'abord">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}

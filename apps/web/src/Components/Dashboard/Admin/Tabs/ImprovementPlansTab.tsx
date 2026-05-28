@@ -1,4 +1,6 @@
 import React from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { analyticsApi } from '@/Services/api';
 import { useAdminImprovementPlansTabData } from '@/Hooks/queries/useAdminDashboardTabs';
 import { Card, CardContent } from '@/Components/UI/Card/Card';
 import {
@@ -35,6 +37,29 @@ export default function ImprovementPlansTab() {
     typeFilter,
   });
 
+  const queryClient = useQueryClient();
+
+  const validateMutation = useMutation({
+    mutationFn: (id: string) => analyticsApi.validateRecommandation(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['analytics', 'admin', 'improvement-plans'] });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, motif }: { id: string; motif: string }) =>
+      analyticsApi.rejectRecommandation(id, motif),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['analytics', 'admin', 'improvement-plans'] });
+    },
+  });
+
+  function handleReject(id: string) {
+    const motif = window.prompt('Motif du rejet :');
+    if (motif === null) return;
+    rejectMutation.mutate({ id, motif: motif.trim() || 'Non précisé' });
+  }
+
   return (
     <div className="space-y-6">
       <ImprovementPlansFiltersSection
@@ -54,7 +79,7 @@ export default function ImprovementPlansTab() {
 
       {plansQuery.isLoading ? (
         <Card>
-          <CardContent className="p-6 text-sm text-sabc-gray-500">Chargement de l’agrégation des plans d’amélioration…</CardContent>
+          <CardContent className="p-6 text-sm text-sabc-gray-500">Chargement de l'agrégation des plans d'amélioration…</CardContent>
         </Card>
       ) : null}
 
@@ -73,6 +98,10 @@ export default function ImprovementPlansTab() {
             rows={rows}
             usersWithRecommendations={totals.users_with_recommendations ?? 0}
             usersAnalyzed={totals.users_analyzed ?? 0}
+            onValidate={(id) => validateMutation.mutate(id)}
+            onReject={handleReject}
+            validateLoading={validateMutation.isPending ? (validateMutation.variables ?? null) : null}
+            rejectLoading={rejectMutation.isPending ? (rejectMutation.variables?.id ?? null) : null}
           />
         </>
       ) : null}
