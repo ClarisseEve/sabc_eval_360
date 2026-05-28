@@ -22,6 +22,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { HealthModule } from './health/health.module';
 import { CommonModule } from './common/common.module';
 import { EvaluationPermissionModule } from './evaluation-permission/evaluation-permission.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Global()
 @Module({
@@ -62,6 +63,7 @@ import { EvaluationPermissionModule } from './evaluation-permission/evaluation-p
     NotificationsModule,
     HealthModule,
     EvaluationPermissionModule,
+    ReportsModule,
   ],
   exports: [CacheService],
   providers: [
