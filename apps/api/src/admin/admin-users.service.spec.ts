@@ -7,6 +7,7 @@ import { EvaluationsService } from '../evaluations/evaluations.service';
 import { HierarchyService } from '../hierarchy/hierarchy.service';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { CreateUserDto } from './dto/user.dto';
+import { UpdateUserDto } from './dto/user.dto';
 
 const ADMIN_MATRICULE = 'ADMIN';
 const ADMIN_IP = '127.0.0.1';
@@ -54,6 +55,7 @@ const makeDbUser = (overrides: Record<string, unknown> = {}) => ({
 describe('AdminUsersService', () => {
   let service: AdminUsersService;
   let prisma: jest.Mocked<PrismaService>;
+  let pg: jest.Mocked<DatabasePgService>;
   let hierarchyService: jest.Mocked<HierarchyService>;
   let auditLogService: jest.Mocked<AuditLogService>;
 
@@ -78,6 +80,7 @@ describe('AdminUsersService', () => {
           provide: DatabasePgService,
           useValue: {
             queryOne: jest.fn().mockResolvedValue({ total: '0', validees: '0', score_moyen: null }),
+            query: jest.fn().mockResolvedValue([]),
           },
         },
         {
@@ -104,6 +107,7 @@ describe('AdminUsersService', () => {
 
     service = module.get<AdminUsersService>(AdminUsersService);
     prisma = module.get(PrismaService) as jest.Mocked<PrismaService>;
+    pg = module.get(DatabasePgService) as jest.Mocked<DatabasePgService>;
     hierarchyService = module.get(HierarchyService) as jest.Mocked<HierarchyService>;
     auditLogService = module.get(AuditLogService) as jest.Mocked<AuditLogService>;
   });
@@ -225,6 +229,56 @@ describe('AdminUsersService', () => {
           id_entite: 'U0001',
           matricule_utilisateur: ADMIN_MATRICULE,
         }),
+      );
+    });
+
+    it('should log USER_MANAGER_CHANGE_EVALS_DETECTED when manager changes and active evals exist (AC5)', async () => {
+      const existingUser = makeDbUser({ manager_matricule: 'OLD01' });
+      const updatedUser = makeDbUser({ manager_matricule: 'NEW01' });
+
+      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(existingUser);
+      (hierarchyService.validerAssignationManager as jest.Mock).mockResolvedValue({ valide: true, erreurs: [] });
+      (prisma.utilisateur.update as jest.Mock).mockResolvedValue(updatedUser);
+      // Simulate 2 active evaluations in open period
+      (pg.query as jest.Mock).mockResolvedValueOnce([
+        { id_evaluation: 'eval-1', statut: 'soumis' },
+        { id_evaluation: 'eval-2', statut: 'brouillon' },
+      ]);
+
+      await service.updateUser('U0001', { manager_matricule: 'NEW01' }, ADMIN_MATRICULE, ADMIN_IP);
+
+      // Should have been called twice: once for MANAGER_CHANGE_EVALS_REASSIGNED + once for USER_UPDATE
+      expect(auditLogService.log).toHaveBeenCalledTimes(2);
+      expect(auditLogService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'USER_MANAGER_CHANGE_EVALS_DETECTED',
+          entite: 'evaluation',
+          id_entite: 'U0001',
+          details_json: expect.objectContaining({
+            ancien_manager: 'OLD01',
+            nouveau_manager: 'NEW01',
+            evaluations_actives: 2,
+            evaluations_ids: ['eval-1', 'eval-2'],
+          }),
+        }),
+      );
+    });
+
+    it('should NOT log EVALS_REASSIGNED when manager changes but no active evals exist', async () => {
+      const existingUser = makeDbUser({ manager_matricule: 'OLD01' });
+      const updatedUser = makeDbUser({ manager_matricule: 'NEW01' });
+
+      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(existingUser);
+      (hierarchyService.validerAssignationManager as jest.Mock).mockResolvedValue({ valide: true, erreurs: [] });
+      (prisma.utilisateur.update as jest.Mock).mockResolvedValue(updatedUser);
+      (pg.query as jest.Mock).mockResolvedValueOnce([]); // no active evals
+
+      await service.updateUser('U0001', { manager_matricule: 'NEW01' }, ADMIN_MATRICULE, ADMIN_IP);
+
+      // Only USER_UPDATE should be logged
+      expect(auditLogService.log).toHaveBeenCalledTimes(1);
+      expect(auditLogService.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'USER_UPDATE' }),
       );
     });
   });

@@ -142,6 +142,23 @@ describe('AuthController', () => {
       expect(result).toEqual(updatedProfile);
     });
 
+    it('maps body.preferences to data.preferences_json in prisma.update', async () => {
+      const req = { user: { matricule: 'MAT001' } };
+      const prefs = { langue: 'fr', notifications_email: true };
+      const body = { preferences: prefs };
+
+      prisma.utilisateur.findFirst.mockResolvedValue(null);
+      prisma.utilisateur.update.mockResolvedValue(undefined);
+      usersService.findByMatricule.mockResolvedValue({ matricule: 'MAT001' } as any);
+
+      await controller.updateProfile(req, body as any);
+
+      expect(prisma.utilisateur.update).toHaveBeenCalledWith({
+        where: { matricule: 'MAT001' },
+        data: expect.objectContaining({ preferences_json: prefs }),
+      });
+    });
+
     it('duplicate email: throws BadRequestException("Cet email est déjà utilisé")', async () => {
       const req = { user: { matricule: 'MAT001' } };
       const body = { email: 'taken@sabc.cm' };

@@ -58,6 +58,7 @@ export class UsersService {
         id_district: true,
         id_secteur: true,
         manager_matricule: true,
+        niveau_hierarchique: true,
         created_at: true,
       },
     });
@@ -72,6 +73,6 @@ export class UsersService {
       });
     }
 
-    return { ...utilisateur, branche };
+    return { ...utilisateur, branche, avatar: utilisateur.photo_url ?? undefined };
   }
 }

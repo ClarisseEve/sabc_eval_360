@@ -1,4 +1,4 @@
-import { Controller, Post, Put, Get, Body, UseGuards, Request, HttpCode, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Patch, Get, Body, UseGuards, Request, HttpCode, BadRequestException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -46,7 +46,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Put('profile')
+  @Patch('profile')
   async updateProfile(
     @Request() req: any,
     @Body() body: UpdateProfileDto,
@@ -73,7 +73,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Put('password')
+  @Post('change-password')
   async updatePassword(
     @Request() req: any,
     @Body() body: UpdatePasswordDto,
