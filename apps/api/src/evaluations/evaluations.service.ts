@@ -3,6 +3,9 @@ import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { createHash } from 'crypto';
 import { normalizeRuleRow, parseRuleEnvelope } from '../regles/rule-schema';
+import { ValidationNotationService } from './validation-notation.service';
+import { ValidationManagerService } from './validation-manager.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface Evaluation {
   id_evaluation: string | number;
@@ -48,6 +51,9 @@ export class EvaluationsService {
   constructor(
     private pg: DatabasePgService,
     private prisma: PrismaService,
+    private validationNotation: ValidationNotationService,
+    private validationManager: ValidationManagerService,
+    private notifications: NotificationsService,
   ) {}
 
   async canCreate(evaluateurMatricule: string, evalueMatricule: string, idRegle?: string): Promise<boolean> {
@@ -182,23 +188,27 @@ export class EvaluationsService {
   }
 
   private canEditEvaluation(eval_: any): boolean {
-    if (eval_.statut === 'brouillon') return true;
-    if (eval_.statut === 'soumis' && eval_.date_soumission) {
-      const submissionDate = new Date(eval_.date_soumission);
-      const hoursSinceSubmission = (Date.now() - submissionDate.getTime()) / (1000 * 60 * 60);
-      return hoursSinceSubmission < 72;
-    }
+    // brouillon and rejete are always editable by the evaluator
+    if (eval_.statut === 'brouillon' || eval_.statut === 'rejete') return true;
     return false;
   }
 
   async updateNotes(id: string, notes: any[], commentaire?: string): Promise<boolean> {
     const eval_ = await this.findById(id);
     if (!this.canEditEvaluation(eval_)) {
-      throw new BadRequestException(
-        eval_.statut === 'soumis'
-          ? "Le délai de modification de 72h après soumission est dépassé"
-          : "L'évaluation n'est pas en brouillon",
-      );
+      throw new BadRequestException("L'évaluation ne peut plus être modifiée dans son état actuel");
+    }
+
+    // Validate note bounds and mandatory comments before saving
+    if (notes && notes.length > 0) {
+      const bornesResult = this.validationNotation.validateBornes(notes);
+      if (!bornesResult.valid) {
+        throw new BadRequestException(bornesResult.errors.join('; '));
+      }
+      const commentairesResult = this.validationNotation.validateCommentaires(notes);
+      if (!commentairesResult.valid) {
+        throw new BadRequestException(commentairesResult.errors.join('; '));
+      }
     }
 
     await this.pg.execute(
@@ -212,23 +222,66 @@ export class EvaluationsService {
   async submit(id: string): Promise<{ success: boolean; message: string }> {
     const eval_ = await this.findById(id);
 
-    if (eval_.statut !== 'brouillon') {
-      return { success: false, message: "L'évaluation n'est pas en brouillon" };
+    if (eval_.statut !== 'brouillon' && eval_.statut !== 'rejete') {
+      return { success: false, message: "L'évaluation ne peut être soumise que depuis le statut brouillon ou rejeté" };
+    }
+
+    // Verify period is still open
+    const periode = await this.pg.queryOne<any>(
+      `SELECT statut FROM periodes_evaluation WHERE id_periode = $1`,
+      [eval_.id_periode],
+    );
+    if (!periode || periode.statut !== 'ouverte') {
+      return { success: false, message: 'La période est fermée' };
     }
 
     const notes = typeof eval_.notations_json === 'string'
       ? JSON.parse(eval_.notations_json)
       : eval_.notations_json ?? [];
 
-    if (!notes.length) {
+    // Load criteres from rule if available
+    let criteres: any[] = [];
+    if (eval_.id_regle) {
+      const regle = await this.pg.queryOne<any>(
+        `SELECT criteres_evaluation_json FROM regles_evaluation WHERE id_regle = $1`,
+        [eval_.id_regle],
+      );
+      if (regle) {
+        const normalized = normalizeRuleRow(regle);
+        const envelope = parseRuleEnvelope(normalized.criteres_evaluation_json);
+        criteres = envelope.criteres;
+      }
+    }
+
+    if (!notes.length && !criteres.length) {
       return { success: false, message: "L'évaluation est vide" };
     }
 
+    const validResult = this.validationNotation.validatePourSoumission(notes, criteres);
+    if (!validResult.valid) {
+      return { success: false, message: validResult.errors.join('; ') };
+    }
+
+    const noteGlobale = this.validationNotation.calculerNoteGlobale(notes);
+
     await this.pg.execute(
-      `UPDATE evaluations SET statut = 'soumis', date_soumission = NOW(), updated_at = NOW()
-       WHERE id_evaluation = $1`,
-      [id],
+      `UPDATE evaluations SET statut = 'soumis', date_soumission = NOW(), note_globale = $1, updated_at = NOW()
+       WHERE id_evaluation = $2`,
+      [noteGlobale, id],
     );
+
+    // Notify manager (non-blocking)
+    const evalue = await this.prisma.utilisateur.findUnique({ where: { matricule: eval_.evalue_matricule } });
+    if (evalue?.manager_matricule) {
+      this.notifications.create({
+        destinataire_matricule: evalue.manager_matricule,
+        titre: 'Nouvelle évaluation à valider',
+        message: `Une évaluation de ${eval_.evaluateur?.prenom ?? ''} ${eval_.evaluateur?.nom ?? ''} pour ${evalue.prenom} ${evalue.nom} est en attente de validation.`,
+        type: 'evaluation',
+        id_evaluation: String(id),
+        expediteur_matricule: eval_.evaluateur_matricule,
+      }).catch(() => {});
+    }
 
     return { success: true, message: 'Évaluation soumise avec succès' };
   }
@@ -237,6 +290,7 @@ export class EvaluationsService {
     id: string,
     validateurMatricule: string,
     estValidee: boolean,
+    motifRejet?: string | null,
     commentaireValidation?: string | null,
   ): Promise<{ success: boolean; message: string }> {
     const eval_ = await this.findById(id);
@@ -245,9 +299,16 @@ export class EvaluationsService {
       return { success: false, message: "L'évaluation n'est pas soumise" };
     }
 
-    const evalue = await this.prisma.utilisateur.findUnique({ where: { matricule: eval_.evalue_matricule } });
-    if (!evalue || evalue.manager_matricule !== validateurMatricule) {
-      throw new ForbiddenException('Non autorisé à valider cette évaluation');
+    // Check authorization: manager direct OR DR/CDTT même région
+    const authResult = await this.validationManager.peutValider(validateurMatricule, eval_.evalue_matricule);
+    if (!authResult.canValidate) {
+      throw new ForbiddenException(authResult.reason ?? 'Non autorisé à valider cette évaluation');
+    }
+
+    // Validate motif if rejecting
+    const motifResult = this.validationManager.validerMotifRejet(motifRejet, estValidee);
+    if (!motifResult.valid) {
+      throw new BadRequestException(motifResult.error);
     }
 
     const validateur = await this.prisma.utilisateur.findUnique({ where: { matricule: validateurMatricule } });
@@ -258,27 +319,37 @@ export class EvaluationsService {
     await this.syncUserRefs([validateur]);
 
     const commentaire = commentaireValidation?.trim() || null;
-    if (!estValidee && !commentaire) {
-      throw new BadRequestException('Un commentaire est obligatoire pour renvoyer en brouillon');
-    }
+    const nouveauStatut = estValidee ? 'valide' : 'rejete';
 
-    const nouveauStatut = estValidee ? 'valide' : 'brouillon';
     await this.pg.execute(
       `UPDATE evaluations
        SET statut = $1,
            validateur_matricule = $2,
            date_validation = NOW(),
            commentaire_validation = $3,
+           motif_rejet = $4,
            updated_at = NOW()
-       WHERE id_evaluation = $4`,
-      [nouveauStatut, validateurMatricule, commentaire, id],
+       WHERE id_evaluation = $5`,
+      [nouveauStatut, validateurMatricule, commentaire, motifRejet?.trim() ?? null, id],
     );
 
     if (estValidee) {
       await this.updateScores(eval_.evalue_matricule, eval_.id_periode);
     }
 
-    const message = estValidee ? 'Évaluation validée avec succès' : 'Évaluation renvoyée en brouillon';
+    // Notify evaluateur (non-blocking)
+    this.notifications.create({
+      destinataire_matricule: eval_.evaluateur_matricule,
+      titre: estValidee ? 'Évaluation validée' : 'Évaluation rejetée',
+      message: estValidee
+        ? `Votre évaluation a été validée par ${validateur.prenom} ${validateur.nom}.`
+        : `Votre évaluation a été rejetée. Motif : ${motifRejet?.trim() ?? commentaire ?? 'non précisé'}.`,
+      type: estValidee ? 'validation' : 'warning',
+      id_evaluation: String(id),
+      expediteur_matricule: validateurMatricule,
+    }).catch(() => {});
+
+    const message = estValidee ? 'Évaluation validée avec succès' : 'Évaluation rejetée';
     return { success: true, message };
   }
 
@@ -297,10 +368,10 @@ export class EvaluationsService {
       select: { matricule: true },
     });
 
-    const matricules = subordonnes.map(s => s.matricule);
+    const matricules = subordonnes.map((s: { matricule: string }) => s.matricule);
     if (!matricules.length) return [];
 
-    const placeholders = matricules.map((_, i) => `$${i + 1}`).join(',');
+    const placeholders = matricules.map((_: string, i: number) => `$${i + 1}`).join(',');
     const evaluations = await this.pg.query<Evaluation>(
       `SELECT * FROM evaluations WHERE statut = 'soumis' AND evalue_matricule IN (${placeholders})
        ORDER BY date_soumission DESC`,
@@ -559,7 +630,7 @@ export class EvaluationsService {
         : Promise.resolve([]),
     ]);
 
-    const usersByMatricule = new Map(users.map((user) => [user.matricule, { ...user, avatar: user.photo_url }]));
+    const usersByMatricule = new Map(users.map((user: { matricule: string; photo_url: string | null; [key: string]: unknown }) => [user.matricule, { ...user, avatar: user.photo_url }]));
     const periodesByCode = new Map(periodes.map((periode: any) => [periode.code_periode, periode]));
     const reglesById = new Map(regles.map((regle: any) => [regle.id_regle, normalizeRuleRow(regle)]));
 

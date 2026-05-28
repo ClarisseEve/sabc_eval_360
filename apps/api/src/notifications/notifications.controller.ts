@@ -64,19 +64,19 @@ export class NotificationsController {
         where: { est_actif: true, role: { not: 'ADMIN' } },
         select: { matricule: true },
       });
-      targets.push(...users.map(u => u.matricule));
+      targets.push(...users.map((u: { matricule: string }) => u.matricule));
     } else if (body.cible === 'role' && body.role) {
       const users = await this.prisma.utilisateur.findMany({
         where: { role: body.role, est_actif: true },
         select: { matricule: true },
       });
-      targets.push(...users.map(u => u.matricule));
+      targets.push(...users.map((u: { matricule: string }) => u.matricule));
     } else if (body.cible === 'region' && body.id_region) {
       const users = await this.prisma.utilisateur.findMany({
         where: { id_region: body.id_region, est_actif: true },
         select: { matricule: true },
       });
-      targets.push(...users.map(u => u.matricule));
+      targets.push(...users.map((u: { matricule: string }) => u.matricule));
     } else if (body.cible === 'individu' && body.matricules?.length) {
       targets.push(...body.matricules);
     }

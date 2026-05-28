@@ -8,10 +8,7 @@ export class AdminStructureService {
   // ── Regions ──
 
   async getRegions() {
-    return this.prisma.region.findMany({
-      include: { _count: { select: { utilisateurs: true } } },
-      orderBy: { nom_region: 'asc' },
-    });
+    return this.prisma.region.findMany({ orderBy: { nom_region: 'asc' } });
   }
 
   async createRegion(data: { id_region: string; nom_region: string; est_taniere?: boolean }) {
@@ -142,20 +139,14 @@ export class AdminStructureService {
   // ── Branches ──
 
   async getBranches() {
-    return this.prisma.branche.findMany({
-      include: { _count: { select: { utilisateurs: true } } },
-      orderBy: { nom_branche: 'asc' },
-    });
+    return this.prisma.branche.findMany({ orderBy: { nom_branche: 'asc' } });
   }
 
   // ── Overview ──
 
   async getOverview() {
     const [regions, totalUsers, activeUsers] = await Promise.all([
-      this.prisma.region.findMany({
-        include: { _count: { select: { utilisateurs: true } } },
-        orderBy: { nom_region: 'asc' },
-      }),
+      this.prisma.region.findMany({ orderBy: { nom_region: 'asc' } }),
       this.prisma.utilisateur.count(),
       this.prisma.utilisateur.count({ where: { statut: 'Actif' } }),
     ]);

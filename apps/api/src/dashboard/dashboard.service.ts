@@ -110,7 +110,7 @@ export class DashboardService {
   private async _getAdminStats(matricule: string): Promise<AdminDashboardStats> {
     const [baseStats, userStats, evalStats, remplacements, regions, rolePerf] = await Promise.all([
       this._getStats(matricule),
-      this.prisma.utilisateur.count().then(async (total) => ({
+      this.prisma.utilisateur.count().then(async (total: number) => ({
         total,
         actifs: await this.prisma.utilisateur.count({ where: { statut: 'Actif' } }),
       })),
@@ -159,17 +159,17 @@ export class DashboardService {
 
   private async _getRegionStats(): Promise<RegionStats[]> {
     try {
-      const regions = await this.prisma.region.findMany({
-        include: {
-          _count: { select: { utilisateurs: true } },
-          utilisateurs: { select: { matricule: true } },
-        },
-      });
+      const regions = await this.prisma.region.findMany();
 
       const regionStats: RegionStats[] = [];
       for (const region of regions) {
+        const users = await this.prisma.utilisateur.findMany({
+          where: { id_region: region.id_region },
+          select: { matricule: true },
+        });
+        const matricules = users.map((u: { matricule: string }) => u.matricule);
+
         let evalCount = 0;
-        const matricules = region.utilisateurs.map((u: { matricule: string }) => u.matricule);
         if (matricules.length > 0) {
           const placeholders = matricules.map((_: string, i: number) => `$${i + 1}`).join(',');
           const result = await this.pg.queryOne<{ count: string }>(
@@ -183,7 +183,7 @@ export class DashboardService {
           id: region.id_region,
           nom: region.nom_region,
           est_taniere: region.est_taniere,
-          utilisateurs: region._count.utilisateurs,
+          utilisateurs: matricules.length,
           evaluations: evalCount,
           badgeColor: region.est_taniere ? '#E53E3E' : '#FF9800',
           badgeText: region.est_taniere ? 'Taniere' : 'Non-taniere',

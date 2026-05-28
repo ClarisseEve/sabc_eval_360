@@ -60,7 +60,7 @@ export class HierarchyService {
       where: { id_region: idRegion, est_actif: true },
       _count: true,
     });
-    return { total, par_role: parRole.map(r => ({ role: r.role, count: r._count })) };
+    return { total, par_role: parRole.map((r: { role: string; _count: number }) => ({ role: r.role, count: r._count })) };
   }
 
   async getSubordonnesDirects(matricule: string) {
@@ -116,7 +116,7 @@ export class HierarchyService {
     if (sup.id_region !== sub.id_region) return false;
     if (sup.niveau_hierarchique >= sub.niveau_hierarchique) return false;
     if (sup.id_branche !== sub.id_branche) {
-      return ['DR', 'CDTT'].includes(sup.role);
+      return this.getRolePeutCrossBranch(sup.role);
     }
     return true;
   }
@@ -131,8 +131,11 @@ export class HierarchyService {
     if (!user || !manager) return { valide: false, erreurs: ['Utilisateur ou manager introuvable'] };
     if (user.id_region !== manager.id_region) erreurs.push("Le manager doit être dans la même région");
     if (manager.niveau_hierarchique >= user.niveau_hierarchique) erreurs.push("Le manager doit être à un niveau supérieur");
-    if (user.id_branche !== manager.id_branche && !['DR', 'CDTT'].includes(manager.role)) {
-      erreurs.push("Seuls les DR et CDTT peuvent superviser des utilisateurs d'autres branches");
+    if (user.id_branche !== manager.id_branche) {
+      const canCross = await this.getRolePeutCrossBranch(manager.role);
+      if (!canCross) {
+        erreurs.push("Seuls les rôles autorisés (peut_cross_branch) peuvent superviser des utilisateurs d'autres branches");
+      }
     }
 
     // Cycle detection
@@ -168,5 +171,10 @@ export class HierarchyService {
       },
       select: { matricule: true, nom: true, prenom: true, role: true, role_nom: true },
     });
+  }
+
+  private async getRolePeutCrossBranch(roleCode: string): Promise<boolean> {
+    const role = await this.prisma.role.findUnique({ where: { id_role: roleCode } });
+    return role?.peut_cross_branch ?? false;
   }
 }

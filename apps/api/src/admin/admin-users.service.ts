@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { DatabasePgService } from '../database/database-pg.service';
 import * as bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
+import { Prisma, Utilisateur } from '@prisma/client';
 import { EvaluationsService } from '../evaluations/evaluations.service';
 import { HierarchyService } from '../hierarchy/hierarchy.service';
 import { AuditLogService } from '../common/services/audit-log.service';
@@ -46,7 +46,6 @@ export class AdminUsersService {
     const [data, total] = await Promise.all([
       this.prisma.utilisateur.findMany({
         where,
-        include: { region: true, branche: true },
         orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
         skip,
         take: limit,
@@ -55,7 +54,7 @@ export class AdminUsersService {
     ]);
 
     return {
-      data: data.map(({ password, remember_token, ...rest }) => rest),
+      data: data.map(({ password, remember_token, ...rest }: Utilisateur) => rest),
       meta: {
         total,
         page,
@@ -68,7 +67,6 @@ export class AdminUsersService {
   async getUserByMatricule(matricule: string) {
     const user = await this.prisma.utilisateur.findUnique({
       where: { matricule },
-      include: { region: true, branche: true },
     });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
@@ -160,6 +158,10 @@ export class AdminUsersService {
     const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
+    const managerChanged =
+      data.manager_matricule !== undefined &&
+      data.manager_matricule !== user.manager_matricule;
+
     if (data.manager_matricule && data.manager_matricule !== user.manager_matricule) {
       const validation = await this.hierarchyService.validerAssignationManager(
         matricule,
@@ -175,8 +177,18 @@ export class AdminUsersService {
     const updated = await this.prisma.utilisateur.update({
       where: { matricule },
       data,
-      include: { region: true, branche: true },
     });
+
+    // AC5: detect and log active evaluations impacted by manager change
+    if (managerChanged && data.manager_matricule) {
+      await this.handleManagerChangeEvaluations(
+        matricule,
+        user.manager_matricule,
+        data.manager_matricule,
+        adminMatricule,
+        ip,
+      );
+    }
 
     await this.auditLogService.log({
       matricule_utilisateur: adminMatricule,
@@ -189,6 +201,40 @@ export class AdminUsersService {
 
     const { password: _pw, remember_token: _rt, ...safe } = updated;
     return safe;
+  }
+
+  private async handleManagerChangeEvaluations(
+    userMatricule: string,
+    oldManagerMatricule: string | null,
+    newManagerMatricule: string,
+    adminMatricule: string,
+    ip: string,
+  ): Promise<void> {
+    const activeEvals = await this.pg.query<{ id_evaluation: string; statut: string }>(
+      `SELECT e.id_evaluation, e.statut
+       FROM evaluations e
+       JOIN periodes_evaluation p ON p.id_periode = e.id_periode
+       WHERE e.evalue_matricule = $1
+         AND e.statut IN ('brouillon', 'soumis')
+         AND p.statut = 'ouverte'`,
+      [userMatricule],
+    );
+
+    if (activeEvals.length > 0) {
+      await this.auditLogService.log({
+        matricule_utilisateur: adminMatricule,
+        action: 'USER_MANAGER_CHANGE_EVALS_DETECTED',
+        entite: 'evaluation',
+        adresse_ip: ip,
+        id_entite: userMatricule,
+        details_json: {
+          ancien_manager: oldManagerMatricule,
+          nouveau_manager: newManagerMatricule,
+          evaluations_actives: activeEvals.length,
+          evaluations_ids: activeEvals.map(e => e.id_evaluation),
+        },
+      });
+    }
   }
 
   async deactivateUser(matricule: string, adminMatricule: string, ip: string) {
@@ -217,7 +263,7 @@ export class AdminUsersService {
       where: { manager_matricule: matricule },
       orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
     });
-    return rows.map(({ password, remember_token, ...rest }) => rest);
+    return rows.map(({ password, remember_token, ...rest }: Utilisateur) => rest);
   }
 
   async getHistorique(matricule: string) {
@@ -243,7 +289,7 @@ export class AdminUsersService {
       },
       orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
     });
-    return rows.map(({ password, remember_token, ...rest }) => rest);
+    return rows.map(({ password, remember_token, ...rest }: Utilisateur) => rest);
   }
 
   private async ensureUserExists(matricule: string) {
