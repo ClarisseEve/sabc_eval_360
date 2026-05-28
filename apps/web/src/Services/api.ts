@@ -219,6 +219,11 @@ export const templatesApi = {
   delete: (id: string) => api.delete(`/templates/${id}`),
   publish: (id: string) => api.post(`/templates/${id}/publish`),
   unpublish: (id: string) => api.post(`/templates/${id}/unpublish`),
+  getMatrice: (idPeriode: string) => api.get(`/templates/matrice/${idPeriode}`),
+  assignTemplate: (data: { id_role: string; id_template: string; id_periode: string }) =>
+    api.post('/templates/assignations', data),
+  removeAssignation: (idRole: string, idPeriode: string) =>
+    api.delete(`/templates/assignations/${idRole}/${idPeriode}`),
 };
 
 export const reglesApi = {

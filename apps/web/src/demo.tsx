@@ -169,7 +169,7 @@ declare global {
 }
 
 // Export a navigation function
-globalThis.navigateTo = (path: string) => {
+(globalThis as any).navigateTo = (path: string) => {
   globalThis.history.pushState({}, '', path);
   renderPage();
 };

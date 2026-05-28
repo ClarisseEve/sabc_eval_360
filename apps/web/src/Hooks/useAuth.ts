@@ -93,7 +93,7 @@ export const useAuth = () => {
       
       // Informations organisationnelles
       region: auth.user.region_nom || auth.user.region || '',
-      department: auth.user.branche_nom || auth.user.department || ''
+      department: auth.user.branche?.nom_branche || auth.user.department || ''
     };
     
     // Fusionner avec les données originales
