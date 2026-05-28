@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabasePgService } from '../database/database-pg.service';
 import { CacheService } from '../common/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type ImprovementPlanFilters = {
   role?: string;
@@ -40,7 +41,7 @@ const EVALUATION_EFFECTIVE_DATE_SQL = `COALESCE(date_validation::date, date_soum
 const USER_REF_TABLE = 'utilisateurs_ref';
 
 @Injectable()
-export class AnalyticsService {
+export class AnalyticsService implements OnModuleInit {
   private readonly logger = new Logger(AnalyticsService.name);
   private readonly serviceUrl: string;
   private readonly serviceKey: string;
@@ -51,10 +52,166 @@ export class AnalyticsService {
     private pg: DatabasePgService,
     private cache: CacheService,
     private prisma: PrismaService,
+    private notificationsService?: NotificationsService,
   ) {
     this.serviceUrl = config.get('ANALYTICS_SERVICE_URL', 'http://analytics-service:8080');
     this.serviceKey = config.get('ANALYTICS_SERVICE_KEY', 'internal-service-key');
     this.enabled = config.get('ANALYTICS_MICROSERVICE_ENABLED', 'false') === 'true';
+  }
+
+  async onModuleInit() {
+    await this.initTables();
+  }
+
+  private async initTables(): Promise<void> {
+    await this.pg.query(`
+      CREATE TABLE IF NOT EXISTS logs_anomalies (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        type VARCHAR(100) NOT NULL,
+        description TEXT NOT NULL,
+        severite VARCHAR(20) NOT NULL,
+        matricule VARCHAR(20),
+        details JSONB,
+        resolue BOOLEAN DEFAULT false,
+        date_resolution TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_logs_anomalies_severite ON logs_anomalies(severite)`);
+    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_logs_anomalies_resolue ON logs_anomalies(resolue)`);
+    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_logs_anomalies_matricule ON logs_anomalies(matricule)`);
+
+    await this.pg.query(`
+      CREATE TABLE IF NOT EXISTS recommandations_admin (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        type VARCHAR(50) NOT NULL,
+        priorite VARCHAR(20) NOT NULL,
+        matricule VARCHAR(20) NOT NULL,
+        titre TEXT NOT NULL,
+        description TEXT NOT NULL,
+        details JSONB,
+        statut VARCHAR(20) DEFAULT 'en_attente',
+        motif_rejet TEXT,
+        validateur_matricule VARCHAR(20),
+        date_validation TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_recommandations_admin_statut ON recommandations_admin(statut)`);
+    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_recommandations_admin_matricule ON recommandations_admin(matricule)`);
+  }
+
+  async runAnomalyDetectionBatch(): Promise<{ total: number; critical: number; inserted: number }> {
+    const result = await this._detecterAnomalies();
+    let inserted = 0;
+    for (const anomalie of result.anomalies) {
+      await this.pg.query(
+        `INSERT INTO logs_anomalies (type, description, severite, matricule, details)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [anomalie.type, anomalie.description, anomalie.severite, anomalie.matricule ?? null, JSON.stringify(anomalie.details)],
+      );
+      inserted++;
+    }
+    if (result.par_severite.critical > 0) {
+      await this.notifierAdminsCritical(result.par_severite.critical);
+    }
+    return { total: result.total, critical: result.par_severite.critical, inserted };
+  }
+
+  async getAnomaliesHistory(filters: { severite?: string; type?: string; resolue?: string; limit?: number }) {
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIdx = 1;
+    if (filters.severite) { conditions.push(`severite = $${paramIdx++}`); params.push(filters.severite); }
+    if (filters.type) { conditions.push(`type = $${paramIdx++}`); params.push(filters.type); }
+    if (filters.resolue !== undefined && filters.resolue !== '') {
+      conditions.push(`resolue = $${paramIdx++}`);
+      params.push(filters.resolue === 'true');
+    }
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limit = Math.min(filters.limit ?? 100, 500);
+    const rows = await this.pg.query(
+      `SELECT * FROM logs_anomalies ${where} ORDER BY created_at DESC LIMIT ${limit}`,
+      params,
+    );
+    return { anomalies: rows, total: rows.length };
+  }
+
+  async acknowledgeAnomalie(id: string): Promise<{ success: boolean; id: string; resolue: boolean; date_resolution: string }> {
+    await this.pg.query(
+      `UPDATE logs_anomalies SET resolue = true, date_resolution = NOW() WHERE id = $1`,
+      [id],
+    );
+    const dateResolution = new Date().toISOString();
+    return { success: true, id, resolue: true, date_resolution: dateResolution };
+  }
+
+  async runRecommandationsBatch(): Promise<{ inserted: number }> {
+    const usersWithEvals = await this.pg.query<{ matricule: string }>(
+      `SELECT DISTINCT evalue_matricule as matricule FROM evaluations WHERE statut = 'valide' AND note_globale IS NOT NULL LIMIT 200`,
+    );
+    let inserted = 0;
+    for (const row of usersWithEvals) {
+      const recos = await this._getRecommandations(row.matricule);
+      for (const reco of recos.recommandations ?? []) {
+        await this.pg.query(
+          `INSERT INTO recommandations_admin (type, priorite, matricule, titre, description, details)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [reco.type, reco.priorite, row.matricule, reco.titre, reco.description, JSON.stringify(reco.details)],
+        );
+        inserted++;
+      }
+    }
+    return { inserted };
+  }
+
+  async getAdminRecommandations(filters: { statut?: string; type?: string; matricule?: string; limit?: number }) {
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIdx = 1;
+    if (filters.statut) { conditions.push(`statut = $${paramIdx++}`); params.push(filters.statut); }
+    if (filters.type) { conditions.push(`type = $${paramIdx++}`); params.push(filters.type); }
+    if (filters.matricule) { conditions.push(`matricule = $${paramIdx++}`); params.push(filters.matricule); }
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limit = Math.min(filters.limit ?? 100, 500);
+    const rows = await this.pg.query(
+      `SELECT * FROM recommandations_admin ${where} ORDER BY created_at DESC LIMIT ${limit}`,
+      params,
+    );
+    return { recommandations: rows, total: rows.length };
+  }
+
+  async validateRecommandation(id: string, validateurMatricule: string) {
+    await this.pg.query(
+      `UPDATE recommandations_admin SET statut='validee', validateur_matricule=$1, date_validation=NOW() WHERE id=$2`,
+      [validateurMatricule, id],
+    );
+    return { success: true, id, statut: 'validee' };
+  }
+
+  async rejectRecommandation(id: string, validateurMatricule: string, motif: string) {
+    await this.pg.query(
+      `UPDATE recommandations_admin SET statut='rejetee', validateur_matricule=$1, date_validation=NOW(), motif_rejet=$2 WHERE id=$3`,
+      [validateurMatricule, motif, id],
+    );
+    return { success: true, id, statut: 'rejetee' };
+  }
+
+  private async notifierAdminsCritical(nbCritical: number): Promise<void> {
+    if (!this.notificationsService) return;
+    const admins = await this.prisma.utilisateur.findMany({
+      where: { est_admin: true, est_actif: true },
+      select: { matricule: true },
+    });
+    for (const admin of admins) {
+      await this.notificationsService.create({
+        destinataire_matricule: admin.matricule,
+        titre: `${nbCritical} anomalie(s) critique(s) détectée(s)`,
+        message: `Le batch de détection a identifié ${nbCritical} anomalie(s) critique(s). Consultez le dashboard Analytics.`,
+        type: 'warning',
+        lien: '/admin/dashboard?tab=anomalies',
+      });
+    }
   }
 
   async getDashboard(filters: { start_date?: string; end_date?: string } = {}) {
@@ -449,6 +606,101 @@ export class AnalyticsService {
       by_type: byType,
       top_axes: topAxes,
       rows: filteredRows,
+      generated_at: new Date().toISOString(),
+    };
+  }
+
+  // ─── Tendances Multi-Périodes ────────────────────────────────────────────
+
+  async getTendancesMultiPeriodes(filters: { id_region?: string; role?: string; limit?: number } = {}) {
+    const limit = filters.limit ?? 6;
+    const key = `analytics:tendances:${filters.id_region ?? ''}:${filters.role ?? ''}:${limit}`;
+    return this.cache.getOrCompute(key, 300, () => this._getTendancesMultiPeriodes(filters));
+  }
+
+  private async _getTendancesMultiPeriodes(filters: { id_region?: string; role?: string; limit?: number } = {}) {
+    const limit = filters.limit ?? 6;
+    const params: any[] = [];
+
+    // Build optional filter clauses on evaluations
+    const regionClause = filters.id_region
+      ? (() => { params.push(filters.id_region); return `AND e.evalue_matricule IN (SELECT matricule FROM ${USER_REF_TABLE} WHERE id_region = $${params.length})`; })()
+      : '';
+
+    const roleClause = filters.role
+      ? (() => { params.push(filters.role); return `AND e.evalue_matricule IN (SELECT matricule FROM ${USER_REF_TABLE} WHERE role = $${params.length})`; })()
+      : '';
+
+    params.push(limit);
+    const limitParam = `$${params.length}`;
+
+    const closedWhereClause = `WHERE p.est_ouverte = false OR p.statut IN ('fermee', 'closed')`;
+
+    const buildQuery = (whereClause: string) => `
+      SELECT p.id_periode, p.code_periode, p.nom_periode,
+             p.date_debut::text as date_debut, p.date_fin::text as date_fin,
+             ROUND(AVG(e.note_globale) FILTER (WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL)::numeric, 2) as score_moyen,
+             COUNT(e.id_evaluation) as nb_evaluations,
+             COUNT(e.id_evaluation) FILTER (WHERE e.statut = 'valide') as nb_valides,
+             CASE WHEN COUNT(e.id_evaluation) > 0
+               THEN ROUND(COUNT(e.id_evaluation) FILTER (WHERE e.statut = 'valide') * 100.0 / COUNT(e.id_evaluation), 1)
+               ELSE 0
+             END as taux_completion
+      FROM periodes_evaluation p
+      LEFT JOIN evaluations e ON e.id_periode = p.id_periode
+        ${regionClause}
+        ${roleClause}
+      ${whereClause}
+      GROUP BY p.id_periode, p.code_periode, p.nom_periode, p.date_debut, p.date_fin
+      ORDER BY p.date_debut ASC
+      LIMIT ${limitParam}
+    `;
+
+    // First try with only closed periods
+    let rows = await this.pg.query<any>(buildQuery(closedWhereClause), params);
+
+    // Fallback: if no closed periods found, include all periods
+    if (!rows || rows.length === 0) {
+      rows = await this.pg.query<any>(buildQuery(''), params);
+    }
+
+    // Calculate deltas
+    const tendances = rows.map((row: any, index: number) => {
+      const scoreMoyen = row.score_moyen != null ? Number(row.score_moyen) : null;
+      const tauxCompletion = Number(row.taux_completion ?? 0);
+      const nbEvaluations = Number(row.nb_evaluations ?? 0);
+      const nbValides = Number(row.nb_valides ?? 0);
+
+      let deltaScore: number | null = null;
+      let deltaCompletion: number | null = null;
+
+      if (index > 0) {
+        const prev = rows[index - 1];
+        const prevScore = prev.score_moyen != null ? Number(prev.score_moyen) : null;
+        if (scoreMoyen != null && prevScore != null) {
+          deltaScore = Math.round((scoreMoyen - prevScore) * 100) / 100;
+        }
+        const prevCompletion = Number(prev.taux_completion ?? 0);
+        deltaCompletion = Math.round((tauxCompletion - prevCompletion) * 10) / 10;
+      }
+
+      return {
+        id_periode: String(row.id_periode),
+        code_periode: String(row.code_periode ?? ''),
+        nom_periode: String(row.nom_periode ?? ''),
+        date_debut: String(row.date_debut ?? ''),
+        date_fin: String(row.date_fin ?? ''),
+        score_moyen: scoreMoyen,
+        taux_completion: tauxCompletion,
+        nb_evaluations: nbEvaluations,
+        nb_valides: nbValides,
+        delta_score: deltaScore,
+        delta_completion: deltaCompletion,
+      };
+    });
+
+    return {
+      tendances,
       generated_at: new Date().toISOString(),
     };
   }

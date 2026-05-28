@@ -298,10 +298,26 @@ export const analyticsApi = {
     api.get(matricule ? `/analytics/axes-amelioration/${matricule}` : '/analytics/axes-amelioration'),
   anomalies: (params?: { matricule?: string; id_region?: string }) =>
     api.get('/analytics/anomalies', { params }),
+  anomaliesHistory: (params?: { severite?: string; type?: string; resolue?: string; limit?: number }) =>
+    api.get('/analytics/anomalies/history', { params }),
+  acknowledgeAnomalie: (id: string) =>
+    api.patch(`/analytics/anomalies/${id}/acknowledge`),
+  runAnomalyDetection: () =>
+    api.post('/analytics/anomalies/run-detection'),
   recommandations: (matricule?: string) =>
     api.get(matricule ? `/analytics/recommandations/${matricule}` : '/analytics/recommandations'),
+  adminRecommandations: (params?: { statut?: string; type?: string; matricule?: string; limit?: number }) =>
+    api.get('/analytics/admin/recommandations', { params }),
+  validateRecommandation: (id: string) =>
+    api.patch(`/analytics/recommandations/${id}/validate`),
+  rejectRecommandation: (id: string, motif: string) =>
+    api.patch(`/analytics/recommandations/${id}/reject`, { motif }),
+  runRecommandationsGeneration: () =>
+    api.post('/analytics/recommandations/run-generation'),
   scores: (matricule?: string) =>
     api.get(matricule ? `/analytics/scores/${matricule}` : '/analytics/scores'),
+  tendances: (params?: { id_region?: string; role?: string; limit?: number }) =>
+    api.get('/analytics/tendances', { params }),
 };
 
 export const utilisateursApi = {

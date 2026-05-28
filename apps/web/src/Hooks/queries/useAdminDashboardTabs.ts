@@ -135,6 +135,37 @@ export function useAdminImprovementPlansTabData(filters: {
   };
 }
 
+export function useAdminTendancesTabData(filters: { regionFilter: string; roleFilter: string }) {
+  const rolesQuery = useQuery({
+    queryKey: ['admin', 'roles', 'options'],
+    queryFn: () => adminApi.roles.list().then((r) => r.data),
+    staleTime: 300_000,
+  });
+  const regionsQuery = useQuery({
+    queryKey: ['admin', 'regions', 'options'],
+    queryFn: () => adminApi.structure.regions().then((r) => r.data),
+    staleTime: 300_000,
+  });
+  const tendancesQuery = useSuspenseQuery({
+    queryKey: ['analytics', 'admin', 'tendances', filters.regionFilter, filters.roleFilter],
+    queryFn: () =>
+      analyticsApi
+        .tendances({
+          ...(filters.regionFilter !== 'all' ? { id_region: filters.regionFilter } : {}),
+          ...(filters.roleFilter !== 'all' ? { role: filters.roleFilter } : {}),
+        })
+        .then((r) => r.data),
+  });
+  return {
+    tendances: asArray(tendancesQuery.data?.tendances),
+    regionOptions: asArray(regionsQuery.data),
+    roleOptions: asArray(rolesQuery.data)
+      .map((r: any) => String(r?.nom_role || ''))
+      .filter(Boolean),
+    generatedAt: tendancesQuery.data?.generated_at ?? null,
+  };
+}
+
 export function useAdminIndividualSearchTabData({
   search,
   selectedMatricule,

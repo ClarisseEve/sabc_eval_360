@@ -17,6 +17,7 @@ const RoleAnalysisTab = React.lazy(() => import('@/Components/Dashboard/Admin/Ta
 const AnomaliesTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/AnomaliesTab'));
 const IndividualSearchTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/IndividualSearchTab'));
 const ImprovementPlansTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/ImprovementPlansTab'));
+const TendancesTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/TendancesTab'));
 
 const ADMIN_TABS = [
   { value: 'overview', label: "Vue d'ensemble" },
@@ -24,7 +25,8 @@ const ADMIN_TABS = [
   { value: 'roles', label: 'Analyse par rôle' },
   { value: 'anomalies', label: 'Anomalies & alertes' },
   { value: 'individual', label: 'Recherche individuelle' },
-  { value: 'improvement', label: 'Plans d’amélioration' },
+  { value: 'improvement', label: "Plans d'amélioration" },
+  { value: 'tendances', label: 'Tendances' },
 ] as const;
 
 type AdminTabValue = (typeof ADMIN_TABS)[number]['value'];
@@ -131,6 +133,14 @@ export default function AdminDashboard() {
             <ErrorBoundary>
               <Suspense fallback={<DashboardSkeleton />}>
                 <ImprovementPlansTab />
+              </Suspense>
+            </ErrorBoundary>
+          </TabsContent>
+
+          <TabsContent value="tendances">
+            <ErrorBoundary>
+              <Suspense fallback={<DashboardSkeleton />}>
+                <TendancesTab />
               </Suspense>
             </ErrorBoundary>
           </TabsContent>
