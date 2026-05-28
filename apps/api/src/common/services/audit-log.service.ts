@@ -30,7 +30,8 @@ export class AuditLogService {
   async log(entry: AuditLogEntry): Promise<void> {
     try {
       const now = new Date();
-      await this.prisma.logAdministration.create({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (this.prisma as any).logAdministration.create({
         data: {
           id_log: generateShortId(),
           matricule_utilisateur: entry.matricule_utilisateur,

@@ -1,6 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { CacheService } from './common/cache.service';
 import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
 import { ConfigModule } from '@nestjs/config';
@@ -20,13 +21,13 @@ import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthModule } from './health/health.module';
 import { CommonModule } from './common/common.module';
-import { EligibilityModule } from './eligibility/eligibility.module';
 import { EvaluationPermissionModule } from './evaluation-permission/evaluation-permission.module';
 
 @Global()
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         name: 'default',
@@ -60,7 +61,6 @@ import { EvaluationPermissionModule } from './evaluation-permission/evaluation-p
     AdminModule,
     NotificationsModule,
     HealthModule,
-    EligibilityModule,
     EvaluationPermissionModule,
   ],
   exports: [CacheService],

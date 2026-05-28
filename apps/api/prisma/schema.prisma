@@ -62,6 +62,7 @@ model Utilisateur {
   email                      String              @unique(map: "utilisateurs_email_unique") @db.VarChar(100)
   telephone                  String?             @db.VarChar(20)
   date_naissance             DateTime?           @db.Date
+  preferences_json           Json?
   sexe                       String?             @db.VarChar(10)
   password                   String              @db.VarChar(255)
   role                       String              @db.VarChar(50)

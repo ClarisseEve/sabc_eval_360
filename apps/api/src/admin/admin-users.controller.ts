@@ -1,7 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/guards/roles.guard';
 import { AdminUsersService } from './admin-users.service';
+import { CreateUserDto } from './dto/user.dto';
+import { UpdateUserDto } from './dto/user.dto';
+
+interface AuthenticatedRequest extends Request {
+  user: { matricule: string; email: string; role: string; is_admin: boolean };
+}
 
 @Controller('admin/utilisateurs')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -46,18 +53,22 @@ export class AdminUsersController {
   }
 
   @Post()
-  createUser(@Body() body: any) {
-    return this.usersService.createUser(body);
+  createUser(@Body() body: CreateUserDto, @Req() req: AuthenticatedRequest) {
+    return this.usersService.createUser(body, req.user.matricule, req.ip ?? '');
   }
 
   @Put(':matricule')
-  updateUser(@Param('matricule') matricule: string, @Body() body: any) {
-    return this.usersService.updateUser(matricule, body);
+  updateUser(
+    @Param('matricule') matricule: string,
+    @Body() body: UpdateUserDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.usersService.updateUser(matricule, body, req.user.matricule, req.ip ?? '');
   }
 
   @Delete(':matricule')
-  deactivateUser(@Param('matricule') matricule: string) {
-    return this.usersService.updateUser(matricule, { statut: 'Inactif', est_actif: false });
+  deactivateUser(@Param('matricule') matricule: string, @Req() req: AuthenticatedRequest) {
+    return this.usersService.deactivateUser(matricule, req.user.matricule, req.ip ?? '');
   }
 
   @Post('remplacants-disponibles')

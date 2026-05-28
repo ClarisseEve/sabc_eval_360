@@ -103,7 +103,6 @@ export class AdminUsersService {
     const emailExists = await this.prisma.utilisateur.findFirst({ where: { email: data.email } });
     if (emailExists) throw new BadRequestException('Cet email est déjà utilisé');
 
-    // Validate manager hierarchy if provided
     if (data.manager_matricule) {
       const validation = await this.hierarchyService.validerAssignationManager(
         data.matricule,
@@ -118,17 +117,31 @@ export class AdminUsersService {
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id_role, password: _rawPw, ...rest } = data;
-    const created = await this.prisma.utilisateur.create({
-      data: {
-        ...rest,
-        password: hashedPassword,
-        statut: 'Actif',
-        est_actif: true,
-      },
-      include: { region: true, branche: true },
-    });
+    // Use unchecked create to pass raw FK fields directly
+    const createData: Parameters<typeof this.prisma.utilisateur.create>[0]['data'] = {
+      matricule: data.matricule,
+      nom: data.nom,
+      prenom: data.prenom,
+      email: data.email,
+      password: hashedPassword,
+      role: data.role,
+      role_nom: data.role_nom,
+      id_region: data.id_region,
+      region_nom: data.region_nom,
+      type_region: data.type_region,
+      id_branche: data.id_branche,
+      manager_matricule: data.manager_matricule,
+      telephone: data.telephone,
+      id_service: data.id_service,
+      id_district: data.id_district,
+      id_secteur: data.id_secteur,
+      sexe: data.sexe,
+      est_admin: data.est_admin ?? false,
+      statut: 'Actif',
+      est_actif: true,
+    };
+
+    const created = await this.prisma.utilisateur.create({ data: createData });
 
     await this.auditLogService.log({
       matricule_utilisateur: adminMatricule,
@@ -147,7 +160,6 @@ export class AdminUsersService {
     const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
-    // Validate manager hierarchy if manager is changing
     if (data.manager_matricule && data.manager_matricule !== user.manager_matricule) {
       const validation = await this.hierarchyService.validerAssignationManager(
         matricule,
