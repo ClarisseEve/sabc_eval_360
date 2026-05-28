@@ -72,15 +72,15 @@ development_status:
   epic-3-retrospective: optional
 
   # Epic 4
-  epic-4: backlog
-  4-1-creation-devaluation-pour-utilisateur-eligible: backlog
-  4-2-notation-et-commentaires-sur-criteres: backlog
-  4-3-validation-et-soumission-devaluation: backlog
-  4-8-reprise-hors-ligne-et-resubmit: backlog
-  4-4-validation-rejet-devaluation-par-manager: backlog
-  4-5-consultation-des-evaluations-recues: backlog
-  4-6-consultation-des-evaluations-donnees: backlog
-  4-7-contre-evaluation-manager: backlog
+  epic-4: done
+  4-1-creation-devaluation-pour-utilisateur-eligible: done
+  4-2-notation-et-commentaires-sur-criteres: done
+  4-3-validation-et-soumission-devaluation: done
+  4-8-reprise-hors-ligne-et-resubmit: done
+  4-4-validation-rejet-devaluation-par-manager: done
+  4-5-consultation-des-evaluations-recues: done
+  4-6-consultation-des-evaluations-donnees: done
+  4-7-contre-evaluation-manager: done
   epic-4-retrospective: optional
 
   # Epic 5

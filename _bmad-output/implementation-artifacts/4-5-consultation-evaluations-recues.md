@@ -1,6 +1,6 @@
 # Story 4.5: Consultation des Évaluations Reçues
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

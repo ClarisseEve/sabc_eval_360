@@ -1,6 +1,6 @@
 # Story 4.4: Validation/Rejet d'Évaluation par Manager
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

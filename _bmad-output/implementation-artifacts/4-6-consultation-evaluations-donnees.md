@@ -1,6 +1,6 @@
 # Story 4.6: Consultation des Évaluations Données
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

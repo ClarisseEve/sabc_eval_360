@@ -1,6 +1,6 @@
 # Story 4.2: Notation et Commentaires sur Critères
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
