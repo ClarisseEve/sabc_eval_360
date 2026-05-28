@@ -16,33 +16,7 @@ export class AdminRolesController {
     return this.rolesService.getRoles();
   }
 
-  @Get(':id')
-  getRole(@Param('id') id: string) {
-    return this.rolesService.getRoleById(id);
-  }
-
-  @Post()
-  createRole(@Body() body: CreateRoleDto, @Req() req: Request) {
-    const matricule = (req.user as any)?.matricule ?? null;
-    const ip = req.ip ?? '0.0.0.0';
-    return this.rolesService.createRole(body, matricule, ip);
-  }
-
-  @Put(':id')
-  updateRole(@Param('id') id: string, @Body() body: UpdateRoleDto, @Req() req: Request) {
-    const matricule = (req.user as any)?.matricule ?? null;
-    const ip = req.ip ?? '0.0.0.0';
-    return this.rolesService.updateRole(id, body, matricule, ip);
-  }
-
-  @Delete(':id')
-  deleteRole(@Param('id') id: string, @Req() req: Request) {
-    const matricule = (req.user as any)?.matricule ?? null;
-    const ip = req.ip ?? '0.0.0.0';
-    return this.rolesService.deleteRole(id, matricule, ip);
-  }
-
-  // ── Evaluation Rules ──
+  // ── Evaluation Rules — static routes MUST come before :id ──
 
   @Get('regles/evaluation')
   getRegles() {
@@ -67,5 +41,33 @@ export class AdminRolesController {
   @Patch('regles/evaluation/:id/toggle')
   toggleRegle(@Param('id') id: string) {
     return this.rolesService.toggleRegleActive(id);
+  }
+
+  // ── Role CRUD — dynamic :id routes come AFTER all static routes ──
+
+  @Get(':id')
+  getRole(@Param('id') id: string) {
+    return this.rolesService.getRoleById(id);
+  }
+
+  @Post()
+  createRole(@Body() body: CreateRoleDto, @Req() req: Request) {
+    const adminMatricule: string = (req.user as any)?.sub ?? (req.user as any)?.matricule ?? 'unknown';
+    const ip = req.ip ?? '0.0.0.0';
+    return this.rolesService.createRole(body, adminMatricule, ip);
+  }
+
+  @Put(':id')
+  updateRole(@Param('id') id: string, @Body() body: UpdateRoleDto, @Req() req: Request) {
+    const adminMatricule: string = (req.user as any)?.sub ?? (req.user as any)?.matricule ?? 'unknown';
+    const ip = req.ip ?? '0.0.0.0';
+    return this.rolesService.updateRole(id, body, adminMatricule, ip);
+  }
+
+  @Delete(':id')
+  deleteRole(@Param('id') id: string, @Req() req: Request) {
+    const adminMatricule: string = (req.user as any)?.sub ?? (req.user as any)?.matricule ?? 'unknown';
+    const ip = req.ip ?? '0.0.0.0';
+    return this.rolesService.deleteRole(id, adminMatricule, ip);
   }
 }

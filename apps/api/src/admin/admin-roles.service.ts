@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DatabasePgService } from '../database/database-pg.service';
 import { AuditLogService } from '../common/services/audit-log.service';
@@ -18,20 +19,38 @@ const GLOBAL_ROLES = ['DR', 'CDTT'];
 /** Role names that map to the ADMIN system role */
 const ADMIN_ROLES = ['ADMIN'];
 
-function applyBusinessRules(data: Record<string, unknown>): Record<string, unknown> {
-  const result = { ...data };
+/** Scalar fields for Role create/update — mirrors Prisma.RoleUncheckedCreateInput scalars */
+interface RoleScalarFields {
+  id_role?: string;
+  nom_role?: string;
+  description?: string | null;
+  id_branche?: string | null;
+  niveau_taniere?: number | null;
+  niveau_non_taniere?: number | null;
+  peut_auto_evaluer?: boolean;
+  peut_evaluer_pairs?: boolean;
+  peut_evaluer_subordonnes?: boolean;
+  peut_cross_branch?: boolean;
+  portee_geographique?: string;
+  role_principal_equivalent?: string | null;
+  peut_remplacer_roles?: string | null;
+  [key: string]: unknown;
+}
+
+function applyBusinessRules(data: Record<string, unknown>): RoleScalarFields {
+  const result: RoleScalarFields = { ...data };
   const nomRole = result['nom_role'] as string | undefined;
 
   if (nomRole && GLOBAL_ROLES.includes(nomRole)) {
-    result['peut_cross_branch'] = true;
-    result['portee_geographique'] = 'global';
-    result['id_branche'] = null;
+    result.peut_cross_branch = true;
+    result.portee_geographique = 'global';
+    result.id_branche = null;
   }
 
   if (nomRole && ADMIN_ROLES.includes(nomRole)) {
-    result['id_branche'] = null;
-    result['niveau_taniere'] = 0;
-    result['niveau_non_taniere'] = 0;
+    result.id_branche = null;
+    result.niveau_taniere = 0;
+    result.niveau_non_taniere = 0;
   }
 
   return result;
@@ -84,7 +103,7 @@ export class AdminRolesService {
     ip: string,
   ) {
     const finalData = applyBusinessRules(data as Record<string, unknown>);
-    const role = await this.prisma.role.create({ data: finalData as any });
+    const role = await this.prisma.role.create({ data: finalData as Prisma.RoleUncheckedCreateInput });
     await this.auditLog.log({
       matricule_utilisateur: adminMatricule,
       action: 'ROLE_CREATE',
@@ -117,7 +136,7 @@ export class AdminRolesService {
     if (!role) throw new NotFoundException('Rôle introuvable');
 
     const finalData = applyBusinessRules(data as Record<string, unknown>);
-    const updated = await this.prisma.role.update({ where: { id_role: id }, data: finalData as any });
+    const updated = await this.prisma.role.update({ where: { id_role: id }, data: finalData as Prisma.RoleUncheckedUpdateInput });
     await this.auditLog.log({
       matricule_utilisateur: adminMatricule,
       action: 'ROLE_UPDATE',
