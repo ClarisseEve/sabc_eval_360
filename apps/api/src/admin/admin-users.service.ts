@@ -4,6 +4,9 @@ import { DatabasePgService } from '../database/database-pg.service';
 import * as bcrypt from 'bcryptjs';
 import { EvaluationsService } from '../evaluations/evaluations.service';
 import { HierarchyService } from '../hierarchy/hierarchy.service';
+import { AuditLogService } from '../common/services/audit-log.service';
+import { CreateUserDto } from './dto/user.dto';
+import { UpdateUserDto } from './dto/user.dto';
 
 @Injectable()
 export class AdminUsersService {
@@ -12,6 +15,7 @@ export class AdminUsersService {
     private pg: DatabasePgService,
     private evaluationsService: EvaluationsService,
     private hierarchyService: HierarchyService,
+    private auditLogService: AuditLogService,
   ) {}
 
   async getUsers(filters?: {
@@ -92,66 +96,108 @@ export class AdminUsersService {
     };
   }
 
-  async createUser(data: {
-    matricule: string;
-    nom: string;
-    prenom: string;
-    email: string;
-    password: string;
-    role: string;
-    role_nom: string;
-    id_region: string;
-    id_branche: string;
-    region_nom: string;
-    type_region: string;
-    manager_matricule?: string;
-    telephone?: string;
-  }) {
+  async createUser(data: CreateUserDto, adminMatricule: string, ip: string) {
     const existing = await this.prisma.utilisateur.findUnique({ where: { matricule: data.matricule } });
     if (existing) throw new BadRequestException('Ce matricule existe déjà');
 
     const emailExists = await this.prisma.utilisateur.findFirst({ where: { email: data.email } });
     if (emailExists) throw new BadRequestException('Cet email est déjà utilisé');
 
+    // Validate manager hierarchy if provided
+    if (data.manager_matricule) {
+      const validation = await this.hierarchyService.validerAssignationManager(
+        data.matricule,
+        data.manager_matricule,
+      );
+      if (!validation.valide) {
+        throw new BadRequestException(
+          `Assignation manager invalide: ${validation.erreurs.join('; ')}`,
+        );
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id_role, password: _rawPw, ...rest } = data;
     const created = await this.prisma.utilisateur.create({
       data: {
-        ...data,
+        ...rest,
         password: hashedPassword,
         statut: 'Actif',
         est_actif: true,
       },
       include: { region: true, branche: true },
     });
+
+    await this.auditLogService.log({
+      matricule_utilisateur: adminMatricule,
+      action: 'USER_CREATE',
+      entite: 'utilisateur',
+      adresse_ip: ip,
+      id_entite: created.matricule,
+      details_json: { matricule: created.matricule, nom: created.nom, prenom: created.prenom, role: created.role },
+    });
+
     const { password: _pw, remember_token: _rt, ...safe } = created;
     return safe;
   }
 
-  async updateUser(matricule: string, data: {
-    nom?: string;
-    prenom?: string;
-    email?: string;
-    role?: string;
-    role_nom?: string;
-    id_region?: string;
-    id_branche?: string;
-    region_nom?: string;
-    type_region?: string;
-    telephone?: string;
-    statut?: string;
-    est_actif?: boolean;
-  }) {
+  async updateUser(matricule: string, data: UpdateUserDto, adminMatricule: string, ip: string) {
     const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
+
+    // Validate manager hierarchy if manager is changing
+    if (data.manager_matricule && data.manager_matricule !== user.manager_matricule) {
+      const validation = await this.hierarchyService.validerAssignationManager(
+        matricule,
+        data.manager_matricule,
+      );
+      if (!validation.valide) {
+        throw new BadRequestException(
+          `Assignation manager invalide: ${validation.erreurs.join('; ')}`,
+        );
+      }
+    }
 
     const updated = await this.prisma.utilisateur.update({
       where: { matricule },
       data,
       include: { region: true, branche: true },
     });
+
+    await this.auditLogService.log({
+      matricule_utilisateur: adminMatricule,
+      action: 'USER_UPDATE',
+      entite: 'utilisateur',
+      adresse_ip: ip,
+      id_entite: matricule,
+      details_json: { champs_modifies: Object.keys(data) },
+    });
+
     const { password: _pw, remember_token: _rt, ...safe } = updated;
     return safe;
+  }
+
+  async deactivateUser(matricule: string, adminMatricule: string, ip: string) {
+    const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
+    if (!user) throw new NotFoundException('Utilisateur introuvable');
+
+    await this.prisma.utilisateur.update({
+      where: { matricule },
+      data: { statut: 'Inactif', est_actif: false },
+    });
+
+    await this.auditLogService.log({
+      matricule_utilisateur: adminMatricule,
+      action: 'USER_DEACTIVATE',
+      entite: 'utilisateur',
+      adresse_ip: ip,
+      id_entite: matricule,
+      details_json: { matricule },
+    });
+
+    return { success: true, message: 'Utilisateur désactivé' };
   }
 
   async getSubordonnes(matricule: string) {

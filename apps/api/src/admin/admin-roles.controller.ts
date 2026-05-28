@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Body, Param, UseGuards, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/guards/roles.guard';
 import { AdminRolesService } from './admin-roles.service';
+import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
 
 @Controller('admin/roles')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -20,23 +22,24 @@ export class AdminRolesController {
   }
 
   @Post()
-  createRole(@Body() body: {
-    id_role: string;
-    nom_role: string;
-    id_branche: string;
-    description?: string;
-  }) {
-    return this.rolesService.createRole(body);
+  createRole(@Body() body: CreateRoleDto, @Req() req: Request) {
+    const matricule = (req.user as any)?.matricule ?? null;
+    const ip = req.ip ?? '0.0.0.0';
+    return this.rolesService.createRole(body, matricule, ip);
   }
 
   @Put(':id')
-  updateRole(@Param('id') id: string, @Body() body: any) {
-    return this.rolesService.updateRole(id, body);
+  updateRole(@Param('id') id: string, @Body() body: UpdateRoleDto, @Req() req: Request) {
+    const matricule = (req.user as any)?.matricule ?? null;
+    const ip = req.ip ?? '0.0.0.0';
+    return this.rolesService.updateRole(id, body, matricule, ip);
   }
 
   @Delete(':id')
-  deleteRole(@Param('id') id: string) {
-    return this.rolesService.deleteRole(id);
+  deleteRole(@Param('id') id: string, @Req() req: Request) {
+    const matricule = (req.user as any)?.matricule ?? null;
+    const ip = req.ip ?? '0.0.0.0';
+    return this.rolesService.deleteRole(id, matricule, ip);
   }
 
   // ── Evaluation Rules ──

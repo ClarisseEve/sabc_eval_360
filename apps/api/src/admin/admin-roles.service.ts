@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DatabasePgService } from '../database/database-pg.service';
+import { AuditLogService } from '../common/services/audit-log.service';
 import {
   normalizeRuleRow,
   serializeRuleEnvelope,
@@ -11,11 +12,37 @@ import {
   type RuleCriterion,
 } from '../regles/rule-schema';
 
+/** Role names that require global cross-branch permissions */
+const GLOBAL_ROLES = ['DR', 'CDTT'];
+
+/** Role names that map to the ADMIN system role */
+const ADMIN_ROLES = ['ADMIN'];
+
+function applyBusinessRules(data: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...data };
+  const nomRole = result['nom_role'] as string | undefined;
+
+  if (nomRole && GLOBAL_ROLES.includes(nomRole)) {
+    result['peut_cross_branch'] = true;
+    result['portee_geographique'] = 'global';
+    result['id_branche'] = null;
+  }
+
+  if (nomRole && ADMIN_ROLES.includes(nomRole)) {
+    result['id_branche'] = null;
+    result['niveau_taniere'] = 0;
+    result['niveau_non_taniere'] = 0;
+  }
+
+  return result;
+}
+
 @Injectable()
 export class AdminRolesService {
   constructor(
     private prisma: PrismaService,
     private pg: DatabasePgService,
+    private auditLog: AuditLogService,
   ) {}
 
   async getRoles() {
@@ -39,29 +66,70 @@ export class AdminRolesService {
     return { ...role, utilisateurs: users };
   }
 
-  async createRole(data: {
-    id_role: string;
-    nom_role: string;
-    id_branche: string;
-    description?: string;
-    niveau_taniere?: number;
-    niveau_non_taniere?: number;
-  }) {
-    return this.prisma.role.create({ data });
+  async createRole(
+    data: {
+      id_role: string;
+      nom_role: string;
+      id_branche?: string | null;
+      description?: string;
+      niveau_taniere?: number;
+      niveau_non_taniere?: number;
+      peut_auto_evaluer?: boolean;
+      peut_evaluer_pairs?: boolean;
+      peut_evaluer_subordonnes?: boolean;
+      peut_cross_branch?: boolean;
+      portee_geographique?: string;
+    },
+    adminMatricule: string,
+    ip: string,
+  ) {
+    const finalData = applyBusinessRules(data as Record<string, unknown>);
+    const role = await this.prisma.role.create({ data: finalData as any });
+    await this.auditLog.log({
+      matricule_utilisateur: adminMatricule,
+      action: 'ROLE_CREATE',
+      entite: 'role',
+      adresse_ip: ip,
+      id_entite: role.id_role,
+      details_json: { nom_role: data.nom_role },
+    });
+    return role;
   }
 
-  async updateRole(id: string, data: {
-    nom_role?: string;
-    description?: string;
-    niveau_taniere?: number;
-    niveau_non_taniere?: number;
-  }) {
+  async updateRole(
+    id: string,
+    data: {
+      nom_role?: string;
+      description?: string;
+      id_branche?: string | null;
+      niveau_taniere?: number;
+      niveau_non_taniere?: number;
+      peut_auto_evaluer?: boolean;
+      peut_evaluer_pairs?: boolean;
+      peut_evaluer_subordonnes?: boolean;
+      peut_cross_branch?: boolean;
+      portee_geographique?: string;
+    },
+    adminMatricule: string,
+    ip: string,
+  ) {
     const role = await this.prisma.role.findUnique({ where: { id_role: id } });
     if (!role) throw new NotFoundException('Rôle introuvable');
-    return this.prisma.role.update({ where: { id_role: id }, data });
+
+    const finalData = applyBusinessRules(data as Record<string, unknown>);
+    const updated = await this.prisma.role.update({ where: { id_role: id }, data: finalData as any });
+    await this.auditLog.log({
+      matricule_utilisateur: adminMatricule,
+      action: 'ROLE_UPDATE',
+      entite: 'role',
+      adresse_ip: ip,
+      id_entite: id,
+      details_json: { nom_role: data.nom_role ?? role.nom_role },
+    });
+    return updated;
   }
 
-  async deleteRole(id: string) {
+  async deleteRole(id: string, adminMatricule: string, ip: string) {
     const role = await this.prisma.role.findUnique({ where: { id_role: id } });
     if (!role) throw new NotFoundException('Rôle introuvable');
 
@@ -69,6 +137,15 @@ export class AdminRolesService {
     if (count > 0) {
       throw new BadRequestException(`Impossible de supprimer: ${count} utilisateur(s) avec ce rôle`);
     }
+
+    await this.auditLog.log({
+      matricule_utilisateur: adminMatricule,
+      action: 'ROLE_DELETE',
+      entite: 'role',
+      adresse_ip: ip,
+      id_entite: id,
+      details_json: { nom_role: role.nom_role },
+    });
     return this.prisma.role.delete({ where: { id_role: id } });
   }
 
