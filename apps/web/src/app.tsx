@@ -115,6 +115,10 @@ const CommonEvaluationsDonnees = lazy(() => import('./pages/Common/Evaluations/D
 const CommonEvaluationsShow = lazy(() => import('./pages/Common/Evaluations/Show'));
 const CommonEvaluationsEdit = lazy(() => import('./pages/Common/Evaluations/Edit'));
 
+// Epic 6: Dashboards Manager & Collaborateur
+const ManagerDashboard = lazy(() => import('./pages/Manager/Dashboard'));
+const CollaborateurDashboard = lazy(() => import('./pages/Collaborateur/Dashboard'));
+
 // Common: Other
 const CommonProfile = lazy(() => import('./pages/Common/Profile'));
 const CommonSettings = lazy(() => import('./pages/Common/Settings'));
@@ -305,6 +309,10 @@ function App() {
                       <Route path="/common/evaluations/validate" element={<G><CommonEvaluationsToValidate /></G>} />
                       <Route path="/common/evaluations/:id" element={<G><CommonEvaluationsShow /></G>} />
                       <Route path="/common/evaluations/:id/edit" element={<G><CommonEvaluationsEdit /></G>} />
+
+                      {/* ── Epic 6: Dashboards Manager & Collaborateur ── */}
+                      <Route path="/manager/dashboard" element={<G><ManagerDashboard /></G>} />
+                      <Route path="/collaborateur/dashboard" element={<G><CollaborateurDashboard /></G>} />
 
                       {/* ── Common: Team ── */}
                       <Route path="/equipe/subordonnes" element={<G><TeamOverview /></G>} />
