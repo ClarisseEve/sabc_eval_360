@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ReportsService } from './reports.service';
+import { ExportService } from './export.service';
 import { ReportsController } from './reports.controller';
 import { DatabasePgModule } from '../database/database-pg.module';
 import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Module({
   imports: [DatabasePgModule],
-  providers: [Reflector, RolesGuard, ReportsService],
+  providers: [Reflector, RolesGuard, ReportsService, ExportService],
   controllers: [ReportsController],
-  exports: [ReportsService],
+  exports: [ReportsService, ExportService],
 })
 export class ReportsModule {}

@@ -1,0 +1,78 @@
+import { NotFoundException } from '@nestjs/common';
+import { ExportService } from './export.service';
+
+// pptxgenjs uses dynamic import() internally which is not compatible with Jest's
+// CommonJS VM context. We mock the module to return a controlled Buffer.
+jest.mock('pptxgenjs', () => {
+  return jest.fn().mockImplementation(() => ({
+    layout: '',
+    addSlide: jest.fn().mockReturnValue({
+      addText: jest.fn(),
+      addShape: jest.fn(),
+    }),
+    write: jest.fn().mockResolvedValue(Buffer.from('PPTX_MOCK_CONTENT')),
+  }));
+});
+
+describe('ExportService', () => {
+  let service: ExportService;
+  let mockPg: { query: jest.Mock; queryOne: jest.Mock };
+
+  const mockRapport = {
+    id_rapport: 'uuid-1',
+    titre: 'Test Rapport',
+    createur_matricule: 'MAT001',
+    sections_json: [
+      { id: 's1', type: 'kpis', titre: 'KPIs', contenu: { texte: 'Texte KPIs' }, ordre: 1 },
+    ],
+    statut: 'brouillon',
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  beforeEach(() => {
+    mockPg = { query: jest.fn(), queryOne: jest.fn() };
+    service = new ExportService(mockPg as any);
+  });
+
+  it('exportPPTX — retourne un Buffer non-vide', async () => {
+    mockPg.queryOne.mockResolvedValue(mockRapport);
+    const buffer = await service.exportPPTX('uuid-1');
+    expect(Buffer.isBuffer(buffer)).toBe(true);
+    expect(buffer.length).toBeGreaterThan(0);
+  });
+
+  it('exportPPTX — lève NotFoundException si rapport absent', async () => {
+    mockPg.queryOne.mockResolvedValue(null);
+    await expect(service.exportPPTX('missing')).rejects.toThrow(NotFoundException);
+  });
+
+  it('exportXLSX — retourne un Buffer non-vide', async () => {
+    mockPg.queryOne.mockResolvedValue(mockRapport);
+    const buffer = await service.exportXLSX('uuid-1');
+    expect(Buffer.isBuffer(buffer)).toBe(true);
+    expect(buffer.length).toBeGreaterThan(0);
+  });
+
+  it('exportXLSX — crée onglet Rapport si sections vides', async () => {
+    mockPg.queryOne.mockResolvedValue({ ...mockRapport, sections_json: [] });
+    const buffer = await service.exportXLSX('uuid-1');
+    expect(Buffer.isBuffer(buffer)).toBe(true);
+  });
+
+  it('logExport — appelle pg.query avec les bons paramètres', async () => {
+    mockPg.query.mockResolvedValue([]);
+    await service.logExport({ rapport_id: 'uuid-1', format: 'pptx', createur_matricule: 'MAT001', fichier_nom: 'test.pptx' });
+    expect(mockPg.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO historique_exports'),
+      ['uuid-1', 'pptx', 'MAT001', 'test.pptx'],
+    );
+  });
+
+  it('getExportHistory — retourne les exports pour un rapport_id', async () => {
+    const rows = [{ id: 'e1', format: 'pptx' }];
+    mockPg.query.mockResolvedValue(rows);
+    const result = await service.getExportHistory('uuid-1');
+    expect(result).toEqual(rows);
+  });
+});
