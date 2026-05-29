@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Link } from '@/lib/inertia-shim';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
 import { useAdminDashboard } from '@/Hooks/queries';
+import { ChartExportButton } from '@/Components/Charts/ChartExportButton';
 
 const SABC_COLORS = {
   primary: '#E53E3E',
@@ -21,6 +22,11 @@ const SABC_COLORS = {
 
 const EvaluationsTab: React.FC = () => {
   const { data } = useAdminDashboard();
+  const chartRefCompetences = useRef<HTMLDivElement>(null);
+  const chartRefTypes = useRef<HTMLDivElement>(null);
+  const chartRefAnalytics = useRef<HTMLDivElement>(null);
+  const chartRefSuperviseurs = useRef<HTMLDivElement>(null);
+  const chartRefQualite = useRef<HTMLDivElement>(null);
 
   const supervisionMetrics = [
     {
@@ -152,16 +158,21 @@ const EvaluationsTab: React.FC = () => {
             {globalCompetencyMatrix.length > 0 && (
               <div className="bg-sabc-gray-50 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Matrice de Competences</h3>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={globalCompetencyMatrix}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="competence" tick={{ fontSize: 10 }} />
-                      <PolarRadiusAxis angle={90} domain={[0, 5]} tick={{ fontSize: 10 }} />
-                      <Radar name="Score Global" dataKey="score" stroke={SABC_COLORS.primary} fill={SABC_COLORS.primary + '30'} strokeWidth={2} />
-                      <Tooltip />
-                    </RadarChart>
-                  </ResponsiveContainer>
+                <div className="relative">
+                  <div className="absolute top-0 right-0 z-10">
+                    <ChartExportButton chartRef={chartRefCompetences} filename="sabc-competences" />
+                  </div>
+                  <div ref={chartRefCompetences} className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={globalCompetencyMatrix}>
+                        <PolarGrid />
+                        <PolarAngleAxis dataKey="competence" tick={{ fontSize: 10 }} />
+                        <PolarRadiusAxis angle={90} domain={[0, 5]} tick={{ fontSize: 10 }} />
+                        <Radar name="Score Global" dataKey="score" stroke={SABC_COLORS.primary} fill={SABC_COLORS.primary + '30'} strokeWidth={2} />
+                        <Tooltip />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
             )}
@@ -169,17 +180,22 @@ const EvaluationsTab: React.FC = () => {
             {evaluationTypeData.length > 0 && (
               <div className="bg-sabc-gray-50 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Types d'Evaluation</h3>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={evaluationTypeData} layout="horizontal" margin={{ left: 80 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-                      <XAxis type="number" tick={{ fontSize: 12 }} />
-                      <YAxis dataKey="type" type="category" tick={{ fontSize: 10 }} width={80} />
-                      <Tooltip />
-                      <Bar dataKey="completed" fill={SABC_COLORS.success} name="Completees" />
-                      <Bar dataKey="target" fill={SABC_COLORS.gray} name="Objectif" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="relative">
+                  <div className="absolute top-0 right-0 z-10">
+                    <ChartExportButton chartRef={chartRefTypes} filename="sabc-types-evaluation" />
+                  </div>
+                  <div ref={chartRefTypes} className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={evaluationTypeData} layout="horizontal" margin={{ left: 80 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
+                        <XAxis type="number" tick={{ fontSize: 12 }} />
+                        <YAxis dataKey="type" type="category" tick={{ fontSize: 10 }} width={80} />
+                        <Tooltip />
+                        <Bar dataKey="completed" fill={SABC_COLORS.success} name="Completees" />
+                        <Bar dataKey="target" fill={SABC_COLORS.gray} name="Objectif" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
             )}
@@ -187,18 +203,23 @@ const EvaluationsTab: React.FC = () => {
             {userAnalytics.length > 0 && (
               <div className="bg-sabc-gray-50 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Analytics Utilisateurs</h3>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={userAnalytics}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-                      <XAxis dataKey="periode" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="evaluations_donnees" stroke={SABC_COLORS.primary} strokeWidth={3} name="Donnees" />
-                      <Line type="monotone" dataKey="evaluations_recues" stroke={SABC_COLORS.success} strokeWidth={2} name="Recues" />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <div className="relative">
+                  <div className="absolute top-0 right-0 z-10">
+                    <ChartExportButton chartRef={chartRefAnalytics} filename="sabc-analytics-utilisateurs" />
+                  </div>
+                  <div ref={chartRefAnalytics} className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={userAnalytics}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
+                        <XAxis dataKey="periode" tick={{ fontSize: 12 }} />
+                        <YAxis tick={{ fontSize: 12 }} />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="evaluations_donnees" stroke={SABC_COLORS.primary} strokeWidth={3} name="Donnees" />
+                        <Line type="monotone" dataKey="evaluations_recues" stroke={SABC_COLORS.success} strokeWidth={2} name="Recues" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
             )}
@@ -222,16 +243,21 @@ const EvaluationsTab: React.FC = () => {
               {supervisorPerformance.length > 0 && (
                 <div className="bg-sabc-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Performance par Role</h3>
-                  <div className="h-56">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={supervisorPerformance}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-                        <XAxis dataKey="role" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Area type="monotone" dataKey="taux_validation" stroke={SABC_COLORS.primary} fill={SABC_COLORS.primary + '30'} strokeWidth={3} name="Taux validation %" />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                  <div className="relative">
+                    <div className="absolute top-0 right-0 z-10">
+                      <ChartExportButton chartRef={chartRefSuperviseurs} filename="sabc-performance-superviseurs" />
+                    </div>
+                    <div ref={chartRefSuperviseurs} className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={supervisorPerformance}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
+                          <XAxis dataKey="role" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 12 }} />
+                          <Tooltip />
+                          <Area type="monotone" dataKey="taux_validation" stroke={SABC_COLORS.primary} fill={SABC_COLORS.primary + '30'} strokeWidth={3} name="Taux validation %" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 </div>
               )}
@@ -239,16 +265,21 @@ const EvaluationsTab: React.FC = () => {
               {qualityMetrics.length > 0 && (
                 <div className="bg-sabc-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Analyse Qualite</h3>
-                  <div className="h-56">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart data={qualityMetrics}>
-                        <PolarGrid />
-                        <PolarAngleAxis dataKey="critere" tick={{ fontSize: 10 }} />
-                        <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
-                        <Radar name="Score" dataKey="score" stroke={SABC_COLORS.primary} fill={SABC_COLORS.primary + '30'} strokeWidth={2} />
-                        <Tooltip />
-                      </RadarChart>
-                    </ResponsiveContainer>
+                  <div className="relative">
+                    <div className="absolute top-0 right-0 z-10">
+                      <ChartExportButton chartRef={chartRefQualite} filename="sabc-qualite" />
+                    </div>
+                    <div ref={chartRefQualite} className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart data={qualityMetrics}>
+                          <PolarGrid />
+                          <PolarAngleAxis dataKey="critere" tick={{ fontSize: 10 }} />
+                          <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
+                          <Radar name="Score" dataKey="score" stroke={SABC_COLORS.primary} fill={SABC_COLORS.primary + '30'} strokeWidth={2} />
+                          <Tooltip />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 </div>
               )}

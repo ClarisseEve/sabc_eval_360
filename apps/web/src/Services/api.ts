@@ -58,6 +58,58 @@ async function parseResponseBody(response: Response) {
   return text;
 }
 
+async function requestBlob(
+  path: string,
+  config: ApiRequestConfig = {},
+): Promise<ApiResponse<Blob>> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), config.timeout ?? 60_000);
+
+  try {
+    const token = getToken();
+    const headers = new Headers(config.headers || {});
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    const response = await fetch(withQueryString(normalizeUrl(path), config.params), {
+      method: 'GET',
+      headers,
+      signal: controller.signal,
+      credentials: 'include',
+    });
+
+    if (response.status === 401) {
+      clearToken();
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+
+    if (!response.ok) {
+      const data = await parseResponseBody(response);
+      throw new ApiError(
+        typeof data?.message === 'string' ? data.message : `HTTP ${response.status}`,
+        { status: response.status, data, headers: response.headers },
+      );
+    }
+
+    const blob = await response.blob();
+    return { data: blob, status: response.status, headers: response.headers };
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new ApiError('Request timeout', {
+        status: 408,
+        data: { message: 'Request timeout' },
+        headers: new Headers(),
+      });
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -341,6 +393,33 @@ export const notificationsApi = {
     id_region?: string;
     matricules?: string[];
   }) => api.post('/notifications/send-bulk', data),
+};
+
+export const reportsApi = {
+  list: (params?: { page?: number; limit?: number }) =>
+    api.get('/reports', { params }),
+  create: (titre: string) =>
+    api.post('/reports', { titre }),
+  get: (id: string) =>
+    api.get(`/reports/${id}`),
+  update: (id: string, data: { titre?: string; statut?: string }) =>
+    api.patch(`/reports/${id}`, data),
+  delete: (id: string) =>
+    api.delete(`/reports/${id}`),
+  addSection: (id: string, section: { type: string; titre: string; contenu?: Record<string, unknown> }) =>
+    api.post(`/reports/${id}/sections`, section),
+  updateSection: (id: string, sectionId: string, updates: { titre?: string; contenu?: Record<string, unknown> }) =>
+    api.patch(`/reports/${id}/sections/${sectionId}`, updates),
+  removeSection: (id: string, sectionId: string) =>
+    api.delete(`/reports/${id}/sections/${sectionId}`),
+  reorderSections: (id: string, orderedIds: string[]) =>
+    api.patch(`/reports/${id}/reorder`, { orderedIds }),
+  exportPPTX: (id: string) =>
+    requestBlob(`/reports/${id}/export/pptx`),
+  exportXLSX: (id: string) =>
+    requestBlob(`/reports/${id}/export/xlsx`),
+  exportHistory: (id: string) =>
+    api.get(`/reports/${id}/exports/history`),
 };
 
 export const profileApi = {

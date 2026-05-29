@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useAdminTendancesTabData } from '@/Hooks/queries/useAdminDashboardTabs';
+import { ChartExportButton } from '@/Components/Charts/ChartExportButton';
 import {
   ComposedChart,
   Bar,
@@ -34,6 +35,7 @@ type Tendance = {
 function TendancesContent() {
   const [regionFilter, setRegionFilter] = React.useState('all');
   const [roleFilter, setRoleFilter] = React.useState('all');
+  const chartRef = useRef<HTMLDivElement>(null);
   const { tendances, regionOptions, roleOptions, generatedAt } = useAdminTendancesTabData({
     regionFilter,
     roleFilter,
@@ -90,53 +92,60 @@ function TendancesContent() {
       ) : (
         <div className="rounded-lg border bg-white p-4">
           <h3 className="mb-4 font-semibold text-gray-800">Évolution par période</h3>
-          <ResponsiveContainer width="100%" height={320}>
-            <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="periode" tick={{ fontSize: 12 }} />
-              <YAxis
-                yAxisId="score"
-                domain={[0, 5]}
-                label={{ value: 'Score /5', angle: -90, position: 'insideLeft', fontSize: 11 }}
-              />
-              <YAxis
-                yAxisId="completion"
-                orientation="right"
-                domain={[0, 100]}
-                label={{
-                  value: '% complétion',
-                  angle: 90,
-                  position: 'insideRight',
-                  fontSize: 11,
-                }}
-              />
-              <Tooltip
-                formatter={(value: string | number | (string | number)[], name: string) => {
-                  if (name === 'Score moyen') return value != null ? [`${value}/5`, name] : ['—', name];
-                  if (name === 'Taux complétion') return [`${value}%`, name];
-                  return [value, name];
-                }}
-              />
-              <Legend />
-              <Bar
-                yAxisId="completion"
-                dataKey="completion"
-                name="Taux complétion"
-                fill="#93C5FD"
-                opacity={0.7}
-              />
-              <Line
-                yAxisId="score"
-                type="monotone"
-                dataKey="score"
-                name="Score moyen"
-                stroke="#EF4444"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-                connectNulls
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <div className="relative">
+            <div className="absolute top-0 right-0 z-10">
+              <ChartExportButton chartRef={chartRef} filename="sabc-tendances" />
+            </div>
+            <div ref={chartRef}>
+              <ResponsiveContainer width="100%" height={320}>
+                <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="periode" tick={{ fontSize: 12 }} />
+                  <YAxis
+                    yAxisId="score"
+                    domain={[0, 5]}
+                    label={{ value: 'Score /5', angle: -90, position: 'insideLeft', fontSize: 11 }}
+                  />
+                  <YAxis
+                    yAxisId="completion"
+                    orientation="right"
+                    domain={[0, 100]}
+                    label={{
+                      value: '% complétion',
+                      angle: 90,
+                      position: 'insideRight',
+                      fontSize: 11,
+                    }}
+                  />
+                  <Tooltip
+                    formatter={(value: string | number | (string | number)[], name: string) => {
+                      if (name === 'Score moyen') return value != null ? [`${value}/5`, name] : ['—', name];
+                      if (name === 'Taux complétion') return [`${value}%`, name];
+                      return [value, name];
+                    }}
+                  />
+                  <Legend />
+                  <Bar
+                    yAxisId="completion"
+                    dataKey="completion"
+                    name="Taux complétion"
+                    fill="#93C5FD"
+                    opacity={0.7}
+                  />
+                  <Line
+                    yAxisId="score"
+                    type="monotone"
+                    dataKey="score"
+                    name="Score moyen"
+                    stroke="#EF4444"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                    connectNulls
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       )}
 

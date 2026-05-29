@@ -71,6 +71,10 @@ const AdminStructureSecteurs = lazy(() => import('./pages/Admin/Structure/secteu
 // Admin: Analytics
 const AdminAnalytics = lazy(() => import('./pages/Admin/Analytics/Index'));
 
+// Admin: Reports
+const AdminReports        = lazy(() => import('./pages/Admin/Reports/Index'));
+const AdminReportsBuilder = lazy(() => import('./pages/Admin/Reports/Builder'));
+
 // Role Dashboards — each role has its own component
 const DRDashboard = lazy(() => import('./pages/DR/Dashboard/index'));
 const CDTTDashboard = lazy(() => import('./pages/CDTT/Dashboard/index'));
@@ -258,6 +262,10 @@ function App() {
                       <Route path="/analytics/dashboard" element={<G><AdminAnalytics /></G>} />
                       <Route path="/analytics/regions" element={<G><AdminAnalytics /></G>} />
                       <Route path="/analytics/anomalies" element={<G><AdminAnalytics /></G>} />
+
+                      {/* ── Admin: Reports ── */}
+                      <Route path="/admin/reports"          element={<G><AdminReports /></G>} />
+                      <Route path="/admin/reports/:id/edit" element={<G><AdminReportsBuilder /></G>} />
 
                       {/* ── Role Dashboards — each role → its own component ── */}
                       <Route path="/dr/dashboard" element={<G><DRDashboard /></G>} />
