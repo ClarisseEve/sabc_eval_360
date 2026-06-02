@@ -6,16 +6,29 @@ import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/Components/UI/Dialog/Dialog';
 import { adminApi } from '@/Services/api';
 import { useAdminStructure } from '@/Hooks/queries';
+import { useConfirm } from '@/Contexts/ConfirmContext';
+import { useToast } from '@/Contexts/ToastContext';
 import { AdminStructureLayout } from './shared';
 
 export default function SecteursIndex() {
   const { data } = useAdminStructure();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const { success, error } = useToast();
   const [nomSecteur, setNomSecteur] = useState('');
   const [idService, setIdService] = useState('');
   const [idDistrict, setIdDistrict] = useState('');
+  const [open, setOpen] = useState(false);
 
   const services = Array.isArray(data?.services) ? data.services : [];
   const districts = Array.isArray(data?.districts) ? data.districts : [];
@@ -30,6 +43,13 @@ export default function SecteursIndex() {
     await queryClient.invalidateQueries({ queryKey: ['admin', 'structure'] });
   };
 
+  const closeModal = () => {
+    setOpen(false);
+    setNomSecteur('');
+    setIdService('');
+    setIdDistrict('');
+  };
+
   const createMutation = useMutation({
     mutationFn: async () =>
       adminApi.structure.createSecteur({
@@ -38,9 +58,7 @@ export default function SecteursIndex() {
         id_district: idDistrict || undefined,
       }),
     onSuccess: async () => {
-      setNomSecteur('');
-      setIdService('');
-      setIdDistrict('');
+      closeModal();
       await refresh();
     },
   });
@@ -50,14 +68,86 @@ export default function SecteursIndex() {
     onSuccess: refresh,
   });
 
+  const handleDelete = async (id: string, nom: string) => {
+    const ok = await confirm({
+      title: `Supprimer le secteur ${nom} ?`,
+      description: 'Cette action est irréversible.',
+      confirmLabel: 'Supprimer',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    try {
+      await deleteMutation.mutateAsync(id);
+      success('Secteur supprimé.');
+    } catch (e: any) {
+      error(e?.response?.data?.message || e?.message || 'La suppression a échoué.');
+    }
+  };
+
+  const errorMessage =
+    (createMutation.error as any)?.response?.data?.message ||
+    (createMutation.error ? 'Une erreur est survenue.' : null);
+
   return (
     <AdminStructureLayout title="Secteurs">
-      <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Créer un secteur</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Secteurs existants</CardTitle>
+          <Button
+            className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+            onClick={() => setOpen(true)}
+          >
+            Nouveau secteur
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Secteur</TableHead>
+                <TableHead>Service</TableHead>
+                <TableHead>District</TableHead>
+                <TableHead>Région</TableHead>
+                <TableHead>Utilisateurs</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {secteurs.map((secteur: any) => (
+                <TableRow key={secteur.id_secteur}>
+                  <TableCell>
+                    <div className="font-medium">{secteur.nom_secteur}</div>
+                    <div className="text-xs text-sabc-gray-500">{secteur.id_secteur}</div>
+                  </TableCell>
+                  <TableCell>{secteur.nom_service}</TableCell>
+                  <TableCell>{secteur.nom_district || 'Direct service'}</TableCell>
+                  <TableCell>{secteur.nom_region}</TableCell>
+                  <TableCell>{secteur.nb_utilisateurs ?? secteur.utilisateurs_count ?? 0}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={Number(secteur.nb_utilisateurs ?? 0) > 0}
+                      onClick={() => handleDelete(secteur.id_secteur, secteur.nom_secteur)}
+                    >
+                      Supprimer
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={(value) => (value ? setOpen(true) : closeModal())}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Créer un secteur</DialogTitle>
+            <DialogDescription>Renseigner les informations du nouveau secteur.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
             <div>
               <Label htmlFor="nom_secteur">Nom du secteur</Label>
               <Input id="nom_secteur" value={nomSecteur} onChange={(e) => setNomSecteur(e.target.value)} placeholder="Secteur Bonanjo" />
@@ -89,64 +179,23 @@ export default function SecteursIndex() {
                 </SelectContent>
               </Select>
             </div>
+            {errorMessage && <p className="text-sm text-sabc-red-primary">{errorMessage}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeModal}>
+              Annuler
+            </Button>
             <Button
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-              disabled={!nomSecteur || !idService}
+              disabled={!nomSecteur || !idService || createMutation.isPending}
               onClick={() => createMutation.mutate()}
             >
-              Créer
+              {createMutation.isPending ? 'Création...' : 'Créer'}
             </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Secteurs existants</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Secteur</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead>District</TableHead>
-                  <TableHead>Région</TableHead>
-                  <TableHead>Utilisateurs</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {secteurs.map((secteur: any) => (
-                  <TableRow key={secteur.id_secteur}>
-                    <TableCell>
-                      <div className="font-medium">{secteur.nom_secteur}</div>
-                      <div className="text-xs text-sabc-gray-500">{secteur.id_secteur}</div>
-                    </TableCell>
-                    <TableCell>{secteur.nom_service}</TableCell>
-                    <TableCell>{secteur.nom_district || 'Direct service'}</TableCell>
-                    <TableCell>{secteur.nom_region}</TableCell>
-                    <TableCell>{secteur.nb_utilisateurs ?? secteur.utilisateurs_count ?? 0}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={Number(secteur.nb_utilisateurs ?? 0) > 0}
-                        onClick={() => {
-                          if (window.confirm(`Supprimer le secteur ${secteur.nom_secteur} ?`)) {
-                            deleteMutation.mutate(secteur.id_secteur);
-                          }
-                        }}
-                      >
-                        Supprimer
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminStructureLayout>
   );
 }

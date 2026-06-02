@@ -1,292 +1,237 @@
-import React, { useState, useEffect } from 'react';
-import { Head, Link } from '@/lib/inertia-shim';
-import { useAuth } from '@/Hooks/useAuth';
-import AppLayout from '@/Components/Layout/app/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import React from 'react';
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { ClipboardList, Edit2, Eye, Plus, Power, Trash2 } from 'lucide-react';
+import { templatesApi } from '@/Services/api';
+import { useConfirm } from '@/Contexts/ConfirmContext';
+import { AdminEvaluationsLayout } from '../shared';
 import { Button } from '@/Components/UI/Button/Button';
 import { Badge } from '@/Components/UI/Badge/Badge';
-import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert/Alert';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
-import { 
-  ClipboardList, 
-  AlertCircle, 
-  Search, 
-  Plus, 
-  Edit2,
-  Eye,
-  Trash2,
-  MoreVertical
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-
-// Respecter la charte graphique SABC
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/Components/UI/DropdownMenu/DropdownMenu';
+import { MoreVertical } from 'lucide-react';
 
-interface EvaluationTemplate {
-  id: string;
-  title: string;
-  description: string;
-  criteria_count: number;
-  status: 'published' | 'draft';
-  created_at: string;
-  updated_at: string;
+function formatDate(value?: string | null) {
+  if (!value) return 'N/A';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-const TemplatesIndexPage = () => {
-  const { user, isLoading } = useAuth();
-  const [templates, setTemplates] = useState<EvaluationTemplate[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState<string>('');
+export default function TemplatesIndexPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const [search, setSearch] = React.useState('');
+  const [feedback, setFeedback] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
-  // Simuler le chargement des données depuis l'API
-  useEffect(() => {
-    // Dans une implémentation réelle, ces données viendraient de l'API
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Simulation de l'appel API
-        // À remplacer par un vrai appel API
-        setTimeout(() => {
-          setTemplates([
-            {
-              id: '1',
-              title: 'Évaluation des compétences managériales',
-              description: 'Évaluation des compétences de leadership et de gestion d\'équipe',
-              criteria_count: 12,
-              status: 'published',
-              created_at: '2025-07-01T10:30:00',
-              updated_at: '2025-07-15T14:20:00',
-            },
-            {
-              id: '2',
-              title: 'Évaluation des compétences commerciales',
-              description: 'Évaluation des compétences de vente et de relation client',
-              criteria_count: 10,
-              status: 'published',
-              created_at: '2025-07-05T09:15:00',
-              updated_at: '2025-07-10T11:45:00',
-            },
-            {
-              id: '3',
-              title: 'Évaluation des compétences techniques',
-              description: 'Évaluation des compétences techniques spécifiques au poste',
-              criteria_count: 15,
-              status: 'draft',
-              created_at: '2025-07-08T14:20:00',
-              updated_at: '2025-07-12T16:30:00',
-            },
-            {
-              id: '4',
-              title: 'Évaluation de la performance commerciale',
-              description: 'Évaluation des résultats commerciaux et des objectifs atteints',
-              criteria_count: 8,
-              status: 'published',
-              created_at: '2025-07-10T08:45:00',
-              updated_at: '2025-07-14T10:15:00',
-            },
-            {
-              id: '5',
-              title: 'Évaluation des compétences marketing',
-              description: 'Évaluation des compétences en marketing opérationnel',
-              criteria_count: 11,
-              status: 'draft',
-              created_at: '2025-07-12T11:30:00',
-              updated_at: '2025-07-16T09:20:00',
-            },
-          ]);
-          
-          setLoading(false);
-        }, 1000);
-        
-      } catch (err) {
-        setError('Erreur lors du chargement des templates');
-        setLoading(false);
-        console.error(err);
-      }
-    };
-    
-    fetchData();
-  }, []);
+  const { data } = useSuspenseQuery({
+    queryKey: ['templates'],
+    queryFn: () => templatesApi.list().then((r) => r.data),
+  });
 
-  // Filtrer les templates en fonction de la recherche
-  const filteredTemplates = templates.filter(template => 
-    template.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    template.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const templates = Array.isArray(data) ? data : [];
+
+  const publishMutation = useMutation({
+    mutationFn: (id: string) => templatesApi.publish(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['templates'] });
+      setFeedback('Template publié.');
+      setTimeout(() => setFeedback(null), 3000);
+    },
+    onError: () => setError('Impossible de publier ce template.'),
+  });
+
+  const unpublishMutation = useMutation({
+    mutationFn: (id: string) => templatesApi.unpublish(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['templates'] });
+      setFeedback('Template dépublié.');
+      setTimeout(() => setFeedback(null), 3000);
+    },
+    onError: () => setError('Impossible de dépublier ce template.'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => templatesApi.delete(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['templates'] });
+      setFeedback('Template supprimé.');
+      setTimeout(() => setFeedback(null), 3000);
+    },
+    onError: () => setError('Impossible de supprimer ce template (des assignations actives existent peut-être).'),
+  });
+
+  const filtered = templates.filter((t: any) =>
+    String(t.titre ?? t.nom ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    String(t.description ?? '').toLowerCase().includes(search.toLowerCase()),
   );
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'published':
-        return <Badge className="bg-sabc-success/20 text-sabc-success">Publié</Badge>;
-      case 'draft':
-        return <Badge className="bg-sabc-gray-100 text-sabc-gray-800">Brouillon</Badge>;
-      default:
-        return <Badge>Inconnu</Badge>;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return format(date, 'dd MMM yyyy', { locale: fr });
-    } catch (e) {
-      return dateString;
-    }
-  };
-
-  const handleDeleteTemplate = (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce template ?')) {
-      // Dans une implémentation réelle, appel API pour supprimer le template
-      setTemplates(templates.filter(template => template.id !== id));
-    }
-  };
-
-  // Afficher un indicateur de chargement pendant que l'authentification est en cours
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-sabc-red-primary"></div>
-      </div>
-    );
-  }
-
-  // Adapter l'utilisateur au format attendu par AppLayout
-  const adaptedUser = user ? {
-    name: `${user.prenom} ${user.nom}`,
-    email: user.email,
-    role: user.role_nom,
-    avatar: user.avatar
-  } : {
-    name: 'Utilisateur',
-    email: 'utilisateur@sabc.cm',
-    role: 'Invité'
-  };
+  const published = templates.filter((t: any) => t.statut === 'published').length;
+  const drafts = templates.filter((t: any) => t.statut === 'draft').length;
 
   return (
-    <AppLayout user={adaptedUser}>
-      <Head title="Gestion des Templates" />
-      
-      <div className="container mx-auto py-6 px-4 md:px-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Gestion des Templates</h1>
-          <Link href="/admin/evaluations/templates/create">
-            <Button className="flex items-center gap-2 bg-sabc-red-primary hover:bg-sabc-red-dark text-white">
-              <Plus className="h-4 w-4" />
-              Créer un template
-            </Button>
-          </Link>
+    <AdminEvaluationsLayout title="Templates d'évaluation">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-sabc-gray-900">Templates d'évaluation</h1>
+          <p className="mt-1 text-sm text-sabc-gray-400">
+            Formulaires réutilisables assignables aux rôles pour chaque période.
+          </p>
         </div>
+        <Button
+          className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+          onClick={() => navigate('/admin/evaluations/templates/create')}
+        >
+          <Plus size={16} className="mr-2" />
+          Nouveau template
+        </Button>
+      </div>
 
-        {error && (
-          <Alert className="mb-6 bg-sabc-red-light border-sabc-red-primary">
-            <AlertCircle className="h-4 w-4 text-sabc-red-primary" />
-            <AlertTitle>Erreur</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center">
-              <ClipboardList className="mr-2 h-5 w-5 text-sabc-red-primary" />
-              Templates d'évaluation
-            </CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-sabc-gray-400" />
-              <input
-                placeholder="Rechercher..."
-                className="pl-8 h-10 w-full rounded-md border border-sabc-gray-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-sabc-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p className="text-center py-4">Chargement des templates...</p>
-            ) : (
-              <>
-                {filteredTemplates.length === 0 ? (
-                  <Alert className="mb-4 bg-sabc-gray-100">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Aucun template</AlertTitle>
-                    <AlertDescription>
-                      Aucun template d'évaluation ne correspond à votre recherche.
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Titre</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Critères</TableHead>
-                          <TableHead>Statut</TableHead>
-                          <TableHead>Dernière modification</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredTemplates.map((template) => (
-                          <TableRow key={template.id}>
-                            <TableCell className="font-medium">{template.title}</TableCell>
-                            <TableCell className="max-w-xs truncate">{template.description}</TableCell>
-                            <TableCell>{template.criteria_count}</TableCell>
-                            <TableCell>{getStatusBadge(template.status)}</TableCell>
-                            <TableCell>{formatDate(template.updated_at)}</TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" className="h-8 w-8 p-0">
-                                    <span className="sr-only">Ouvrir menu</span>
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem asChild>
-                                    <Link href={`/admin/evaluations/templates/${template.id}`} className="flex items-center">
-                                      <Eye className="mr-2 h-4 w-4" />
-                                      <span>Voir</span>
-                                    </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem asChild>
-                                    <Link href={`/admin/evaluations/templates/${template.id}/edit`} className="flex items-center">
-                                      <Edit2 className="mr-2 h-4 w-4" />
-                                      <span>Modifier</span>
-                                    </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    className="text-sabc-red-primary focus:text-sabc-red-primary"
-                                    onClick={() => handleDeleteTemplate(template.id)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    <span>Supprimer</span>
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </>
-            )}
+          <CardContent className="p-4">
+            <div className="text-sm text-sabc-gray-400">Total templates</div>
+            <div className="text-2xl font-bold text-sabc-gray-900">{templates.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-sabc-gray-400">Publiés</div>
+            <div className="text-2xl font-bold text-sabc-success">{published}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-sabc-gray-400">Brouillons</div>
+            <div className="text-2xl font-bold text-sabc-warning">{drafts}</div>
           </CardContent>
         </Card>
       </div>
-    </AppLayout>
-  );
-};
 
-export default TemplatesIndexPage;
+      {feedback && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {feedback}
+        </div>
+      )}
+      {error && (
+        <div className="rounded-lg border border-sabc-red-primary/30 bg-sabc-red-light px-4 py-3 text-sm text-sabc-red-primary">
+          {error}
+        </div>
+      )}
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ClipboardList size={18} className="text-sabc-red-primary" />
+            Templates ({filtered.length})
+          </CardTitle>
+          <input
+            placeholder="Rechercher..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 w-56 rounded-md border border-sabc-gray-200 bg-white px-3 text-sm placeholder:text-sabc-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary"
+          />
+        </CardHeader>
+        <CardContent>
+          {filtered.length === 0 ? (
+            <p className="py-8 text-center text-sm text-sabc-gray-400">
+              {templates.length === 0
+                ? 'Aucun template créé. Créez votre premier template ci-dessus.'
+                : 'Aucun template ne correspond à votre recherche.'}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Titre</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Version</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Modifié le</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((template: any) => {
+                    const id = template.id ?? template.id_template;
+                    const titre = template.titre ?? template.nom ?? 'Sans titre';
+                    const isPublished = template.statut === 'published';
+                    return (
+                      <TableRow key={id}>
+                        <TableCell className="font-medium">{titre}</TableCell>
+                        <TableCell className="max-w-xs truncate text-sabc-gray-400">
+                          {template.description || '—'}
+                        </TableCell>
+                        <TableCell className="text-sabc-gray-400">v{template.version ?? 1}</TableCell>
+                        <TableCell>
+                          {isPublished ? (
+                            <Badge variant="success">Publié</Badge>
+                          ) : template.statut === 'archived' ? (
+                            <Badge variant="secondary">Archivé</Badge>
+                          ) : (
+                            <Badge variant="warning">Brouillon</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sabc-gray-400">{formatDate(template.updated_at)}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Ouvrir menu</span>
+                                <MoreVertical size={16} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => navigate(`/admin/evaluations/templates/show?id=${id}`)}>
+                                <Eye size={14} className="mr-2" />
+                                Voir
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => navigate(`/admin/evaluations/templates/${id}/edit`)}>
+                                <Edit2 size={14} className="mr-2" />
+                                Modifier
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => isPublished ? unpublishMutation.mutate(id) : publishMutation.mutate(id)}
+                              >
+                                <Power size={14} className="mr-2" />
+                                {isPublished ? 'Dépublier' : 'Publier'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-sabc-red-primary focus:text-sabc-red-primary"
+                                onClick={async () => {
+                                  const ok = await confirm({
+                                    title: 'Supprimer ce template ?',
+                                    description: 'Cette action est irréversible.',
+                                    confirmLabel: 'Supprimer',
+                                    variant: 'destructive',
+                                  });
+                                  if (ok) deleteMutation.mutate(id);
+                                }}
+                              >
+                                <Trash2 size={14} className="mr-2" />
+                                Supprimer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </AdminEvaluationsLayout>
+  );
+}

@@ -9,6 +9,7 @@ import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
 import { Link } from '@/lib/inertia-shim';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
 import { Checkbox } from '@/Components/UI/Checkbox/Checkbox';
+import { useToast } from '@/Contexts/ToastContext';
 
 /**
  * Page d'édition de template d'évaluation pour l'administrateur
@@ -19,6 +20,7 @@ import { Checkbox } from '@/Components/UI/Checkbox/Checkbox';
  * - Minimum 5 compétences par template
  */
 const TemplateEditPage: React.FC = () => {
+  const { warning } = useToast();
   // Simuler un utilisateur administrateur pour la démo
   const mockUser = {
     name: 'Admin SABC',
@@ -248,7 +250,7 @@ const TemplateEditPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid()) {
-      alert('Veuillez remplir tous les champs obligatoires et ajouter au moins 5 compétences au total.');
+      warning('Veuillez remplir tous les champs obligatoires et ajouter au moins 5 compétences au total.');
       return;
     }
     
@@ -269,7 +271,7 @@ const TemplateEditPage: React.FC = () => {
       
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center mb-6">
-          <Link href="/admin/evaluation/templates">
+          <Link href="/admin/evaluations/templates">
             <Button variant="ghost" className="mr-4">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Retour
@@ -480,7 +482,7 @@ const TemplateEditPage: React.FC = () => {
             
             {/* Boutons d'action */}
             <div className="flex justify-end space-x-2">
-              <Link href="/admin/evaluation/templates">
+              <Link href="/admin/evaluations/templates">
                 <Button variant="outline">Annuler</Button>
               </Link>
               <Button 

@@ -7,7 +7,8 @@ import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/Components/UI/Card/Card';
 import { Eye, EyeOff } from 'lucide-react';
-import { Alert, AlertDescription } from '@/Components/UI/Alert/Alert';
+
+const IS_DEV = import.meta.env.DEV;
 
 type TestAccount = {
   label: string;
@@ -23,17 +24,15 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('***REMOVED***');
+  const [password, setPassword] = useState(IS_DEV ? '***REMOVED***' : '');
   const [showPassword, setShowPassword] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [errors, setErrors] = useState<{ identifier?: string; password?: string }>({});
-  const [status, setStatus] = useState('');
 
   // Redirect if already authenticated
-  if (isAuthenticated) {
-    navigate('/dashboard', { replace: true });
-    return null;
-  }
+  React.useEffect(() => {
+    if (isAuthenticated) navigate('/dashboard', { replace: true });
+  }, [isAuthenticated, navigate]);
 
   const testAccounts: TestAccount[] = [
     { 
@@ -64,7 +63,7 @@ const Login: React.FC = () => {
       label: 'TMO Littoral', 
       description: 'Vue individuelle, auto-évaluation et axes d’amélioration', 
       email: 'tmo.littoral@sabc.local',
-      username: 'T1230',
+      username: 'T1210',
       badge: 'TMO',
       badgeColor: 'bg-sabc-red-dark'
     }
@@ -113,36 +112,32 @@ const Login: React.FC = () => {
         </CardHeader>
         
         <CardContent className="p-6">
-          {status && (
-            <Alert className="mb-6">
-              <AlertDescription>{status}</AlertDescription>
-            </Alert>
-          )}
-          
-          <div className="mb-6">
-            <p className="text-sm text-sabc-gray-800 mb-2 font-medium">Compte administrateur :</p>
-            <div className="border border-sabc-gray-200 rounded-md p-2 bg-white">
-              {testAccounts.map((account, index) => (
-                <div 
-                  key={index} 
-                  className="flex flex-col p-2 hover:bg-sabc-gray-50 cursor-pointer rounded-md mb-1 transition-colors"
-                  onClick={() => setIdentifier(account.username)}
-                >
-                  <div className="flex items-center">
-                    <span className="font-medium text-sabc-gray-800">{account.label}</span>
-                    {account.badge && (
-                      <span className={`ml-2 text-xs text-white px-2 py-0.5 rounded-full ${account.badgeColor}`}>
-                        {account.badge}
-                      </span>
-                    )}
+          {IS_DEV && (
+            <div className="mb-6">
+              <p className="text-sm text-sabc-gray-800 mb-2 font-medium">Comptes de démonstration (dev) :</p>
+              <div className="border border-sabc-gray-200 rounded-md p-2 bg-white">
+                {testAccounts.map((account, index) => (
+                  <div
+                    key={index}
+                    className="flex flex-col p-2 hover:bg-sabc-gray-50 cursor-pointer rounded-md mb-1 transition-colors"
+                    onClick={() => setIdentifier(account.username)}
+                  >
+                    <div className="flex items-center">
+                      <span className="font-medium text-sabc-gray-800">{account.label}</span>
+                      {account.badge && (
+                        <span className={`ml-2 text-xs text-white px-2 py-0.5 rounded-full ${account.badgeColor}`}>
+                          {account.badge}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-sabc-gray-400">{account.description}</span>
                   </div>
-                  <span className="text-xs text-sabc-gray-400">{account.description}</span>
-                </div>
-              ))}
+                ))}
+              </div>
+              <p className="text-xs text-sabc-gray-400 mt-1">Cliquez sur un compte pour remplir un identifiant local cohérent</p>
             </div>
-            <p className="text-xs text-sabc-gray-400 mt-1">Cliquez sur un compte pour remplir un identifiant local cohérent</p>
-          </div>
-          
+          )}
+
           <form onSubmit={handleSubmit}>
             <div className="space-y-5">
               <div className="space-y-2">
@@ -193,19 +188,6 @@ const Login: React.FC = () => {
                 {errors.password && (
                   <p className="text-sm text-sabc-error font-medium">{errors.password}</p>
                 )}
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <input
-                  id="remember"
-                  type="checkbox"
-                  checked={false}
-                  onChange={() => {}}
-                  className="h-5 w-5 rounded border-sabc-gray-300 text-sabc-red-primary focus:ring-sabc-red-primary"
-                />
-                <Label htmlFor="remember" className="text-sm font-medium text-sabc-gray-700">
-                  Se souvenir de moi
-                </Label>
               </div>
             </div>
             

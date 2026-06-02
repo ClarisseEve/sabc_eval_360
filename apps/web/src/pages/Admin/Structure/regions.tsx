@@ -6,8 +6,18 @@ import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/Components/UI/Dialog/Dialog';
 import { adminApi } from '@/Services/api';
 import { useAdminStructure } from '@/Hooks/queries';
+import { useConfirm } from '@/Contexts/ConfirmContext';
+import { useToast } from '@/Contexts/ToastContext';
 import { AdminStructureLayout } from './shared';
 
 const initialForm = { id_region: '', nom_region: '', est_taniere: 'false' };
@@ -17,11 +27,52 @@ export default function RegionsIndex() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const confirm = useConfirm();
+  const { success, error } = useToast();
 
   const regions = Array.isArray(data?.regions) ? data.regions : [];
 
+  const handleDelete = async (id: string, nom: string) => {
+    const ok = await confirm({
+      title: `Supprimer la région ${nom} ?`,
+      description: 'Cette action est irréversible.',
+      confirmLabel: 'Supprimer',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    try {
+      await deleteMutation.mutateAsync(id);
+      success('Région supprimée.');
+    } catch (e: any) {
+      error(e?.response?.data?.message || e?.message || 'La suppression a échoué.');
+    }
+  };
+
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin', 'structure'] });
+  };
+
+  const closeModal = () => {
+    setOpen(false);
+    setEditingId(null);
+    setForm(initialForm);
+  };
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(initialForm);
+    setOpen(true);
+  };
+
+  const openEdit = (region: any) => {
+    setEditingId(region.id_region);
+    setForm({
+      id_region: region.id_region,
+      nom_region: region.nom_region,
+      est_taniere: String(!!region.est_taniere),
+    });
+    setOpen(true);
   };
 
   const createMutation = useMutation({
@@ -32,7 +83,7 @@ export default function RegionsIndex() {
         est_taniere: form.est_taniere === 'true',
       }),
     onSuccess: async () => {
-      setForm(initialForm);
+      closeModal();
       await refresh();
     },
   });
@@ -44,8 +95,7 @@ export default function RegionsIndex() {
         est_taniere: form.est_taniere === 'true',
       }),
     onSuccess: async () => {
-      setEditingId(null);
-      setForm(initialForm);
+      closeModal();
       await refresh();
     },
   });
@@ -55,14 +105,73 @@ export default function RegionsIndex() {
     onSuccess: refresh,
   });
 
+  const activeMutation = editingId ? updateMutation : createMutation;
+  const errorMessage =
+    (activeMutation.error as any)?.response?.data?.message ||
+    (activeMutation.error ? 'Une erreur est survenue.' : null);
+
   return (
     <AdminStructureLayout title="Gestion des régions">
-      <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>{editingId ? 'Modifier une région' : 'Créer une région'}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Régions existantes</CardTitle>
+          <Button
+            className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+            onClick={openCreate}
+          >
+            Nouvelle région
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Code</TableHead>
+                <TableHead>Nom</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Utilisateurs</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {regions.map((region: any) => (
+                <TableRow key={region.id_region}>
+                  <TableCell>{region.id_region}</TableCell>
+                  <TableCell>{region.nom_region}</TableCell>
+                  <TableCell>{region.est_taniere ? 'Tanière' : 'Non tanière'}</TableCell>
+                  <TableCell>{region._count?.utilisateurs ?? 0}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openEdit(region)}>
+                        Modifier
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={(region._count?.utilisateurs ?? 0) > 0}
+                        onClick={() => handleDelete(region.id_region, region.nom_region)}
+                      >
+                        Supprimer
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={(value) => (value ? setOpen(true) : closeModal())}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Modifier une région' : 'Créer une région'}</DialogTitle>
+            <DialogDescription>
+              {editingId ? 'Mettre à jour les informations de la région.' : 'Renseigner les informations de la nouvelle région.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
             {!editingId && (
               <div>
                 <Label htmlFor="id_region">Code région</Label>
@@ -93,82 +202,27 @@ export default function RegionsIndex() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-2">
-              <Button
-                className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-                onClick={() => (editingId ? updateMutation.mutate() : createMutation.mutate())}
-                disabled={!form.nom_region || (!editingId && !form.id_region)}
-              >
-                {editingId ? 'Mettre à jour' : 'Créer'}
-              </Button>
-              {editingId && (
-                <Button variant="outline" onClick={() => { setEditingId(null); setForm(initialForm); }}>
-                  Annuler
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            {errorMessage && <p className="text-sm text-sabc-red-primary">{errorMessage}</p>}
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Régions existantes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Utilisateurs</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {regions.map((region: any) => (
-                  <TableRow key={region.id_region}>
-                    <TableCell>{region.id_region}</TableCell>
-                    <TableCell>{region.nom_region}</TableCell>
-                    <TableCell>{region.est_taniere ? 'Tanière' : 'Non tanière'}</TableCell>
-                    <TableCell>{region._count?.utilisateurs ?? 0}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingId(region.id_region);
-                            setForm({
-                              id_region: region.id_region,
-                              nom_region: region.nom_region,
-                              est_taniere: String(!!region.est_taniere),
-                            });
-                          }}
-                        >
-                          Modifier
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={(region._count?.utilisateurs ?? 0) > 0}
-                          onClick={() => {
-                            if (window.confirm(`Supprimer la région ${region.nom_region} ?`)) {
-                              deleteMutation.mutate(region.id_region);
-                            }
-                          }}
-                        >
-                          Supprimer
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeModal}>
+              Annuler
+            </Button>
+            <Button
+              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+              onClick={() => (editingId ? updateMutation.mutate() : createMutation.mutate())}
+              disabled={!form.nom_region || (!editingId && !form.id_region) || activeMutation.isPending}
+            >
+              {activeMutation.isPending
+                ? 'Enregistrement...'
+                : editingId
+                  ? 'Mettre à jour'
+                  : 'Créer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminStructureLayout>
   );
 }

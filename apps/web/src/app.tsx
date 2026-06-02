@@ -9,6 +9,9 @@ import { DisplayScaleProvider } from './Hooks/useDisplayScale';
 import { AuthProvider, useAuthContext } from './Contexts/AuthContext';
 import { AuthGuard } from './Components/Auth/AuthGuard';
 import { QueryProvider } from './Contexts/QueryProvider';
+import { ToastProvider } from './Contexts/ToastContext';
+import { ConfirmProvider } from './Contexts/ConfirmContext';
+import { Toaster } from './Components/UI/Toast';
 import { ErrorBoundary } from './Components/ErrorBoundary';
 import { useInitRouter } from './lib/inertia-shim';
 
@@ -48,6 +51,11 @@ const AdminEvaluationsForm = lazy(() => import('./pages/Admin/Evaluations/Form')
 const AdminReglesIndex = lazy(() => import('./pages/Admin/Evaluations/Regles/Index'));
 const AdminReglesCreate = lazy(() => import('./pages/Admin/Evaluations/Regles/Create'));
 const AdminReglesEdit = lazy(() => import('./pages/Admin/Evaluations/Regles/Edit'));
+
+// Admin: Évaluations — Templates
+const AdminTemplatesIndex = lazy(() => import('./pages/Admin/Evaluations/Templates/Index'));
+const AdminTemplatesCreate = lazy(() => import('./pages/Admin/Evaluations/Templates/Create'));
+const AdminTemplatesEdit = lazy(() => import('./pages/Admin/Evaluations/Templates/Edit'));
 
 // Admin: Remplacements
 const AdminRemplacements = lazy(() => import('./pages/Admin/Remplacements/index'));
@@ -116,6 +124,7 @@ const CommonEvaluationsPending = lazy(() => import('./pages/Common/Evaluations/P
 const CommonEvaluationsToValidate = lazy(() => import('./pages/Common/Evaluations/ToValidate'));
 const CommonEvaluationsRecues = lazy(() => import('./pages/Common/Evaluations/Recues'));
 const CommonEvaluationsDonnees = lazy(() => import('./pages/Common/Evaluations/Donnees'));
+const CommonEvaluationsHistorique = lazy(() => import('./pages/Common/Evaluations/Historique'));
 const CommonEvaluationsShow = lazy(() => import('./pages/Common/Evaluations/Show'));
 const CommonEvaluationsEdit = lazy(() => import('./pages/Common/Evaluations/Edit'));
 
@@ -164,6 +173,11 @@ function G({ children }: { children: React.ReactNode }) {
   return <AuthGuard>{children}</AuthGuard>;
 }
 
+// ─── Admin-only guard shorthand (authenticated AND role ADMIN) ──────────────
+function A({ children }: { children: React.ReactNode }) {
+  return <AuthGuard requiredRoles={['ADMIN']}>{children}</AuthGuard>;
+}
+
 function buildLegacyLayoutUser(user: ReturnType<typeof useAuthContext>['user']) {
   if (!user) {
     return {
@@ -199,7 +213,9 @@ function App() {
     <QueryProvider>
       <ThemeProvider>
         <DisplayScaleProvider>
-          <AuthProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+            <AuthProvider>
             <BrowserRouter>
               <RouterInit>
                 <ErrorBoundary>
@@ -213,59 +229,60 @@ function App() {
                       <Route path="/dashboard" element={<G><DashboardRedirect /></G>} />
 
                       {/* ── Admin: Dashboard ── */}
-                      <Route path="/admin/dashboard" element={<G><AdminDashboard /></G>} />
+                      <Route path="/admin/dashboard" element={<A><AdminDashboard /></A>} />
 
                       {/* ── Admin: Utilisateurs (static routes BEFORE :matricule) ── */}
-                      <Route path="/admin/utilisateurs" element={<G><AdminUtilisateurs /></G>} />
-                      <Route path="/admin/utilisateurs/create" element={<G><AdminUtilisateursCreate /></G>} />
-                      <Route path="/admin/utilisateurs/gaps" element={<G><AdminUtilisateursGaps /></G>} />
-                      <Route path="/admin/utilisateurs/:matricule" element={<G><AdminUtilisateursShow /></G>} />
-                      <Route path="/admin/utilisateurs/:matricule/edit" element={<G><AdminUtilisateursEdit /></G>} />
+                      <Route path="/admin/utilisateurs" element={<A><AdminUtilisateurs /></A>} />
+                      <Route path="/admin/utilisateurs/create" element={<A><AdminUtilisateursCreate /></A>} />
+                      <Route path="/admin/utilisateurs/gaps" element={<A><AdminUtilisateursGaps /></A>} />
+                      <Route path="/admin/utilisateurs/:matricule" element={<A><AdminUtilisateursShow /></A>} />
+                      <Route path="/admin/utilisateurs/:matricule/edit" element={<A><AdminUtilisateursEdit /></A>} />
 
                       {/* ── Admin: Évaluations ── */}
-                      <Route path="/admin/evaluations/periodes" element={<G><AdminEvaluationsPeriodes /></G>} />
-                      <Route path="/admin/evaluations/management" element={<G><AdminEvaluationsManagement /></G>} />
-                      <Route path="/admin/evaluations/history" element={<G><AdminEvaluationsHistory /></G>} />
-                      <Route path="/admin/evaluations/:id" element={<G><AdminEvaluationsShow /></G>} />
-                      <Route path="/admin/evaluations/form" element={<G><AdminEvaluationsForm /></G>} />
+                      <Route path="/admin/evaluations/periodes" element={<A><AdminEvaluationsPeriodes /></A>} />
+                      <Route path="/admin/evaluations/management" element={<A><AdminEvaluationsManagement /></A>} />
+                      <Route path="/admin/evaluations/history" element={<A><AdminEvaluationsHistory /></A>} />
+                      <Route path="/admin/evaluations/:id" element={<A><AdminEvaluationsShow /></A>} />
+                      <Route path="/admin/evaluations/form" element={<A><AdminEvaluationsForm /></A>} />
 
                       {/* ── Admin: Règles d'évaluation ── */}
-                      <Route path="/admin/evaluations/regles" element={<G><AdminReglesIndex /></G>} />
-                      <Route path="/admin/evaluations/regles/create" element={<G><AdminReglesCreate /></G>} />
-                      <Route path="/admin/evaluations/regles/:id/edit" element={<G><AdminReglesEdit /></G>} />
+                      <Route path="/admin/evaluations/regles" element={<A><AdminReglesIndex /></A>} />
+                      <Route path="/admin/evaluations/regles/create" element={<A><AdminReglesCreate /></A>} />
+                      <Route path="/admin/evaluations/regles/:id/edit" element={<A><AdminReglesEdit /></A>} />
 
                       {/* ── Admin: Templates ── */}
-                      <Route path="/admin/evaluations/templates" element={<G><RulesRedirect /></G>} />
-                      <Route path="/admin/evaluations/templates/:id/edit" element={<G><RulesRedirect /></G>} />
+                      <Route path="/admin/evaluations/templates" element={<A><AdminTemplatesIndex /></A>} />
+                      <Route path="/admin/evaluations/templates/create" element={<A><AdminTemplatesCreate /></A>} />
+                      <Route path="/admin/evaluations/templates/:id/edit" element={<A><AdminTemplatesEdit /></A>} />
 
                       {/* ── Admin: Remplacements ── */}
-                      <Route path="/admin/remplacements" element={<G><AdminRemplacements /></G>} />
-                      <Route path="/admin/remplacements/create" element={<G><AdminRemplacementsCreate /></G>} />
-                      <Route path="/admin/remplacements/:id" element={<G><AdminRemplacementsShow /></G>} />
-                      <Route path="/admin/remplacements/:id/edit" element={<G><AdminRemplacementsEdit /></G>} />
+                      <Route path="/admin/remplacements" element={<A><AdminRemplacements /></A>} />
+                      <Route path="/admin/remplacements/create" element={<A><AdminRemplacementsCreate /></A>} />
+                      <Route path="/admin/remplacements/:id" element={<A><AdminRemplacementsShow /></A>} />
+                      <Route path="/admin/remplacements/:id/edit" element={<A><AdminRemplacementsEdit /></A>} />
 
                       {/* ── Admin: Rôles ── */}
-                      <Route path="/admin/roles" element={<G><AdminRoles /></G>} />
-                      <Route path="/admin/roles/create" element={<G><AdminRolesCreate /></G>} />
-                      <Route path="/admin/roles/permissions" element={<G><AdminRolesPermissions /></G>} />
-                      <Route path="/admin/roles/:id" element={<G><AdminRolesShow /></G>} />
+                      <Route path="/admin/roles" element={<A><AdminRoles /></A>} />
+                      <Route path="/admin/roles/create" element={<A><AdminRolesCreate /></A>} />
+                      <Route path="/admin/roles/permissions" element={<A><AdminRolesPermissions /></A>} />
+                      <Route path="/admin/roles/:id" element={<A><AdminRolesShow /></A>} />
 
                       {/* ── Admin: Structure Organisationnelle ── */}
-                      <Route path="/admin/structure" element={<G><AdminStructure /></G>} />
-                      <Route path="/admin/structure/regions" element={<G><AdminStructureRegions /></G>} />
-                      <Route path="/admin/structure/services" element={<G><AdminStructureServices /></G>} />
-                      <Route path="/admin/structure/districts" element={<G><AdminStructureDistricts /></G>} />
-                      <Route path="/admin/structure/secteurs" element={<G><AdminStructureSecteurs /></G>} />
+                      <Route path="/admin/structure" element={<A><AdminStructure /></A>} />
+                      <Route path="/admin/structure/regions" element={<A><AdminStructureRegions /></A>} />
+                      <Route path="/admin/structure/services" element={<A><AdminStructureServices /></A>} />
+                      <Route path="/admin/structure/districts" element={<A><AdminStructureDistricts /></A>} />
+                      <Route path="/admin/structure/secteurs" element={<A><AdminStructureSecteurs /></A>} />
 
-                      {/* ── Admin: Analytics ── */}
-                      <Route path="/admin/analytics" element={<G><AdminAnalytics /></G>} />
-                      <Route path="/analytics/dashboard" element={<G><AdminAnalytics /></G>} />
-                      <Route path="/analytics/regions" element={<G><AdminAnalytics /></G>} />
-                      <Route path="/analytics/anomalies" element={<G><AdminAnalytics /></G>} />
+                      {/* ── Admin: Analytics (ADMIN uniquement) ── */}
+                      <Route path="/admin/analytics" element={<A><AdminAnalytics /></A>} />
+                      <Route path="/analytics/dashboard" element={<Navigate to="/admin/analytics?tab=overview" replace />} />
+                      <Route path="/analytics/regions" element={<Navigate to="/admin/analytics?tab=regions" replace />} />
+                      <Route path="/analytics/anomalies" element={<Navigate to="/admin/analytics?tab=anomalies" replace />} />
 
                       {/* ── Admin: Reports ── */}
-                      <Route path="/admin/reports"          element={<G><AdminReports /></G>} />
-                      <Route path="/admin/reports/:id/edit" element={<G><AdminReportsBuilder /></G>} />
+                      <Route path="/admin/reports"          element={<A><AdminReports /></A>} />
+                      <Route path="/admin/reports/:id/edit" element={<A><AdminReportsBuilder /></A>} />
 
                       {/* ── Role Dashboards — each role → its own component ── */}
                       <Route path="/dr/dashboard" element={<G><DRDashboard /></G>} />
@@ -308,6 +325,7 @@ function App() {
                       <Route path="/evaluations/validate" element={<G><CommonEvaluationsToValidate /></G>} />
                       <Route path="/evaluations/recues" element={<G><CommonEvaluationsRecues /></G>} />
                       <Route path="/evaluations/donnees" element={<G><CommonEvaluationsDonnees /></G>} />
+                      <Route path="/evaluations/historique" element={<G><CommonEvaluationsHistorique /></G>} />
                       <Route path="/evaluations/history" element={<G><CommonEvaluationsIndex /></G>} />
                       <Route path="/evaluations/:id" element={<G><CommonEvaluationsShow /></G>} />
                       <Route path="/evaluations/:id/edit" element={<G><CommonEvaluationsEdit /></G>} />
@@ -348,7 +366,10 @@ function App() {
                 </ErrorBoundary>
               </RouterInit>
             </BrowserRouter>
-          </AuthProvider>
+            </AuthProvider>
+            </ConfirmProvider>
+            <Toaster />
+          </ToastProvider>
         </DisplayScaleProvider>
       </ThemeProvider>
     </QueryProvider>

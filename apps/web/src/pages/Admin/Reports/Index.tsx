@@ -4,12 +4,18 @@ import { useReportsList, useCreateReport } from '@/Hooks/queries/useReports';
 import { FileText, Plus, Edit2, Trash2 } from 'lucide-react';
 import { reportsApi } from '@/Services/api';
 import { useQueryClient } from '@tanstack/react-query';
+import { PageContainer } from '@/Components/UI/Page/PageContainer';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+import { useConfirm } from '@/Contexts/ConfirmContext';
+import { useToast } from '@/Contexts/ToastContext';
 
 export default function ReportsIndex() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data, isLoading } = useReportsList();
   const createReport = useCreateReport();
+  const confirm = useConfirm();
+  const { success, error } = useToast();
   const [newTitre, setNewTitre] = useState('');
   const [showCreate, setShowCreate] = useState(false);
 
@@ -22,23 +28,37 @@ export default function ReportsIndex() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer ce rapport ?')) return;
-    await reportsApi.delete(id);
-    qc.invalidateQueries({ queryKey: ['reports'] });
+    const ok = await confirm({
+      title: 'Supprimer ce rapport ?',
+      description: 'Cette action est irréversible.',
+      confirmLabel: 'Supprimer',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    try {
+      await reportsApi.delete(id);
+      qc.invalidateQueries({ queryKey: ['reports'] });
+      success('Rapport supprimé.');
+    } catch (e: any) {
+      error(e?.response?.data?.message || e?.message || 'La suppression a échoué.');
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Rapports</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-        >
-          <Plus size={18} />
-          Nouveau rapport
-        </button>
-      </div>
+    <PageContainer width="narrow">
+      <PageHeader
+        title="Rapports"
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Rapports' }]}
+        actions={
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-sabc-red-primary text-white rounded-lg hover:bg-sabc-red-dark"
+          >
+            <Plus size={18} />
+            Nouveau rapport
+          </button>
+        }
+      />
 
       {showCreate && (
         <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6 flex gap-3">
@@ -47,11 +67,11 @@ export default function ReportsIndex() {
             value={newTitre}
             onChange={(e) => setNewTitre(e.target.value)}
             placeholder="Titre du rapport..."
-            className="flex-1 border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-red-500"
+            className="flex-1 border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-sabc-red-primary"
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             autoFocus
           />
-          <button onClick={handleCreate} className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+          <button onClick={handleCreate} className="px-4 py-2 bg-sabc-red-primary text-white rounded text-sm hover:bg-sabc-red-dark">
             Créer
           </button>
           <button onClick={() => setShowCreate(false)} className="px-3 py-2 border border-gray-200 rounded text-sm hover:bg-gray-50">
@@ -96,6 +116,6 @@ export default function ReportsIndex() {
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

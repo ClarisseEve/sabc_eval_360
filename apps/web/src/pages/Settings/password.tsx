@@ -19,6 +19,7 @@ export default function Password() {
   });
   const [processing, setProcessing] = useState(false);
   const [recentlySuccessful, setRecentlySuccessful] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const layoutUser = {
     name: user ? [user.prenom, user.nom].filter(Boolean).join(' ') || 'Utilisateur' : 'Utilisateur',
@@ -30,18 +31,23 @@ export default function Password() {
   const updatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setProcessing(true);
+    setErrorMessage(null);
     try {
       await profileApi.changePassword(data);
       setData({ current_password: '', password: '', password_confirmation: '' });
       setRecentlySuccessful(true);
       window.setTimeout(() => setRecentlySuccessful(false), 2500);
     } catch (error: any) {
-      if (error?.response?.data?.message?.toLowerCase?.().includes('actuel')) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Une erreur est survenue. Vérifiez votre mot de passe actuel et réessayez.';
+      setErrorMessage(message);
+      if (message.toLowerCase().includes('actuel')) {
         currentPasswordInput.current?.focus();
       } else {
         passwordInput.current?.focus();
       }
-      throw error;
     } finally {
       setProcessing(false);
     }
@@ -60,6 +66,11 @@ export default function Password() {
           </CardHeader>
           <CardContent>
             <form onSubmit={updatePassword} className="space-y-6">
+              {errorMessage ? (
+                <div role="alert" className="rounded-md border border-sabc-error/30 bg-sabc-error/10 px-4 py-3 text-sm font-medium text-sabc-error">
+                  {errorMessage}
+                </div>
+              ) : null}
               <div>
                 <label htmlFor="current_password" className="mb-2 block text-sm font-medium text-sabc-gray-800">Mot de passe actuel</label>
                 <Input id="current_password" ref={currentPasswordInput} type="password" value={data.current_password} onChange={(e) => setData((p) => ({ ...p, current_password: e.target.value }))} />

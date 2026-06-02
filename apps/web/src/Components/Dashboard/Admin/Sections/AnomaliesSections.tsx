@@ -134,7 +134,7 @@ export function AnomalySummarySection({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <Card className="overflow-hidden border-sabc-gray-200/80 bg-[radial-gradient(circle_at_top_right,_rgba(229,62,62,0.08),_transparent_35%),linear-gradient(180deg,_rgba(255,255,255,1),_rgba(248,250,252,0.92))] shadow-sm">
         <CardContent className="grid gap-5 p-6 xl:grid-cols-[1.3fr,0.7fr]">
           <div>
@@ -146,8 +146,8 @@ export function AnomalySummarySection({
               Alertes et anomalies pilotées sur les données réelles
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-sabc-gray-600">
-              Cette vue sert à valider que les seed data alimentent bien les calculs analytiques, les graphes et les détections
-              métiers avant le branchement progressif des bases en production.
+              Suivez en temps réel les anomalies et incohérences détectées sur les évaluations,
+              priorisez les alertes critiques et traitez-les avant qu'elles n'impactent les résultats.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2">
@@ -186,7 +186,7 @@ export function AnomalySummarySection({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <div className="rounded-2xl border border-sabc-gray-200/80 bg-white/85 p-4 shadow-sm">
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Charge critique</div>
-              <div className="mt-2 text-3xl font-semibold text-sabc-gray-900">{criticalShare.toFixed(0)}%</div>
+              <div className="mt-2 text-2xl font-semibold text-sabc-gray-900">{criticalShare.toFixed(0)}%</div>
               <p className="mt-1 text-sm text-sabc-gray-500">Part des alertes qui demandent une intervention rapide.</p>
             </div>
             <div className="rounded-2xl border border-sabc-gray-200/80 bg-white/85 p-4 shadow-sm">

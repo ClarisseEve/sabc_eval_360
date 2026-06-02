@@ -136,6 +136,14 @@
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
 
+    /* Couleurs fonctionnelles SABC enregistrées comme couleurs Tailwind v4
+       afin que les utilitaires + variantes d'opacité (bg-sabc-error/10, etc.)
+       soient réellement générés. Source de vérité : sabc-colors.css */
+    --color-sabc-error: var(--sabc-error);
+    --color-sabc-success: var(--sabc-success);
+    --color-sabc-warning: var(--sabc-warning);
+    --color-sabc-info: var(--sabc-info);
+
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);

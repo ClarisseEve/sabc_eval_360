@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Download, ChevronDown } from 'lucide-react';
+import { useToast } from '@/Contexts/ToastContext';
 
 interface Props {
   chartRef: React.RefObject<HTMLDivElement | null>;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function ChartExportButton({ chartRef, filename = 'sabc-chart' }: Props) {
+  const { error } = useToast();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const today = new Date().toISOString().split('T')[0];
@@ -42,7 +44,7 @@ export function ChartExportButton({ chartRef, filename = 'sabc-chart' }: Props) 
     if (!chartRef.current) return;
     const svgEl = chartRef.current.querySelector('svg');
     if (!svgEl) {
-      alert('Aucun SVG trouvé dans ce graphe');
+      error('Aucun SVG trouvé dans ce graphe.');
       return;
     }
     const clone = svgEl.cloneNode(true) as SVGSVGElement;

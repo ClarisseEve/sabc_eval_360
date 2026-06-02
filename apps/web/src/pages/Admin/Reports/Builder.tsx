@@ -12,6 +12,7 @@ import {
 import { useReport, useAddSection, useUpdateSection, useRemoveSection, useReorderSections } from '@/Hooks/queries/useReports';
 import { SectionCard } from '@/Components/Admin/Reports/SectionCard';
 import { reportsApi } from '@/Services/api';
+import { useToast } from '@/Contexts/ToastContext';
 import { ArrowLeft, Plus, FileText } from 'lucide-react';
 
 const SECTION_TYPES = [
@@ -31,6 +32,8 @@ export default function Builder() {
   const removeSection = useRemoveSection(id!);
   const reorderSections = useReorderSections(id!);
   const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [exporting, setExporting] = useState<'pptx' | 'xlsx' | null>(null);
+  const { success, error } = useToast();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -67,19 +70,35 @@ export default function Builder() {
   };
 
   const handleExportPPTX = async () => {
-    const res = await reportsApi.exportPPTX(id!);
-    downloadBlob(
-      new Blob([(res as any).data], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }),
-      `rapport-${id}.pptx`,
-    );
+    setExporting('pptx');
+    try {
+      const res = await reportsApi.exportPPTX(id!);
+      downloadBlob(
+        new Blob([(res as any).data], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }),
+        `rapport-${id}.pptx`,
+      );
+      success('Export PowerPoint généré.');
+    } catch (e: any) {
+      error(e?.response?.data?.message || e?.message || "L'export PowerPoint a échoué. Réessayez.");
+    } finally {
+      setExporting(null);
+    }
   };
 
   const handleExportXLSX = async () => {
-    const res = await reportsApi.exportXLSX(id!);
-    downloadBlob(
-      new Blob([(res as any).data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-      `rapport-${id}.xlsx`,
-    );
+    setExporting('xlsx');
+    try {
+      const res = await reportsApi.exportXLSX(id!);
+      downloadBlob(
+        new Blob([(res as any).data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        `rapport-${id}.xlsx`,
+      );
+      success('Export Excel généré.');
+    } catch (e: any) {
+      error(e?.response?.data?.message || e?.message || "L'export Excel a échoué. Réessayez.");
+    } finally {
+      setExporting(null);
+    }
   };
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement…</div>;
@@ -95,17 +114,19 @@ export default function Builder() {
         <div className="flex gap-2">
           <button
             onClick={handleExportPPTX}
-            className="flex items-center gap-2 px-3 py-2 bg-orange-500 text-white rounded-lg text-sm hover:bg-orange-600"
+            disabled={exporting !== null}
+            className="flex items-center gap-2 px-3 py-2 bg-orange-500 text-white rounded-lg text-sm hover:bg-orange-600 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <FileText size={16} />
-            PowerPoint
+            {exporting === 'pptx' ? 'Export en cours…' : 'PowerPoint'}
           </button>
           <button
             onClick={handleExportXLSX}
-            className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+            disabled={exporting !== null}
+            className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <FileText size={16} />
-            Excel
+            {exporting === 'xlsx' ? 'Export en cours…' : 'Excel'}
           </button>
         </div>
       </div>

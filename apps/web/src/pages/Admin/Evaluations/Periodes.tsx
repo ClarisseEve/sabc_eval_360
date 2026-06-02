@@ -4,8 +4,17 @@ import { Calendar, Edit3, Plus, Power, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Input } from '@/Components/UI/Input/Input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/Components/UI/Dialog/Dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
 import { usePeriodes } from '@/Hooks/queries/useEvaluationsQuery';
+import { useConfirm } from '@/Contexts/ConfirmContext';
 import { periodesApi } from '@/Services/api';
 import { AdminEvaluationsLayout } from './shared';
 
@@ -40,25 +49,93 @@ function statusLabel(raw?: string, estOuverte?: boolean) {
   return raw || 'Inconnue';
 }
 
+function toInputDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Construit une nomenclature de période pré-remplie (modifiable par l'admin).
+ * - code_periode = P{AA}{SS} (AA = 2 derniers chiffres de l'année, SS = semestre '01' ou '02')
+ * - nom_periode = "Cycle {AAAA} - Semestre {S}"
+ * - dates par défaut : début = 1er jour du semestre suggéré, fin ≈ +90 jours
+ * Si le code calculé existe déjà dans la liste, on incrémente vers le
+ * semestre/année suivant disponible.
+ */
+function buildSuggestedForm(periodes: any[]): FormState {
+  const existingCodes = new Set(
+    periodes.map((p) => String(p?.code_periode || '').toUpperCase()).filter(Boolean),
+  );
+
+  const now = new Date();
+  let year = now.getFullYear();
+  let semester = now.getMonth() < 6 ? 1 : 2; // mois 0-5 → S1, 6-11 → S2
+
+  // Cherche le premier (année, semestre) dont le code n'existe pas encore.
+  // Borne de sécurité pour éviter toute boucle infinie.
+  for (let guard = 0; guard < 24; guard += 1) {
+    const code = `P${String(year).slice(-2)}${String(semester).padStart(2, '0')}`;
+    if (!existingCodes.has(code)) break;
+    if (semester === 1) {
+      semester = 2;
+    } else {
+      semester = 1;
+      year += 1;
+    }
+  }
+
+  const code = `P${String(year).slice(-2)}${String(semester).padStart(2, '0')}`;
+  const nom = `Cycle ${year} - Semestre ${semester}`;
+
+  // 1er jour du semestre suggéré : janvier (S1) ou juillet (S2).
+  const startMonth = semester === 1 ? 0 : 6;
+  let start = new Date(year, startMonth, 1);
+  // La règle métier exige une date de début dans le futur : si le 1er du
+  // semestre est déjà passé, on décale au lendemain pour rester cohérent.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (start <= today) {
+    start = new Date(today);
+    start.setDate(start.getDate() + 1);
+  }
+  const end = new Date(start);
+  end.setDate(end.getDate() + 90); // durée par défaut dans la fenêtre 7–180 jours
+
+  return {
+    code_periode: code,
+    nom_periode: nom,
+    description: '',
+    date_debut: toInputDate(start),
+    date_fin: toInputDate(end),
+  };
+}
+
 export default function AdminPeriodesPage() {
   const { data } = usePeriodes();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [search, setSearch] = React.useState('');
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [form, setForm] = React.useState<FormState>(EMPTY_FORM);
   const [feedback, setFeedback] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [modalError, setModalError] = React.useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
 
   const periodes = Array.isArray(data) ? data : [];
-
-  const resetForm = React.useCallback(() => {
-    setEditingId(null);
-    setForm(EMPTY_FORM);
-  }, []);
 
   const refresh = React.useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['periodes'] });
   }, [queryClient]);
+
+  const closeModal = React.useCallback(() => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setModalError(null);
+  }, []);
 
   const saveMutation = useMutation({
     mutationFn: async (payload: FormState) => {
@@ -75,12 +152,14 @@ export default function AdminPeriodesPage() {
     onSuccess: async () => {
       setFeedback(editingId ? 'Période mise à jour.' : 'Période créée.');
       setError(null);
-      resetForm();
+      closeModal();
       await refresh();
     },
     onError: (mutationError: any) => {
-      setError(mutationError?.response?.data?.message || 'Impossible de sauvegarder la période.');
-      setFeedback(null);
+      // L'erreur reste DANS le modal, qui ne se ferme pas.
+      setModalError(
+        mutationError?.response?.data?.message || 'Impossible de sauvegarder la période.',
+      );
     },
   });
 
@@ -129,6 +208,14 @@ export default function AdminPeriodesPage() {
     planifiees: periodes.filter((periode: any) => String(periode.statut).toLowerCase() === 'planifiee').length,
   }), [periodes]);
 
+  const openCreate = React.useCallback(() => {
+    setEditingId(null);
+    setForm(buildSuggestedForm(periodes));
+    setModalError(null);
+    setFeedback(null);
+    setIsModalOpen(true);
+  }, [periodes]);
+
   const startEdit = React.useCallback((periode: any) => {
     setEditingId(periode.id_periode);
     setForm({
@@ -138,11 +225,14 @@ export default function AdminPeriodesPage() {
       date_debut: periode.date_debut ? String(periode.date_debut).slice(0, 10) : '',
       date_fin: periode.date_fin ? String(periode.date_fin).slice(0, 10) : '',
     });
-    setError(null);
+    setModalError(null);
     setFeedback(null);
+    setIsModalOpen(true);
   }, []);
 
   const isBusy = saveMutation.isPending || toggleMutation.isPending || deleteMutation.isPending;
+  const isFormIncomplete =
+    !form.code_periode || !form.nom_periode || !form.date_debut || !form.date_fin;
 
   return (
     <AdminEvaluationsLayout title="Périodes d'évaluation">
@@ -151,46 +241,27 @@ export default function AdminPeriodesPage() {
           <h1 className="text-2xl font-bold text-sabc-gray-900">Périodes d’évaluation</h1>
           <p className="text-sm text-sabc-gray-600">Gestion des cycles d’évaluation, ouverture, clôture et mise à jour.</p>
         </div>
-        <Button variant="outline" onClick={() => refresh()}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Rafraîchir
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => refresh()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Rafraîchir
+          </Button>
+          <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nouvelle période
+          </Button>
+        </div>
       </div>
+
+      {feedback ? <div className="rounded-lg border border-sabc-success/30 bg-sabc-success/10 px-4 py-3 text-sm text-sabc-success">{feedback}</div> : null}
+      {error ? <div className="rounded-lg border border-sabc-red-primary/30 bg-sabc-red-light px-4 py-3 text-sm text-sabc-red-primary">{error}</div> : null}
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Total</div><div className="text-3xl font-bold">{stats.total}</div></CardContent></Card>
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Ouvertes</div><div className="text-3xl font-bold text-sabc-success">{stats.ouvertes}</div></CardContent></Card>
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Fermées</div><div className="text-3xl font-bold text-sabc-gray-700">{stats.fermees}</div></CardContent></Card>
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Planifiées</div><div className="text-3xl font-bold text-sabc-accent">{stats.planifiees}</div></CardContent></Card>
+        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Total</div><div className="text-2xl font-bold">{stats.total}</div></CardContent></Card>
+        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Ouvertes</div><div className="text-2xl font-bold text-sabc-success">{stats.ouvertes}</div></CardContent></Card>
+        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Fermées</div><div className="text-2xl font-bold text-sabc-gray-700">{stats.fermees}</div></CardContent></Card>
+        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Planifiées</div><div className="text-2xl font-bold text-sabc-accent">{stats.planifiees}</div></CardContent></Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{editingId ? 'Modifier une période' : 'Créer une période'}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {feedback ? <div className="rounded-lg border border-sabc-success/30 bg-sabc-success/10 px-4 py-3 text-sm text-sabc-success">{feedback}</div> : null}
-          {error ? <div className="rounded-lg border border-sabc-red-primary/30 bg-sabc-red-light px-4 py-3 text-sm text-sabc-red-primary">{error}</div> : null}
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <Input placeholder="Code période" value={form.code_periode} disabled={!!editingId} onChange={(e) => setForm((current) => ({ ...current, code_periode: e.target.value }))} />
-            <Input placeholder="Nom période" value={form.nom_periode} onChange={(e) => setForm((current) => ({ ...current, nom_periode: e.target.value }))} />
-            <Input type="date" value={form.date_debut} onChange={(e) => setForm((current) => ({ ...current, date_debut: e.target.value }))} />
-            <Input type="date" value={form.date_fin} onChange={(e) => setForm((current) => ({ ...current, date_fin: e.target.value }))} />
-            <Input placeholder="Description" value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-              disabled={isBusy || !form.code_periode || !form.nom_periode || !form.date_debut || !form.date_fin}
-              onClick={() => saveMutation.mutate(form)}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {editingId ? 'Enregistrer les modifications' : 'Créer la période'}
-            </Button>
-            {editingId ? <Button variant="outline" onClick={resetForm}>Annuler</Button> : null}
-          </div>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -236,15 +307,27 @@ export default function AdminPeriodesPage() {
                           <Edit3 className="mr-1 h-3.5 w-3.5" />
                           Modifier
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => toggleMutation.mutate(periode.id_periode)} disabled={isBusy}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleMutation.mutate(periode.id_periode)}
+                          disabled={isBusy || periode.est_cloturee}
+                          title={periode.est_cloturee ? 'Période terminée — non modifiable' : undefined}
+                        >
                           <Power className="mr-1 h-3.5 w-3.5" />
-                          Basculer
+                          {periode.est_ouverte ? 'Fermer' : 'Ouvrir'}
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            if (window.confirm('Supprimer cette période ?')) deleteMutation.mutate(periode.id_periode);
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: 'Supprimer cette période ?',
+                              description: 'Cette action est irréversible.',
+                              confirmLabel: 'Supprimer',
+                              variant: 'destructive',
+                            });
+                            if (ok) deleteMutation.mutate(periode.id_periode);
                           }}
                           disabled={isBusy}
                         >
@@ -260,6 +343,97 @@ export default function AdminPeriodesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isModalOpen} onOpenChange={(open) => (open ? setIsModalOpen(true) : closeModal())}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Modifier une période' : 'Nouvelle période'}</DialogTitle>
+            <DialogDescription>
+              {editingId
+                ? 'Mettez à jour les informations de la période. Seules les périodes planifiées sont modifiables.'
+                : 'Les champs sont pré-remplis selon la nomenclature. Vous pouvez les ajuster librement.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {modalError ? (
+              <div className="rounded-lg border border-sabc-red-primary/30 bg-sabc-red-light px-4 py-3 text-sm text-sabc-red-primary">
+                {modalError}
+              </div>
+            ) : null}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-sabc-gray-700">Code période</label>
+                <Input
+                  placeholder="P2602"
+                  value={form.code_periode}
+                  disabled={!!editingId}
+                  onChange={(e) => setForm((current) => ({ ...current, code_periode: e.target.value }))}
+                />
+                {editingId ? (
+                  <p className="text-xs text-sabc-gray-500">Le code n’est pas modifiable après création.</p>
+                ) : null}
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-sabc-gray-700">Nom période</label>
+                <Input
+                  placeholder="Cycle 2026 - Semestre 2"
+                  value={form.nom_periode}
+                  onChange={(e) => setForm((current) => ({ ...current, nom_periode: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-sabc-gray-700">Date de début</label>
+                <Input
+                  type="date"
+                  value={form.date_debut}
+                  onChange={(e) => setForm((current) => ({ ...current, date_debut: e.target.value }))}
+                />
+                <p className="text-xs text-sabc-gray-500">
+                  Durée entre 7 et 180 jours, sans chevauchement, début dans le futur.
+                </p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-sabc-gray-700">Date de fin</label>
+                <Input
+                  type="date"
+                  value={form.date_fin}
+                  onChange={(e) => setForm((current) => ({ ...current, date_fin: e.target.value }))}
+                />
+                <p className="text-xs text-sabc-gray-500">
+                  Durée entre 7 et 180 jours, sans chevauchement, début dans le futur.
+                </p>
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-medium text-sabc-gray-700">Description</label>
+                <Input
+                  placeholder="Description (optionnelle)"
+                  value={form.description}
+                  onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={closeModal} disabled={saveMutation.isPending}>
+              Annuler
+            </Button>
+            <Button
+              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+              disabled={saveMutation.isPending || isFormIncomplete}
+              onClick={() => {
+                setModalError(null);
+                saveMutation.mutate(form);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              {editingId ? 'Enregistrer les modifications' : 'Créer la période'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminEvaluationsLayout>
   );
 }
