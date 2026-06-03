@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
+import { Badge } from '@/Components/UI/Badge/Badge';
 import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
@@ -150,7 +151,11 @@ export default function RegionsIndex() {
                 <TableRow key={region.id_region}>
                   <TableCell>{region.id_region}</TableCell>
                   <TableCell>{region.nom_region}</TableCell>
-                  <TableCell>{region.est_taniere ? 'Tanière' : 'Non tanière'}</TableCell>
+                  <TableCell>
+                    <Badge variant={region.est_taniere ? 'primary' : 'secondary'}>
+                      {region.est_taniere ? 'Tanière' : 'Non tanière'}
+                    </Badge>
+                  </TableCell>
                   <TableCell>{region._count?.utilisateurs ?? 0}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">

@@ -61,8 +61,8 @@ export default function ShowUser() {
             <div><span className="font-medium">Branche:</span> {user?.branche?.nom_branche || user?.id_branche}</div>
             <div><span className="font-medium">Manager:</span> {user?.manager_matricule || 'N/A'}</div>
             <div className="flex gap-2 pt-2">
-              <Badge variant={user?.est_actif ? 'default' : 'outline'}>{user?.est_actif ? 'Actif' : 'Inactif'}</Badge>
-              <Badge variant={user?.est_admin ? 'default' : 'outline'}>{user?.est_admin ? 'Admin' : 'Standard'}</Badge>
+              <Badge variant={user?.est_actif ? 'success' : 'secondary'}>{user?.est_actif ? 'Actif' : 'Inactif'}</Badge>
+              <Badge variant={user?.est_admin ? 'primary' : 'secondary'}>{user?.est_admin ? 'Admin' : 'Standard'}</Badge>
             </div>
           </CardContent>
         </Card>
