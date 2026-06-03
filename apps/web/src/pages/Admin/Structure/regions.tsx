@@ -18,6 +18,7 @@ import { adminApi } from '@/Services/api';
 import { useAdminStructure } from '@/Hooks/queries';
 import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
+import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
 
 const initialForm = { id_region: '', nom_region: '', est_taniere: 'false' };
@@ -123,6 +124,17 @@ export default function RegionsIndex() {
           </Button>
         </CardHeader>
         <CardContent>
+          {regions.length === 0 ? (
+            <EmptyState
+              title="Aucune région"
+              description="Créez votre première région pour structurer l'organisation."
+              action={
+                <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={openCreate}>
+                  Nouvelle région
+                </Button>
+              }
+            />
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -159,6 +171,7 @@ export default function RegionsIndex() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 

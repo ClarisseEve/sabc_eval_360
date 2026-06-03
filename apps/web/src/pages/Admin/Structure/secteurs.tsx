@@ -18,6 +18,7 @@ import { adminApi } from '@/Services/api';
 import { useAdminStructure } from '@/Hooks/queries';
 import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
+import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
 
 export default function SecteursIndex() {
@@ -101,6 +102,17 @@ export default function SecteursIndex() {
           </Button>
         </CardHeader>
         <CardContent>
+          {secteurs.length === 0 ? (
+            <EmptyState
+              title="Aucun secteur"
+              description="Créez votre premier secteur pour structurer l'organisation."
+              action={
+                <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => setOpen(true)}>
+                  Nouveau secteur
+                </Button>
+              }
+            />
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -137,6 +149,7 @@ export default function SecteursIndex() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 

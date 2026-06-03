@@ -8,6 +8,8 @@ import { PageContainer } from '@/Components/UI/Page/PageContainer';
 import { PageHeader } from '@/Components/UI/Page/PageHeader';
 import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
+import { EmptyState } from '@/Components/UI/EmptyState';
+import { Skeleton } from '@/Components/UI/Skeleton';
 
 export default function ReportsIndex() {
   const navigate = useNavigate();
@@ -81,12 +83,26 @@ export default function ReportsIndex() {
       )}
 
       {isLoading ? (
-        <div className="text-center py-10 text-gray-500">Chargement…</div>
-      ) : rapports.length === 0 ? (
-        <div className="text-center py-10 text-gray-400">
-          <FileText size={48} className="mx-auto mb-3 opacity-30" />
-          <p>Aucun rapport. Créez votre premier rapport.</p>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} height={72} className="w-full rounded-lg" />
+          ))}
         </div>
+      ) : rapports.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="Aucun rapport"
+          description="Créez votre premier rapport pour assembler des sections et l'exporter en PowerPoint ou Excel."
+          action={
+            <button
+              onClick={() => setShowCreate(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-sabc-red-primary text-white rounded-lg hover:bg-sabc-red-dark"
+            >
+              <Plus size={18} />
+              Nouveau rapport
+            </button>
+          }
+        />
       ) : (
         <div className="space-y-3">
           {rapports.map((r: any) => (

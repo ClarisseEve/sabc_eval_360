@@ -18,6 +18,7 @@ import { adminApi } from '@/Services/api';
 import { useAdminStructure } from '@/Hooks/queries';
 import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
+import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
 
 export default function ServicesIndex() {
@@ -88,6 +89,17 @@ export default function ServicesIndex() {
           </Button>
         </CardHeader>
         <CardContent>
+          {services.length === 0 ? (
+            <EmptyState
+              title="Aucun service"
+              description="Créez votre premier service commercial pour structurer l'organisation."
+              action={
+                <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => setOpen(true)}>
+                  Nouveau service
+                </Button>
+              }
+            />
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -122,6 +134,7 @@ export default function ServicesIndex() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 

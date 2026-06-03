@@ -13,6 +13,8 @@ import { useReport, useAddSection, useUpdateSection, useRemoveSection, useReorde
 import { SectionCard } from '@/Components/Admin/Reports/SectionCard';
 import { reportsApi } from '@/Services/api';
 import { useToast } from '@/Contexts/ToastContext';
+import { EmptyState } from '@/Components/UI/EmptyState';
+import { Skeleton } from '@/Components/UI/Skeleton';
 import { ArrowLeft, Plus, FileText } from 'lucide-react';
 
 const SECTION_TYPES = [
@@ -101,8 +103,37 @@ export default function Builder() {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement…</div>;
-  if (!rapport)  return <div className="p-8 text-center text-red-500">Rapport introuvable</div>;
+  if (isLoading) {
+    return (
+      <div className="max-w-3xl mx-auto p-6 space-y-4">
+        <Skeleton height={40} className="w-1/3 rounded-lg" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} height={96} className="w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+  if (!rapport) {
+    return (
+      <div className="max-w-3xl mx-auto p-6">
+        <EmptyState
+          variant="error"
+          icon={FileText}
+          title="Rapport introuvable"
+          description="Ce rapport n'existe pas ou a été supprimé."
+          action={
+            <button
+              onClick={() => navigate('/admin/reports')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-sabc-red-primary text-white rounded-lg hover:bg-sabc-red-dark"
+            >
+              <ArrowLeft size={18} />
+              Retour aux rapports
+            </button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-6">

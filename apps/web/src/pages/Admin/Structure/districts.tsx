@@ -18,6 +18,7 @@ import { adminApi } from '@/Services/api';
 import { useAdminStructure } from '@/Hooks/queries';
 import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
+import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
 
 export default function DistrictsIndex() {
@@ -90,6 +91,17 @@ export default function DistrictsIndex() {
           </Button>
         </CardHeader>
         <CardContent>
+          {districts.length === 0 ? (
+            <EmptyState
+              title="Aucun district"
+              description="Créez votre premier district pour structurer l'organisation."
+              action={
+                <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => setOpen(true)}>
+                  Nouveau district
+                </Button>
+              }
+            />
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -126,6 +138,7 @@ export default function DistrictsIndex() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 
