@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Button } from '@/Components/UI/Button';
 import { Checkbox } from '@/Components/UI/Checkbox';
 import { Input } from '@/Components/UI/Input';
-import { Label } from '@/Components/UI/Label';
+import { FormField } from '@/Components/UI/Form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import { Textarea } from '@/Components/UI/Textarea';
 import { adminApi } from '@/Services/api';
+import { useToast } from '@/Contexts/ToastContext';
 import { AdminRolesLayout } from './shared';
 
 const initialForm = {
@@ -26,7 +27,13 @@ const initialForm = {
 
 export default function CreateRole() {
   const navigate = useNavigate();
+  const { success, error } = useToast();
   const [form, setForm] = useState(initialForm);
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ['admin', 'structure', 'branches'],
+    queryFn: () => adminApi.structure.branches().then((r) => r.data),
+  });
 
   const createMutation = useMutation({
     mutationFn: async () =>
@@ -43,17 +50,18 @@ export default function CreateRole() {
         peut_cross_branch: form.peut_cross_branch,
       }),
     onSuccess: (response) => {
+      success('Rôle créé.');
       navigate(`/admin/roles/${response.data.id_role}`);
+    },
+    onError: (e: any) => {
+      error(e?.response?.data?.message || e?.message || 'La création du rôle a échoué.');
     },
   });
 
   return (
     <AdminRolesLayout title="Créer un rôle">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Créer un rôle</h1>
-          <p className="text-sm text-sabc-gray-600">Création réelle via `POST /admin/roles`.</p>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight text-sabc-gray-900">Créer un rôle</h1>
         <Link to="/admin/roles">
           <Button variant="outline">Retour</Button>
         </Link>
@@ -64,20 +72,23 @@ export default function CreateRole() {
           <CardTitle>Informations du rôle</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div>
-            <Label htmlFor="id_role">Code rôle</Label>
+          <FormField label="Code rôle" htmlFor="id_role" required hint="Identifiant court, ex. R0001.">
             <Input id="id_role" value={form.id_role} onChange={(e) => setForm((p) => ({ ...p, id_role: e.target.value.toUpperCase() }))} />
-          </div>
-          <div>
-            <Label htmlFor="nom_role">Nom rôle</Label>
-            <Input id="nom_role" value={form.nom_role} onChange={(e) => setForm((p) => ({ ...p, nom_role: e.target.value }))} />
-          </div>
-          <div>
-            <Label htmlFor="id_branche">Branche</Label>
-            <Input id="id_branche" value={form.id_branche} onChange={(e) => setForm((p) => ({ ...p, id_branche: e.target.value.toUpperCase() }))} placeholder="COMM / MKT / ..." />
-          </div>
-          <div>
-            <Label>Niveau</Label>
+          </FormField>
+          <FormField label="Nom du rôle" htmlFor="nom_role" required>
+            <Input id="nom_role" value={form.nom_role} onChange={(e) => setForm((p) => ({ ...p, nom_role: e.target.value }))} placeholder="Directeur Régional" />
+          </FormField>
+          <FormField label="Branche" required>
+            <Select value={form.id_branche} onValueChange={(v) => setForm((p) => ({ ...p, id_branche: v }))}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner une branche" /></SelectTrigger>
+              <SelectContent>
+                {(branches as any[]).map((b) => (
+                  <SelectItem key={b.id_branche} value={b.id_branche}>{b.nom_branche}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormField>
+          <FormField label="Niveau hiérarchique" hint="Le niveau s'applique selon le mode tanière / non-tanière.">
             <div className="flex gap-2">
               <Select value={form.niveau_mode} onValueChange={(value) => setForm((p) => ({ ...p, niveau_mode: value }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -97,11 +108,10 @@ export default function CreateRole() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="md:col-span-2">
-            <Label htmlFor="description">Description</Label>
+          </FormField>
+          <FormField label="Description" htmlFor="description" className="md:col-span-2">
             <Textarea id="description" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} rows={3} />
-          </div>
+          </FormField>
           <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
             <label className="flex items-center gap-2"><Checkbox checked={form.peut_auto_evaluer} onCheckedChange={(v) => setForm((p) => ({ ...p, peut_auto_evaluer: !!v }))} />Peut s'auto-évaluer</label>
             <label className="flex items-center gap-2"><Checkbox checked={form.peut_evaluer_pairs} onCheckedChange={(v) => setForm((p) => ({ ...p, peut_evaluer_pairs: !!v }))} />Peut évaluer ses pairs</label>
