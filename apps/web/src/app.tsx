@@ -56,6 +56,7 @@ const AdminReglesEdit = lazy(() => import('./pages/Admin/Evaluations/Regles/Edit
 const AdminTemplatesIndex = lazy(() => import('./pages/Admin/Evaluations/Templates/Index'));
 const AdminTemplatesCreate = lazy(() => import('./pages/Admin/Evaluations/Templates/Create'));
 const AdminTemplatesEdit = lazy(() => import('./pages/Admin/Evaluations/Templates/Edit'));
+const AdminTemplatesShow = lazy(() => import('./pages/Admin/Evaluations/Templates/Show'));
 
 // Admin: Remplacements
 const AdminRemplacements = lazy(() => import('./pages/Admin/Remplacements/index'));
@@ -254,6 +255,7 @@ function App() {
                       <Route path="/admin/evaluations/templates" element={<A><AdminTemplatesIndex /></A>} />
                       <Route path="/admin/evaluations/templates/create" element={<A><AdminTemplatesCreate /></A>} />
                       <Route path="/admin/evaluations/templates/:id/edit" element={<A><AdminTemplatesEdit /></A>} />
+                      <Route path="/admin/evaluations/templates/:id" element={<A><AdminTemplatesShow /></A>} />
 
                       {/* ── Admin: Remplacements ── */}
                       <Route path="/admin/remplacements" element={<A><AdminRemplacements /></A>} />

@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
-import { Head } from '@/lib/inertia-shim';
-import AppLayout from '@/Components/Layout/app/AppLayout';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Button } from '@/Components/UI/Button/Button';
 import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
-import { Link } from '@/lib/inertia-shim';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
 import { Checkbox } from '@/Components/UI/Checkbox/Checkbox';
+import { templatesApi } from '@/Services/api';
 import { useToast } from '@/Contexts/ToastContext';
+import { AdminEvaluationsLayout } from '../shared';
 
 /**
  * Page d'édition de template d'évaluation pour l'administrateur
@@ -20,29 +21,18 @@ import { useToast } from '@/Contexts/ToastContext';
  * - Minimum 5 compétences par template
  */
 const TemplateEditPage: React.FC = () => {
-  const { warning } = useToast();
-  // Simuler un utilisateur administrateur pour la démo
-  const mockUser = {
-    name: 'Admin SABC',
-    email: 'admin@sabc.cm',
-    role: 'ADMIN',
-    avatar: undefined
-  };
-  
-  // Données de démonstration pour le template à éditer
-  const initialTemplateData = {
-    id: '1',
-    titre: 'Évaluation Commerciale Standard',
-    categorie: 'commercial',
-    description: 'Template standard pour l\'évaluation des performances commerciales',
-    est_actif: true,
-    version: '2.1',
-    date_creation: '2023-01-15',
-    date_modification: '2023-05-20',
-  };
-  
+  const { id = '' } = useParams();
+  const navigate = useNavigate();
+  const { warning, success, error } = useToast();
+
   // État du formulaire pour les informations de base du template
-  const [formData, setFormData] = useState(initialTemplateData);
+  const [formData, setFormData] = useState({
+    titre: '',
+    categorie: '',
+    description: '',
+    est_actif: true,
+    version: '1.0',
+  });
   
   // État pour les sections et compétences
   const [sections, setSections] = useState<Array<{
@@ -55,84 +45,39 @@ const TemplateEditPage: React.FC = () => {
       description: string;
       obligatoire: boolean;
     }>;
-  }>>([
-    {
-      id: '1',
-      titre: 'Communication et relationnel',
-      description: 'Capacités de communication et gestion des relations',
-      competences: [
-        {
-          id: '1-1',
-          libelle: 'Communication orale',
-          description: 'Capacité à s\'exprimer clairement et efficacement à l\'oral',
-          obligatoire: true
-        },
-        {
-          id: '1-2',
-          libelle: 'Communication écrite',
-          description: 'Capacité à rédiger des documents clairs et structurés',
-          obligatoire: true
-        },
-        {
-          id: '1-3',
-          libelle: 'Gestion des conflits',
-          description: 'Capacité à gérer et résoudre les situations conflictuelles',
-          obligatoire: false
-        }
-      ]
-    },
-    {
-      id: '2',
-      titre: 'Compétences techniques',
-      description: 'Maîtrise des outils et processus commerciaux',
-      competences: [
-        {
-          id: '2-1',
-          libelle: 'Connaissance produits',
-          description: 'Maîtrise des caractéristiques et avantages des produits SABC',
-          obligatoire: true
-        },
-        {
-          id: '2-2',
-          libelle: 'Techniques de vente',
-          description: 'Application des méthodes et techniques de vente efficaces',
-          obligatoire: true
-        },
-        {
-          id: '2-3',
-          libelle: 'Négociation commerciale',
-          description: 'Capacité à négocier et conclure des accords favorables',
-          obligatoire: true
-        }
-      ]
-    },
-    {
-      id: '3',
-      titre: 'Leadership et management',
-      description: 'Capacités de direction et gestion d\'équipe',
-      competences: [
-        {
-          id: '3-1',
-          libelle: 'Prise de décision',
-          description: 'Capacité à prendre des décisions pertinentes et assumées',
-          obligatoire: true
-        },
-        {
-          id: '3-2',
-          libelle: 'Délégation',
-          description: 'Capacité à déléguer efficacement les tâches',
-          obligatoire: false
-        },
-        {
-          id: '3-3',
-          libelle: 'Développement des collaborateurs',
-          description: 'Capacité à faire progresser et développer son équipe',
-          obligatoire: true
-        }
-      ]
-    }
-  ]);
-  
+  }>>([]);
+
+  // Chargement du template réel
+  const { data: template, isLoading } = useQuery({
+    queryKey: ['templates', id],
+    queryFn: () => templatesApi.get(id).then((r) => r.data),
+    enabled: !!id,
+  });
+
+  useEffect(() => {
+    if (!template) return;
+    setFormData({
+      titre: template.titre ?? '',
+      categorie: template.categorie ?? '',
+      description: template.description ?? '',
+      est_actif: !!template.est_actif,
+      version: String(template.version ?? '1'),
+    });
+    setSections(
+      (template.sections ?? []).map((section: any, sectionIndex: number) => ({
+        id: String(sectionIndex + 1),
+        titre: section.titre ?? '',
+        description: section.description ?? '',
+        competences: (section.competences ?? []).map((competence: any, compIndex: number) => ({
+          id: `${sectionIndex + 1}-${compIndex + 1}`,
+          libelle: competence.libelle ?? '',
+          description: competence.description ?? '',
+          obligatoire: true,
+        })),
+      })),
+    );
+  }, [template]);
+
   // Gérer les changements dans le formulaire principal
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -246,6 +191,36 @@ const TemplateEditPage: React.FC = () => {
     );
   };
   
+  // Construit le payload attendu par l'API (modèle sections -> compétences)
+  const buildDto = () => ({
+    titre: formData.titre,
+    description: formData.description || undefined,
+    categorie: formData.categorie,
+    version: formData.version,
+    est_actif: formData.est_actif,
+    sections: sections.map((section, sectionIndex) => ({
+      titre: section.titre,
+      description: section.description || undefined,
+      ordre: sectionIndex + 1,
+      competences: section.competences.map((competence, compIndex) => ({
+        libelle: competence.libelle,
+        description: competence.description || undefined,
+        ordre: compIndex + 1,
+      })),
+    })),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () => templatesApi.update(id, buildDto()),
+    onSuccess: () => {
+      success('Template mis à jour.');
+      navigate('/admin/evaluations/templates');
+    },
+    onError: (e: any) => {
+      error(e?.response?.data?.message || e?.message || 'La mise à jour du template a échoué.');
+    },
+  });
+
   // Gérer la soumission du formulaire
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -253,30 +228,25 @@ const TemplateEditPage: React.FC = () => {
       warning('Veuillez remplir tous les champs obligatoires et ajouter au moins 5 compétences au total.');
       return;
     }
-    
-    // Ici, on simulerait l'envoi des données au backend
-    console.log('Données du formulaire soumises:', {
-      ...formData,
-      sections
-    });
-    // Redirection vers la liste des templates après modification
+    updateMutation.mutate();
   };
-  
+
+  if (isLoading) {
+    return (
+      <AdminEvaluationsLayout title="Modifier le template">
+        <div className="p-8 text-center text-sabc-gray-500">Chargement…</div>
+      </AdminEvaluationsLayout>
+    );
+  }
+
   return (
-    <AppLayout
-      user={mockUser}
-      notifications={[]}
-    >
-      <Head title={`Modifier le template: ${formData.titre} - SABC Évaluation 360°`} />
-      
+    <AdminEvaluationsLayout title="Modifier le template">
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center mb-6">
-          <Link href="/admin/evaluations/templates">
-            <Button variant="ghost" className="mr-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Retour
-            </Button>
-          </Link>
+          <Button variant="ghost" className="mr-4" onClick={() => navigate('/admin/evaluations/templates')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Retour
+          </Button>
           <h1 className="text-2xl font-bold text-sabc-gray-900">Modifier le template d'évaluation</h1>
         </div>
         
@@ -349,12 +319,14 @@ const TemplateEditPage: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="mt-4 p-4 bg-sabc-accent-light border-l-4 border-sabc-warning rounded-md">
-                  <p className="text-sm text-sabc-gray-800">
-                    <span className="font-medium">Information:</span> Ce template a été créé le {formData.date_creation} 
-                    et modifié pour la dernière fois le {formData.date_modification}.
-                  </p>
-                </div>
+                {template?.updated_at ? (
+                  <div className="mt-4 p-4 bg-sabc-accent-light border-l-4 border-sabc-warning rounded-md">
+                    <p className="text-sm text-sabc-gray-800">
+                      <span className="font-medium">Information :</span> dernière modification le{' '}
+                      {new Date(template.updated_at).toLocaleDateString('fr-FR')}.
+                    </p>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
             
@@ -482,22 +454,22 @@ const TemplateEditPage: React.FC = () => {
             
             {/* Boutons d'action */}
             <div className="flex justify-end space-x-2">
-              <Link href="/admin/evaluations/templates">
-                <Button variant="outline">Annuler</Button>
-              </Link>
-              <Button 
-                type="submit" 
+              <Button type="button" variant="outline" onClick={() => navigate('/admin/evaluations/templates')}>
+                Annuler
+              </Button>
+              <Button
+                type="submit"
                 className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white"
-                disabled={!isFormValid()}
+                disabled={!isFormValid() || updateMutation.isPending}
               >
                 <Save className="h-4 w-4 mr-2" />
-                Enregistrer les modifications
+                {updateMutation.isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
               </Button>
             </div>
           </div>
         </form>
       </div>
-    </AppLayout>
+    </AdminEvaluationsLayout>
   );
 };
 

@@ -191,7 +191,7 @@ export default function TemplatesIndexPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => navigate(`/admin/evaluations/templates/show?id=${id}`)}>
+                              <DropdownMenuItem onClick={() => navigate(`/admin/evaluations/templates/${id}`)}>
                                 <Eye size={14} className="mr-2" />
                                 Voir
                               </DropdownMenuItem>
