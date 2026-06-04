@@ -5,15 +5,33 @@ import { Badge } from '@/Components/UI/Badge';
 import { Button } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { remplacementsApi } from '@/Services/api';
+import { useConfirm } from '@/Contexts/ConfirmContext';
+import { useToast } from '@/Contexts/ToastContext';
 import { AdminRemplacementsLayout } from './shared';
+
+const STATUT_META = {
+  actif: { label: 'Actif', variant: 'success' as const },
+  avenir: { label: 'À venir', variant: 'info' as const },
+  termine: { label: 'Terminé', variant: 'secondary' as const },
+};
 
 export default function ShowRemplacement() {
   const { id = '' } = useParams();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const { success, error } = useToast();
   const { data } = useSuspenseQuery({
     queryKey: ['admin', 'remplacements', id],
     queryFn: () => remplacementsApi.get(id).then((r) => r.data),
   });
+
+  // Statut tri-état dérivé (objet seul, pas de bucket d'origine)
+  const statut: keyof typeof STATUT_META = data.est_actif
+    ? 'actif'
+    : new Date(data.date_debut) > new Date()
+      ? 'avenir'
+      : 'termine';
+  const meta = STATUT_META[statut];
 
   const terminerMutation = useMutation({
     mutationFn: async () => remplacementsApi.terminer(id),
@@ -22,6 +40,22 @@ export default function ShowRemplacement() {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'remplacements', id] });
     },
   });
+
+  const handleTerminer = async () => {
+    const ok = await confirm({
+      title: 'Terminer ce remplacement ?',
+      description: 'Le remplacement sera clôturé immédiatement.',
+      confirmLabel: 'Terminer',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    try {
+      await terminerMutation.mutateAsync();
+      success('Remplacement terminé.');
+    } catch (e: any) {
+      error(e?.response?.data?.message || e?.message || 'La clôture du remplacement a échoué.');
+    }
+  };
 
   return (
     <AdminRemplacementsLayout title={`Remplacement #${id}`}>
@@ -33,7 +67,7 @@ export default function ShowRemplacement() {
         <div className="flex gap-2">
           <Link to="/admin/remplacements"><Button variant="outline">Retour</Button></Link>
           <Link to={`/admin/remplacements/${id}/edit`}><Button variant="outline">Modifier</Button></Link>
-          {data.est_actif ? <Button variant="outline" onClick={() => terminerMutation.mutate()}>Terminer</Button> : null}
+          {statut === 'actif' ? <Button variant="outline" onClick={handleTerminer}>Terminer</Button> : null}
         </div>
       </div>
 
@@ -42,7 +76,7 @@ export default function ShowRemplacement() {
           <CardHeader><CardTitle>Informations générales</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div><span className="font-medium">ID:</span> {data.id_remplacement}</div>
-            <div><span className="font-medium">Statut:</span> <Badge variant={data.est_actif ? 'default' : 'outline'}>{data.est_actif ? 'Actif' : 'Terminé'}</Badge></div>
+            <div><span className="font-medium">Statut:</span> <Badge variant={meta.variant}>{meta.label}</Badge></div>
             <div><span className="font-medium">Rôle remplacé:</span> {data.role_remplace}</div>
             <div><span className="font-medium">Région:</span> {data.region_remplacement}</div>
             <div><span className="font-medium">Service:</span> {data.service_remplacement || 'N/A'}</div>

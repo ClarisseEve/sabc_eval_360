@@ -4,17 +4,20 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { Button } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Input } from '@/Components/UI/Input';
-import { Label } from '@/Components/UI/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import { Textarea } from '@/Components/UI/Textarea';
+import { FormField } from '@/Components/UI/Form';
+import { PageHeader } from '@/Components/UI/Page';
 import { useAdminUsers } from '@/Hooks/queries';
 import { remplacementsApi } from '@/Services/api';
+import { useToast } from '@/Contexts/ToastContext';
 import { AdminRemplacementsLayout } from './shared';
 
 export default function EditRemplacement() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { success, error } = useToast();
   const { data: usersData } = useAdminUsers({ limit: 1000 });
   const users = usersData?.data ?? (Array.isArray(usersData) ? usersData : []);
   const { data } = useSuspenseQuery({
@@ -61,25 +64,27 @@ export default function EditRemplacement() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'remplacements'] });
       await queryClient.invalidateQueries({ queryKey: ['admin', 'remplacements', id] });
+      success('Remplacement mis à jour.');
       navigate(`/admin/remplacements/${id}`);
+    },
+    onError: (e: any) => {
+      error(e?.response?.data?.message || e?.message || 'La mise à jour du remplacement a échoué.');
     },
   });
 
   return (
     <AdminRemplacementsLayout title={`Modifier remplacement #${id}`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Modifier remplacement #{id}</h1>
-          <p className="text-sm text-sabc-gray-600">Le titulaire et le rôle restent ceux du remplacement initial.</p>
-        </div>
-        <Link to={`/admin/remplacements/${id}`}><Button variant="outline">Retour</Button></Link>
-      </div>
+      <PageHeader
+        title={`Modifier le remplacement #${id}`}
+        description="Le titulaire et le rôle restent ceux du remplacement initial."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Remplacements', to: '/admin/remplacements' }, { label: 'Modifier' }]}
+        actions={<Link to={`/admin/remplacements/${id}`}><Button variant="outline">Retour</Button></Link>}
+      />
 
       <Card>
-        <CardHeader><CardTitle>Edition</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Édition</CardTitle></CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div>
-            <Label>Remplaçant</Label>
+          <FormField label="Remplaçant" required>
             <Select value={form.remplacant_matricule} onValueChange={(value) => setForm((p) => ({ ...p, remplacant_matricule: value }))}>
               <SelectTrigger><SelectValue placeholder="Sélectionner le remplaçant" /></SelectTrigger>
               <SelectContent>
@@ -90,30 +95,29 @@ export default function EditRemplacement() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div>
-            <Label>Durée prévue</Label>
+          </FormField>
+          <FormField label="Durée prévue">
             <Input value={`${duree} jour(s)`} readOnly />
-          </div>
-          <div>
-            <Label>Date début</Label>
-            <Input type="date" value={form.date_debut} onChange={(e) => setForm((p) => ({ ...p, date_debut: e.target.value }))} />
-          </div>
-          <div>
-            <Label>Date fin</Label>
-            <Input type="date" value={form.date_fin} onChange={(e) => setForm((p) => ({ ...p, date_fin: e.target.value }))} />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Service de remplacement</Label>
-            <Input value={form.service_remplacement} onChange={(e) => setForm((p) => ({ ...p, service_remplacement: e.target.value }))} />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Motif</Label>
-            <Textarea rows={4} value={form.motif} onChange={(e) => setForm((p) => ({ ...p, motif: e.target.value }))} />
-          </div>
+          </FormField>
+          <FormField label="Date de début" htmlFor="date_debut" required>
+            <Input id="date_debut" type="date" value={form.date_debut} onChange={(e) => setForm((p) => ({ ...p, date_debut: e.target.value }))} />
+          </FormField>
+          <FormField label="Date de fin" htmlFor="date_fin" hint="Laisser vide pour une durée indéterminée.">
+            <Input id="date_fin" type="date" value={form.date_fin} onChange={(e) => setForm((p) => ({ ...p, date_fin: e.target.value }))} />
+          </FormField>
+          <FormField label="Service de remplacement" htmlFor="service_remplacement" className="md:col-span-2">
+            <Input id="service_remplacement" value={form.service_remplacement} onChange={(e) => setForm((p) => ({ ...p, service_remplacement: e.target.value }))} />
+          </FormField>
+          <FormField label="Motif" htmlFor="motif" required className="md:col-span-2">
+            <Textarea id="motif" rows={4} value={form.motif} onChange={(e) => setForm((p) => ({ ...p, motif: e.target.value }))} />
+          </FormField>
           <div className="md:col-span-2 flex justify-end gap-2">
             <Link to={`/admin/remplacements/${id}`}><Button variant="outline">Annuler</Button></Link>
-            <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => updateMutation.mutate()}>
+            <Button
+              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+              disabled={updateMutation.isPending}
+              onClick={() => updateMutation.mutate()}
+            >
               {updateMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
             </Button>
           </div>
