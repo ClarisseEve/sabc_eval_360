@@ -2,6 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Input } from '@/Components/UI/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { PageHeader } from '@/Components/UI/Page';
+import { EmptyState } from '@/Components/UI/EmptyState';
+import { CheckCircle2 } from 'lucide-react';
 import { useAdminUsers } from '@/Hooks/queries';
 import { AdminUsersLayout } from './shared';
 
@@ -36,10 +39,11 @@ export default function UserGaps() {
 
   return (
     <AdminUsersLayout title="Analyse des gaps utilisateurs">
-      <div>
-        <h1 className="text-2xl font-bold text-sabc-gray-900">Analyse des gaps utilisateurs</h1>
-        <p className="text-sm text-sabc-gray-600">Détection simple des incohérences de données exploitées par l’application.</p>
-      </div>
+      <PageHeader
+        title="Analyse des gaps utilisateurs"
+        description="Détection simple des incohérences de données exploitées par l’application."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Utilisateurs', to: '/admin/utilisateurs' }, { label: 'Gaps' }]}
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Utilisateurs audités</div><div className="text-2xl font-bold">{users.length}</div></CardContent></Card>
@@ -51,26 +55,34 @@ export default function UserGaps() {
         <CardHeader><CardTitle>Résultats</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un utilisateur ou un gap" />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Matricule</TableHead>
-                <TableHead>Nom</TableHead>
-                <TableHead>Rôle</TableHead>
-                <TableHead>Gaps</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map(({ user, gaps }: { user: any; gaps: string[] }) => (
-                <TableRow key={user.matricule}>
-                  <TableCell>{user.matricule}</TableCell>
-                  <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
-                  <TableCell>{user.role}</TableCell>
-                  <TableCell>{gaps.join(', ')}</TableCell>
+          {rows.length === 0 ? (
+            search.trim() ? (
+              <EmptyState title="Aucun résultat" description="Aucun gap ne correspond à votre recherche." />
+            ) : (
+              <EmptyState icon={CheckCircle2} title="Aucun gap détecté" description="Toutes les données utilisateurs exploitées sont complètes." />
+            )
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Matricule</TableHead>
+                  <TableHead>Nom</TableHead>
+                  <TableHead>Rôle</TableHead>
+                  <TableHead>Gaps</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.map(({ user, gaps }: { user: any; gaps: string[] }) => (
+                  <TableRow key={user.matricule}>
+                    <TableCell>{user.matricule}</TableCell>
+                    <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
+                    <TableCell>{user.role}</TableCell>
+                    <TableCell>{gaps.join(', ')}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </AdminUsersLayout>

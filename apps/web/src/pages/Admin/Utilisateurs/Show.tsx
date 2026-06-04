@@ -5,14 +5,20 @@ import { Badge } from '@/Components/UI/Badge';
 import { Button } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { PageHeader } from '@/Components/UI/Page';
+import { EmptyState } from '@/Components/UI/EmptyState';
 import { adminApi } from '@/Services/api';
 import { useAdminUser } from '@/Hooks/queries';
+import { useConfirm } from '@/Contexts/ConfirmContext';
+import { useToast } from '@/Contexts/ToastContext';
 import { AdminUsersLayout } from './shared';
 
 export default function ShowUser() {
   const { matricule = '' } = useParams();
   const { data } = useAdminUser(matricule);
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const { success, error } = useToast();
   const { data: subordinates } = useSuspenseQuery({
     queryKey: ['admin', 'users', matricule, 'subordonnes'],
     queryFn: () => adminApi.users.subordonnes(matricule).then((r) => r.data),
@@ -23,8 +29,20 @@ export default function ShowUser() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
       await queryClient.invalidateQueries({ queryKey: ['admin', 'users', matricule] });
+      success('Utilisateur désactivé.');
     },
+    onError: (e: any) => error(e?.response?.data?.message || e?.message || 'La désactivation a échoué.'),
   });
+
+  const handleDeactivate = async () => {
+    const ok = await confirm({
+      title: 'Désactiver cet utilisateur ?',
+      description: 'Le compte ne pourra plus se connecter tant qu’il n’est pas réactivé.',
+      confirmLabel: 'Désactiver',
+      variant: 'destructive',
+    });
+    if (ok) deactivateMutation.mutate();
+  };
 
   const user = data;
   const stats = user?.stats || {};
@@ -32,17 +50,18 @@ export default function ShowUser() {
 
   return (
     <AdminUsersLayout title={`Utilisateur ${matricule}`}>
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-sabc-gray-900">{[user?.prenom, user?.nom].filter(Boolean).join(' ')}</h1>
-          <p className="text-sm text-sabc-gray-600">{user?.email}</p>
-        </div>
-        <div className="flex gap-2">
-          <Link to="/admin/utilisateurs"><Button variant="outline">Retour</Button></Link>
-          <Link to={`/admin/utilisateurs/${matricule}/edit`}><Button variant="outline">Modifier</Button></Link>
-          <Button variant="outline" onClick={() => deactivateMutation.mutate()}>Désactiver</Button>
-        </div>
-      </div>
+      <PageHeader
+        title={[user?.prenom, user?.nom].filter(Boolean).join(' ') || matricule}
+        description={user?.email}
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Utilisateurs', to: '/admin/utilisateurs' }, { label: matricule }]}
+        actions={
+          <>
+            <Link to="/admin/utilisateurs"><Button variant="outline">Retour</Button></Link>
+            <Link to={`/admin/utilisateurs/${matricule}/edit`}><Button variant="outline">Modifier</Button></Link>
+            <Button variant="destructive" onClick={handleDeactivate} disabled={deactivateMutation.isPending}>Désactiver</Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Rôle</div><div className="text-xl font-bold">{user?.role}</div></CardContent></Card>
@@ -70,24 +89,28 @@ export default function ShowUser() {
         <Card>
           <CardHeader><CardTitle>Subordonnés directs</CardTitle></CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Matricule</TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Rôle</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {subs.map((sub: any) => (
-                  <TableRow key={sub.matricule}>
-                    <TableCell>{sub.matricule}</TableCell>
-                    <TableCell>{[sub.prenom, sub.nom].filter(Boolean).join(' ')}</TableCell>
-                    <TableCell>{sub.role}</TableCell>
+            {subs.length === 0 ? (
+              <EmptyState title="Aucun subordonné" description="Cet utilisateur n’encadre aucun collaborateur direct." />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Matricule</TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Rôle</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {subs.map((sub: any) => (
+                    <TableRow key={sub.matricule}>
+                      <TableCell>{sub.matricule}</TableCell>
+                      <TableCell>{[sub.prenom, sub.nom].filter(Boolean).join(' ')}</TableCell>
+                      <TableCell>{sub.role}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
