@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Edit2, Eye, Plus, Power, Trash2 } from 'lucide-react';
 import { templatesApi } from '@/Services/api';
 import { useConfirm } from '@/Contexts/ConfirmContext';
+import { useToast } from '@/Contexts/ToastContext';
+import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminEvaluationsLayout } from '../shared';
 import { Button } from '@/Components/UI/Button/Button';
 import { Badge } from '@/Components/UI/Badge/Badge';
@@ -28,9 +30,8 @@ export default function TemplatesIndexPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const { success, error } = useToast();
   const [search, setSearch] = React.useState('');
-  const [feedback, setFeedback] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
 
   const { data } = useSuspenseQuery({
     queryKey: ['templates'],
@@ -43,30 +44,27 @@ export default function TemplatesIndexPage() {
     mutationFn: (id: string) => templatesApi.publish(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['templates'] });
-      setFeedback('Template publié.');
-      setTimeout(() => setFeedback(null), 3000);
+      success('Template publié.');
     },
-    onError: () => setError('Impossible de publier ce template.'),
+    onError: () => error('Impossible de publier ce template.'),
   });
 
   const unpublishMutation = useMutation({
     mutationFn: (id: string) => templatesApi.unpublish(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['templates'] });
-      setFeedback('Template dépublié.');
-      setTimeout(() => setFeedback(null), 3000);
+      success('Template dépublié.');
     },
-    onError: () => setError('Impossible de dépublier ce template.'),
+    onError: () => error('Impossible de dépublier ce template.'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => templatesApi.delete(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['templates'] });
-      setFeedback('Template supprimé.');
-      setTimeout(() => setFeedback(null), 3000);
+      success('Template supprimé.');
     },
-    onError: () => setError('Impossible de supprimer ce template (des assignations actives existent peut-être).'),
+    onError: () => error('Impossible de supprimer ce template (des assignations actives existent peut-être).'),
   });
 
   const filtered = templates.filter((t: any) =>
@@ -116,17 +114,6 @@ export default function TemplatesIndexPage() {
         </Card>
       </div>
 
-      {feedback && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          {feedback}
-        </div>
-      )}
-      {error && (
-        <div className="rounded-lg border border-sabc-red-primary/30 bg-sabc-red-light px-4 py-3 text-sm text-sabc-red-primary">
-          {error}
-        </div>
-      )}
-
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -142,11 +129,20 @@ export default function TemplatesIndexPage() {
         </CardHeader>
         <CardContent>
           {filtered.length === 0 ? (
-            <p className="py-8 text-center text-sm text-sabc-gray-400">
-              {templates.length === 0
-                ? 'Aucun template créé. Créez votre premier template ci-dessus.'
-                : 'Aucun template ne correspond à votre recherche.'}
-            </p>
+            templates.length === 0 ? (
+              <EmptyState
+                icon={ClipboardList}
+                title="Aucun template"
+                description="Créez votre premier template d’évaluation pour structurer les compétences."
+                action={
+                  <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => navigate('/admin/evaluations/templates/create')}>
+                    Nouveau template
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState icon={ClipboardList} title="Aucun résultat" description="Aucun template ne correspond à votre recherche." />
+            )
           ) : (
             <div className="overflow-x-auto">
               <Table>

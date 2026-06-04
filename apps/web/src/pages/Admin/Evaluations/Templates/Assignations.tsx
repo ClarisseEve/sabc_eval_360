@@ -2,7 +2,14 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { templatesApi, periodesApi } from '@/Services/api';
 import { AdminEvaluationsLayout } from '../shared';
+import { PageHeader } from '@/Components/UI/Page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
+import { Badge } from '@/Components/UI/Badge/Badge';
+import { Skeleton } from '@/Components/UI/Skeleton';
+import { EmptyState } from '@/Components/UI/EmptyState';
+import { useToast } from '@/Contexts/ToastContext';
+import { ClipboardList } from 'lucide-react';
 
 interface Periode {
   id_periode: string;
@@ -11,21 +18,28 @@ interface Periode {
 }
 
 interface Template {
-  id_template: string;
-  nom: string;
+  id_template?: string;
+  id?: string;
+  nom?: string;
+  titre?: string;
   statut: string;
 }
 
 interface AssignationCell {
   id_role: string;
   nom_role: string;
-  template_assigne: { id_template: string; nom: string; statut: string } | null;
+  template_assigne: { id_template?: string; id?: string; nom?: string; titre?: string; statut: string } | null;
   est_assigne: boolean;
 }
+
+// Normalisation tolérante aux deux formes de l'API (titre/nom, id/id_template).
+const tplId = (t: { id_template?: string; id?: string } | null | undefined) => t?.id_template ?? t?.id ?? '';
+const tplLabel = (t: { titre?: string; nom?: string } | null | undefined) => t?.titre ?? t?.nom ?? 'Sans titre';
 
 export default function AssignationsPage() {
   const [selectedPeriode, setSelectedPeriode] = useState<string>('');
   const queryClient = useQueryClient();
+  const { success, error } = useToast();
 
   const { data: periodes = [] } = useQuery({
     queryKey: ['periodes'],
@@ -46,13 +60,21 @@ export default function AssignationsPage() {
   const assignMutation = useMutation({
     mutationFn: (data: { id_role: string; id_template: string }) =>
       templatesApi.assignTemplate({ ...data, id_periode: selectedPeriode }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['matrice'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['matrice', selectedPeriode] });
+      success('Template assigné.');
+    },
+    onError: (e: any) => error(e?.response?.data?.message || e?.message || "L'assignation a échoué."),
   });
 
   const removeMutation = useMutation({
     mutationFn: ({ id_role }: { id_role: string }) =>
       templatesApi.removeAssignation(id_role, selectedPeriode),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['matrice'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['matrice', selectedPeriode] });
+      success('Assignation retirée.');
+    },
+    onError: (e: any) => error(e?.response?.data?.message || e?.message || 'Le retrait a échoué.'),
   });
 
   const selectedPeriodeData = periodes.find((p) => p.id_periode === selectedPeriode);
@@ -61,29 +83,28 @@ export default function AssignationsPage() {
 
   return (
     <AdminEvaluationsLayout title="Assignation des templates">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Assignation des templates</h1>
-          <p className="mt-1 text-sm text-sabc-gray-400">
-            Associez un template publié à chaque rôle pour une période donnée.
-          </p>
-        </div>
-        <select
-          className="rounded-md border border-sabc-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sabc-red-primary"
-          value={selectedPeriode}
-          onChange={(e) => setSelectedPeriode(e.target.value)}
-        >
-          <option value="">Sélectionner une période</option>
-          {periodes.map((p) => (
-            <option key={p.id_periode} value={p.id_periode}>
-              {p.nom_periode} {p.est_ouverte ? '(ouverte)' : ''}
-            </option>
-          ))}
-        </select>
-      </div>
+      <PageHeader
+        title="Assignation des templates"
+        description="Associez un template publié à chaque rôle pour une période donnée."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Templates', to: '/admin/evaluations/templates' }, { label: 'Assignations' }]}
+        actions={
+          <select
+            className="rounded-md border border-sabc-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sabc-red-primary"
+            value={selectedPeriode}
+            onChange={(e) => setSelectedPeriode(e.target.value)}
+          >
+            <option value="">Sélectionner une période</option>
+            {periodes.map((p) => (
+              <option key={p.id_periode} value={p.id_periode}>
+                {p.nom_periode} {p.est_ouverte ? '(ouverte)' : ''}
+              </option>
+            ))}
+          </select>
+        }
+      />
 
       {isReadOnly && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        <div className="rounded-md border border-sabc-warning/30 bg-sabc-warning/10 p-3 text-sm text-sabc-gray-800">
           Période ouverte — les modifications sont désactivées.
         </div>
       )}
@@ -95,40 +116,36 @@ export default function AssignationsPage() {
           </CardHeader>
           <CardContent>
             {loadingMatrice ? (
-              <div className="py-8 text-center text-sabc-gray-400">Chargement…</div>
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} height={44} className="w-full rounded-md" />
+                ))}
+              </div>
             ) : matrice.length === 0 ? (
-              <div className="py-8 text-center text-sabc-gray-400">Aucun rôle trouvé pour cette période.</div>
+              <EmptyState icon={ClipboardList} title="Aucun rôle" description="Aucun rôle trouvé pour cette période." />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead className="bg-sabc-gray-50">
-                    <tr>
-                      <th className="border border-sabc-gray-200 px-4 py-3 text-left text-xs font-medium uppercase text-sabc-gray-800">
-                        Rôle
-                      </th>
-                      <th className="border border-sabc-gray-200 px-4 py-3 text-left text-xs font-medium uppercase text-sabc-gray-800">
-                        Template assigné
-                      </th>
-                      <th className="border border-sabc-gray-200 px-4 py-3 text-left text-xs font-medium uppercase text-sabc-gray-800">
-                        Statut
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-sabc-gray-200">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Rôle</TableHead>
+                      <TableHead>Template assigné</TableHead>
+                      <TableHead>Statut</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {matrice.map((row) => (
-                      <tr key={row.id_role} className="hover:bg-sabc-gray-50">
-                        <td className="border border-sabc-gray-200 px-4 py-3 font-medium text-sabc-gray-900">
-                          {row.nom_role}
-                        </td>
-                        <td className="border border-sabc-gray-200 px-4 py-3">
+                      <TableRow key={row.id_role}>
+                        <TableCell className="font-medium text-sabc-gray-900">{row.nom_role}</TableCell>
+                        <TableCell>
                           {isReadOnly ? (
                             <span className={row.est_assigne ? 'text-sabc-success' : 'text-sabc-gray-400'}>
-                              {row.template_assigne?.nom ?? 'Non assigné'}
+                              {row.template_assigne ? tplLabel(row.template_assigne) : 'Non assigné'}
                             </span>
                           ) : (
                             <select
                               className="w-full rounded border border-sabc-gray-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sabc-red-primary"
-                              value={row.template_assigne?.id_template ?? ''}
+                              value={tplId(row.template_assigne)}
                               onChange={(e) => {
                                 if (e.target.value) {
                                   assignMutation.mutate({ id_role: row.id_role, id_template: e.target.value });
@@ -139,28 +156,22 @@ export default function AssignationsPage() {
                             >
                               <option value="">— Non assigné —</option>
                               {publishedTemplates.map((t) => (
-                                <option key={t.id_template} value={t.id_template}>
-                                  {t.nom}
+                                <option key={tplId(t)} value={tplId(t)}>
+                                  {tplLabel(t)}
                                 </option>
                               ))}
                             </select>
                           )}
-                        </td>
-                        <td className="border border-sabc-gray-200 px-4 py-3">
-                          <span
-                            className={`inline-flex rounded px-2 py-1 text-xs font-medium ${
-                              row.est_assigne
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-sabc-gray-100 text-sabc-gray-500'
-                            }`}
-                          >
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={row.est_assigne ? 'success' : 'secondary'}>
                             {row.est_assigne ? 'Assigné' : 'Non assigné'}
-                          </span>
-                        </td>
-                      </tr>
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
