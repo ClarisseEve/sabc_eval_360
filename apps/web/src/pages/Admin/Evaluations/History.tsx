@@ -2,13 +2,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, ClipboardList, Download, Search } from 'lucide-react';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Input } from '@/Components/UI/Input/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
 import { adminApi } from '@/Services/api';
-import { AdminEvaluationsLayout } from './shared';
+import { EmptyState } from '@/Components/UI/EmptyState';
+import { AdminEvaluationsLayout, EvaluationStatusBadge } from './shared';
 import { buildEvaluationContext } from '@/pages/Common/Evaluations/shared';
 
 function formatPerson(user?: any) {
@@ -28,15 +28,6 @@ function normalizeStatus(status?: string) {
   if (raw === 'valide') return 'validé';
   if (raw === 'rejete') return 'rejeté';
   return raw || 'inconnu';
-}
-
-function StatusBadge({ status }: { status?: string }) {
-  const normalized = normalizeStatus(status);
-  if (normalized === 'brouillon') return <Badge variant="outline" className="bg-sabc-gray-100 text-sabc-gray-800">Brouillon</Badge>;
-  if (normalized === 'soumis') return <Badge variant="outline" className="bg-sabc-accent-light text-sabc-accent">Soumis</Badge>;
-  if (normalized === 'validé') return <Badge variant="outline" className="bg-sabc-success/20 text-sabc-success">Validé</Badge>;
-  if (normalized === 'rejeté') return <Badge variant="outline" className="bg-sabc-red-light text-sabc-red-primary">Rejeté</Badge>;
-  return <Badge variant="outline">{normalized}</Badge>;
 }
 
 function Pagination({ meta, onPageChange }: { meta: { total: number; page: number; limit: number; totalPages: number }; onPageChange: (p: number) => void }) {
@@ -149,9 +140,11 @@ export default function EvaluationHistoryPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {filtered.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-sabc-gray-200 p-8 text-center text-sm text-sabc-gray-500">
-              Aucune évaluation ne correspond aux filtres courants.
-            </div>
+            <EmptyState
+              icon={Search}
+              title="Aucune évaluation"
+              description="Aucune évaluation ne correspond aux filtres courants."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -179,7 +172,7 @@ export default function EvaluationHistoryPage() {
                     <TableCell>{row.evaluateur}</TableCell>
                     <TableCell>{row.evalue}</TableCell>
                     <TableCell>{row.periode}</TableCell>
-                    <TableCell><StatusBadge status={row.statut} /></TableCell>
+                    <TableCell><EvaluationStatusBadge statut={row.statut} /></TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm text-sabc-gray-600">
                         <Calendar className="h-3.5 w-3.5" />

@@ -15,8 +15,10 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
 import { usePeriodes } from '@/Hooks/queries/useEvaluationsQuery';
 import { useConfirm } from '@/Contexts/ConfirmContext';
+import { useToast } from '@/Contexts/ToastContext';
 import { periodesApi } from '@/Services/api';
-import { AdminEvaluationsLayout } from './shared';
+import { EmptyState } from '@/Components/UI/EmptyState';
+import { AdminEvaluationsLayout, PeriodeStatusBadge } from './shared';
 
 type FormState = {
   code_periode: string;
@@ -39,14 +41,6 @@ function formatDate(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'N/A';
   return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function statusLabel(raw?: string, estOuverte?: boolean) {
-  const value = String(raw || '').toLowerCase();
-  if (value === 'planifiee') return 'Planifiée';
-  if (value === 'ouverte') return estOuverte ? 'Active ouverte' : 'Active';
-  if (value === 'fermee') return 'Terminée';
-  return raw || 'Inconnue';
 }
 
 function toInputDate(date: Date) {
@@ -116,11 +110,10 @@ export default function AdminPeriodesPage() {
   const { data } = usePeriodes();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [search, setSearch] = React.useState('');
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [form, setForm] = React.useState<FormState>(EMPTY_FORM);
-  const [feedback, setFeedback] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
   const [modalError, setModalError] = React.useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
 
@@ -150,8 +143,7 @@ export default function AdminPeriodesPage() {
       return periodesApi.create(payload);
     },
     onSuccess: async () => {
-      setFeedback(editingId ? 'Période mise à jour.' : 'Période créée.');
-      setError(null);
+      toastSuccess(editingId ? 'Période mise à jour.' : 'Période créée.');
       closeModal();
       await refresh();
     },
@@ -166,26 +158,22 @@ export default function AdminPeriodesPage() {
   const toggleMutation = useMutation({
     mutationFn: (id: string) => periodesApi.toggle(id),
     onSuccess: async () => {
-      setFeedback('Statut de la période mis à jour.');
-      setError(null);
+      toastSuccess('Statut de la période mis à jour.');
       await refresh();
     },
     onError: (mutationError: any) => {
-      setError(mutationError?.response?.data?.message || 'Impossible de modifier le statut.');
-      setFeedback(null);
+      toastError(mutationError?.response?.data?.message || 'Impossible de modifier le statut.');
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => periodesApi.delete(id),
     onSuccess: async () => {
-      setFeedback('Période supprimée.');
-      setError(null);
+      toastSuccess('Période supprimée.');
       await refresh();
     },
     onError: (mutationError: any) => {
-      setError(mutationError?.response?.data?.message || 'Impossible de supprimer la période.');
-      setFeedback(null);
+      toastError(mutationError?.response?.data?.message || 'Impossible de supprimer la période.');
     },
   });
 
@@ -212,7 +200,6 @@ export default function AdminPeriodesPage() {
     setEditingId(null);
     setForm(buildSuggestedForm(periodes));
     setModalError(null);
-    setFeedback(null);
     setIsModalOpen(true);
   }, [periodes]);
 
@@ -226,7 +213,6 @@ export default function AdminPeriodesPage() {
       date_fin: periode.date_fin ? String(periode.date_fin).slice(0, 10) : '',
     });
     setModalError(null);
-    setFeedback(null);
     setIsModalOpen(true);
   }, []);
 
@@ -253,9 +239,6 @@ export default function AdminPeriodesPage() {
         </div>
       </div>
 
-      {feedback ? <div className="rounded-lg border border-sabc-success/30 bg-sabc-success/10 px-4 py-3 text-sm text-sabc-success">{feedback}</div> : null}
-      {error ? <div className="rounded-lg border border-sabc-red-primary/30 bg-sabc-red-light px-4 py-3 text-sm text-sabc-red-primary">{error}</div> : null}
-
       <div className="grid gap-4 md:grid-cols-4">
         <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Total</div><div className="text-2xl font-bold">{stats.total}</div></CardContent></Card>
         <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Ouvertes</div><div className="text-2xl font-bold text-sabc-success">{stats.ouvertes}</div></CardContent></Card>
@@ -270,9 +253,11 @@ export default function AdminPeriodesPage() {
         <CardContent className="space-y-4">
           <Input placeholder="Rechercher une période" value={search} onChange={(e) => setSearch(e.target.value)} />
           {filtered.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-sabc-gray-200 p-8 text-center text-sm text-sabc-gray-500">
-              Aucune période trouvée.
-            </div>
+            <EmptyState
+              icon={Calendar}
+              title={search ? 'Aucun résultat' : 'Aucune période'}
+              description={search ? 'Aucune période ne correspond à votre recherche.' : 'Créez une première période d’évaluation pour démarrer.'}
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -298,7 +283,7 @@ export default function AdminPeriodesPage() {
                         {formatDate(periode.date_debut)} - {formatDate(periode.date_fin)}
                       </div>
                     </TableCell>
-                    <TableCell>{statusLabel(periode.statut, periode.est_ouverte)}</TableCell>
+                    <TableCell><PeriodeStatusBadge statut={periode.statut} estOuverte={periode.est_ouverte} /></TableCell>
                     <TableCell>{periode.nb_evaluations_completees ?? 0} / {periode.nb_evaluations_attendues ?? 0}</TableCell>
                     <TableCell>{Number(periode.taux_completion ?? 0).toFixed(0)}%</TableCell>
                     <TableCell className="text-right">

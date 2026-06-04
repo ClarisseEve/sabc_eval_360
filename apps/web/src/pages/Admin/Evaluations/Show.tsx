@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/C
 import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert/Alert';
 import { Avatar } from '@/Components/UI/Avatar/Avatar';
 import { adminApi } from '@/Services/api';
-import { AdminEvaluationsLayout } from './shared';
+import { AdminEvaluationsLayout, EvaluationStatusBadge } from './shared';
 import {
   buildEvaluationContext,
   formatDisplayName,
@@ -37,27 +37,11 @@ function formatDate(value?: string | null, withTime = false) {
   }).format(date);
 }
 
-const STATUS_VARIANTS: Record<string, { label: string; variant: 'primary' | 'secondary' | 'destructive'; helper: string }> = {
-  brouillon: {
-    label: 'Brouillon',
-    variant: 'secondary',
-    helper: 'Évaluation encore modifiable par son auteur.',
-  },
-  soumis: {
-    label: 'Soumise',
-    variant: 'primary',
-    helper: 'Soumise et en attente d’une décision manager.',
-  },
-  valide: {
-    label: 'Validée',
-    variant: 'primary',
-    helper: 'Évaluation validée dans le cycle courant.',
-  },
-  rejete: {
-    label: 'Rejetée',
-    variant: 'destructive',
-    helper: 'Évaluation renvoyée en brouillon pour correction.',
-  },
+const STATUS_HELPER: Record<string, string> = {
+  brouillon: 'Évaluation encore modifiable par son auteur.',
+  soumis: 'Soumise et en attente d’une décision manager.',
+  valide: 'Évaluation validée dans le cycle courant.',
+  rejete: 'Évaluation renvoyée en brouillon pour correction.',
 };
 
 export default function AdminEvaluationShowPage() {
@@ -68,7 +52,7 @@ export default function AdminEvaluationShowPage() {
   });
 
   const context = useMemo(() => buildEvaluationContext(evaluation), [evaluation]);
-  const statusMeta = STATUS_VARIANTS[evaluation?.statut] ?? STATUS_VARIANTS.brouillon;
+  const statusHelper = STATUS_HELPER[evaluation?.statut] ?? STATUS_HELPER.brouillon;
   const overallScore = evaluation?.note_globale != null ? Number(evaluation.note_globale) : null;
   const decisionDateLabel = evaluation?.statut === 'valide' ? 'Validée le' : 'Dernière décision';
 
@@ -96,14 +80,14 @@ export default function AdminEvaluationShowPage() {
         <CardContent className="grid gap-6 p-6 md:grid-cols-3">
           <div className="space-y-3 md:col-span-2">
             <div className="flex flex-wrap items-center gap-3">
-              <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
+              <EvaluationStatusBadge statut={evaluation?.statut} />
               <span className="text-xs text-sabc-gray-500">ID {evaluation?.id_evaluation ?? evaluation?.id}</span>
               {context.rule.type_evaluation ? <Badge variant="primary">{formatEvaluationType(context.rule.type_evaluation)}</Badge> : null}
             </div>
             <h1 className="text-2xl font-semibold text-sabc-gray-900">
               {context.summary.name || 'Évaluation'}
             </h1>
-            <p className="text-sm text-sabc-gray-600">{statusMeta.helper}</p>
+            <p className="text-sm text-sabc-gray-600">{statusHelper}</p>
           </div>
           <div className="rounded-lg border border-sabc-gray-200 bg-white p-4 text-sm">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-sabc-gray-500">
@@ -173,7 +157,7 @@ export default function AdminEvaluationShowPage() {
                   <div className="mt-1 flex flex-wrap gap-2">
                     <Badge variant="info">{context.criteriaCount} critères</Badge>
                     <Badge variant="info">{context.sections.length} sections</Badge>
-                    <Badge variant="warning">visibilité {context.visibilityDetail}</Badge>
+                    <Badge variant="info">visibilité {context.visibilityDetail}</Badge>
                   </div>
                 </div>
                 <div className="rounded-lg border border-sabc-gray-200 p-3 text-sm">

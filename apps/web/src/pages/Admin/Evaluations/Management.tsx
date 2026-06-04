@@ -19,7 +19,8 @@ import { Progress } from '@/Components/UI/Progress/Progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
 import { analyticsApi } from '@/Services/api';
 import { usePeriodes } from '@/Hooks/queries/useEvaluationsQuery';
-import { AdminEvaluationsLayout } from './shared';
+import { EmptyState } from '@/Components/UI/EmptyState';
+import { AdminEvaluationsLayout, PeriodeStatusBadge } from './shared';
 
 function formatDate(value?: string | null) {
   if (!value) return 'N/A';
@@ -183,9 +184,7 @@ export default function EvaluationManagementPage() {
         </CardHeader>
         <CardContent className="pt-6">
           {periodes.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-sabc-gray-200 p-8 text-center text-sm text-sabc-gray-500">
-              Aucune période disponible.
-            </div>
+            <EmptyState title="Aucune période" description="Aucune période d’évaluation n’est disponible pour le moment." />
           ) : (
             <Table>
               <TableHeader>
@@ -204,7 +203,7 @@ export default function EvaluationManagementPage() {
                       <div className="text-xs text-sabc-gray-500">{periode.code_periode}</div>
                     </TableCell>
                     <TableCell>{formatDate(periode.date_debut)} - {formatDate(periode.date_fin)}</TableCell>
-                    <TableCell>{periode.est_ouverte ? 'Ouverte' : periode.est_cloturee ? 'Fermée' : 'Planifiée'}</TableCell>
+                    <TableCell><PeriodeStatusBadge statut={periode.statut} estOuverte={periode.est_ouverte} /></TableCell>
                     <TableCell>{Number(periode.taux_completion ?? 0).toFixed(0)}%</TableCell>
                   </TableRow>
                 ))}
