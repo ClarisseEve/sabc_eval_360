@@ -31,6 +31,16 @@ type AdminRegionAggregate = {
   badgeText: string;
 };
 
+type RecommendationUser = {
+  matricule: string;
+  nom: string | null;
+  prenom: string | null;
+  role: string | null;
+  role_nom: string | null;
+  id_region: string | null;
+  niveau_hierarchique: number | null;
+};
+
 type ImprovementPlanSnapshot = {
   user: {
     matricule: string;
@@ -51,6 +61,10 @@ function clampLimit(value: unknown, fallback = 100, max = 500): number {
   if (!Number.isFinite(parsed) || parsed < 1) return fallback;
   return Math.min(Math.floor(parsed), max);
 }
+
+// Plafond du nombre d'utilisateurs analysés en une passe pour les plans
+// d'amélioration: borne la mémoire et le nombre de requêtes.
+const IMPROVEMENT_PLAN_MAX_USERS = 500;
 
 const EVALUATION_EFFECTIVE_TS_SQL = `COALESCE(date_validation, date_soumission, created_at, date_creation::timestamp)`;
 const EVALUATION_EFFECTIVE_DATE_SQL = `COALESCE(date_validation::date, date_soumission::date, created_at::date, date_creation)`;
@@ -586,11 +600,37 @@ export class AnalyticsService {
         role: true,
         role_nom: true,
         region_nom: true,
+        // Chargés ici pour que buildImprovementPlanSnapshot n'ait pas à
+        // relire chaque utilisateur depuis MySQL.
+        id_region: true,
+        niveau_hierarchique: true,
       },
       orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
     });
 
-    const snapshots = await this.mapWithConcurrency(users, 8, async (user) =>
+    // Seuls les utilisateurs ayant au moins une évaluation validée peuvent
+    // produire des recommandations: analyser les autres coûtait deux requêtes
+    // PostgreSQL chacun pour un résultat vide.
+    const evaluated = await this.pg.query<{ matricule: string }>(
+      `SELECT DISTINCT evalue_matricule AS matricule
+       FROM evaluations
+       WHERE statut = 'valide' AND notations_json IS NOT NULL`,
+    );
+    const evaluatedMatricules = new Set(evaluated.map((row) => String(row.matricule)));
+    const analysable = users.filter((user) => evaluatedMatricules.has(String(user.matricule)));
+
+    // Plafond explicite: sans lui, la mémoire et le nombre de requêtes croissent
+    // linéairement avec l'effectif. La troncature est remontée dans la réponse
+    // plutôt que silencieuse.
+    const analysed = analysable.slice(0, IMPROVEMENT_PLAN_MAX_USERS);
+    const truncated = analysable.length - analysed.length;
+    if (truncated > 0) {
+      this.logger.warn(
+        `Plans d'amélioration: ${analysed.length} utilisateurs analysés sur ${analysable.length} (plafond ${IMPROVEMENT_PLAN_MAX_USERS}).`,
+      );
+    }
+
+    const snapshots = await this.mapWithConcurrency(analysed, 8, async (user) =>
       this.buildImprovementPlanSnapshot(user, 'admin'),
     );
     const allRows = this.buildImprovementRows(snapshots);
@@ -629,6 +669,10 @@ export class AnalyticsService {
       totals: {
         users_filtered: users.length,
         users_analyzed: snapshots.length,
+        // Utilisateurs éligibles (au moins une évaluation validée) et nombre
+        // écarté par le plafond: la troncature doit rester visible côté UI.
+        users_evaluable: analysable.length,
+        users_truncated: truncated,
         recommendations_total: filteredRows.length,
         recommendations_total_all_types: allRows.length,
         high_priority: highPriorityCount,
@@ -928,34 +972,44 @@ export class AnalyticsService {
   }
 
   // ─── Recommandations personnalisées ─────────────────────────────────────
+  /**
+   * `knownUser` évite un aller-retour MySQL quand l'appelant a déjà chargé
+   * l'utilisateur — c'est le cas des plans d'amélioration, qui parcourent des
+   * centaines d'utilisateurs déjà en mémoire. Le résultat est identique, donc
+   * la clé de cache reste inchangée.
+   */
   async getRecommandations(
     matricule: string,
     audience: AnalyticsVisibilityAudience = 'evaluated',
+    knownUser?: RecommendationUser | null,
   ) {
     return this.cache.getOrCompute(`analytics:reco:${audience}:${matricule}`, 300, () =>
-      this._getRecommandations(matricule, audience),
+      this._getRecommandations(matricule, audience, knownUser),
     );
   }
 
   private async _getRecommandations(
     matricule: string,
     audience: AnalyticsVisibilityAudience,
+    knownUser?: RecommendationUser | null,
   ) {
     const [axes, scores, user] = await Promise.all([
       this.getAxesAmelioration(matricule, audience),
       this.getScoresUtilisateur(matricule, audience),
-      this.prisma.utilisateur.findUnique({
-        where: { matricule },
-        select: {
-          matricule: true,
-          nom: true,
-          prenom: true,
-          role: true,
-          role_nom: true,
-          id_region: true,
-          niveau_hierarchique: true,
-        },
-      }),
+      knownUser
+        ? Promise.resolve(knownUser)
+        : this.prisma.utilisateur.findUnique({
+            where: { matricule },
+            select: {
+              matricule: true,
+              nom: true,
+              prenom: true,
+              role: true,
+              role_nom: true,
+              id_region: true,
+              niveau_hierarchique: true,
+            },
+          }),
     ]);
 
     const recommandations: Array<{
@@ -1271,7 +1325,17 @@ export class AnalyticsService {
   ): Promise<ImprovementPlanSnapshot> {
     const [axes, recommandations] = await Promise.all([
       this.getAxesAmelioration(String(user.matricule), audience),
-      this.getRecommandations(String(user.matricule), audience),
+      // L'utilisateur est déjà chargé: le passer évite une requête MySQL par
+      // utilisateur analysé.
+      this.getRecommandations(String(user.matricule), audience, {
+        matricule: String(user.matricule),
+        nom: user.nom ?? null,
+        prenom: user.prenom ?? null,
+        role: user.role ?? null,
+        role_nom: user.role_nom ?? null,
+        id_region: user.id_region ?? null,
+        niveau_hierarchique: user.niveau_hierarchique ?? null,
+      }),
     ]);
 
     return {

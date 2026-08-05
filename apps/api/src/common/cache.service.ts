@@ -17,12 +17,17 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   private readonly cacheDriver: 'auto' | 'memory' | 'redis';
   private readonly redisUrl: string | null;
   private readonly keyPrefix: string;
+  private readonly memoryMaxEntries: number;
 
   constructor(private readonly configService: ConfigService) {
     const driver = this.configService.get<string>('CACHE_DRIVER', 'auto').toLowerCase();
     this.cacheDriver = driver === 'redis' || driver === 'memory' ? driver : 'auto';
     this.redisUrl = this.configService.get<string>('REDIS_URL') ?? null;
     this.keyPrefix = this.configService.get<string>('CACHE_PREFIX', 'sabc_eval360');
+    this.memoryMaxEntries = Math.max(
+      1,
+      Number(this.configService.get<number>('CACHE_MEMORY_MAX_ENTRIES', 500)),
+    );
   }
 
   async onModuleInit(): Promise<void> {
@@ -80,11 +85,31 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     return entry.data as T;
   }
 
+  /**
+   * Le cache mémoire ne se purgeait qu'à la lecture d'une clé expirée: une
+   * entrée écrite puis jamais relue restait indéfiniment. Comme certaines clés
+   * sont par utilisateur (analytics:scores:<matricule>), la Map grossissait
+   * sans borne — sur le chemin de repli, c'est-à-dire quand Redis est indisponible.
+   */
   private setInMemory<T>(key: string, data: T, ttlSeconds: number): void {
     this.store.set(key, {
       data,
       expiresAt: Date.now() + ttlSeconds * 1000,
     });
+
+    if (this.store.size <= this.memoryMaxEntries) return;
+
+    const now = Date.now();
+    for (const [storedKey, entry] of this.store) {
+      if (now > entry.expiresAt) this.store.delete(storedKey);
+    }
+
+    // Si la purge des expirées ne suffit pas, on évince les plus anciennes:
+    // une Map itère dans l'ordre d'insertion.
+    for (const storedKey of this.store.keys()) {
+      if (this.store.size <= this.memoryMaxEntries) break;
+      this.store.delete(storedKey);
+    }
   }
 
   async get<T>(key: string): Promise<T | null> {

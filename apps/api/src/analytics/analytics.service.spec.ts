@@ -144,24 +144,54 @@ describe('AnalyticsService', () => {
       );
     });
 
+    const improvementUser = {
+      matricule: 'M001',
+      nom: 'Nom',
+      prenom: 'Prénom',
+      role: 'CSC',
+      role_nom: 'CSC',
+      region_nom: 'Région',
+      id_region: 'R1',
+      niveau_hierarchique: 3,
+    };
+
     it('utilise policy.admin pour les plans d’amélioration administrateur', async () => {
-      mockPrisma.utilisateur.findMany.mockResolvedValue([
-        {
-          matricule: 'M001',
-          nom: 'Nom',
-          prenom: 'Prénom',
-          role: 'CSC',
-          role_nom: 'CSC',
-          region_nom: 'Région',
-        },
-      ]);
+      mockPrisma.utilisateur.findMany.mockResolvedValue([improvementUser]);
+      // Liste des utilisateurs ayant au moins une évaluation validée.
+      mockPg.query.mockResolvedValue([{ matricule: 'M001' }]);
       jest.spyOn(service, 'getAxesAmelioration').mockResolvedValue({ axes_amelioration: [] } as any);
       jest.spyOn(service, 'getRecommandations').mockResolvedValue({ recommandations: [] } as any);
 
       await service.getImprovementPlans();
 
       expect(service.getAxesAmelioration).toHaveBeenCalledWith('M001', 'admin');
-      expect(service.getRecommandations).toHaveBeenCalledWith('M001', 'admin');
+      // L'utilisateur déjà chargé est transmis pour éviter une requête MySQL
+      // supplémentaire par utilisateur analysé.
+      expect(service.getRecommandations).toHaveBeenCalledWith(
+        'M001',
+        'admin',
+        expect.objectContaining({ matricule: 'M001', id_region: 'R1' }),
+      );
+    });
+
+    it('n’analyse pas les utilisateurs sans évaluation validée', async () => {
+      mockPrisma.utilisateur.findMany.mockResolvedValue([
+        improvementUser,
+        { ...improvementUser, matricule: 'M002' },
+      ]);
+      // Seul M001 a une évaluation validée.
+      mockPg.query.mockResolvedValue([{ matricule: 'M001' }]);
+      jest.spyOn(service, 'getAxesAmelioration').mockResolvedValue({ axes_amelioration: [] } as any);
+      jest.spyOn(service, 'getRecommandations').mockResolvedValue({ recommandations: [] } as any);
+
+      const result = await service.getImprovementPlans();
+
+      expect(service.getAxesAmelioration).toHaveBeenCalledTimes(1);
+      expect(service.getAxesAmelioration).toHaveBeenCalledWith('M001', 'admin');
+      expect(result.totals.users_filtered).toBe(2);
+      expect(result.totals.users_evaluable).toBe(1);
+      expect(result.totals.users_analyzed).toBe(1);
+      expect(result.totals.users_truncated).toBe(0);
     });
 
     it('filtre le classement selon son audience', async () => {
