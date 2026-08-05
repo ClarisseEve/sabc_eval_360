@@ -3,6 +3,16 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { analyticsApi } from '@/Services/api';
 import { useAdminImprovementPlansTabData } from '@/Hooks/queries/useAdminDashboardTabs';
 import { Card, CardContent } from '@/Components/UI/Card/Card';
+import { Button } from '@/Components/UI/Button/Button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/Components/UI/Dialog/Dialog';
+import { useToast } from '@/Contexts/ToastContext';
 import {
   ImprovementPlansFiltersSection,
   ImprovementPlansTotalsSection,
@@ -38,12 +48,20 @@ export default function ImprovementPlansTab() {
   });
 
   const queryClient = useQueryClient();
+  const { success, error } = useToast();
+  const [rejectTarget, setRejectTarget] = React.useState<string | null>(null);
+  const [rejectMotif, setRejectMotif] = React.useState('');
+
+  const readError = (e: any, fallback: string) =>
+    typeof e?.response?.data?.message === 'string' ? e.response.data.message : fallback;
 
   const validateMutation = useMutation({
     mutationFn: (id: string) => analyticsApi.validateRecommandation(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['analytics', 'admin', 'improvement-plans'] });
+      success('Recommandation validée.');
     },
+    onError: (e: any) => error(readError(e, "La recommandation n'a pas pu être validée.")),
   });
 
   const rejectMutation = useMutation({
@@ -51,13 +69,26 @@ export default function ImprovementPlansTab() {
       analyticsApi.rejectRecommandation(id, motif),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['analytics', 'admin', 'improvement-plans'] });
+      closeReject();
+      success('Recommandation rejetée.');
     },
+    onError: (e: any) => error(readError(e, "La recommandation n'a pas pu être rejetée.")),
   });
 
+  function closeReject() {
+    setRejectTarget(null);
+    setRejectMotif('');
+    rejectMutation.reset();
+  }
+
   function handleReject(id: string) {
-    const motif = window.prompt('Motif du rejet :');
-    if (motif === null) return;
-    rejectMutation.mutate({ id, motif: motif.trim() || 'Non précisé' });
+    setRejectTarget(id);
+    setRejectMotif('');
+  }
+
+  function submitReject() {
+    if (!rejectTarget) return;
+    rejectMutation.mutate({ id: rejectTarget, motif: rejectMotif.trim() || 'Non précisé' });
   }
 
   return (
@@ -105,6 +136,45 @@ export default function ImprovementPlansTab() {
           />
         </>
       ) : null}
+
+      {/* Remplace un window.prompt: bloquant, non stylé et filtré par certains
+          navigateurs. */}
+      <Dialog
+        open={rejectTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !rejectMutation.isPending) closeReject();
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rejeter cette recommandation ?</DialogTitle>
+            <DialogDescription>
+              Le motif est conservé dans l'historique de la recommandation.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            value={rejectMotif}
+            onChange={(e) => setRejectMotif(e.target.value)}
+            rows={4}
+            autoFocus
+            placeholder="Motif du rejet (facultatif)"
+            className="w-full rounded-md border border-sabc-gray-200 px-3 py-2 text-sm focus:border-sabc-red-primary focus:outline-none"
+          />
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={closeReject} disabled={rejectMutation.isPending}>
+              Annuler
+            </Button>
+            <Button
+              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+              onClick={submitReject}
+              loading={rejectMutation.isPending}
+              disabled={rejectMutation.isPending}
+            >
+              Rejeter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -149,7 +149,7 @@ export default function EvaluationManagementPage() {
       icon: History,
     },
     {
-      to: '/admin/dashboard?tab=overview',
+      to: '/admin/analytics?tab=overview',
       title: 'Analytics',
       description: 'Contrôler les tendances, graphes et anomalies.',
       icon: Radar,

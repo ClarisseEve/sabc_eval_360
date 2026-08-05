@@ -55,8 +55,6 @@ export interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string, remember?: boolean) => Promise<void>;
   logout: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (email: string, password: string, token: string) => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
 }
 
@@ -130,13 +128,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialUse
     }
   }, []);
 
-  const forgotPassword = useCallback(async (email: string) => {
-    await api.post('/auth/forgot-password', { email });
-  }, []);
-
-  const resetPassword = useCallback(async (email: string, password: string, token: string) => {
-    await api.post('/auth/reset-password', { email, password, password_confirmation: password, token });
-  }, []);
+  // Pas de forgotPassword/resetPassword: la réinitialisation est assurée par le
+  // service informatique (cf. pages/Auth/ForgotPassword) et l'API n'expose
+  // aucune route correspondante.
 
   const updateProfile = useCallback(async (data: Partial<User>) => {
     const res = await api.patch<Partial<User>>('/auth/profile', data);
@@ -151,8 +145,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialUse
     isLoading,
     login,
     logout,
-    forgotPassword,
-    resetPassword,
     updateProfile,
   };
 

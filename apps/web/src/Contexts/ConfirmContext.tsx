@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -28,11 +28,23 @@ export const ConfirmProvider: React.FC<{ children: ReactNode }> = ({ children })
   const resolver = useRef<((value: boolean) => void) | null>(null);
 
   const confirm = useCallback<ConfirmFn>((opts) => {
+    // Un second confirm() écraserait le resolver du premier, dont l'appelant
+    // resterait bloqué indéfiniment sur son await: on le tranche à false.
+    resolver.current?.(false);
+    resolver.current = null;
     setOptions(opts);
     setOpen(true);
     return new Promise<boolean>((resolve) => {
       resolver.current = resolve;
     });
+  }, []);
+
+  // Même précaution au démontage du provider.
+  useEffect(() => {
+    return () => {
+      resolver.current?.(false);
+      resolver.current = null;
+    };
   }, []);
 
   const settle = useCallback((value: boolean) => {

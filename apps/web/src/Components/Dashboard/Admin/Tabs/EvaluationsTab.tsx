@@ -337,7 +337,7 @@ const EvaluationsTab: React.FC = () => {
               </div>
             </Link>
 
-            <Link href="/admin/dashboard?tab=overview" className="group">
+            <Link href="/admin/analytics?tab=overview" className="group">
               <div className="w-full h-20 border border-sabc-gray-200 rounded-lg p-4 hover:border-sabc-red-primary hover:shadow-md transition-all flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <BarChart3 className="w-6 h-6 text-sabc-success" />

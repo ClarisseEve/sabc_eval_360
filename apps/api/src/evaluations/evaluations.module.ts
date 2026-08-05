@@ -12,10 +12,14 @@ import { EvaluationsConsultationController } from './evaluations-consultation.co
 
 @Module({
   controllers: [
-    EvaluationsController,
+    // EvaluationsConsultationController partage le préfixe 'evaluations' et
+    // expose des chemins littéraux (recues, donnees). Il doit être enregistré
+    // avant EvaluationsController, dont le @Get(':id') capturerait sinon
+    // « recues » et « donnees » comme identifiants et renverrait une 404.
+    EvaluationsConsultationController,
     EligibilityController,
     ContreEvaluationController,
-    EvaluationsConsultationController,
+    EvaluationsController,
   ],
   providers: [
     EvaluationsService,

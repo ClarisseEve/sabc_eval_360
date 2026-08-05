@@ -31,11 +31,6 @@ export default function SettingsLayout({ children }: Readonly<SettingsLayoutProp
       href: '/settings/appearance',
       active: url.startsWith('/settings/appearance'),
     },
-    {
-      title: 'Notifications',
-      href: '/settings/notifications',
-      active: url.startsWith('/settings/notifications'),
-    },
   ];
 
   return (

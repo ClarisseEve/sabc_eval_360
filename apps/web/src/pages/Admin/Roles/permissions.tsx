@@ -16,12 +16,14 @@ import {
 } from '@/Components/UI/Dialog/Dialog';
 import { adminApi } from '@/Services/api';
 import { useAdminRoleRules, useAdminRoles } from '@/Hooks/queries';
+import { useToast } from '@/Contexts/ToastContext';
 import { AdminRolesLayout } from './shared';
 
 export default function RolesPermissions() {
   const { data: rolesData } = useAdminRoles();
   const { data: rulesData } = useAdminRoleRules();
   const queryClient = useQueryClient();
+  const { success, error } = useToast();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -36,6 +38,8 @@ export default function RolesPermissions() {
   const closeModal = () => {
     setOpen(false);
     setForm({ nom: '', description: '', criteres: '[{"nom":"Impact","poids":50},{"nom":"Execution","poids":50}]' });
+    // Sinon l'erreur précédente reste affichée à la réouverture.
+    createMutation.reset();
   };
 
   const createMutation = useMutation({
@@ -60,7 +64,14 @@ export default function RolesPermissions() {
     mutationFn: async (id: string) => adminApi.roles.toggleRegle(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'roles', 'regles'] });
+      success('Règle mise à jour.');
     },
+    onError: (e: any) =>
+      error(
+        typeof e?.response?.data?.message === 'string'
+          ? e.response.data.message
+          : "La règle n'a pas pu être modifiée.",
+      ),
   });
 
   const filteredRules = useMemo(() => {
@@ -118,7 +129,12 @@ export default function RolesPermissions() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" onClick={() => toggleMutation.mutate(rule.id_regle)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={toggleMutation.isPending}
+                          onClick={() => toggleMutation.mutate(rule.id_regle)}
+                        >
                           Basculer
                         </Button>
                       </TableCell>

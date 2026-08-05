@@ -59,6 +59,7 @@ const AdminTemplatesIndex = lazy(() => import('./pages/Admin/Evaluations/Templat
 const AdminTemplatesCreate = lazy(() => import('./pages/Admin/Evaluations/Templates/Create'));
 const AdminTemplatesEdit = lazy(() => import('./pages/Admin/Evaluations/Templates/Edit'));
 const AdminTemplatesShow = lazy(() => import('./pages/Admin/Evaluations/Templates/Show'));
+const AdminTemplatesAssignations = lazy(() => import('./pages/Admin/Evaluations/Templates/Assignations'));
 
 // Admin: Remplacements
 const AdminRemplacements = lazy(() => import('./pages/Admin/Remplacements/index'));
@@ -211,6 +212,7 @@ function App() {
                       {/* ── Admin: Templates ── */}
                       <Route path="/admin/evaluations/templates" element={<A><AdminTemplatesIndex /></A>} />
                       <Route path="/admin/evaluations/templates/create" element={<A><AdminTemplatesCreate /></A>} />
+                      <Route path="/admin/evaluations/templates/assignations" element={<A><AdminTemplatesAssignations /></A>} />
                       <Route path="/admin/evaluations/templates/:id/edit" element={<A><AdminTemplatesEdit /></A>} />
                       <Route path="/admin/evaluations/templates/:id" element={<A><AdminTemplatesShow /></A>} />
 
@@ -286,7 +288,8 @@ function App() {
                       <Route path="/evaluations/recues" element={<G><CommonEvaluationsRecues /></G>} />
                       <Route path="/evaluations/donnees" element={<G><CommonEvaluationsDonnees /></G>} />
                       <Route path="/evaluations/historique" element={<G><CommonEvaluationsHistorique /></G>} />
-                      <Route path="/evaluations/history" element={<G><CommonEvaluationsIndex /></G>} />
+                      {/* Alias historique: rendait le hub au lieu de l'historique. */}
+                      <Route path="/evaluations/history" element={<Navigate to="/evaluations/historique" replace />} />
                       <Route path="/evaluations/:id" element={<G><CommonEvaluationsShow /></G>} />
                       <Route path="/evaluations/:id/edit" element={<G><CommonEvaluationsEdit /></G>} />
                       {/* Legacy paths (redirects from old nav) */}

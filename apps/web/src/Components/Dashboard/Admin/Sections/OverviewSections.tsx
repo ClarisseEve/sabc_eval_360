@@ -395,7 +395,7 @@ export function TopRolesSection({ topRoles }: { topRoles: TopRoleEntry[] }) {
               </div>
               <div className="flex items-center gap-3">
                 <Badge variant="info">{Number(role.avgScore ?? 0).toFixed(2)}/5</Badge>
-                <Link to="/admin/dashboard?tab=roles">
+                <Link to="/admin/analytics?tab=roles">
                   <Button variant="outline" size="sm">Analyse par rôle</Button>
                 </Link>
               </div>

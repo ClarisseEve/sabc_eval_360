@@ -16,6 +16,8 @@ import {
   DialogTitle,
 } from '@/Components/UI/Dialog/Dialog';
 import { normalizePublishedRule } from '@/utils/rules';
+import { useConfirm } from '@/Contexts/ConfirmContext';
+import { useToast } from '@/Contexts/ToastContext';
 import type { PublishedRule } from '@/types/rules';
 
 const EVALUATION_TYPES = ['auto', 'pairs', 'descendante', 'ascendante', '360'] as const;
@@ -32,16 +34,19 @@ type ViewMode = 'matrix' | 'list';
 
 // State for the cell-driven modal: which evaluator/evaluatee couple, and an
 // existing rule if one already matches the selected type.
+// Volontairement sans la règle elle-même: elle est relue depuis l'index au
+// rendu, sinon la modale garderait un état périmé après un basculement.
 interface CellSelection {
   evaluator: string;
   evaluatee: string;
   type: string;
-  rule: PublishedRule | null;
 }
 
 export default function RulesIndexPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const { success, error } = useToast();
 
   const [view, setView] = React.useState<ViewMode>('matrix');
   const [selectedType, setSelectedType] = React.useState<string>(EVALUATION_TYPES[0]);
@@ -93,11 +98,16 @@ export default function RulesIndexPage() {
     [ruleIndex],
   );
 
+  const readError = (e: any, fallback: string) =>
+    typeof e?.response?.data?.message === 'string' ? e.response.data.message : fallback;
+
   const toggleMutation = useMutation({
     mutationFn: (id: string) => adminApi.roles.toggleRegle(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'roles', 'regles'] });
+      success('Règle mise à jour.');
     },
+    onError: (e: any) => error(readError(e, "La règle n'a pas pu être modifiée.")),
   });
 
   const deleteMutation = useMutation({
@@ -105,8 +115,20 @@ export default function RulesIndexPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'roles', 'regles'] });
       setSelection(null);
+      success('Règle supprimée.');
     },
+    onError: (e: any) => error(readError(e, "La règle n'a pas pu être supprimée.")),
   });
+
+  const handleDelete = async (rule: PublishedRule) => {
+    const confirmed = await confirm({
+      title: 'Supprimer cette règle ?',
+      description: `« ${rule.nom_regle} » sera définitivement supprimée. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+      variant: 'destructive',
+    });
+    if (confirmed) deleteMutation.mutate(rule.id_regle);
+  };
 
   const activeCount = rules.filter((rule) => rule.est_active).length;
   const compatibleForType = rules.filter(
@@ -114,12 +136,7 @@ export default function RulesIndexPage() {
   ).length;
 
   const openCell = (evaluator: string, evaluatee: string) => {
-    setSelection({
-      evaluator,
-      evaluatee,
-      type: selectedType,
-      rule: findRule(evaluator, evaluatee, selectedType),
-    });
+    setSelection({ evaluator, evaluatee, type: selectedType });
   };
 
   const goToCreate = (evaluator?: string, evaluatee?: string) => {
@@ -400,10 +417,15 @@ export default function RulesIndexPage() {
         </Card>
       )}
 
-      {/* Cell-driven modal: edit/toggle/delete an existing rule, or create one. */}
+      {/* Cell-driven modal: edit/toggle/delete an existing rule, or create one.
+          La règle est relue depuis l'index à chaque rendu: une copie figée dans
+          `selection` afficherait encore l'ancien statut après un basculement. */}
       <Dialog open={selection !== null} onOpenChange={(open) => !open && setSelection(null)}>
         <DialogContent>
           {selection ? (
+            (() => {
+              const currentRule = findRule(selection.evaluator, selection.evaluatee, selection.type);
+              return (
             <>
               <DialogHeader>
                 <DialogTitle>
@@ -415,29 +437,29 @@ export default function RulesIndexPage() {
                 </DialogDescription>
               </DialogHeader>
 
-              {selection.rule ? (
+              {currentRule ? (
                 <div className="space-y-4">
                   <div className="rounded-xl border border-sabc-gray-200 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="font-medium text-sabc-gray-900">{selection.rule.nom_regle}</div>
+                        <div className="font-medium text-sabc-gray-900">{currentRule.nom_regle}</div>
                         <div className="mt-1 text-sm text-sabc-gray-400">
-                          {selection.rule.description || 'Sans description'}
+                          {currentRule.description || 'Sans description'}
                         </div>
                       </div>
                       <Badge
                         className={
-                          selection.rule.est_active
+                          currentRule.est_active
                             ? 'bg-sabc-success text-white'
                             : 'bg-sabc-gray-400 text-white'
                         }
                       >
-                        {selection.rule.est_active ? 'Active' : 'Inactive'}
+                        {currentRule.est_active ? 'Active' : 'Inactive'}
                       </Badge>
                     </div>
                     <div className="mt-3 text-sm text-sabc-gray-600">
-                      {selection.rule.criteres.length} critères ·{' '}
-                      {selection.rule.sections.map((s) => s.titre).slice(0, 3).join(', ') || 'aucune section'}
+                      {currentRule.criteres.length} critères ·{' '}
+                      {currentRule.sections.map((s) => s.titre).slice(0, 3).join(', ') || 'aucune section'}
                     </div>
                   </div>
 
@@ -446,7 +468,7 @@ export default function RulesIndexPage() {
                       variant="outline"
                       className="text-sabc-error hover:bg-red-50"
                       loading={deleteMutation.isPending}
-                      onClick={() => selection.rule && deleteMutation.mutate(selection.rule.id_regle)}
+                      onClick={() => handleDelete(currentRule)}
                     >
                       <Trash2 size={15} className="mr-1.5" />
                       Supprimer
@@ -454,18 +476,16 @@ export default function RulesIndexPage() {
                     <Button
                       variant="outline"
                       loading={toggleMutation.isPending}
-                      onClick={() =>
-                        selection.rule && toggleMutation.mutate(selection.rule.id_regle)
-                      }
+                      disabled={toggleMutation.isPending}
+                      onClick={() => toggleMutation.mutate(currentRule.id_regle)}
                     >
                       <Power size={15} className="mr-1.5" />
-                      {selection.rule.est_active ? 'Désactiver' : 'Activer'}
+                      {currentRule.est_active ? 'Désactiver' : 'Activer'}
                     </Button>
                     <Button
                       className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
                       onClick={() =>
-                        selection.rule &&
-                        navigate(`/admin/evaluations/regles/${selection.rule.id_regle}/edit`)
+                        navigate(`/admin/evaluations/regles/${currentRule.id_regle}/edit`)
                       }
                     >
                       <Pencil size={15} className="mr-1.5" />
@@ -494,6 +514,8 @@ export default function RulesIndexPage() {
                 </div>
               )}
             </>
+              );
+            })()
           ) : null}
         </DialogContent>
       </Dialog>

@@ -408,13 +408,6 @@ export const analyticsApi = {
     api.get('/analytics/tendances', { params }),
 };
 
-export const utilisateursApi = {
-  list: (params?: any) => api.get('/utilisateurs', { params }),
-  get: (matricule: string) => api.get(`/utilisateurs/${matricule}`),
-  getSubordonnes: (matricule: string) => api.get(`/utilisateurs/${matricule}/subordonnes`),
-  remplacantsDisponibles: (data: any) => api.post('/utilisateurs/remplacants-disponibles', data),
-};
-
 export const notificationsApi = {
   list: (params?: { non_lues?: boolean; limit?: number }) => api.get('/notifications', { params }),
   count: () => api.get<{ count: number }>('/notifications/count'),

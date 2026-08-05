@@ -22,6 +22,7 @@ import {
 import { adminApi } from '@/Services/api';
 import { useAdminRoles } from '@/Hooks/queries';
 import { useConfirm } from '@/Contexts/ConfirmContext';
+import { useToast } from '@/Contexts/ToastContext';
 import { AdminRolesLayout } from './shared';
 
 const initialForm = {
@@ -41,6 +42,7 @@ export default function RolesIndex() {
   const { data } = useAdminRoles();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const { success, error } = useToast();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
@@ -49,6 +51,9 @@ export default function RolesIndex() {
   const closeModal = () => {
     setOpen(false);
     setForm(initialForm);
+    // Sans reset, l'erreur de la tentative précédente s'affiche encore à la
+    // réouverture de la modale alors que rien n'a été soumis.
+    createMutation.reset();
   };
 
   const createMutation = useMutation({
@@ -75,7 +80,16 @@ export default function RolesIndex() {
     mutationFn: async (id: string) => adminApi.roles.delete(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'roles'] });
+      success('Rôle supprimé.');
     },
+    // Un rôle rattaché à des utilisateurs est refusé par l'API: sans ce retour,
+    // la ligne restait affichée et l'échec passait inaperçu.
+    onError: (e: any) =>
+      error(
+        typeof e?.response?.data?.message === 'string'
+          ? e.response.data.message
+          : "Ce rôle n'a pas pu être supprimé.",
+      ),
   });
 
   const filteredRoles = useMemo(() => {

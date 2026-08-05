@@ -109,6 +109,9 @@ export function normalizeRole(input?: string | null): Role {
   if (r === 'TMO' || r.includes('TRADE MARKETING OPERATOR')) return 'TMO';
   if (r === 'SRMO' || r.includes('SUPERVISEUR REGIONAL MARKETING OPERATIONNEL')) return 'SRMO';
   if (r === 'AS' || r.includes('ASSISTANT SUPERVISEUR SPONSORING')) return 'AS';
+  // Doit rester après AS: « assistant superviseur sponsoring » contient aussi
+  // « superviseur sponsoring ».
+  if (r === 'SS' || r.includes('SUPERVISEUR SPONSORING')) return 'SS';
   // Fallback conservateur
   return 'CSC';
 }

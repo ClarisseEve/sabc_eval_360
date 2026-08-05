@@ -110,8 +110,6 @@ export const useAuth = () => {
     login,
     logout,
     errors,
-    forgotPassword: auth.forgotPassword,
-    resetPassword: auth.resetPassword,
     updateProfile: auth.updateProfile,
     hasPermission,
     canEvaluate

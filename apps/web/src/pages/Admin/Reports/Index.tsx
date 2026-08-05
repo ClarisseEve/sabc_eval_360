@@ -24,9 +24,13 @@ export default function ReportsIndex() {
   const rapports = (data as any)?.data ?? [];
 
   const handleCreate = async () => {
-    if (!newTitre.trim()) return;
-    const res = await createReport.mutateAsync(newTitre.trim());
-    navigate(`/admin/reports/${(res as any).data.id_rapport}/edit`);
+    if (!newTitre.trim() || createReport.isPending) return;
+    try {
+      const res = await createReport.mutateAsync(newTitre.trim());
+      navigate(`/admin/reports/${(res as any).data.id_rapport}/edit`);
+    } catch (e: any) {
+      error(e?.response?.data?.message || e?.message || 'La création du rapport a échoué.');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -73,8 +77,12 @@ export default function ReportsIndex() {
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             autoFocus
           />
-          <button onClick={handleCreate} className="px-4 py-2 bg-sabc-red-primary text-white rounded text-sm hover:bg-sabc-red-dark">
-            Créer
+          <button
+            onClick={handleCreate}
+            disabled={createReport.isPending}
+            className="px-4 py-2 bg-sabc-red-primary text-white rounded text-sm hover:bg-sabc-red-dark disabled:opacity-60"
+          >
+            {createReport.isPending ? 'Création…' : 'Créer'}
           </button>
           <button onClick={() => setShowCreate(false)} className="px-3 py-2 border border-gray-200 rounded text-sm hover:bg-gray-50">
             Annuler

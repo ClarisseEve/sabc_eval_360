@@ -1036,8 +1036,8 @@ function AdminAxesPage() {
 
           <QuickActionsCard
             actions={[
-              { label: 'Dashboard admin', href: '/admin/dashboard?tab=improvement' },
-              { label: 'Recherche 360°', href: '/admin/dashboard?tab=individual' },
+              { label: 'Dashboard admin', href: '/admin/analytics?tab=improvement' },
+              { label: 'Recherche 360°', href: '/admin/analytics?tab=individual' },
             ]}
           />
         </>
