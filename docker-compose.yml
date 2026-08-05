@@ -27,12 +27,12 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET est requis — copiez .env.example vers .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      DATABASE_URL: ${DATABASE_URL_DOCKER:-mysql://sabc_user:secret@mysql:3306/sabc_core}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:?DATABASE_URL_DOCKER est requis — copiez .env.example vers .env}
       PG_HOST: postgres
       PG_PORT: 5432
       PG_DATABASE: ${PG_DATABASE:-sabc_business}
       PG_USER: ${PG_USER:-sabc_user}
-      PG_PASSWORD: ${PG_PASSWORD:-***REMOVED***}
+      PG_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD est requis — copiez .env.example vers .env}
       CACHE_DRIVER: ${CACHE_DRIVER:-redis}
       REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
       CACHE_PREFIX: ${CACHE_PREFIX:-sabc_eval360}
@@ -67,17 +67,17 @@ services:
     container_name: sabc-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-***REMOVED***}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD est requis — copiez .env.example vers .env}
       MYSQL_DATABASE: sabc_core
       MYSQL_USER: sabc_user
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-***REMOVED***}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD est requis — copiez .env.example vers .env}
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-***REMOVED***}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -91,7 +91,7 @@ services:
     environment:
       POSTGRES_DB: ${PG_DATABASE:-sabc_business}
       POSTGRES_USER: ${PG_USER:-sabc_user}
-      POSTGRES_PASSWORD: ${PG_PASSWORD:-***REMOVED***}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD est requis — copiez .env.example vers .env}
     ports:
       - "${PG_PORT_HOST:-5432}:5432"
     volumes:

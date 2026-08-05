@@ -21,6 +21,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Vérifier l'absence de secrets versionnés
+        run: ./scripts/check-secrets.sh
+
   frontend:
     name: Frontend checks
     runs-on: ubuntu-latest
@@ -66,8 +77,8 @@ jobs:
         working-directory: apps/api
     env:
       NODE_ENV: test
-      DATABASE_URL: mysql://sabc:***REMOVED***@127.0.0.1:3306/sabc_eval360
-      JWT_SECRET: ***REMOVED***-with-at-least-32-characters
+      DATABASE_URL: mysql://sabc:ci-${{ github.run_id }}@127.0.0.1:3306/sabc_eval360
+      JWT_SECRET: ci-jwt-${{ github.run_id }}-${{ github.run_attempt }}-padding-32chars
       CACHE_DRIVER: memory
     steps:
       - name: Checkout
@@ -117,14 +128,14 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_ROOT_PASSWORD: ci-root-${{ github.run_id }}
           MYSQL_DATABASE: sabc_eval360
           MYSQL_USER: sabc
-          MYSQL_PASSWORD: ***REMOVED***
+          MYSQL_PASSWORD: ci-${{ github.run_id }}
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password --silent"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-${{ github.run_id }} --silent"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
@@ -133,7 +144,7 @@ jobs:
         env:
           POSTGRES_DB: sabc_business
           POSTGRES_USER: sabc
-          POSTGRES_PASSWORD: ***REMOVED***
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}
         ports:
           - 5432:5432
         options: >-
@@ -153,17 +164,17 @@ jobs:
     env:
       NODE_ENV: test
       PORT: 3000
-      DATABASE_URL: mysql://sabc:***REMOVED***@127.0.0.1:3306/sabc_eval360
+      DATABASE_URL: mysql://sabc:ci-${{ github.run_id }}@127.0.0.1:3306/sabc_eval360
       PG_HOST: 127.0.0.1
       PG_PORT: 5432
       PG_DATABASE: sabc_business
       PG_USER: sabc
-      PG_PASSWORD: ***REMOVED***
+      PG_PASSWORD: ci-${{ github.run_id }}
       REDIS_URL: redis://127.0.0.1:6379
       CACHE_DRIVER: redis
       FRONTEND_URL: http://127.0.0.1:5173
-      JWT_SECRET: ***REMOVED***-with-at-least-32-characters
-      SEED_PASSWORD: ***REMOVED***-2026
+      JWT_SECRET: ci-jwt-${{ github.run_id }}-${{ github.run_attempt }}-padding-32chars
+      SEED_PASSWORD: ci-seed-${{ github.run_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -206,14 +217,14 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_ROOT_PASSWORD: ci-root-${{ github.run_id }}
           MYSQL_DATABASE: sabc_eval360
           MYSQL_USER: sabc
-          MYSQL_PASSWORD: ***REMOVED***
+          MYSQL_PASSWORD: ci-${{ github.run_id }}
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password --silent"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-${{ github.run_id }} --silent"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
@@ -222,7 +233,7 @@ jobs:
         env:
           POSTGRES_DB: sabc_business
           POSTGRES_USER: sabc
-          POSTGRES_PASSWORD: ***REMOVED***
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}
         ports:
           - 5432:5432
         options: >-
@@ -243,17 +254,17 @@ jobs:
       CI: "true"
       NODE_ENV: test
       PORT: 3000
-      DATABASE_URL: mysql://sabc:***REMOVED***@127.0.0.1:3306/sabc_eval360
+      DATABASE_URL: mysql://sabc:ci-${{ github.run_id }}@127.0.0.1:3306/sabc_eval360
       PG_HOST: 127.0.0.1
       PG_PORT: 5432
       PG_DATABASE: sabc_business
       PG_USER: sabc
-      PG_PASSWORD: ***REMOVED***
+      PG_PASSWORD: ci-${{ github.run_id }}
       REDIS_URL: redis://127.0.0.1:6379
       CACHE_DRIVER: redis
       FRONTEND_URL: http://127.0.0.1:4173
-      JWT_SECRET: ***REMOVED***-with-at-least-32-characters
-      SEED_PASSWORD: ***REMOVED***-2026
+      JWT_SECRET: ci-jwt-${{ github.run_id }}-${{ github.run_attempt }}-padding-32chars
+      SEED_PASSWORD: ci-seed-${{ github.run_id }}
       E2E_API_PORT: 3300
       E2E_WEB_PORT: 4173
     steps:

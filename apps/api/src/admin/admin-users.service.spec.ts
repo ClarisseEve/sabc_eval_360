@@ -19,7 +19,7 @@ const makeCreateDto = (
   nom: 'Dupont',
   prenom: 'Jean',
   email: 'jean.dupont@sabc.cm',
-  password: '***REMOVED***',
+  password: 'Fixture-NotARealSecret-1',
   id_role: 'R001',
   id_region: 'RG01',
   ...overrides,

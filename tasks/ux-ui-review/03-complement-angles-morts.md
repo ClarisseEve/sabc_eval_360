@@ -30,7 +30,7 @@ Page autoportante (n'utilise AUCUN des layouts d'auth du dossier `Layout/auth/`)
 - **`bg-sabc-red-dark` pour 3 badges sur 4** (DR/CDS/TMO) : les badges de rôle utilisent des nuances de rouge marque au lieu de **pills sémantiques neutres**. Un badge de rôle n'est ni une action ni une alerte → viole la discipline du rouge.
 - **[C2] Mutation silencieuse + état mort.** La case « Se souvenir de moi » est `checked={false}` / `onChange={() => {}}` (lignes 201-202) : **contrôle factice, ne fait rien**. À retirer ou implémenter. Le state `status` (ligne 30) n'est jamais positionné → l'`Alert` de succès est du code mort.
 - **Échec d'auth non « toasté »** : l'erreur 401 s'affiche uniquement sous le champ identifiant. Acceptable, mais aucun feedback non bloquant global (C2).
-- **Mot de passe pré-rempli `'***REMOVED***'`** (ligne 26) : pratique en démo mais c'est un identifiant en clair dans le bundle de prod. À conditionner à `import.meta.env.DEV`.
+- **Mot de passe pré-rempli ``<mot-de-passe-démo>``** (ligne 26) : pratique en démo mais c'est un identifiant en clair dans le bundle de prod. À conditionner à `import.meta.env.DEV`.
 - **Densité** : le bloc « comptes de démo » prend autant de place que le formulaire lui-même. En prod cela devrait être repliable / masqué hors DEV.
 - **`shadow-lg border-0`** : ombre non tokenisée (échelle e0→e4 attendue).
 
@@ -39,7 +39,7 @@ ClickUp/Linear : carte d'auth minimale, un seul accent, micro-illustration de ma
 
 ### Actions
 - **P0/S — correction** : retirer la case « se souvenir de moi » factice (ou l'implémenter).
-- **P0/S — correction** : conditionner `***REMOVED***` et le bloc démo à `import.meta.env.DEV`.
+- **P0/S — correction** : conditionner `<mot-de-passe-démo>` et le bloc démo à `import.meta.env.DEV`.
 - **P1/S — correction** : remplacer `text-[#424242]`/`text-[#9E9E9E]` par tokens (`text-foreground`/`text-muted-foreground`).
 - **P1/M — amélioration** : passer les liens en neutre/`muted` (réserver le rouge au CTA), badges de rôle en pills neutres sémantiques.
 - **P1/S — amélioration** : supprimer l'`Alert` de `status` mort, et router les erreurs serveur génériques vers le futur système de Toast.
@@ -140,7 +140,7 @@ Quatre fichiers : `auth-layout.tsx` (wrapper → simple), `auth-simple-layout.ts
 
 ## Top priorités P0 de la zone
 1. **P0/S** — Détokeniser les rouges hardcodés des SVG d'erreur (`#E53E3E` → token `#C8102E`/`currentColor`). La marque est littéralement fausse à l'écran.
-2. **P0/S** — Login : retirer la case « se souvenir » factice + conditionner `***REMOVED***`/bloc démo à DEV.
+2. **P0/S** — Login : retirer la case « se souvenir » factice + conditionner `<mot-de-passe-démo>`/bloc démo à DEV.
 3. **P1/M** — Réécrire `welcome.tsx` (contenu produit + branding SABC) ou la rediriger vers `/login`.
 4. **P1/M** — Factoriser un `ErrorLayout` unique et UN seul `AuthLayout` sur une famille de tokens unique.
 

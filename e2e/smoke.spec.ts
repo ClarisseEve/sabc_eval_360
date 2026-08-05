@@ -1,9 +1,16 @@
 import { expect, test } from '@playwright/test';
 
+// Pas de mot de passe litteral dans le depot.
+function requireSeedPassword(): string {
+  const value = process.env.SEED_PASSWORD;
+  if (!value) throw new Error('SEED_PASSWORD est requis pour executer les tests e2e');
+  return value;
+}
+
 async function login(
   page: import('@playwright/test').Page,
   identifier: string,
-  password = process.env.SEED_PASSWORD || '***REMOVED***',
+  password = requireSeedPassword(),
 ) {
   await page.goto('/login');
   await page.getByLabel('Matricule ou Email').fill(identifier);

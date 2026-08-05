@@ -35,12 +35,17 @@ async function loadEnvFile() {
 }
 
 function getConnectionConfig() {
+  // Pas de mot de passe par défaut: ce serait un secret versionné.
+  if (!process.env.PG_PASSWORD) {
+    throw new Error('PG_PASSWORD est requis pour appliquer les migrations PostgreSQL');
+  }
+
   return {
     host: process.env.PG_HOST || 'localhost',
     port: Number(process.env.PG_PORT || 5432),
     database: process.env.PG_DATABASE || 'sabc_business',
     user: process.env.PG_USER || 'sabc',
-    password: process.env.PG_PASSWORD || '***REMOVED***',
+    password: process.env.PG_PASSWORD,
     max: 1,
   };
 }

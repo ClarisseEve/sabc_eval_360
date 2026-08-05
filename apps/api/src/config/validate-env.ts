@@ -29,7 +29,19 @@ export function validateEnvironment(config: Environment): Environment {
   const pgPassword = requireValue(config, 'PG_PASSWORD');
   requireValue(config, 'FRONTEND_URL');
 
-  const knownExamplePasswords = new Set(['secret', 'password', '***REMOVED***', 'change_me']);
+  // Les placeholders des .env.example commencent tous par CHANGE_ME: les
+  // rejeter évite qu'un déploiement parte avec une valeur d'exemple.
+  const knownExamplePasswords = new Set([
+    'secret',
+    '***REMOVED***',
+    'password',
+    '***REMOVED***',
+    'change_me',
+  ]);
+  const isExamplePassword = (value: string) => {
+    const normalized = value.toLowerCase();
+    return knownExamplePasswords.has(normalized) || normalized.startsWith('change_me');
+  };
   let mysqlPassword = '';
   try {
     const parsedDatabaseUrl = new URL(databaseUrl);
@@ -38,10 +50,10 @@ export function validateEnvironment(config: Environment): Environment {
   } catch {
     throw new Error('DATABASE_URL doit être une URL MySQL valide');
   }
-  if (knownExamplePasswords.has(mysqlPassword)) {
+  if (isExamplePassword(mysqlPassword)) {
     throw new Error("DATABASE_URL utilise un mot de passe d'exemple interdit en production");
   }
-  if (knownExamplePasswords.has(pgPassword.toLowerCase())) {
+  if (isExamplePassword(pgPassword)) {
     throw new Error("PG_PASSWORD utilise un mot de passe d'exemple interdit en production");
   }
 

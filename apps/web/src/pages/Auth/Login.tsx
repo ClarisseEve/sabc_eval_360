@@ -24,7 +24,11 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState(IS_DEV ? '***REMOVED***' : '');
+  // Aucun mot de passe en dur: le pré-remplissage de confort en développement
+  // passe par VITE_DEMO_PASSWORD, défini localement et jamais committé.
+  const [password, setPassword] = useState(
+    IS_DEV ? (import.meta.env.VITE_DEMO_PASSWORD ?? '') : '',
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [errors, setErrors] = useState<{ identifier?: string; password?: string }>({});

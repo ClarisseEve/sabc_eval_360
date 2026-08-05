@@ -10,13 +10,21 @@ export class DatabasePgService implements OnModuleInit, OnModuleDestroy {
   constructor(private config: ConfigService) {}
 
   async onModuleInit() {
+    // Aucun mot de passe par défaut: un identifiant en dur laisserait l'app se
+    // connecter silencieusement à une base mal configurée, et constitue un
+    // secret versionné.
+    const password = this.config.get<string>('PG_PASSWORD');
+    if (!password) {
+      throw new Error("PG_PASSWORD est requis pour ouvrir le pool PostgreSQL");
+    }
+
     this.pool = new Pool({
       host: this.config.get('PG_HOST', 'localhost'),
       port: this.config.get<number>('PG_PORT', 5432),
       database: this.config.get('PG_DATABASE', 'sabc_business'),
       user: this.config.get('PG_USER', 'sabc'),
-      password: this.config.get('PG_PASSWORD', '***REMOVED***'),
-      max: 10,
+      password,
+      max: this.config.get<number>('PG_POOL_MAX', 10),
     });
     this.logger.log('PostgreSQL pool initialized');
   }

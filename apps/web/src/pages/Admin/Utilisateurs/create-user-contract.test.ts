@@ -7,7 +7,7 @@ const validForm = {
     nom: ' Dupont ',
     prenom: ' Jean ',
     email: ' jean.dupont@sabc.cm ',
-    password: '***REMOVED***',
+    password: 'Fixture-NotARealSecret-1',
     id_role: 'R0003',
     id_region: 'RG001',
 };
@@ -21,7 +21,7 @@ describe('create user API contract', () => {
             nom: 'Dupont',
             prenom: 'Jean',
             email: 'jean.dupont@sabc.cm',
-            password: '***REMOVED***',
+            password: 'Fixture-NotARealSecret-1',
             id_role: 'R0003',
             id_region: 'RG001',
             telephone: null,

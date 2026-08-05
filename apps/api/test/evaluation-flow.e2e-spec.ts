@@ -12,6 +12,13 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { GlobalExceptionFilter } from '../src/common/filters/http-exception.filter';
 
+// Pas de mot de passe litteral dans le depot: le seed impose deja SEED_PASSWORD.
+function requireSeedPassword(): string {
+  const value = process.env.SEED_PASSWORD;
+  if (!value) throw new Error('SEED_PASSWORD est requis pour executer les tests e2e');
+  return value;
+}
+
 describe('Evaluation 360° Flow (e2e)', () => {
   let app: INestApplication;
   let accessToken: string;
@@ -21,7 +28,7 @@ describe('Evaluation 360° Flow (e2e)', () => {
   // Test credentials — must exist in seeded DB
   const TEST_ADMIN = {
     identifier: 'admin@sabc.local',
-    password: process.env.SEED_PASSWORD || '***REMOVED***',
+    password: requireSeedPassword(),
   };
 
   beforeAll(async () => {
@@ -181,7 +188,7 @@ describe('Evaluation 360° Flow (e2e)', () => {
         .post('/api/auth/login')
         .send({
           identifier: 'S1110',
-          password: process.env.SEED_PASSWORD || '***REMOVED***',
+          password: requireSeedPassword(),
         });
       expect(evaluatorLogin.status).toBe(201);
       lifecycleToken = evaluatorLogin.body.access_token;
@@ -210,7 +217,7 @@ describe('Evaluation 360° Flow (e2e)', () => {
           nom: 'Cible',
           prenom: 'E2E',
           email: `e2e.${evalueMatricule.toLowerCase()}@sabc.local`,
-          password: process.env.SEED_PASSWORD || '***REMOVED***',
+          password: requireSeedPassword(),
           id_role: targetRole.id_role,
           id_region: lifecycleProfile.id_region,
           manager_matricule: lifecycleProfile.matricule,

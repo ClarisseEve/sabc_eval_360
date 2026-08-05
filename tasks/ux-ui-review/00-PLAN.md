@@ -148,7 +148,7 @@ Actions nouvelles uniquement (les actions transverses déjà au PLAN — tokens/
 - **[P0/S] Corriger les routes cassées** `/admin/evaluation/templates` (singulier → 404) → `/admin/evaluations/templates` partout.
 - **[P0/S] `password.tsx` : afficher l'erreur** au lieu du `throw error` aveugle après focus (échec silencieux — mot de passe actuel incorrect jamais affiché).
 - **[P0/S] Retirer le copy de dev exposé à l'admin** : hero Anomalies (« seed data / branchement progressif en production »), et la landing `welcome.tsx` (« apps/web », « préflight migrations », NestJS/Redis).
-- **[P0/S] Login : retirer la case « se souvenir de moi » factice** (`onChange={()=>{}}`) + l'`Alert` de `status` qui est du code mort ; conditionner `***REMOVED***` et le bloc comptes démo à `import.meta.env.DEV` (identifiant en clair dans le bundle prod).
+- **[P0/S] Login : retirer la case « se souvenir de moi » factice** (`onChange={()=>{}}`) + l'`Alert` de `status` qui est du code mort ; conditionner `<mot-de-passe-démo>` et le bloc comptes démo à `import.meta.env.DEV` (identifiant en clair dans le bundle prod).
 - **[P0/S] Réconcilier nav ↔ routes** : groupe Notifications de `nav.tsx` (`/admin/notifications/send|history`) pointe vers 0 route → 404. Créer les routes ou retirer le groupe + **ajouter un test** liant chaque `NavItem.href` à une route déclarée.
 
 ## P1 — cohérence structurante (nouveau)
@@ -190,7 +190,7 @@ Actions nouvelles uniquement (les actions transverses déjà au PLAN — tokens/
 
 | Famille | Note /100 | Actions clés |
 |---|:---:|---|
-| **Auth, Erreurs & Accueil** | 48 | Détokeniser les rouges hardcodés des SVG d'erreur (`#E53E3E`→token) ; Login : retirer case « se souvenir » factice + conditionner `***REMOVED***`/démo à DEV ; factoriser un `ErrorLayout` + un `AuthLayout` uniques ; réécrire/rediriger `welcome.tsx`. |
+| **Auth, Erreurs & Accueil** | 48 | Détokeniser les rouges hardcodés des SVG d'erreur (`#E53E3E`→token) ; Login : retirer case « se souvenir » factice + conditionner `<mot-de-passe-démo>`/démo à DEV ; factoriser un `ErrorLayout` + un `AuthLayout` uniques ; réécrire/rediriger `welcome.tsx`. |
 | **Admin · Dashboard & Analytics** | 61 | Supprimer doublon `Index.tsx`/`index.tsx` (build cassé) ; trancher le module mort `Components/Analytics/` (~80 Ko, heatmap) ; retirer copy dev « seed data » ; statuts sémantiques (pas couleurs par index) + supprimer `import { error } from 'console'`. |
 | **Admin · Évaluations (core)** | 54 | Supprimer le code mort (`index.tsx`, `Templates.tsx` plat, `Evaluation/*`, `.bak`) ; enrichir `shared.tsx` en vrai PageHeader + Toaster ; réintroduire les actions admin Valider/Rejeter dans `Show` ; `History` filtre statut côté serveur + renommer l'export `window.print()`. |
 | **Admin · Règles & Templates** | 41 | Recâbler `Templates/Create+Edit+Show` (mockés, non fonctionnels) sur l'API + réconcilier le modèle de données ; corriger routes `/admin/evaluation/templates` (404) ; `onError`+feedback sur assign/remove ; CriteresEditor : supprimer l'état local dupliqué. |

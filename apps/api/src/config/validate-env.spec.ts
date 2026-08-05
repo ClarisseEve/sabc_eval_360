@@ -38,6 +38,33 @@ describe('validateEnvironment', () => {
     ).toThrow('PG_PASSWORD');
   });
 
+  // Les .env.example ne contiennent plus que des placeholders CHANGE_ME_*:
+  // un déploiement qui les recopie tels quels doit échouer au démarrage.
+  it.each([
+    ['CHANGE_ME_PG_PASSWORD'],
+    ['CHANGE_ME_MYSQL_PASSWORD'],
+    ['change_me_anything'],
+  ])('rejects the placeholder %s for PG_PASSWORD', (placeholder) => {
+    expect(() =>
+      validateEnvironment({ ...productionEnv, PG_PASSWORD: placeholder }),
+    ).toThrow('PG_PASSWORD');
+  });
+
+  it('rejects a placeholder password inside DATABASE_URL', () => {
+    expect(() =>
+      validateEnvironment({
+        ...productionEnv,
+        DATABASE_URL: 'mysql://sabc_user:CHANGE_ME_MYSQL_PASSWORD@mysql:3306/sabc_core',
+      }),
+    ).toThrow('DATABASE_URL');
+  });
+
+  it('rejects the historical ***REMOVED*** default', () => {
+    expect(() =>
+      validateEnvironment({ ...productionEnv, PG_PASSWORD: '***REMOVED***' }),
+    ).toThrow('PG_PASSWORD');
+  });
+
   it('keeps local development lightweight', () => {
     expect(validateEnvironment({ NODE_ENV: 'development' })).toMatchObject({ PORT: 3000 });
   });
