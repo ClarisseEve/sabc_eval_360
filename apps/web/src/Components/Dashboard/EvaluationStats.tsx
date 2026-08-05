@@ -151,7 +151,7 @@ export const EvaluationStats: EvaluationStatsComponent = ({
               <div 
                 key={index}
                 className={cn(
-                  "rounded-md border p-4",
+                  "rounded-md border p-5",
                   getVariantClasses(stat.variant),
                   layout === 'row' && "flex-1 min-w-[200px]"
                 )}
@@ -162,7 +162,7 @@ export const EvaluationStats: EvaluationStatsComponent = ({
                   </p>
                   {stat.icon && (
                     <div className={cn(
-                      "rounded-full p-2",
+                      "rounded-full bg-sabc-red-primary/10 p-3",
                       getIconClasses(stat.variant)
                     )}>
                       {stat.icon}
@@ -171,7 +171,7 @@ export const EvaluationStats: EvaluationStatsComponent = ({
                 </div>
                 
                 <div className="mt-2">
-                  <p className="text-3xl font-bold text-sabc-gray-900 dark:text-white">
+                  <p className="text-2xl font-bold text-sabc-gray-900 dark:text-white">
                     {formatValue(stat.value, stat.format)}
                   </p>
                   

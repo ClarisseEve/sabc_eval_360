@@ -20,7 +20,7 @@ export class ContreEvaluationController {
   }
 
   @Get(':id/contre-evaluations')
-  async list(@Param('id') id: string) {
-    return this.service.getContreEvaluations(id);
+  async list(@Param('id') id: string, @Request() req: any) {
+    return this.service.getContreEvaluations(id, req.user);
   }
 }

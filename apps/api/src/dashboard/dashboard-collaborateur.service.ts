@@ -2,17 +2,26 @@ import { Injectable } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../common/cache.service';
+import {
+  EVALUATED_VISIBILITY_SQL,
+  INTERNAL_RULE_ENVELOPE_FIELD,
+  isVisibleToEvaluated,
+  redactEvaluationForVisibility,
+  resolveEvaluationVisibilityPolicy,
+} from '../evaluations/evaluation-visibility';
 
 interface EvalRow {
   id_evaluation: string;
-  evaluateur_matricule: string;
+  evaluateur_matricule: string | null;
   evalue_matricule: string;
+  type_evaluation: string;
   statut: string;
   id_periode: string;
   note_globale: number | null;
   date_soumission: string | null;
   created_at: string;
   nom_periode: string;
+  __rule_envelope?: unknown;
 }
 
 interface UtilisateurRow {
@@ -23,7 +32,7 @@ interface UtilisateurRow {
 
 export interface EvalEnriched {
   id_evaluation: string;
-  evaluateur_matricule: string;
+  evaluateur_matricule: string | null;
   evaluateur_nom: string;
   evalue_matricule: string;
   evalue_nom: string;
@@ -67,6 +76,7 @@ export class DashboardCollaborateurService {
     // 1. a_completer: évals où le collaborateur EST l'évaluateur (brouillon ou soumis)
     const aCompleterRows = await this.pg.query<EvalRow>(
       `SELECT e.id_evaluation, e.evaluateur_matricule, e.evalue_matricule,
+              e.type_evaluation,
               e.statut, e.id_periode, e.note_globale,
               e.date_soumission, e.created_at, p.nom_periode
        FROM evaluations e
@@ -79,11 +89,16 @@ export class DashboardCollaborateurService {
     // 2. recues: évals où le collaborateur EST l'évalué (soumis ou valide — pas brouillon AC3)
     const recuesRows = await this.pg.query<EvalRow>(
       `SELECT e.id_evaluation, e.evaluateur_matricule, e.evalue_matricule,
+              e.type_evaluation,
               e.statut, e.id_periode, e.note_globale,
-              e.date_soumission, e.created_at, p.nom_periode
+              e.date_soumission, e.created_at, p.nom_periode,
+              r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
        FROM evaluations e
        JOIN periodes_evaluation p ON p.id_periode = e.id_periode
-       WHERE e.evalue_matricule = $1 AND e.statut IN ('soumis', 'valide')
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.evalue_matricule = $1
+         AND e.statut IN ('soumis', 'valide')
+         AND ${EVALUATED_VISIBILITY_SQL}
        ORDER BY e.created_at DESC`,
       [matricule],
     );
@@ -91,8 +106,12 @@ export class DashboardCollaborateurService {
     // 3. score_global: moyenne des évals validées où ce collaborateur est l'évalué
     const scoreRow = await this.pg.queryOne<{ score: string }>(
       `SELECT COALESCE(AVG(note_globale), 0)::text as score
-       FROM evaluations
-       WHERE evalue_matricule = $1 AND statut = 'valide' AND note_globale IS NOT NULL`,
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.evalue_matricule = $1
+         AND e.statut = 'valide'
+         AND e.note_globale IS NOT NULL
+         AND ${EVALUATED_VISIBILITY_SQL}`,
       [matricule],
     );
     const scoreGlobal = Math.round(parseFloat(scoreRow?.score ?? '0') * 100) / 100;
@@ -101,14 +120,24 @@ export class DashboardCollaborateurService {
     const progression = await this._getProgression(matricule);
 
     // 5. Enrichissement: récupérer noms/prénoms en une seule requête Prisma
+    const aCompleterRedacted = aCompleterRows.map((evaluation) =>
+      redactEvaluationForVisibility(evaluation, { preserveDetails: true }),
+    );
+    const recuesRedacted = recuesRows.flatMap((evaluation) => {
+      const policy = resolveEvaluationVisibilityPolicy(evaluation);
+      return isVisibleToEvaluated(evaluation as unknown as Record<string, unknown>, policy)
+        ? [redactEvaluationForVisibility(evaluation, { policy })]
+        : [];
+    });
+
     const allMatricules = Array.from(
       new Set([
-        ...aCompleterRows.map((r) => r.evaluateur_matricule),
-        ...aCompleterRows.map((r) => r.evalue_matricule),
-        ...recuesRows.map((r) => r.evaluateur_matricule),
-        ...recuesRows.map((r) => r.evalue_matricule),
+        ...aCompleterRedacted.map((r) => r.evaluateur_matricule),
+        ...aCompleterRedacted.map((r) => r.evalue_matricule),
+        ...recuesRedacted.map((r) => r.evaluateur_matricule),
+        ...recuesRedacted.map((r) => r.evalue_matricule),
       ]),
-    );
+    ).filter((candidate): candidate is string => Boolean(candidate));
 
     const utilisateurs: UtilisateurRow[] = allMatricules.length > 0
       ? await this.prisma.utilisateur.findMany({
@@ -122,7 +151,8 @@ export class DashboardCollaborateurService {
       userMap[u.matricule] = u;
     }
 
-    const formatNom = (mat: string): string => {
+    const formatNom = (mat: string | null): string => {
+      if (!mat) return 'Anonyme';
       const u = userMap[mat];
       return u ? `${u.prenom} ${u.nom}` : mat;
     };
@@ -141,8 +171,8 @@ export class DashboardCollaborateurService {
       created_at: row.created_at,
     });
 
-    const aCompleter = aCompleterRows.map(enrich);
-    const recues = recuesRows.map(enrich);
+    const aCompleter = aCompleterRedacted.map(enrich);
+    const recues = recuesRedacted.map(enrich);
 
     return {
       a_completer: aCompleter,
@@ -168,8 +198,12 @@ export class DashboardCollaborateurService {
     // c. Score période active
     const scoreActifRow = await this.pg.queryOne<{ avg: string | null }>(
       `SELECT AVG(note_globale)::text as avg
-       FROM evaluations
-       WHERE evalue_matricule = $1 AND statut = 'valide' AND id_periode = $2`,
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.evalue_matricule = $1
+         AND e.statut = 'valide'
+         AND e.id_periode = $2
+         AND ${EVALUATED_VISIBILITY_SQL}`,
       [matricule, periodeActive.id_periode],
     );
     const scoreActif = scoreActifRow?.avg != null ? parseFloat(scoreActifRow.avg) : null;
@@ -188,8 +222,12 @@ export class DashboardCollaborateurService {
     // e. Score période précédente
     const scorePrecRow = await this.pg.queryOne<{ avg: string | null }>(
       `SELECT AVG(note_globale)::text as avg
-       FROM evaluations
-       WHERE evalue_matricule = $1 AND statut = 'valide' AND id_periode = $2`,
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.evalue_matricule = $1
+         AND e.statut = 'valide'
+         AND e.id_periode = $2
+         AND ${EVALUATED_VISIBILITY_SQL}`,
       [matricule, periodePrecedente.id_periode],
     );
     const scorePrec = scorePrecRow?.avg != null ? parseFloat(scorePrecRow.avg) : null;

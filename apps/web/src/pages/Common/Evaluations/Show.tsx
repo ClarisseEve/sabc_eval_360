@@ -71,10 +71,8 @@ const ShowEvaluation: React.FC = () => {
   const mergedCriteria = context.criteria;
   const isEvaluator = evaluation?.evaluateur?.matricule && evaluation.evaluateur.matricule === rawUser?.matricule;
   const canEditDraft = isEvaluator && evaluation?.statut === 'brouillon';
-  const submissionDate = evaluation?.date_soumission ? new Date(evaluation.date_soumission) : null;
-  const hoursLeftToEdit = submissionDate ? Math.max(0, 72 - (Date.now() - submissionDate.getTime()) / 3_600_000) : 0;
-  const canEditSubmitted = isEvaluator && evaluation?.statut === 'soumis' && hoursLeftToEdit > 0;
-  const canEdit = canEditDraft || canEditSubmitted;
+  const canEditRejected = isEvaluator && evaluation?.statut === 'rejete';
+  const canEdit = canEditDraft || canEditRejected;
   const evaluationId = evaluation?.id_evaluation ?? evaluation?.id;
   const overallScore = evaluation?.note_globale ? Number(evaluation.note_globale) : null;
   const hasComments = Boolean(evaluation?.commentaire_general);
@@ -97,14 +95,9 @@ const ShowEvaluation: React.FC = () => {
                 <Button asChild={false} size="sm" className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => { window.location.href = `/evaluations/${evaluationId}/edit`; }}>
                   <span className="inline-flex items-center">
                     <Edit3 className="mr-2 h-4 w-4" />
-                    {canEditDraft ? 'Continuer la saisie' : 'Éditer'}
+                    {canEditDraft ? 'Continuer la saisie' : 'Corriger et resoumettre'}
                   </span>
                 </Button>
-                {canEditSubmitted && (
-                  <span className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700">
-                    Modifiable encore {hoursLeftToEdit >= 1 ? `${Math.floor(hoursLeftToEdit)}h` : `${Math.ceil(hoursLeftToEdit * 60)}min`}
-                  </span>
-                )}
               </>
             )}
             <Button variant="outline" size="sm" onClick={() => window.print()}>
@@ -197,74 +190,76 @@ const ShowEvaluation: React.FC = () => {
         <div className="grid gap-6 md:grid-cols-[340px,1fr]">
           <div className="space-y-6">
             <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <ShieldCheck className="h-5 w-5 text-sabc-success" />
-                  Synthèse générale
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-xl bg-sabc-red-light/60 p-4 text-center">
-                  <div className="text-xs uppercase tracking-wide text-sabc-red-primary/80">Note globale</div>
-                  <div className="mt-2 text-4xl font-bold text-sabc-red-primary">
-                    {overallScore != null ? overallScore.toFixed(2) : '—'}
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg border border-sabc-gray-200 p-3 text-sm">
-                    <div className="text-xs font-semibold uppercase text-sabc-gray-400">Cadre</div>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      <Badge variant="info">{context.criteriaCount} critères</Badge>
-                      <Badge variant="info">{context.sections.length} sections</Badge>
-                      <Badge variant="warning">visibilité {context.visibilityDetail}</Badge>
+              <CardContent className="p-0">
+                <div className="flex">
+                  {/* Score — gauche, large */}
+                  <div className="flex w-44 shrink-0 flex-col items-center justify-center border-r border-sabc-gray-200 bg-gradient-to-b from-sabc-red-light/50 to-white py-6 dark:border-sabc-gray-700 dark:from-sabc-red-primary/10 dark:to-sabc-gray-900">
+                    <ShieldCheck className="mb-1.5 h-6 w-6 text-sabc-success" />
+                    <div className="text-[10px] font-semibold uppercase tracking-widest text-sabc-gray-400">Note globale</div>
+                    <div className="mt-1 text-5xl font-extrabold leading-none text-sabc-red-primary">
+                      {overallScore != null ? overallScore.toFixed(2) : '—'}
                     </div>
-                  </div>
-                  <div className="rounded-lg border border-sabc-gray-200 p-3 text-sm">
-                    <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sabc-gray-400">
-                      <CalendarClock className="h-4 w-4" />
-                      Cycle
-                    </div>
-                    <div className="mt-1 font-medium text-sabc-gray-900 dark:text-white">{context.periodLabel}</div>
-                    {context.periodRange ? (
-                      <div className="text-xs text-sabc-gray-500">
-                        {`${formatDateLabel(context.periodRange.start)} — ${formatDateLabel(context.periodRange.end)}`}
+                    <div className="mt-0.5 text-sm font-medium text-sabc-gray-400">/5</div>
+                    {overallScore != null && (
+                      <div className="mt-3 h-2 w-20 overflow-hidden rounded-full bg-sabc-gray-200 dark:bg-sabc-gray-700">
+                        <div
+                          className="h-full rounded-full bg-sabc-red-primary transition-all"
+                          style={{ width: `${Math.min((overallScore / 5) * 100, 100)}%` }}
+                        />
                       </div>
-                    ) : null}
+                    )}
                   </div>
-                </div>
 
-                <div className="space-y-3 text-sm text-sabc-gray-600 dark:text-sabc-gray-300">
-                  <div>
-                    <div className="text-xs font-semibold uppercase text-sabc-gray-400">Créée le</div>
-                    <div>{formatDate(evaluation?.created_at, true) ?? 'Non renseigné'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase text-sabc-gray-400">Soumise le</div>
-                    <div>{formatDate(evaluation?.date_soumission, true) ?? 'En attente'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase text-sabc-gray-400">{decisionDateLabel}</div>
-                    <div>{formatDate(evaluation?.date_validation, true) ?? 'En cours'}</div>
-                  </div>
-                </div>
-
-                {evaluation?.validateur && (
-                  <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-3 text-xs text-sabc-gray-600 dark:border-sabc-gray-700 dark:bg-sabc-gray-800 dark:text-sabc-gray-300">
-                    <div className="flex items-center gap-2 text-sabc-gray-500">
-                      <CheckCircle2 className="h-4 w-4 text-sabc-success" />
-                      Validation manager
-                    </div>
-                    <div className="mt-1 font-medium text-sabc-gray-900 dark:text-white">
-                      {formatDisplayName(evaluation.validateur)}
-                    </div>
-                    {evaluation?.commentaire_validation ? (
-                      <div className="mt-2 text-xs leading-relaxed text-sabc-gray-600 dark:text-sabc-gray-300">
-                        {evaluation.commentaire_validation}
+                  {/* Centre — cadre, cycle, validation */}
+                  <div className="flex flex-1 flex-col justify-center space-y-3 p-4">
+                    <div className="flex flex-wrap items-start gap-x-6 gap-y-2 text-xs">
+                      <div>
+                        <span className="font-semibold uppercase text-sabc-gray-400">Cadre</span>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          <Badge variant="info">{context.criteriaCount} critères</Badge>
+                          <Badge variant="info">{context.sections.length} sections</Badge>
+                        </div>
                       </div>
-                    ) : null}
+                      <div>
+                        <span className="font-semibold uppercase text-sabc-gray-400">Cycle</span>
+                        <div className="mt-1 font-medium text-sabc-gray-800 dark:text-sabc-gray-200">{context.periodLabel}</div>
+                        {context.periodRange && (
+                          <div className="text-sabc-gray-500">
+                            {`${formatDateLabel(context.periodRange.start)} — ${formatDateLabel(context.periodRange.end)}`}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {evaluation?.validateur && (
+                      <div className="flex items-start gap-2 border-t border-sabc-gray-100 pt-2 text-xs dark:border-sabc-gray-800">
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sabc-success" />
+                        <div>
+                          <span className="font-medium text-sabc-gray-800 dark:text-sabc-gray-200">{formatDisplayName(evaluation.validateur)}</span>
+                          {evaluation.commentaire_validation && (
+                            <span className="ml-1 text-sabc-gray-500">— {evaluation.commentaire_validation}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {/* Droite — dates */}
+                  <div className="flex w-40 shrink-0 flex-col justify-center gap-2 border-l border-sabc-gray-100 px-4 py-4 text-[11px] dark:border-sabc-gray-800">
+                    <div>
+                      <div className="font-semibold uppercase text-sabc-gray-400">Créée</div>
+                      <div className="text-sabc-gray-600 dark:text-sabc-gray-300">{formatDate(evaluation?.created_at, true) ?? '—'}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold uppercase text-sabc-gray-400">Soumise</div>
+                      <div className="text-sabc-gray-600 dark:text-sabc-gray-300">{formatDate(evaluation?.date_soumission, true) ?? 'En attente'}</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold uppercase text-sabc-gray-400">{decisionDateLabel}</div>
+                      <div className="text-sabc-gray-600 dark:text-sabc-gray-300">{formatDate(evaluation?.date_validation, true) ?? 'En cours'}</div>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -282,7 +277,7 @@ const ShowEvaluation: React.FC = () => {
                 Détail des critères évalués
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               {mergedCriteria.length === 0 ? (
                 <Alert className="border-sabc-gray-200 bg-sabc-gray-50 text-sabc-gray-600 dark:border-sabc-gray-700 dark:bg-sabc-gray-800 dark:text-sabc-gray-300">
                   <AlertTitle>Pas de critères renseignés</AlertTitle>
@@ -291,40 +286,43 @@ const ShowEvaluation: React.FC = () => {
                   </AlertDescription>
                 </Alert>
               ) : (
-                mergedCriteria.map((critere, index) => (
-                  <div
-                    key={String(critere.id ?? index)}
-                    className="rounded-lg border border-sabc-gray-200 p-4 transition hover:border-sabc-red-primary/40 dark:border-sabc-gray-700"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <div className="font-semibold text-sabc-gray-900 dark:text-white">{critere.libelle}</div>
-                        <div className="mt-1 flex flex-wrap gap-2 text-[10px] uppercase">
-                          <Badge variant="secondary">{critere.section}</Badge>
-                          {critere.poids != null ? <Badge variant="secondary">Poids {critere.poids}</Badge> : null}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {mergedCriteria.map((critere, index) => {
+                    const note = critere.note != null ? Number(critere.note) : null;
+                    const noteColor =
+                      note == null ? 'text-sabc-gray-400'
+                      : note >= 4 ? 'text-sabc-success'
+                      : note >= 3 ? 'text-sabc-accent'
+                      : 'text-sabc-error';
+
+                    return (
+                      <div
+                        key={String(critere.id ?? index)}
+                        className="group relative flex flex-col items-center rounded-xl border border-sabc-gray-200 px-3 py-4 text-center transition hover:border-sabc-red-primary/40 hover:shadow-sm dark:border-sabc-gray-700"
+                        title={[critere.description, critere.commentaire].filter(Boolean).join('\n\n')}
+                      >
+                        <span className="mb-2 inline-block rounded-full bg-sabc-gray-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sabc-gray-500 dark:bg-sabc-gray-800">
+                          {critere.section}
+                        </span>
+                        <div className="text-xs font-semibold leading-tight text-sabc-gray-800 dark:text-sabc-gray-200">
+                          {critere.libelle}
                         </div>
-                      </div>
-                      <Badge variant="secondary" className="text-[10px] uppercase">
-                        Note {critere.note != null ? critere.note : '—'} / 5
-                      </Badge>
-                    </div>
-                    {critere.description && (
-                      <p className="mt-2 text-xs text-sabc-gray-500">{critere.description}</p>
-                    )}
-                    {critere.commentaire ? (
-                      <div className="mt-3 rounded-md bg-sabc-gray-50 p-3 text-xs text-sabc-gray-600 dark:bg-sabc-gray-800 dark:text-sabc-gray-300">
-                        <div className="mb-1 flex items-center gap-2 font-semibold text-sabc-gray-500">
-                          <MessageSquare className="h-3.5 w-3.5" /> Commentaire
+                        <div className={`mt-2 text-2xl font-bold leading-none ${noteColor}`}>
+                          {note != null ? note : '—'}
+                          <span className="text-sm font-medium text-sabc-gray-400"> /5</span>
                         </div>
-                        {critere.commentaire}
+                        {critere.poids != null && (
+                          <span className="mt-1.5 text-[10px] text-sabc-gray-400">
+                            Poids {critere.poids}
+                          </span>
+                        )}
+                        {critere.commentaire && (
+                          <MessageSquare className="absolute right-2 top-2 h-3 w-3 text-sabc-gray-300 dark:text-sabc-gray-600" />
+                        )}
                       </div>
-                    ) : (
-                      <div className="mt-3 text-xs italic text-sabc-gray-400">
-                        Aucun commentaire renseigné pour ce critère.
-                      </div>
-                    )}
-                  </div>
-                ))
+                    );
+                  })}
+                </div>
               )}
             </CardContent>
           </Card>

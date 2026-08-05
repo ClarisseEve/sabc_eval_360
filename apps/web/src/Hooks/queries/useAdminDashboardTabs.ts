@@ -12,11 +12,11 @@ export function getAdminDisplayName(user: any) {
   return [user?.prenom, user?.nom].filter(Boolean).join(' ').trim() || user?.matricule || 'Utilisateur';
 }
 
-export function useAdminOverviewTabData() {
+export function useAdminOverviewTabData(dateRange?: { start_date?: string; end_date?: string }) {
   return useSuspenseQuery({
-    queryKey: ['admin', 'dashboard', 'tab', 'overview'],
+    queryKey: ['admin', 'dashboard', 'tab', 'overview', dateRange?.start_date ?? 'all', dateRange?.end_date ?? 'all'],
     queryFn: async () => {
-      const analytics = (await analyticsApi.adminOverview()).data;
+      const analytics = (await analyticsApi.adminOverview(dateRange)).data;
 
       return {
         totalEvaluations: Number(analytics?.kpis?.total_evaluations ?? 0),
@@ -42,11 +42,11 @@ export function useAdminOverviewTabData() {
   });
 }
 
-export function useAdminRoleAnalysisTabData() {
+export function useAdminRoleAnalysisTabData(dateRange?: { start_date?: string; end_date?: string }) {
   return useSuspenseQuery({
-    queryKey: ['admin', 'dashboard', 'tab', 'roles'],
+    queryKey: ['admin', 'dashboard', 'tab', 'roles', dateRange?.start_date ?? 'all', dateRange?.end_date ?? 'all'],
     queryFn: async () => {
-      const response = await analyticsApi.adminRoles();
+      const response = await analyticsApi.adminRoles(dateRange);
       const rolePerf = asArray(response.data?.roles);
       const channels = asArray(response.data?.channels);
       const globalAvg = Number(response.data?.global_average ?? 0);
@@ -62,10 +62,10 @@ export function useAdminRoleAnalysisTabData() {
   });
 }
 
-export function useAdminRegionsTabData(selectedRegion: string) {
+export function useAdminRegionsTabData(selectedRegion: string, dateRange?: { start_date?: string; end_date?: string }) {
   const overviewQuery = useSuspenseQuery({
-    queryKey: ['admin', 'dashboard', 'tab', 'regions', 'overview'],
-    queryFn: () => analyticsApi.adminRegionsOverview().then((response) => response.data),
+    queryKey: ['admin', 'dashboard', 'tab', 'regions', 'overview', dateRange?.start_date ?? 'all', dateRange?.end_date ?? 'all'],
+    queryFn: () => analyticsApi.adminRegionsOverview(dateRange).then((response) => response.data),
   });
 
   const regionAnalyticsQuery = useQuery({

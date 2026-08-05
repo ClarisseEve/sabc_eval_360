@@ -24,6 +24,9 @@ describe('DashboardService', () => {
       role: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      replacement_temporaire: {
+        count: jest.fn().mockResolvedValue(0),
+      },
     };
     mockCache = {
       getOrCompute: jest.fn((_key: string, _ttl: number, fn: () => any) => fn()),
@@ -75,12 +78,10 @@ describe('DashboardService', () => {
         .mockResolvedValueOnce(null)              // periode
         .mockResolvedValueOnce({ total: '100', en_cours: '20', validees: '60' }); // eval stats
 
-      // 6th queryOne: remplacements count
-      mockPg.queryOne.mockResolvedValueOnce({ count: '3' });
-
       mockPrisma.utilisateur.count
         .mockResolvedValueOnce(50)                // total users
         .mockResolvedValueOnce(45);               // active users
+      mockPrisma.replacement_temporaire.count.mockResolvedValueOnce(3);
 
       const result = await service.getAdminStats('ADMIN01');
 
@@ -91,6 +92,19 @@ describe('DashboardService', () => {
       expect(result.evaluations_validees).toBe(60);
       expect(result.taux_completion).toBe(60);
       expect(result.remplacements_actifs).toBe(3);
+      expect(mockPrisma.replacement_temporaire.count).toHaveBeenCalledWith({
+        where: {
+          est_actif: true,
+          date_debut: { lte: expect.any(Date) },
+          OR: [
+            { date_fin: null },
+            { date_fin: { gte: expect.any(Date) } },
+          ],
+        },
+      });
+      expect(mockPg.queryOne).not.toHaveBeenCalledWith(
+        expect.stringContaining('remplacements_temporaires'),
+      );
     });
   });
 
@@ -101,8 +115,8 @@ describe('DashboardService', () => {
       expect(service.getRoleTitle('CDS')).toBe('Tableau de Bord Chef de Secteur');
     });
 
-    it('should default to admin for unknown roles', () => {
-      expect(service.getRoleTitle('unknown')).toBe('Tableau de Bord Administrateur');
+    it('should default to collaborateur for unknown roles', () => {
+      expect(service.getRoleTitle('unknown')).toBe('Tableau de Bord Collaborateur');
     });
   });
 
@@ -112,7 +126,8 @@ describe('DashboardService', () => {
       expect(roles).toContain('admin');
       expect(roles).toContain('dr');
       expect(roles).toContain('cdtt');
-      expect(roles.length).toBe(11);
+      expect(roles).toContain('collaborateur');
+      expect(roles.length).toBe(12);
     });
   });
 });

@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Link } from '@/lib/inertia-shim';
-import { LogOut, ChevronDown, ChevronRight, AlignLeft, Menu } from 'lucide-react';
+import { LogOut, ChevronDown, ChevronRight, AlignLeft, Menu, PlayCircle } from 'lucide-react';
 import { cn } from '@/utils/helpers';
 import { Button } from '@/Components/UI/Button/Button';
-import { NAV_ITEMS, NAV_BOTTOM_ITEMS, resolveHref } from '@/config/nav';
+import { Badge } from '@/Components/UI/Badge/Badge';
+import { NAV_ITEMS, NAV_BOTTOM_ITEMS, VALIDATION_QUEUE_ROLES, resolveHref } from '@/config/nav';
 import { normalizeRole, type Role } from '@/config/rbac';
+import { useAuthContext } from '@/Contexts/AuthContext';
+import api from '@/Services/api';
 
 // Types pour les éléments de navigation
 interface NavItem {
@@ -26,7 +31,7 @@ interface SidebarProps {
   };
   isCollapsed: boolean;
   onToggle: () => void;
-  onLogout?: () => void;
+  onLogout?: () => void | Promise<void>;
   className?: string;
 }
 
@@ -37,17 +42,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   className,
 }): React.ReactElement => {
+  const { user: authUser, logout } = useAuthContext();
+  const navigate = useNavigate();
+
+  // The role only controls navigation/badge loading; the API authorizes every queue item.
+  const canValidate = Boolean(authUser?.role) && VALIDATION_QUEUE_ROLES.includes(normalizeRole(authUser?.role));
+
+  const { data: pendingCount = 0 } = useQuery({
+    queryKey: ['evaluations', 'pending', 'count'],
+    queryFn: async () => {
+      const r = await api.get('/evaluations', { params: { statut: 'soumis' } });
+      const d = r.data;
+      if (Array.isArray(d)) return d.length;
+      if (Array.isArray(d?.data)) return d.data.length;
+      if (Array.isArray(d?.a_valider)) return d.a_valider.length;
+      return d?.total ?? d?.count ?? 0;
+    },
+    enabled: canValidate,
+    staleTime: 60_000,
+  });
+
   // État pour suivre les éléments de navigation dépliés (tous rétractés par défaut)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
-  
-  // État pour suivre l'élément actif
-  const [activePath, setActivePath] = useState<string>("");
-  
-  // Détecter le chemin actif
-  useEffect(() => {
-    const currentPath = globalThis.location.pathname;
-    setActivePath(currentPath);
-  }, []);
+
+  // Chemin actif réactif : suit la navigation client-side de react-router
+  const location = useLocation();
+  const activePath = location.pathname;
+  const activeSearch = location.search;
+
+  // Détermine si un href (avec ou sans query string ?tab=...) correspond à la route active
+  const isHrefActive = React.useCallback((href: string): boolean => {
+    if (!href || href === '#') return false;
+    const [hrefPath, hrefQuery] = href.split('?');
+    if (activePath !== hrefPath && !activePath.startsWith(hrefPath + '/')) {
+      return false;
+    }
+    // Si le lien cible un onglet précis (?tab=...), exiger la correspondance des params
+    if (hrefQuery) {
+      const target = new URLSearchParams(hrefQuery);
+      const current = new URLSearchParams(activeSearch);
+      for (const [key, value] of target.entries()) {
+        if (current.get(key) !== value) return false;
+      }
+    }
+    return true;
+  }, [activePath, activeSearch]);
 
   // Génération des menus depuis la config centrale
   const { mainMenuItems, bottomMenuItems } = React.useMemo(() => {
@@ -67,28 +106,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [user.role]);
   
-  // Ouvrir automatiquement le parent si un sous-menu est actif
+  // Ouvrir automatiquement le parent si un sous-menu est actif (sans écraser les dépliages manuels)
   useEffect(() => {
     const nextExpanded: Record<string, boolean> = {};
     const markParentsWithActiveChild = (items: NavItem[]) => {
       for (const it of items) {
         const hasChildren = it.children && it.children.length > 0;
-        const childActive = !!(hasChildren && it.children!.some(
-          (c) => activePath === c.href || activePath.startsWith(c.href + "/")
-        ));
-        // Si un enfant est actif, déplier ce parent
+        const childActive = !!(hasChildren && it.children!.some((c) => isHrefActive(c.href)));
         if (childActive) {
           nextExpanded[it.title] = true;
         }
-        // Optionnel: si l'élément lui-même est actif et a des enfants, on peut le garder replié
         if (hasChildren) {
           markParentsWithActiveChild(it.children!);
         }
       }
     };
     markParentsWithActiveChild(mainMenuItems);
-    setExpandedItems(nextExpanded);
-  }, [activePath, mainMenuItems]);
+    setExpandedItems((prev) => ({ ...prev, ...nextExpanded }));
+  }, [isHrefActive, mainMenuItems]);
   
   // Fonction pour basculer l'état déplié d'un élément
   const toggleExpand = (title: string) => {
@@ -108,21 +143,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const renderChevron = (expanded: boolean) =>
     expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />;
 
-  const renderCollapsedParent = (item: NavItem, hasActiveChild: boolean) => (
-    <button
-      type="button"
-      className={cn(
-        "flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out",
-        getActiveClassName(hasActiveChild),
-        hoverClassName
-      )}
-      onClick={() => toggleExpand(item.title)}
-    >
-      {item.icon}
-    </button>
-  );
+  const getParentBadgeCount = (item: NavItem): number => {
+    if (!canValidate || pendingCount === 0) return 0;
+    const hasValidateChild = item.children?.some((c) => c.href === '/evaluations/validate');
+    return hasValidateChild ? pendingCount : 0;
+  };
 
-  const renderExpandedParent = (item: NavItem, hasActiveChild: boolean, isSectionToggle: boolean, isExpanded: boolean) => (
+  const renderCollapsedParent = (item: NavItem, hasActiveChild: boolean) => {
+    const badgeCount = getParentBadgeCount(item);
+    return (
+      <button
+        type="button"
+        className={cn(
+          "relative flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out",
+          getActiveClassName(hasActiveChild),
+          hoverClassName
+        )}
+        onClick={() => toggleExpand(item.title)}
+      >
+        {item.icon}
+        {badgeCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        )}
+      </button>
+    );
+  };
+
+  const renderExpandedParent = (item: NavItem, hasActiveChild: boolean, isSectionToggle: boolean, isExpanded: boolean) => {
+    const badgeCount = getParentBadgeCount(item);
+    return (
     <div
       className={cn(
         "flex items-center rounded-md bg-transparent px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out",
@@ -141,7 +192,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {item.icon}
             <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
           </span>
-          {renderChevron(isExpanded)}
+          <span className="flex items-center gap-1.5">
+            {badgeCount > 0 && !isExpanded && (
+              <Badge
+                variant="destructive"
+                className="border-0 px-1.5 py-0 text-[10px] leading-none"
+              >
+                {badgeCount > 99 ? '99+' : badgeCount}
+              </Badge>
+            )}
+            {renderChevron(isExpanded)}
+          </span>
         </button>
       ) : (
         <>
@@ -167,37 +228,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
     </div>
   );
+  };
 
-  const renderLeafItem = (item: NavItem, isActive: boolean) => (
-    <Link
-      href={item.href}
-      className={cn(
-        "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out",
-        isCollapsed ? "justify-center" : "justify-start",
-        isActive
-          ? "text-sabc-red-primary dark:text-sabc-red-light font-semibold"
-          : "text-sabc-gray-800 dark:text-sabc-gray-200",
-        hoverClassName
-      )}
-    >
-      <span className="flex items-center">
-        {item.icon}
-        {!isCollapsed && (
-          <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
+  const renderLeafItem = (item: NavItem, isActive: boolean) => {
+    const showPendingBadge =
+      item.href === '/evaluations/validate' && canValidate && pendingCount > 0;
+
+    return (
+      <Link
+        href={item.href}
+        className={cn(
+          "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out",
+          isCollapsed ? "justify-center" : "justify-start",
+          isActive
+            ? "text-sabc-red-primary dark:text-sabc-red-light font-semibold"
+            : "text-sabc-gray-800 dark:text-sabc-gray-200",
+          hoverClassName
         )}
-      </span>
-    </Link>
-  );
+      >
+        <span className="flex flex-1 items-center">
+          {item.icon}
+          {!isCollapsed && (
+            <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
+          )}
+        </span>
+        {showPendingBadge && !isCollapsed && (
+          <Badge
+            variant="destructive"
+            className="ml-auto border-0 px-2 py-0.5 text-[11px] leading-none"
+          >
+            {pendingCount > 99 ? '99+' : pendingCount}
+          </Badge>
+        )}
+      </Link>
+    );
+  };
 
   // Fonction pour rendre un élément de navigation
   const renderNavItem = (item: NavItem, level: number = 0): React.ReactElement => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedItems[item.title] || false;
     const isSectionToggle = hasChildren && (!item.href || item.href === '#');
-    const isActive = activePath === item.href || activePath.startsWith(item.href + "/");
-    const hasActiveChild = hasChildren && item.children!.some(
-      child => activePath === child.href || activePath.startsWith(child.href + "/")
-    );
+    const isActive = isHrefActive(item.href);
+    const hasActiveChild = hasChildren && item.children!.some((child) => isHrefActive(child.href));
 
     let content: React.ReactNode;
     if (hasChildren) {
@@ -240,8 +313,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {!isCollapsed && (
           <div className="flex items-center">
             <img 
-              src="/images/logos/sabc-logo.png" 
-              alt="SABC Logo" 
+              src="/images/logos/sabc-logo.png"
+              alt="SABC Logo"
               className="h-14 w-auto object-contain"
             />
           </div>
@@ -256,6 +329,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {isCollapsed ? <Menu className="h-5 w-5 text-sabc-gray-800" /> : <AlignLeft className="h-5 w-5 text-sabc-gray-800" />}
         </Button>
       </div>
+
+      {/* CTA Évaluations — visible uniquement pour les rôles non-admin */}
+      {(authUser?.role || '').toUpperCase() !== 'ADMIN' && (
+        <div className={cn('px-3 pb-3 pt-3', isCollapsed && 'px-2')}>
+          <a
+            href="/evaluations/mine"
+            className={cn(
+              'flex items-center gap-2 rounded-xl bg-sabc-red-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sabc-red-dark transition-colors',
+              isCollapsed && 'justify-center px-2'
+            )}
+            title={isCollapsed ? 'Mes évaluations' : undefined}
+          >
+            <PlayCircle className="h-4 w-4 shrink-0" />
+            {!isCollapsed && <span>Mes évaluations</span>}
+          </a>
+        </div>
+      )}
 
       {/* Contenu du sidebar avec scroll */}
       <div className="flex flex-1 flex-col overflow-y-auto">
@@ -283,10 +373,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 ? "w-full justify-center p-2 bg-transparent hover:bg-transparent" 
                 : "w-full justify-start p-2 text-sabc-error hover:bg-sabc-gray-100 hover:text-sabc-red-primary dark:hover:bg-transparent dark:hover:text-sabc-red-light"
             )}
-            onClick={() => {
-              if (onLogout) onLogout();
-              localStorage.removeItem('sabc_access_token');
-              globalThis.location.href = '/login';
+            onClick={async () => {
+              if (onLogout) {
+                await onLogout();
+              } else {
+                await logout();
+              }
+              navigate('/login', { replace: true });
             }}
             type="button"
             title={isCollapsed ? "Déconnexion" : undefined}

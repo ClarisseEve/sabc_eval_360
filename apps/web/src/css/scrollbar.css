@@ -1,4 +1,13 @@
 /* Styles de scrollbar personnalisés pour SABC */
+
+/* Masquer complètement la scrollbar */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
   height: 6px;

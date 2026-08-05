@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { adminApi, hierarchyApi, utilisateursApi } from '@/Services/api';
+import { adminApi, hierarchyApi } from '@/Services/api';
 
 export function useAdminUsers(params?: any) {
   return useSuspenseQuery({

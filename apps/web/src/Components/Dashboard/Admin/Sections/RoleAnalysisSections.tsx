@@ -110,8 +110,8 @@ export function RoleScoreChartSection({ rows }: { rows: RolePerformanceEntry[] }
         ) : (
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={rows} layout="vertical" margin={{ left: 60, right: 20 }}>
-                <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#E5E7EB" />
+              <BarChart data={rows} layout="vertical" margin={{ top: 10, right: 20, left: 60, bottom: 0 }}>
+                <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                 <XAxis type="number" domain={[0, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                 <YAxis dataKey="role" type="category" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} width={55} />
                 <Tooltip content={<ChartTooltip />} />
@@ -144,8 +144,8 @@ export function RoleCompletionChartSection({ rows }: { rows: RolePerformanceEntr
         ) : (
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={rows} layout="vertical" margin={{ left: 60, right: 20 }}>
-                <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#E5E7EB" />
+              <BarChart data={rows} layout="vertical" margin={{ top: 10, right: 20, left: 60, bottom: 0 }}>
+                <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                 <XAxis type="number" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                 <YAxis dataKey="role" type="category" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} width={55} />
                 <Tooltip content={<ChartTooltip />} />
@@ -176,10 +176,10 @@ export function ChannelPerformanceSection({ channels }: { channels: ChannelPerfo
         {channels.length === 0 ? (
           <EmptyState message="Aucune donnee de canal disponible." />
         ) : (
-          <div className="h-64">
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={channels} margin={{ left: 20, right: 20 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#E5E7EB" />
+              <BarChart data={channels} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                 <XAxis dataKey="channel" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                 <Tooltip content={<ChartTooltip />} />

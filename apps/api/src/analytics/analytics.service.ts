@@ -1,9 +1,10 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabasePgService } from '../database/database-pg.service';
 import { CacheService } from '../common/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { getDoualaDate } from '../periodes/douala-date';
 
 type ImprovementPlanFilters = {
   role?: string;
@@ -36,12 +37,20 @@ type ImprovementPlanSnapshot = {
   recommandations: any[];
 };
 
+// Les limites arrivent en chaîne depuis la query string: sans coercition, un
+// `?limit=abc` produisait `LIMIT NaN` et une 500 opaque.
+function clampLimit(value: unknown, fallback = 100, max = 500): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.min(Math.floor(parsed), max);
+}
+
 const EVALUATION_EFFECTIVE_TS_SQL = `COALESCE(date_validation, date_soumission, created_at, date_creation::timestamp)`;
 const EVALUATION_EFFECTIVE_DATE_SQL = `COALESCE(date_validation::date, date_soumission::date, created_at::date, date_creation)`;
 const USER_REF_TABLE = 'utilisateurs_ref';
 
 @Injectable()
-export class AnalyticsService implements OnModuleInit {
+export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
   private readonly serviceUrl: string;
   private readonly serviceKey: string;
@@ -57,48 +66,6 @@ export class AnalyticsService implements OnModuleInit {
     this.serviceUrl = config.get('ANALYTICS_SERVICE_URL', 'http://analytics-service:8080');
     this.serviceKey = config.get('ANALYTICS_SERVICE_KEY', 'internal-service-key');
     this.enabled = config.get('ANALYTICS_MICROSERVICE_ENABLED', 'false') === 'true';
-  }
-
-  async onModuleInit() {
-    await this.initTables();
-  }
-
-  private async initTables(): Promise<void> {
-    await this.pg.query(`
-      CREATE TABLE IF NOT EXISTS logs_anomalies (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        type VARCHAR(100) NOT NULL,
-        description TEXT NOT NULL,
-        severite VARCHAR(20) NOT NULL,
-        matricule VARCHAR(20),
-        details JSONB,
-        resolue BOOLEAN DEFAULT false,
-        date_resolution TIMESTAMP,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_logs_anomalies_severite ON logs_anomalies(severite)`);
-    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_logs_anomalies_resolue ON logs_anomalies(resolue)`);
-    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_logs_anomalies_matricule ON logs_anomalies(matricule)`);
-
-    await this.pg.query(`
-      CREATE TABLE IF NOT EXISTS recommandations_admin (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        type VARCHAR(50) NOT NULL,
-        priorite VARCHAR(20) NOT NULL,
-        matricule VARCHAR(20) NOT NULL,
-        titre TEXT NOT NULL,
-        description TEXT NOT NULL,
-        details JSONB,
-        statut VARCHAR(20) DEFAULT 'en_attente',
-        motif_rejet TEXT,
-        validateur_matricule VARCHAR(20),
-        date_validation TIMESTAMP,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_recommandations_admin_statut ON recommandations_admin(statut)`);
-    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_recommandations_admin_matricule ON recommandations_admin(matricule)`);
   }
 
   async runAnomalyDetectionBatch(): Promise<{ total: number; critical: number; inserted: number }> {
@@ -129,9 +96,9 @@ export class AnalyticsService implements OnModuleInit {
       params.push(filters.resolue === 'true');
     }
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const limit = Math.min(filters.limit ?? 100, 500);
+    params.push(clampLimit(filters.limit));
     const rows = await this.pg.query(
-      `SELECT * FROM logs_anomalies ${where} ORDER BY created_at DESC LIMIT ${limit}`,
+      `SELECT * FROM logs_anomalies ${where} ORDER BY created_at DESC LIMIT $${paramIdx}`,
       params,
     );
     return { anomalies: rows, total: rows.length };
@@ -173,9 +140,9 @@ export class AnalyticsService implements OnModuleInit {
     if (filters.type) { conditions.push(`type = $${paramIdx++}`); params.push(filters.type); }
     if (filters.matricule) { conditions.push(`matricule = $${paramIdx++}`); params.push(filters.matricule); }
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const limit = Math.min(filters.limit ?? 100, 500);
+    params.push(clampLimit(filters.limit));
     const rows = await this.pg.query(
-      `SELECT * FROM recommandations_admin ${where} ORDER BY created_at DESC LIMIT ${limit}`,
+      `SELECT * FROM recommandations_admin ${where} ORDER BY created_at DESC LIMIT $${paramIdx}`,
       params,
     );
     return { recommandations: rows, total: rows.length };
@@ -278,32 +245,45 @@ export class AnalyticsService implements OnModuleInit {
     );
   }
 
-  async getAdminOverview() {
-    return this.cache.getOrCompute('analytics:admin:overview', 120, () => this._getAdminOverview());
+  async getAdminOverview(filters: { start_date?: string; end_date?: string } = {}) {
+    const cacheKey = `analytics:admin:overview:${filters.start_date ?? 'all'}:${filters.end_date ?? 'all'}`;
+    return this.cache.getOrCompute(cacheKey, 120, () => this._getAdminOverview(filters));
   }
 
-  private async _getAdminOverview() {
+  private async _getAdminOverview(filters: { start_date?: string; end_date?: string } = {}) {
+    const today = new Date(`${getDoualaDate()}T00:00:00.000Z`);
     const [dashboard, userStats, evaluationStatus, remplacements, regionsOverview, roleAnalytics] = await Promise.all([
-      this.getDashboard(),
+      this.getDashboard(filters),
       (async () => ({
         total_users: String(await this.prisma.utilisateur.count()),
         active_users: String(await this.prisma.utilisateur.count({ where: { est_actif: true } })),
       }))(),
-      this.pg.queryOne<any>(
-        `SELECT
-           COUNT(*)::text as total_evaluations,
-           COUNT(*) FILTER (WHERE statut = 'valide')::text as validated_evaluations,
-           COUNT(*) FILTER (WHERE statut = 'soumis')::text as submitted_evaluations,
-           COUNT(*) FILTER (WHERE statut = 'brouillon')::text as draft_evaluations
-         FROM evaluations`,
-      ),
-      this.pg.queryOne<any>(
-        `SELECT COUNT(*)::text as active_replacements
-         FROM remplacements_temporaires
-         WHERE est_actif = true AND (date_fin IS NULL OR date_fin >= CURRENT_DATE)`,
-      ),
-      this.getAdminRegionsOverview(),
-      this.getAdminRoleAnalytics(),
+      (async () => {
+        const startDate = filters.start_date;
+        const endDate = filters.end_date;
+        const dateFilter = startDate && endDate
+          ? `WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2`
+          : '';
+        const dateParams = startDate && endDate ? [startDate, endDate] : [];
+        return this.pg.queryOne<any>(
+          `SELECT
+             COUNT(*)::text as total_evaluations,
+             COUNT(*) FILTER (WHERE statut = 'valide')::text as validated_evaluations,
+             COUNT(*) FILTER (WHERE statut = 'soumis')::text as submitted_evaluations,
+             COUNT(*) FILTER (WHERE statut = 'brouillon')::text as draft_evaluations
+           FROM evaluations ${dateFilter}`,
+          dateParams,
+        );
+      })(),
+      this.prisma.replacement_temporaire.count({
+        where: {
+          est_actif: true,
+          date_debut: { lte: today },
+          OR: [{ date_fin: null }, { date_fin: { gte: today } }],
+        },
+      }),
+      this.getAdminRegionsOverview(filters),
+      this.getAdminRoleAnalytics(filters),
     ]);
 
     const totalEvaluations = Number(evaluationStatus?.total_evaluations ?? dashboard?.kpis?.total_evaluations ?? 0);
@@ -323,7 +303,7 @@ export class AnalyticsService implements OnModuleInit {
         validated_evaluations: validatedEvaluations,
         active_users: Number(userStats?.active_users ?? 0),
         total_users: Number(userStats?.total_users ?? 0),
-        active_replacements: Number(remplacements?.active_replacements ?? 0),
+        active_replacements: remplacements,
       },
       status_distribution: [
         { name: 'Validées', value: validatedEvaluations, color: '#48BB78' },
@@ -338,14 +318,15 @@ export class AnalyticsService implements OnModuleInit {
     };
   }
 
-  async getAdminRoleAnalytics() {
-    return this.cache.getOrCompute('analytics:admin:roles', 120, () => this._getAdminRoleAnalytics());
+  async getAdminRoleAnalytics(filters: { start_date?: string; end_date?: string } = {}) {
+    const cacheKey = `analytics:admin:roles:${filters.start_date ?? 'all'}:${filters.end_date ?? 'all'}`;
+    return this.cache.getOrCompute(cacheKey, 120, () => this._getAdminRoleAnalytics(filters));
   }
 
-  private async _getAdminRoleAnalytics() {
+  private async _getAdminRoleAnalytics(filters: { start_date?: string; end_date?: string } = {}) {
     const [roles, channels] = await Promise.all([
-      this.getAdminRolePerformance(),
-      this.getPerformances(),
+      this.getAdminRolePerformance(filters),
+      this.getPerformances(filters),
     ]);
 
     const globalAverage = roles.length > 0
@@ -369,12 +350,13 @@ export class AnalyticsService implements OnModuleInit {
     };
   }
 
-  async getAdminRegionsOverview() {
-    return this.cache.getOrCompute('analytics:admin:regions', 120, () => this._getAdminRegionsOverview());
+  async getAdminRegionsOverview(filters: { start_date?: string; end_date?: string } = {}) {
+    const cacheKey = `analytics:admin:regions:${filters.start_date ?? 'all'}:${filters.end_date ?? 'all'}`;
+    return this.cache.getOrCompute(cacheKey, 120, () => this._getAdminRegionsOverview(filters));
   }
 
-  private async _getAdminRegionsOverview() {
-    const rows = await this.getAdminRegionAggregates();
+  private async _getAdminRegionsOverview(filters: { start_date?: string; end_date?: string } = {}) {
+    const rows = await this.getAdminRegionAggregates(filters);
 
     return {
       regions: rows,
@@ -1009,6 +991,42 @@ export class AnalyticsService implements OnModuleInit {
     return this.cache.getOrCompute(`analytics:scores:${matricule}`, 120, () => this._getScoresUtilisateur(matricule));
   }
 
+  /**
+   * Récupère les scores de plusieurs utilisateurs en un seul appel HTTP.
+   * Réutilise le cache par matricule et borne la concurrence pour ménager le pool PostgreSQL.
+   * Retourne un dictionnaire { matricule: scores }.
+   */
+  async getScoresBatch(matricules: string[]): Promise<Record<string, any>> {
+    return this.mapByMatricule(matricules, (matricule) => this.getScoresUtilisateur(matricule));
+  }
+
+  /**
+   * Récupère les axes d'amélioration de plusieurs utilisateurs en un seul appel HTTP.
+   * Retourne un dictionnaire { matricule: axes }.
+   */
+  async getAxesAmeliorationBatch(matricules: string[]): Promise<Record<string, any>> {
+    return this.mapByMatricule(matricules, (matricule) => this.getAxesAmelioration(matricule));
+  }
+
+  private async mapByMatricule(
+    matricules: string[],
+    compute: (matricule: string) => Promise<any>,
+    concurrency = 10,
+  ): Promise<Record<string, any>> {
+    const unique = [...new Set((matricules ?? []).filter((m): m is string => typeof m === 'string' && m.length > 0))];
+    const result: Record<string, any> = {};
+
+    for (let i = 0; i < unique.length; i += concurrency) {
+      const chunk = unique.slice(i, i + concurrency);
+      const computed = await Promise.all(chunk.map((matricule) => compute(matricule)));
+      chunk.forEach((matricule, index) => {
+        result[matricule] = computed[index];
+      });
+    }
+
+    return result;
+  }
+
   private async _getScoresUtilisateur(matricule: string) {
     const recent = await this.pg.queryOne<any>(
       `SELECT AVG(note_globale) as score_recent
@@ -1227,7 +1245,13 @@ export class AnalyticsService implements OnModuleInit {
     return results;
   }
 
-  private async getAdminRegionAggregates(): Promise<AdminRegionAggregate[]> {
+  private async getAdminRegionAggregates(filters: { start_date?: string; end_date?: string } = {}): Promise<AdminRegionAggregate[]> {
+    const dateJoinCondition = filters.start_date && filters.end_date
+      ? `AND ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2`
+      : '';
+    const dateParams = filters.start_date && filters.end_date
+      ? [filters.start_date, filters.end_date]
+      : [];
     const rows = await this.pg.query<any>(
       `SELECT
          COALESCE(NULLIF(TRIM(u.id_region), ''), 'unknown') as id_region,
@@ -1242,11 +1266,12 @@ export class AnalyticsService implements OnModuleInit {
            ELSE 0
          END as completion_rate
        FROM ${USER_REF_TABLE} u
-       LEFT JOIN evaluations e ON e.evalue_matricule = u.matricule
+       LEFT JOIN evaluations e ON e.evalue_matricule = u.matricule ${dateJoinCondition}
        WHERE COALESCE(u.est_actif, true) = true
        GROUP BY COALESCE(NULLIF(TRIM(u.id_region), ''), 'unknown'),
                 COALESCE(NULLIF(TRIM(u.region_nom), ''), COALESCE(NULLIF(TRIM(u.id_region), ''), 'Région non renseignée'))
        ORDER BY nom_region ASC`,
+      dateParams,
     );
 
     return rows.map((row: any) => ({
@@ -1262,7 +1287,13 @@ export class AnalyticsService implements OnModuleInit {
     }));
   }
 
-  private async getAdminRolePerformance() {
+  private async getAdminRolePerformance(filters: { start_date?: string; end_date?: string } = {}) {
+    const dateJoinCondition = filters.start_date && filters.end_date
+      ? `AND ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2`
+      : '';
+    const dateParams = filters.start_date && filters.end_date
+      ? [filters.start_date, filters.end_date]
+      : [];
     const rows = await this.pg.query<any>(
       `SELECT
          COALESCE(NULLIF(TRIM(u.role), ''), 'Rôle non renseigné') as role,
@@ -1274,10 +1305,11 @@ export class AnalyticsService implements OnModuleInit {
            ELSE 0
          END as completion
        FROM ${USER_REF_TABLE} u
-       LEFT JOIN evaluations e ON e.evalue_matricule = u.matricule
+       LEFT JOIN evaluations e ON e.evalue_matricule = u.matricule ${dateJoinCondition}
        WHERE COALESCE(u.est_actif, true) = true
        GROUP BY COALESCE(NULLIF(TRIM(u.role), ''), 'Rôle non renseigné')
        ORDER BY avg_score DESC NULLS LAST, count DESC`,
+      dateParams,
     );
 
     return rows.map((row: any) => ({

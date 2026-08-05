@@ -1,6 +1,13 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
+import type { EvaluationActor } from './evaluations.service';
+import {
+  INTERNAL_RULE_ENVELOPE_FIELD,
+  isVisibleToEvaluated,
+  redactEvaluationForVisibility,
+  resolveEvaluationVisibilityPolicy,
+} from './evaluation-visibility';
 
 @Injectable()
 export class ContreEvaluationService {
@@ -104,10 +111,74 @@ export class ContreEvaluationService {
   /**
    * List contre-evaluations for a given original evaluation.
    */
-  async getContreEvaluations(evaluationId: string): Promise<any[]> {
-    return this.pg.query<any>(
-      `SELECT * FROM evaluations WHERE evaluation_parent_id = $1 ORDER BY created_at DESC`,
-      [evaluationId],
+  async getContreEvaluations(evaluationId: string, actor: EvaluationActor): Promise<any[]> {
+    const [original, contreEvaluations] = await Promise.all([
+      this.pg.queryOne<any>(
+        `SELECT id_evaluation, evaluateur_matricule, evalue_matricule, validateur_matricule
+         FROM evaluations WHERE id_evaluation = $1`,
+        [evaluationId],
+      ),
+      this.pg.query<any>(
+        `SELECT e.*, r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.evaluation_parent_id = $1
+         ORDER BY e.created_at DESC`,
+        [evaluationId],
+      ),
+    ]);
+
+    if (!original) throw new NotFoundException('Évaluation introuvable');
+    if (!actor?.matricule) throw new ForbiddenException('Identité utilisateur introuvable');
+
+    const role = String(actor.role_nom ?? actor.role ?? '').toUpperCase();
+    const isAdmin = Boolean(actor.is_admin) || role === 'ADMIN';
+
+    const isParticipant = [
+      original.evaluateur_matricule,
+      original.evalue_matricule,
+      original.validateur_matricule,
+    ].includes(actor.matricule);
+    const ownsContreEvaluation = contreEvaluations.some(
+      (evaluation) => evaluation.evaluateur_matricule === actor.matricule,
     );
+
+    let isDirectManager = false;
+    if (!isParticipant && !ownsContreEvaluation) {
+      const evalue = await this.prisma.utilisateur.findUnique({
+        where: { matricule: original.evalue_matricule },
+        select: { manager_matricule: true },
+      });
+      isDirectManager = evalue?.manager_matricule === actor.matricule;
+    }
+
+    if (!isAdmin && !isParticipant && !ownsContreEvaluation && !isDirectManager) {
+      throw new ForbiddenException('Non autorisé à consulter ces contre-évaluations');
+    }
+
+    return contreEvaluations.flatMap((evaluation) => {
+      const policy = resolveEvaluationVisibilityPolicy(evaluation);
+      const isOwner = evaluation.evaluateur_matricule === actor.matricule;
+      const statusIsVisible =
+        evaluation.statut === 'soumis' || evaluation.statut === 'valide';
+
+      if (isOwner) {
+        return [redactEvaluationForVisibility(evaluation, { policy, preserveDetails: true })];
+      }
+      if (isAdmin) {
+        return policy.admin
+          ? [redactEvaluationForVisibility(evaluation, { policy })]
+          : [];
+      }
+      if (evaluation.evalue_matricule === actor.matricule) {
+        return isVisibleToEvaluated(evaluation, policy)
+          ? [redactEvaluationForVisibility(evaluation, { policy })]
+          : [];
+      }
+      if (!statusIsVisible) return [];
+      if (isDirectManager && !policy.manager_n1) return [];
+
+      return [redactEvaluationForVisibility(evaluation, { policy })];
+    });
   }
 }

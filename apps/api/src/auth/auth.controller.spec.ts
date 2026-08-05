@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 
 describe('AuthController', () => {
   let controller: AuthController;
+  let authService: { login: jest.Mock; me: jest.Mock; logout: jest.Mock };
   let auditLog: jest.Mocked<AuditLogService>;
   let usersService: jest.Mocked<UsersService>;
   let prisma: {
@@ -23,6 +24,7 @@ describe('AuthController', () => {
     const mockAuthService = {
       login: jest.fn(),
       me: jest.fn(),
+      logout: jest.fn().mockResolvedValue(undefined),
     };
 
     const mockUsersService = {
@@ -56,6 +58,7 @@ describe('AuthController', () => {
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
+    authService = module.get(AuthService);
     auditLog = module.get(AuditLogService);
     usersService = module.get(UsersService) as jest.Mocked<UsersService>;
     prisma = module.get(PrismaService) as any;
@@ -64,14 +67,15 @@ describe('AuthController', () => {
   // ─── logout ─────────────────────────────────────────────────────────────────
 
   describe('logout', () => {
-    it('calls auditLog.log with action "logout", adresse_ip, and matricule_utilisateur from JWT sub', async () => {
+    it('blacklists the session and logs the logout with the current matricule', async () => {
       const req = {
-        user: { sub: 'MAT01', matricule: 'MAT01' },
+        user: { matricule: 'MAT01', jti: 'token-id', exp: 1_800_000_000 },
         ip: '127.0.0.1',
       };
 
       const result = await controller.logout(req);
 
+      expect(authService.logout).toHaveBeenCalledWith(req.user);
       expect(auditLog.log).toHaveBeenCalledTimes(1);
       expect(auditLog.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -85,9 +89,13 @@ describe('AuthController', () => {
       expect(result).toEqual({ message: 'Déconnexion réussie' });
     });
 
-    it('uses req.user.sub as matricule_utilisateur when both sub and matricule are present', async () => {
+    it('uses the database-backed matricule exposed by JwtStrategy', async () => {
       const req = {
-        user: { sub: 'SUB_MAT', matricule: 'OTHER_MAT' },
+        user: {
+          matricule: 'OTHER_MAT',
+          jti: 'token-id',
+          exp: 1_800_000_000,
+        },
         ip: '10.0.0.5',
       };
 
@@ -95,7 +103,7 @@ describe('AuthController', () => {
 
       expect(auditLog.log).toHaveBeenCalledWith(
         expect.objectContaining({
-          matricule_utilisateur: 'SUB_MAT',
+          matricule_utilisateur: 'OTHER_MAT',
           adresse_ip: '10.0.0.5',
         }),
       );
@@ -103,7 +111,7 @@ describe('AuthController', () => {
 
     it('falls back to "unknown" adresse_ip when req.ip is falsy', async () => {
       const req = {
-        user: { sub: 'MAT01' },
+        user: { matricule: 'MAT01', jti: 'token-id', exp: 1_800_000_000 },
         ip: undefined,
       };
 
@@ -122,8 +130,17 @@ describe('AuthController', () => {
   describe('updateProfile', () => {
     it('nominal: updates nom/prenom/email, calls prisma.utilisateur.update, returns profile', async () => {
       const req = { user: { matricule: 'MAT001' } };
-      const body = { nom: 'Dupont', prenom: 'Jean', email: 'jean.dupont@sabc.cm' };
-      const updatedProfile = { matricule: 'MAT001', nom: 'Dupont', prenom: 'Jean', email: 'jean.dupont@sabc.cm' };
+      const body = {
+        nom: 'Dupont',
+        prenom: 'Jean',
+        email: 'jean.dupont@sabc.cm',
+      };
+      const updatedProfile = {
+        matricule: 'MAT001',
+        nom: 'Dupont',
+        prenom: 'Jean',
+        email: 'jean.dupont@sabc.cm',
+      };
 
       prisma.utilisateur.findFirst.mockResolvedValue(null); // no duplicate
       prisma.utilisateur.update.mockResolvedValue(undefined);
@@ -136,7 +153,11 @@ describe('AuthController', () => {
       });
       expect(prisma.utilisateur.update).toHaveBeenCalledWith({
         where: { matricule: 'MAT001' },
-        data: expect.objectContaining({ nom: 'Dupont', prenom: 'Jean', email: 'jean.dupont@sabc.cm' }),
+        data: expect.objectContaining({
+          nom: 'Dupont',
+          prenom: 'Jean',
+          email: 'jean.dupont@sabc.cm',
+        }),
       });
       expect(usersService.findByMatricule).toHaveBeenCalledWith('MAT001');
       expect(result).toEqual(updatedProfile);
@@ -149,7 +170,9 @@ describe('AuthController', () => {
 
       prisma.utilisateur.findFirst.mockResolvedValue(null);
       prisma.utilisateur.update.mockResolvedValue(undefined);
-      usersService.findByMatricule.mockResolvedValue({ matricule: 'MAT001' } as any);
+      usersService.findByMatricule.mockResolvedValue({
+        matricule: 'MAT001',
+      } as any);
 
       await controller.updateProfile(req, body as any);
 
@@ -163,7 +186,10 @@ describe('AuthController', () => {
       const req = { user: { matricule: 'MAT001' } };
       const body = { email: 'taken@sabc.cm' };
 
-      prisma.utilisateur.findFirst.mockResolvedValue({ matricule: 'OTHER', email: 'taken@sabc.cm' });
+      prisma.utilisateur.findFirst.mockResolvedValue({
+        matricule: 'OTHER',
+        email: 'taken@sabc.cm',
+      });
 
       await expect(controller.updateProfile(req, body as any)).rejects.toThrow(
         new BadRequestException('Cet email est déjà utilisé'),
@@ -186,7 +212,10 @@ describe('AuthController', () => {
         password_confirmation: 'newpassword',
       };
 
-      prisma.utilisateur.findUnique.mockResolvedValue({ matricule: 'MAT001', password: hashedCurrent });
+      prisma.utilisateur.findUnique.mockResolvedValue({
+        matricule: 'MAT001',
+        password: hashedCurrent,
+      });
       prisma.utilisateur.update.mockResolvedValue(undefined);
 
       const result = await controller.updatePassword(req, body as any);
@@ -195,7 +224,9 @@ describe('AuthController', () => {
         where: { matricule: 'MAT001' },
         data: expect.objectContaining({ password: expect.any(String) }),
       });
-      expect(result).toEqual({ message: 'Mot de passe mis à jour avec succès' });
+      expect(result).toEqual({
+        message: 'Mot de passe mis à jour avec succès',
+      });
     });
 
     it('incorrect current password → throws BadRequestException("Mot de passe actuel incorrect")', async () => {

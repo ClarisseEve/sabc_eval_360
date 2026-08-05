@@ -10,6 +10,51 @@ import { EvaluationPageLayout, formatDisplayName, formatRole } from './shared';
 import { QuickActionsCard, formatDateLabel } from '@/Components/Dashboard/RoleDashboardShared';
 import { TruncatedList } from '@/Components/UI/TruncatedList/TruncatedList';
 import { CheckCheck, ClipboardList, Clock, FileEdit, Send } from 'lucide-react';
+import { cn } from '@/utils/helpers';
+
+type StatusMeta = {
+  label: string;
+  groupLabel: string;
+  Icon: React.ElementType;
+  badgeVariant: 'warning' | 'info' | 'secondary';
+  accent: string;
+  chip: string;
+  action: string;
+};
+
+/** Code couleur cohérent avec les tuiles du haut : brouillon = ambre, soumis = bleu. */
+const STATUS_META: Record<string, StatusMeta> = {
+  brouillon: {
+    label: 'Brouillon',
+    groupLabel: 'Brouillons à reprendre',
+    Icon: FileEdit,
+    badgeVariant: 'warning',
+    accent: 'border-l-amber-400 dark:border-l-amber-500',
+    chip: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    action: 'Reprendre',
+  },
+  soumis: {
+    label: 'Soumise',
+    groupLabel: 'Soumises',
+    Icon: Send,
+    badgeVariant: 'info',
+    accent: 'border-l-blue-400 dark:border-l-blue-500',
+    chip: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    action: 'Voir',
+  },
+};
+
+const FALLBACK_STATUS_META: StatusMeta = {
+  label: '',
+  groupLabel: 'Autres',
+  Icon: Clock,
+  badgeVariant: 'secondary',
+  accent: 'border-l-sabc-gray-300 dark:border-l-sabc-gray-600',
+  chip: 'bg-sabc-gray-100 text-sabc-gray-600 dark:bg-sabc-gray-800 dark:text-sabc-gray-300',
+  action: 'Voir',
+};
+
+const STATUS_ORDER = ['brouillon', 'soumis'];
 
 function MetricTile({
   label,
@@ -54,6 +99,57 @@ const Pending: React.FC = () => {
   const filtered = activeTab === 'all'
     ? data.pendingEvaluations
     : data.pendingEvaluations.filter((evaluation) => (evaluation.type_evaluation || 'autre') === activeTab);
+
+  // Regroupe par statut (brouillons d'abord), sans mélanger soumis et brouillons.
+  const statusOrder = [...STATUS_ORDER];
+  for (const evaluation of filtered) {
+    if (!statusOrder.includes(evaluation.statut)) statusOrder.push(evaluation.statut);
+  }
+  const statusGroups = statusOrder
+    .map((statut) => ({ statut, items: filtered.filter((evaluation) => evaluation.statut === statut) }))
+    .filter((group) => group.items.length > 0);
+
+  const renderEvaluationItem = (evaluation: any, meta: StatusMeta) => {
+    const Icon = meta.Icon;
+    return (
+      <div
+        className={cn(
+          'flex flex-col gap-3 rounded-lg border border-l-4 border-sabc-gray-200 p-4 dark:border-sabc-gray-800 md:flex-row md:items-center md:justify-between',
+          meta.accent,
+        )}
+      >
+        <div className="min-w-0">
+          <div className="font-medium text-sabc-gray-900 dark:text-white">
+            {formatDisplayName(evaluation.evalue || {})}
+          </div>
+          <div className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
+            {formatRole(evaluation.evalue || {})} · {evaluation.regle?.nom_regle || evaluation.type_evaluation || 'Évaluation'}
+          </div>
+          <div className="text-xs text-sabc-gray-400 dark:text-sabc-gray-500">
+            Créée le {evaluation.created_at ? new Date(evaluation.created_at).toLocaleDateString('fr-FR') : '—'}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge variant={meta.badgeVariant} className="gap-1">
+            <Icon className="h-3 w-3" aria-hidden />
+            {meta.label || evaluation.statut}
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              window.location.href =
+                evaluation.statut === 'brouillon'
+                  ? `/evaluations/${evaluation.id_evaluation}/edit`
+                  : `/evaluations/${evaluation.id_evaluation}`;
+            }}
+          >
+            {meta.action}
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <EvaluationPageLayout pageTitle="Évaluations à compléter">
@@ -135,7 +231,7 @@ const Pending: React.FC = () => {
                   </TabsTrigger>
                 ))}
               </TabsList>
-              <TabsContent value={activeTab} className="mt-4 space-y-3">
+              <TabsContent value={activeTab} className="mt-4 space-y-6">
                 {filtered.length === 0 ? (
                   <Alert>
                     <AlertTitle>Aucune évaluation</AlertTitle>
@@ -144,47 +240,36 @@ const Pending: React.FC = () => {
                     </AlertDescription>
                   </Alert>
                 ) : (
-                  <TruncatedList
-                    items={filtered}
-                    previewCount={6}
-                    keyExtractor={(evaluation: any) => evaluation.id_evaluation}
-                    modalTitle="Toutes les évaluations en attente"
-                    modalDescription={`${filtered.length} évaluation(s) au total`}
-                    className="space-y-3"
-                    modalClassName="space-y-3"
-                    renderItem={(evaluation: any) => (
-                      <div className="flex flex-col gap-3 rounded-lg border border-sabc-gray-200 p-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <div className="font-medium text-sabc-gray-900">
-                            {formatDisplayName(evaluation.evalue || {})}
-                          </div>
-                          <div className="text-sm text-sabc-gray-500">
-                            {formatRole(evaluation.evalue || {})} · {evaluation.regle?.nom_regle || evaluation.type_evaluation || 'Évaluation'}
-                          </div>
-                          <div className="text-xs text-sabc-gray-400">
-                            Créée le {evaluation.created_at ? new Date(evaluation.created_at).toLocaleDateString('fr-FR') : '—'}
-                          </div>
-                        </div>
+                  statusGroups.map(({ statut, items }) => {
+                    const meta = STATUS_META[statut] ?? FALLBACK_STATUS_META;
+                    const GroupIcon = meta.Icon;
+                    return (
+                      <div key={statut} className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <Badge variant={evaluation.statut === 'soumis' ? 'primary' : 'secondary'}>
-                            {evaluation.statut}
-                          </Badge>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              window.location.href =
-                                evaluation.statut === 'brouillon'
-                                  ? `/evaluations/${evaluation.id_evaluation}/edit`
-                                  : `/evaluations/${evaluation.id_evaluation}`;
-                            }}
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold',
+                              meta.chip,
+                            )}
                           >
-                            {evaluation.statut === 'brouillon' ? 'Reprendre' : 'Voir'}
-                          </Button>
+                            <GroupIcon className="h-3.5 w-3.5" aria-hidden />
+                            {meta.groupLabel}
+                          </span>
+                          <span className="text-xs font-medium text-sabc-gray-400">{items.length}</span>
                         </div>
+                        <TruncatedList
+                          items={items}
+                          previewCount={5}
+                          keyExtractor={(evaluation: any) => evaluation.id_evaluation}
+                          modalTitle={meta.groupLabel}
+                          modalDescription={`${items.length} évaluation(s)`}
+                          className="space-y-3"
+                          modalClassName="space-y-3"
+                          renderItem={(evaluation: any) => renderEvaluationItem(evaluation, meta)}
+                        />
                       </div>
-                    )}
-                  />
+                    );
+                  })
                 )}
               </TabsContent>
             </Tabs>

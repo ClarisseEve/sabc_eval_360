@@ -1,47 +1,15 @@
-import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RapportRow, RapportSection, SectionType } from './dto/section.dto';
 
 @Injectable()
-export class ReportsService implements OnModuleInit {
+export class ReportsService {
   constructor(
     private readonly pg: DatabasePgService,
     private readonly prisma: PrismaService,
   ) {}
-
-  async onModuleInit(): Promise<void> {
-    await this.initTables();
-  }
-
-  private async initTables(): Promise<void> {
-    await this.pg.query(`
-      CREATE TABLE IF NOT EXISTS rapports (
-        id_rapport         UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-        titre              VARCHAR(200) NOT NULL,
-        createur_matricule VARCHAR(20)  NOT NULL,
-        sections_json      JSONB        NOT NULL DEFAULT '[]',
-        statut             VARCHAR(20)  NOT NULL DEFAULT 'brouillon',
-        created_at         TIMESTAMP    DEFAULT NOW(),
-        updated_at         TIMESTAMP    DEFAULT NOW()
-      )
-    `);
-    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_rapports_createur ON rapports(createur_matricule)`);
-    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_rapports_statut   ON rapports(statut)`);
-
-    await this.pg.query(`
-      CREATE TABLE IF NOT EXISTS historique_exports (
-        id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-        rapport_id         UUID        REFERENCES rapports(id_rapport) ON DELETE SET NULL,
-        format             VARCHAR(20) NOT NULL,
-        createur_matricule VARCHAR(20) NOT NULL,
-        fichier_nom        VARCHAR(255),
-        created_at         TIMESTAMP   DEFAULT NOW()
-      )
-    `);
-    await this.pg.query(`CREATE INDEX IF NOT EXISTS idx_historique_exports_rapport ON historique_exports(rapport_id)`);
-  }
 
   async createRapport(titre: string, createurMatricule: string): Promise<RapportRow> {
     const row = await this.pg.queryOne<RapportRow>(

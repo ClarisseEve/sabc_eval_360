@@ -111,10 +111,10 @@ export default function EvaluationFormPage() {
     onSuccess: (response) => {
       const id = response.data?.id_evaluation || response.data?.id;
       if (id) {
-        navigate(`/common/evaluations/${id}/edit`);
+        navigate(`/evaluations/${id}/edit`);
         return;
       }
-      navigate('/common/evaluations');
+      navigate('/evaluations');
     },
     onError: (mutationError: any) => {
       setError(mutationError?.response?.data?.message || mutationError?.message || 'Impossible de créer l’évaluation.');

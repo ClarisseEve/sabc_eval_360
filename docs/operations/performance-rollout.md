@@ -52,14 +52,15 @@ Mesurer séparément:
 
 ## Outil embarqué
 
-Le repo contient un script Node sans dépendance externe:
+Le repo contient un script Node sans dépendance externe. Exporter au préalable
+le `SEED_PASSWORD` de l'environnement de test :
 
 ```bash
 LOAD_BASE_URL=http://localhost:3000 \
 LOAD_ADMIN_EMAIL=admin@sabc.local \
-LOAD_ADMIN_PASSWORD=***REMOVED*** \
+LOAD_ADMIN_PASSWORD="$SEED_PASSWORD" \
 LOAD_USER_EMAIL=user@sabc.local \
-LOAD_USER_PASSWORD=***REMOVED*** \
+LOAD_USER_PASSWORD="$SEED_PASSWORD" \
 LOAD_TARGET_MATRICULE=U1234 \
 LOAD_VALIDATION_EVALUATION_IDS=<evaluation-id-1>,<evaluation-id-2>,<evaluation-id-3> \
 LOAD_ITERATIONS=100 \

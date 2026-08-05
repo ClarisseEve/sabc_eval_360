@@ -30,7 +30,9 @@ export class EligibilityController {
     if (!callerMatricule) {
       throw new UnauthorizedException('Impossible de déterminer l\'identité de l\'appelant');
     }
-    if (!req.user?.est_admin && dto.evaluateur_matricule !== callerMatricule) {
+    const role = String(req.user?.role ?? '').toUpperCase();
+    const isAdmin = Boolean(req.user?.is_admin ?? req.user?.est_admin) || role === 'ADMIN';
+    if (!isAdmin && dto.evaluateur_matricule !== callerMatricule) {
       throw new ForbiddenException(
         'Vous ne pouvez vérifier l\'éligibilité qu\'en votre propre nom',
       );

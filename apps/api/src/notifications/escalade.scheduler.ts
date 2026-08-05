@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { EscaladeService } from './escalade.service';
 
@@ -6,10 +7,15 @@ import { EscaladeService } from './escalade.service';
 export class EscaladeScheduler {
   private readonly logger = new Logger(EscaladeScheduler.name);
 
-  constructor(private escaladeService: EscaladeService) {}
+  constructor(
+    private escaladeService: EscaladeService,
+    private config: ConfigService,
+  ) {}
 
-  @Cron('0 8 * * *', { timeZone: 'Africa/Douala' })
+  @Cron('0 8 * * *', { timeZone: 'Africa/Douala', waitForCompletion: true })
   async traiterEscalade(): Promise<void> {
+    if (!this.isSchedulerEnabled()) return;
+
     this.logger.log('[5.4] Cron démarré: traitement des escalades automatiques');
     try {
       const result = await this.escaladeService.traiterEscalade();
@@ -19,5 +25,9 @@ export class EscaladeScheduler {
     } catch (err) {
       this.logger.error(`[5.4] Erreur cron escalade: ${err}`);
     }
+  }
+
+  private isSchedulerEnabled(): boolean {
+    return String(this.config.get('SCHEDULER_ENABLED', 'true')).trim().toLowerCase() === 'true';
   }
 }

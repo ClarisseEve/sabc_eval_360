@@ -61,10 +61,13 @@ export class NotificationsService {
     return Number(result[0]?.count ?? 0);
   }
 
-  async marquerCommeLue(id: string) {
+  async marquerCommeLue(id: string, matricule: string) {
     await this.prisma.$executeRawUnsafe(
-      'UPDATE notifications_utilisateurs SET est_lu = 1, date_lecture = NOW() WHERE id_notification = ?',
+      `UPDATE notifications_utilisateurs
+       SET est_lu = 1, date_lecture = NOW()
+       WHERE id_notification = ? AND destinataire_matricule = ?`,
       id,
+      matricule,
     );
     return { success: true };
   }

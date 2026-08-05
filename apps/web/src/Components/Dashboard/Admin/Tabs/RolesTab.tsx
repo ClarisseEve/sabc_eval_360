@@ -51,7 +51,7 @@ const RolesTab: React.FC = () => {
   const marketingRoles = roles.filter(role => role.categorie === 'Marketing' || role.categorie === null);
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-sabc-gray-700 dark:text-sabc-gray-300">Gestion des Rôles</h2>
         <Button 

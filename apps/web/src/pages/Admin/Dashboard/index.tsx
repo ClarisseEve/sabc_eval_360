@@ -1,55 +1,85 @@
 import React, { Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Head } from '@/lib/inertia-shim';
-import { useSearchParams } from 'react-router-dom';
-import { Badge } from '@/Components/UI/Badge/Badge';
+import { Link } from 'react-router-dom';
 import AppLayout from '@/Components/Layout/app/AppLayout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs/Tabs';
+import { Card, CardContent } from '@/Components/UI/Card';
 import { WelcomeMessage } from '@/Components/UI/WelcomeMessage';
 import { ErrorBoundary } from '@/Components/ErrorBoundary';
-import { DashboardSkeleton } from '@/Components/Dashboard/DashboardSkeleton';
 import { useAuthContext } from '@/Contexts/AuthContext';
-import { analyticsApi } from '@/Services/api';
+import { analyticsApi, periodesApi, reglesApi } from '@/Services/api';
+import { useAdminOverviewTabData } from '@/Hooks/queries/useAdminDashboardTabs';
+import { AdminOverviewMetricsSection } from '@/Components/Dashboard/Admin/Sections/OverviewSections';
+import {
+  AlertTriangle,
+  BarChart3,
+  CalendarClock,
+  CheckCircle2,
+  ClipboardList,
+  FileText,
+  Layers3,
+  ShieldAlert,
+  Users,
+} from 'lucide-react';
 
-const DashboardTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/DashboardTab'));
-const RegionsTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/RegionsTab'));
-const RoleAnalysisTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/RoleAnalysisTab'));
-const AnomaliesTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/AnomaliesTab'));
-const IndividualSearchTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/IndividualSearchTab'));
-const ImprovementPlansTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/ImprovementPlansTab'));
-const TendancesTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/TendancesTab'));
-
-const ADMIN_TABS = [
-  { value: 'overview', label: "Vue d'ensemble" },
-  { value: 'regions', label: 'Analyse régionale' },
-  { value: 'roles', label: 'Analyse par rôle' },
-  { value: 'anomalies', label: 'Anomalies & alertes' },
-  { value: 'individual', label: 'Recherche individuelle' },
-  { value: 'improvement', label: "Plans d'amélioration" },
-  { value: 'tendances', label: 'Tendances' },
-] as const;
-
-type AdminTabValue = (typeof ADMIN_TABS)[number]['value'];
-
-function resolveTab(rawValue: string | null): AdminTabValue {
-  if (ADMIN_TABS.some((tab) => tab.value === rawValue)) {
-    return rawValue as AdminTabValue;
-  }
-  return 'overview';
+function KpiSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="h-28 animate-pulse rounded-2xl bg-sabc-gray-100 dark:bg-sabc-gray-800" />
+      ))}
+    </div>
+  );
 }
+
+function AdminKpis() {
+  const { data } = useAdminOverviewTabData();
+  return (
+    <AdminOverviewMetricsSection
+      totalEvaluations={data.totalEvaluations}
+      uniqueUsers={data.uniqueUsers}
+      averageScore={data.averageScore}
+      completionRate={data.completionRate}
+      validatedEvaluations={data.validatedEvaluations}
+    />
+  );
+}
+
+const QUICK_LINKS = [
+  { label: 'Analytics 360°', caption: 'Analyses détaillées par région, rôle, tendances', href: '/admin/analytics?tab=overview', icon: BarChart3 },
+  { label: 'Gestion des évaluations', caption: 'Suivi global des évaluations', href: '/admin/evaluations/management', icon: ClipboardList },
+  { label: 'Périodes', caption: 'Ouvrir / fermer les cycles', href: '/admin/evaluations/periodes', icon: CalendarClock },
+  { label: 'Règles', caption: 'Cadres et critères d’évaluation', href: '/admin/evaluations/regles', icon: Layers3 },
+  { label: 'Utilisateurs', caption: 'Annuaire et hiérarchie', href: '/admin/utilisateurs', icon: Users },
+  { label: 'Rapports', caption: 'Exports PPTX / XLSX', href: '/admin/reports', icon: FileText },
+];
 
 export default function AdminDashboard() {
   const { user } = useAuthContext();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = resolveTab(searchParams.get('tab'));
+
   const { data: anomalyTotal = 0 } = useQuery({
     queryKey: ['admin', 'dashboard', 'anomalies', 'badge'],
-    queryFn: async () => {
-      const response = await analyticsApi.anomalies();
-      return Number(response.data?.total ?? 0);
-    },
+    queryFn: async () => Number((await analyticsApi.anomalies()).data?.total ?? 0),
     staleTime: 60_000,
   });
+
+  const { data: periodesData } = useQuery({
+    queryKey: ['admin', 'setup', 'periodes'],
+    queryFn: () => periodesApi.list().then((r) => (Array.isArray(r.data) ? r.data : [])),
+    staleTime: 30_000,
+  });
+
+  const { data: reglesData } = useQuery({
+    queryKey: ['admin', 'setup', 'regles'],
+    queryFn: () => reglesApi.list().then((r) => (Array.isArray(r.data) ? r.data : [])),
+    staleTime: 30_000,
+  });
+
+  const periodes = Array.isArray(periodesData) ? periodesData : [];
+  const openPeriode = periodes.find((p: any) => p.est_ouverte) ?? null;
+  const hasOpenPeriod = Boolean(openPeriode);
+  const hasActiveRules = Array.isArray(reglesData) && reglesData.length > 0;
+  const isSetupComplete = hasOpenPeriod && hasActiveRules;
 
   const layoutUser = {
     name: user ? [user.prenom, user.nom].filter(Boolean).join(' ') || 'Administrateur' : 'Administrateur',
@@ -58,93 +88,120 @@ export default function AdminDashboard() {
     avatar: user?.avatar,
   };
 
-  const handleTabChange = (value: string) => {
-    const nextTab = resolveTab(value);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set('tab', nextTab);
-    setSearchParams(nextParams, { replace: true });
-  };
-
   return (
-    <AppLayout user={layoutUser} pageTitle="Dashboard 360°" notifications={[]}>
-      <Head title="Dashboard Administrateur 360° - SABC Eval360" />
+    <AppLayout user={layoutUser} pageTitle="Tableau de bord" notifications={[]}>
+      <Head title="Tableau de bord - SABC Eval360" />
 
-      <div className="container mx-auto px-4 py-6">
-        <WelcomeMessage userName={layoutUser.name} className="mb-8" />
+      <div className="container mx-auto space-y-6 px-4 py-6">
+        <WelcomeMessage userName={layoutUser.name} />
 
-        <Tabs value={activeTab} variant="card" onValueChange={handleTabChange}>
-          <TabsList className="mb-4 flex w-full flex-wrap justify-start gap-2">
-            {ADMIN_TABS.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value} className="gap-2">
-                <span>{tab.label}</span>
-                {tab.value === 'anomalies' && anomalyTotal > 0 && (
-                  <Badge
-                    variant={activeTab === tab.value ? 'secondary' : 'destructive'}
-                    className="border-0 px-2 py-0.5 text-[11px] leading-none"
-                  >
-                    {anomalyTotal > 99 ? '99+' : anomalyTotal}
-                  </Badge>
-                )}
-              </TabsTrigger>
+        {/* Checklist de configuration */}
+        {!isSetupComplete && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div className="flex-1">
+                <div className="font-semibold text-amber-900 dark:text-amber-200">Configuration requise avant le lancement des évaluations</div>
+                <div className="mt-2 space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm">
+                    {hasActiveRules
+                      ? <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+                    <span className={hasActiveRules ? 'text-emerald-800' : 'text-amber-800'}>
+                      {hasActiveRules ? 'Au moins une règle active publiée' : 'Aucune règle active — '}
+                    </span>
+                    {!hasActiveRules && (
+                      <Link to="/admin/evaluations/regles/create" className="font-medium text-sabc-red-primary underline-offset-2 hover:underline">
+                        Créer une règle →
+                      </Link>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    {hasOpenPeriod
+                      ? <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+                    <span className={hasOpenPeriod ? 'text-emerald-800' : 'text-amber-800'}>
+                      {hasOpenPeriod ? "Période d'évaluation ouverte" : 'Aucune période ouverte — '}
+                    </span>
+                    {!hasOpenPeriod && (
+                      <Link to="/admin/evaluations/periodes" className="font-medium text-sabc-red-primary underline-offset-2 hover:underline">
+                        Créer et ouvrir une période →
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Indicateurs clés en un coup d'œil */}
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-sabc-gray-900 dark:text-white">Indicateurs clés</h2>
+            <Link to="/admin/analytics?tab=overview" className="text-sm font-medium text-sabc-red-primary hover:underline">
+              Voir les analyses détaillées →
+            </Link>
+          </div>
+          <ErrorBoundary>
+            <Suspense fallback={<KpiSkeleton />}>
+              <AdminKpis />
+            </Suspense>
+          </ErrorBoundary>
+        </section>
+
+        {/* Alertes & état des campagnes */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <Link to="/admin/analytics?tab=anomalies" className="block">
+            <Card className="transition-shadow hover:shadow-md">
+              <CardContent className="flex items-center gap-4 p-5">
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${anomalyTotal > 0 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                  <ShieldAlert className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-sabc-gray-900 dark:text-white">{anomalyTotal}</div>
+                  <div className="text-sm text-sabc-gray-500">
+                    {anomalyTotal > 0 ? 'Anomalies à examiner' : 'Aucune anomalie détectée'}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Card>
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sabc-gray-100 text-sabc-gray-600 dark:bg-sabc-gray-800">
+                <CalendarClock className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="text-base font-semibold text-sabc-gray-900 dark:text-white">
+                  {openPeriode ? (openPeriode.nom_periode || openPeriode.code_periode) : 'Aucune période ouverte'}
+                </div>
+                <div className="text-sm text-sabc-gray-500">
+                  {openPeriode ? 'Campagne en cours' : 'Ouvrez une période pour lancer les évaluations'}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Accès rapides */}
+        <section>
+          <h2 className="mb-3 text-base font-semibold text-sabc-gray-900 dark:text-white">Accès rapides</h2>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+            {QUICK_LINKS.map(({ label, caption, href, icon: Icon }) => (
+              <Link key={href} to={href} className="block">
+                <Card className="h-full transition-all hover:-translate-y-0.5 hover:border-sabc-red-primary/40 hover:shadow-md">
+                  <CardContent className="flex h-full flex-col gap-2 p-4">
+                    <Icon className="h-6 w-6 text-sabc-red-primary" />
+                    <div className="text-sm font-semibold text-sabc-gray-900 dark:text-white">{label}</div>
+                    <div className="text-xs text-sabc-gray-500">{caption}</div>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
-          </TabsList>
-
-          <TabsContent value="overview">
-            <ErrorBoundary>
-              <Suspense fallback={<DashboardSkeleton />}>
-                <DashboardTab />
-              </Suspense>
-            </ErrorBoundary>
-          </TabsContent>
-
-          <TabsContent value="regions">
-            <ErrorBoundary>
-              <Suspense fallback={<DashboardSkeleton />}>
-                <RegionsTab />
-              </Suspense>
-            </ErrorBoundary>
-          </TabsContent>
-
-          <TabsContent value="roles">
-            <ErrorBoundary>
-              <Suspense fallback={<DashboardSkeleton />}>
-                <RoleAnalysisTab />
-              </Suspense>
-            </ErrorBoundary>
-          </TabsContent>
-
-          <TabsContent value="anomalies">
-            <ErrorBoundary>
-              <Suspense fallback={<DashboardSkeleton />}>
-                <AnomaliesTab />
-              </Suspense>
-            </ErrorBoundary>
-          </TabsContent>
-
-          <TabsContent value="individual">
-            <ErrorBoundary>
-              <Suspense fallback={<DashboardSkeleton />}>
-                <IndividualSearchTab />
-              </Suspense>
-            </ErrorBoundary>
-          </TabsContent>
-
-          <TabsContent value="improvement">
-            <ErrorBoundary>
-              <Suspense fallback={<DashboardSkeleton />}>
-                <ImprovementPlansTab />
-              </Suspense>
-            </ErrorBoundary>
-          </TabsContent>
-
-          <TabsContent value="tendances">
-            <ErrorBoundary>
-              <Suspense fallback={<DashboardSkeleton />}>
-                <TendancesTab />
-              </Suspense>
-            </ErrorBoundary>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </section>
       </div>
     </AppLayout>
   );

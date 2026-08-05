@@ -35,7 +35,7 @@ model Role {
   id_role                   String    @id @db.VarChar(5)
   nom_role                  String    @unique(map: "roles_nom_role_unique") @db.VarChar(50)
   description               String?   @db.Text
-  id_branche                String?   @db.VarChar(10)
+  id_branche                String?   @db.VarChar(5)
   niveau_taniere            Int?
   niveau_non_taniere        Int?
   peut_auto_evaluer         Boolean   @default(true)
@@ -111,7 +111,7 @@ model Utilisateur {
 model ServiceCommercial {
   id_service   String        @id @db.VarChar(10)
   nom_service  String        @unique(map: "services_commerciaux_nom_service_unique") @db.VarChar(100)
-  id_region    String        @db.VarChar(10)
+  id_region    String        @db.VarChar(5)
   description  String?       @db.Text
   est_actif    Boolean       @default(true)
   created_at   DateTime?     @db.Timestamp(0)

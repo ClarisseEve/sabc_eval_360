@@ -97,12 +97,12 @@ export function ScoresByTypeCard({
         ) : variant === 'chart' ? (
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={entries} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 5]} />
-                <YAxis dataKey="type" type="category" width={100} tickFormatter={(value) => formatEvaluationType(value)} />
+              <BarChart data={entries} layout="vertical" margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" horizontal={false} />
+                <XAxis type="number" domain={[0, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                <YAxis dataKey="type" type="category" width={110} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} tickFormatter={(value) => formatEvaluationType(value)} />
                 <Tooltip formatter={(value: number) => [`${value}/5`, 'Score moyen']} labelFormatter={(value) => formatEvaluationType(value)} />
-                <Bar dataKey="moyenne" fill="#C62828" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="moyenne" fill="#C62828" radius={[0, 10, 10, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -244,5 +244,60 @@ describe('DashboardManagerService', () => {
       expect(result.meta.total).toBe(0);
       expect(result.meta.page).toBe(1);
     });
+
+    it("anonymise l'évaluateur pair avant l'enrichissement de la file", async () => {
+      mockHierarchy.getSubordonnesDirects.mockResolvedValue([{ matricule: 'EMP001' }]);
+      mockPg.queryOne.mockResolvedValue({ count: '1' });
+      mockPg.query.mockResolvedValue([
+        {
+          id_evaluation: 'eval-pairs',
+          evaluateur_matricule: 'PAIR-SECRET',
+          evalue_matricule: 'EMP001',
+          type_evaluation: 'pairs',
+          date_soumission: '2025-05-01T10:00:00Z',
+          jours_attente: 2,
+          nom_periode: 'P2025',
+          id_periode: 'P1',
+          __rule_envelope: {
+            visibility_policy: { manager_n1: true, detail: 'detailed' },
+          },
+        },
+      ]);
+      mockPrisma.utilisateur.findMany.mockResolvedValue([
+        { matricule: 'PAIR-SECRET', nom: 'Identité', prenom: 'Secrète', role_nom: 'CSC' },
+        { matricule: 'EMP001', nom: 'Employé', prenom: 'Un', role_nom: 'CSC' },
+      ]);
+
+      const result = await service.getValidationsAttente('MGR001', { page: 1, limit: 20 });
+
+      expect(result.data[0].evaluateur_matricule).toBeNull();
+      expect(result.data[0].evaluateur_nom).toBe('Anonyme');
+      expect(mockPrisma.utilisateur.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { matricule: { in: ['EMP001'] } } }),
+      );
+      for (const sql of [
+        String(mockPg.queryOne.mock.calls[0][0]),
+        String(mockPg.query.mock.calls[0][0]),
+      ]) {
+        expect(sql).toContain("'{visibility_policy,manager_n1}'");
+      }
+    });
+
+    it("exclut les pairs d'un filtre par matricule pour éviter un oracle d'identité", async () => {
+      mockHierarchy.getSubordonnesDirects.mockResolvedValue([{ matricule: 'EMP001' }]);
+      mockPg.queryOne.mockResolvedValue({ count: '0' });
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getValidationsAttente('MGR001', {
+        evaluateur_matricule: 'PAIR-SECRET',
+      });
+
+      const countSql = String(mockPg.queryOne.mock.calls[0][0]);
+      const rowsSql = String(mockPg.query.mock.calls[0][0]);
+      for (const sql of [countSql, rowsSql]) {
+        expect(sql).toContain("e.type_evaluation <> 'pairs'");
+        expect(sql).toContain('e.evaluateur_matricule');
+      }
+    });
   });
 });

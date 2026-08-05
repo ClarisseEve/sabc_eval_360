@@ -6,9 +6,9 @@ import {
   RegionalRankingSection,
 } from '@/Components/Dashboard/Admin/Sections/RegionsSections';
 
-export default function RegionsTab() {
+export default function RegionsTab({ dateRange }: { dateRange?: { start_date?: string; end_date?: string } }) {
   const [selectedRegion, setSelectedRegion] = React.useState('');
-  const { regions, interRegionData, selectedRegionStats, regionClassement } = useAdminRegionsTabData(selectedRegion);
+  const { regions, interRegionData, selectedRegionStats, regionClassement } = useAdminRegionsTabData(selectedRegion, dateRange);
 
   React.useEffect(() => {
     if (!selectedRegion && regions.length > 0) {
@@ -18,7 +18,7 @@ export default function RegionsTab() {
   const distribution = regionClassement?.distribution || {};
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <RegionSelectionSection
         selectedRegion={selectedRegion}
         onRegionChange={setSelectedRegion}

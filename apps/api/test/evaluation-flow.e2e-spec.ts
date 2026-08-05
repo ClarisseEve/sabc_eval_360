@@ -19,7 +19,10 @@ describe('Evaluation 360° Flow (e2e)', () => {
   jest.setTimeout(30000);
 
   // Test credentials — must exist in seeded DB
-  const TEST_ADMIN = { email: 'admin@sabc.local', password: process.env.SEED_PASSWORD || '***REMOVED***' };
+  const TEST_ADMIN = {
+    identifier: 'admin@sabc.local',
+    password: process.env.SEED_PASSWORD || '***REMOVED***',
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -48,7 +51,7 @@ describe('Evaluation 360° Flow (e2e)', () => {
     it('should reject invalid credentials', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/auth/login')
-        .send({ email: 'wrong@sabc.cm', password: 'wrong' });
+        .send({ identifier: 'wrong@sabc.cm', password: 'wrong' });
 
       expect(res.status).toBe(401);
     });
@@ -61,7 +64,7 @@ describe('Evaluation 360° Flow (e2e)', () => {
       expect(res.status).toBe(201);
       expect(res.body).toHaveProperty('access_token');
       expect(res.body).toHaveProperty('user');
-      expect(res.body.user).toHaveProperty('email', TEST_ADMIN.email);
+      expect(res.body.user).toHaveProperty('email', TEST_ADMIN.identifier);
 
       accessToken = res.body.access_token;
     });
@@ -80,7 +83,7 @@ describe('Evaluation 360° Flow (e2e)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('matricule');
-      expect(res.body).toHaveProperty('email', TEST_ADMIN.email);
+      expect(res.body).toHaveProperty('email', TEST_ADMIN.identifier);
 
       userProfile = res.body;
     });
@@ -148,59 +151,105 @@ describe('Evaluation 360° Flow (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.meta).toEqual(
+        expect.objectContaining({
+          total: expect.any(Number),
+          page: 1,
+          limit: 20,
+          totalPages: expect.any(Number),
+        }),
+      );
     });
   });
 
   // ─── 4. Full evaluation lifecycle ──────────────────────────────────────────
   //
-  // This test group requires seeded periodes & users.
-  // If seeded data is not available, these tests will be skipped gracefully.
+  // This test group requires the canonical demo seed prepared by test:e2e:prepare.
 
   describe('Evaluation Lifecycle: create → update → submit → validate', () => {
     let evaluationId: string;
     let periodeId: string | number;
     let evalueMatricule: string;
+    let regleId: string;
+    let criteres: Array<{ id: string }> = [];
+    let lifecycleToken: string;
+    let lifecycleProfile: any;
 
-    it('should fetch a valid periode and eligible user (setup)', async () => {
-      // Get active periods
+    it('should prepare an eligible evaluator, target, rule and period', async () => {
+      const evaluatorLogin = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({
+          identifier: 'S1110',
+          password: process.env.SEED_PASSWORD || '***REMOVED***',
+        });
+      expect(evaluatorLogin.status).toBe(201);
+      lifecycleToken = evaluatorLogin.body.access_token;
+
+      const profileRes = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${lifecycleToken}`);
+      expect(profileRes.status).toBe(200);
+      lifecycleProfile = profileRes.body;
+
+      const rolesRes = await request(app.getHttpServer())
+        .get('/api/admin/roles')
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(rolesRes.status).toBe(200);
+      const targetRole = rolesRes.body.find(
+        (role: any) => String(role.nom_role).toUpperCase() === 'CSC',
+      );
+      expect(targetRole?.id_role).toBeTruthy();
+
+      evalueMatricule = `E${String(Date.now() % 10_000).padStart(4, '0')}`;
+      const createTargetRes = await request(app.getHttpServer())
+        .post('/api/admin/utilisateurs')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          matricule: evalueMatricule,
+          nom: 'Cible',
+          prenom: 'E2E',
+          email: `e2e.${evalueMatricule.toLowerCase()}@sabc.local`,
+          password: process.env.SEED_PASSWORD || '***REMOVED***',
+          id_role: targetRole.id_role,
+          id_region: lifecycleProfile.id_region,
+          manager_matricule: lifecycleProfile.matricule,
+        });
+      expect(createTargetRes.status).toBe(201);
+
+      const reglesRes = await request(app.getHttpServer())
+        .get('/api/regles')
+        .set('Authorization', `Bearer ${lifecycleToken}`);
+      expect(reglesRes.status).toBe(200);
+      const regle = reglesRes.body.find(
+        (candidate: any) =>
+          String(candidate.role_evaluateur).toUpperCase() === 'CDS' &&
+          String(candidate.role_evalue).toUpperCase() === 'CSC' &&
+          candidate.type_evaluation === 'descendante',
+      );
+      expect(regle?.id_regle).toBeTruthy();
+      expect(Array.isArray(regle?.criteres)).toBe(true);
+      expect(regle.criteres.length).toBeGreaterThan(0);
+      regleId = String(regle.id_regle);
+      criteres = regle.criteres;
+
       const periodesRes = await request(app.getHttpServer())
         .get('/api/evaluations/periodes-actives')
-        .set('Authorization', `Bearer ${accessToken}`);
-
-      if (!periodesRes.body.length) {
-        console.warn('⚠ No active periodes found — skipping lifecycle tests');
-        return;
-      }
+        .set('Authorization', `Bearer ${lifecycleToken}`);
+      expect(periodesRes.status).toBe(200);
+      expect(periodesRes.body.length).toBeGreaterThan(0);
       periodeId = periodesRes.body[0].id_periode || periodesRes.body[0].id;
-
-      // Get eligible users
-      const eligiblesRes = await request(app.getHttpServer())
-        .get('/api/evaluations/eligibles')
-        .set('Authorization', `Bearer ${accessToken}`);
-
-      const candidates = [
-        ...(Array.isArray(eligiblesRes.body?.subordonnes) ? eligiblesRes.body.subordonnes : []),
-        ...(Array.isArray(eligiblesRes.body?.pairs) ? eligiblesRes.body.pairs : []),
-      ];
-
-      if (!candidates.length) {
-        console.warn('⚠ No eligible users found — skipping lifecycle tests');
-        return;
-      }
-      evalueMatricule = candidates[0].matricule;
     });
 
     it('should create an evaluation', async () => {
-      if (!periodeId || !evalueMatricule) return;
-
       const res = await request(app.getHttpServer())
         .post('/api/evaluations')
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Authorization', `Bearer ${lifecycleToken}`)
         .send({
-          evaluateur_matricule: userProfile.matricule,
+          evaluateur_matricule: lifecycleProfile.matricule,
           evalue_matricule: evalueMatricule,
           id_periode: periodeId,
+          id_regle: regleId,
         });
 
       expect([200, 201]).toContain(res.status);
@@ -209,30 +258,24 @@ describe('Evaluation 360° Flow (e2e)', () => {
     });
 
     it('should fetch the created evaluation', async () => {
-      if (!evaluationId) return;
-
       const res = await request(app.getHttpServer())
         .get(`/api/evaluations/${evaluationId}`)
-        .set('Authorization', `Bearer ${accessToken}`);
+        .set('Authorization', `Bearer ${lifecycleToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body.id_evaluation).toBe(evaluationId);
     });
 
     it('should update evaluation notes', async () => {
-      if (!evaluationId) return;
-
       const res = await request(app.getHttpServer())
         .put(`/api/evaluations/${evaluationId}`)
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Authorization', `Bearer ${lifecycleToken}`)
         .send({
-          notes: [
-            { note: 4, commentaire: 'Excellent leadership' },
-            { note: 3, commentaire: 'Good communication' },
-            { note: 5, commentaire: 'Outstanding results' },
-            { note: 4, commentaire: 'Strong teamwork' },
-            { note: 3, commentaire: 'Adequate technical skills' },
-          ],
+          notes: criteres.map((critere) => ({
+            critere_id: String(critere.id),
+            note: 4,
+            commentaire: 'Observation E2E complète.',
+          })),
           commentaire_general: 'Bonne performance globale.',
         });
 
@@ -240,24 +283,26 @@ describe('Evaluation 360° Flow (e2e)', () => {
     });
 
     it('should submit the evaluation', async () => {
-      if (!evaluationId) return;
-
       const res = await request(app.getHttpServer())
         .post(`/api/evaluations/${evaluationId}/submit`)
-        .set('Authorization', `Bearer ${accessToken}`);
+        .set('Authorization', `Bearer ${lifecycleToken}`);
 
       expect([200, 201]).toContain(res.status);
+      expect(res.body).toEqual(
+        expect.objectContaining({ success: true }),
+      );
     });
 
     it('should validate the evaluation', async () => {
-      if (!evaluationId) return;
-
       const res = await request(app.getHttpServer())
         .post(`/api/evaluations/${evaluationId}/validate`)
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Authorization', `Bearer ${lifecycleToken}`)
         .send({ est_validee: true });
 
       expect([200, 201]).toContain(res.status);
+      expect(res.body).toEqual(
+        expect.objectContaining({ success: true }),
+      );
     });
   });
 

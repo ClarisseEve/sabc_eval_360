@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles, RolesGuard } from '../auth/guards/roles.guard';
 import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendBulkNotificationDto } from './dto/send-bulk-notification.dto';
@@ -32,13 +33,13 @@ export class NotificationsController {
   }
 
   @Post(':id/lire')
-  markAsRead(@Param('id') id: string) {
-    return this.notificationsService.marquerCommeLue(id);
+  markAsRead(@Param('id') id: string, @Request() req: any) {
+    return this.notificationsService.marquerCommeLue(id, req.user.matricule);
   }
 
   @Post(':id/read')
-  markAsReadAlias(@Param('id') id: string) {
-    return this.notificationsService.marquerCommeLue(id);
+  markAsReadAlias(@Param('id') id: string, @Request() req: any) {
+    return this.notificationsService.marquerCommeLue(id, req.user.matricule);
   }
 
   @Post('lire-tout')
@@ -52,6 +53,8 @@ export class NotificationsController {
   }
 
   @Post('send-bulk')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async sendBulk(
     @Request() req: any,

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/Components/UI/Dialog/Dialog';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
@@ -56,6 +57,7 @@ const noteColor = (n: number) => {
 };
 
 export default function ValidationModal({ evaluation, open, onClose }: Props) {
+  const queryClient = useQueryClient();
   const [action, setAction] = useState<'valide' | 'rejete' | null>(null);
   const [commentaire, setCommentaire] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -65,8 +67,8 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
 
   const handleSubmit = () => {
     if (!action) return;
-    if (action === 'rejete' && !commentaire.trim()) {
-      setError('Un commentaire est obligatoire pour le rejet.');
+    if (action === 'rejete' && commentaire.trim().length < 20) {
+      setError('Le motif de rejet doit contenir au moins 20 caractères.');
       return;
     }
     setSubmitting(true);
@@ -74,14 +76,17 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
 
     evaluationsApi
       .validate(evaluation.id_evaluation, action === 'valide', commentaire)
-      .then(() => {
+      .then((response) => {
+        if (response.data?.success === false) {
+          throw new Error(response.data.message || "La validation de l'évaluation a été refusée.");
+        }
         setSubmitting(false);
         onClose();
-        window.location.reload();
+        queryClient.invalidateQueries({ queryKey: ['evaluations'] });
       })
       .catch((err: any) => {
         setSubmitting(false);
-        setError(err.response?.data?.message || 'Une erreur est survenue');
+        setError(err.response?.data?.message || err.message || 'Une erreur est survenue');
       });
   };
 
@@ -208,12 +213,12 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
             </label>
             <textarea
               className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-sabc-red-primary ${
-                error && action === 'rejete' && !commentaire.trim() ? 'border-red-400' : 'border-gray-200'
+                error && action === 'rejete' && commentaire.trim().length < 20 ? 'border-red-400' : 'border-gray-200'
               }`}
               rows={3}
               placeholder={
                 action === 'rejete'
-                  ? 'Expliquez la raison du renvoi (obligatoire)...'
+                  ? 'Expliquez la raison du renvoi (20 caractères minimum)...'
                   : 'Commentaire facultatif...'
               }
               value={commentaire}

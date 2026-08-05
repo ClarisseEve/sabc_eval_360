@@ -61,7 +61,7 @@ export default function Performance({ auth }: PerformanceProps) {
                       cy="50" 
                       r="45" 
                       fill="none" 
-                      stroke="#E0E0E0" 
+                      stroke="var(--sabc-gray-200)"
                       strokeWidth="10" 
                     />
                     <circle 

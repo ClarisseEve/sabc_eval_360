@@ -46,36 +46,30 @@ export default function RoleDirectorDashboardPage({
       subtitle={subtitle}
       periodName={data.dashboard?.periode_active?.nom ?? null}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <MetricCard
           label="Évaluations données"
           value={data.givenEvaluations.length}
-          caption="Historique des évaluations réalisées par vous"
+          caption="Évaluations réalisées par vous"
           accentClassName="border-l-sabc-red-primary"
         />
         <MetricCard
           label="Validations en attente"
           value={data.toValidateEvaluations.length}
-          caption="Soumissions à arbitrer dans votre périmètre"
+          caption="Soumissions à arbitrer"
           accentClassName="border-l-sabc-warning"
         />
         <MetricCard
           label="Périmètre direct"
           value={data.directMembers.length}
-          caption="Managers ou responsables sous votre responsabilité immédiate"
+          caption="Responsables directs"
           accentClassName="border-l-sabc-info"
-        />
-        <MetricCard
-          label="Périmètre total"
-          value={data.teamMembers.length}
-          caption="Chaîne complète récupérée via tous-subordonnés"
-          accentClassName="border-l-sabc-success"
         />
         <MetricCard
           label="Couverture globale"
           value={`${data.completionRate}%`}
           caption={data.teamAverageScore > 0 ? `Score moyen ${data.teamAverageScore}/5` : 'Aucun score consolidé'}
-          accentClassName="border-l-sabc-accent"
+          accentClassName="border-l-sabc-success"
         />
       </div>
 
@@ -89,16 +83,16 @@ export default function RoleDirectorDashboardPage({
             {data.roleBreakdown.length === 0 ? (
               <EmptyState message="Aucun agrégat par rôle n’est disponible sur ce périmètre." />
             ) : (
-              <div className="h-80">
+              <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.roleBreakdown} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="role" />
-                    <YAxis yAxisId="left" domain={[0, 5]} />
-                    <YAxis yAxisId="right" orientation="right" domain={[0, 100]} />
+                  <BarChart data={data.roleBreakdown} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" vertical={false} />
+                    <XAxis dataKey="role" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="left" domain={[0, 5]} tickLine={false} axisLine={false} width={30} />
+                    <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} width={35} />
                     <Tooltip />
-                    <Bar yAxisId="left" dataKey="scoreMoyen" fill="#C62828" name="Score moyen" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="right" dataKey="couverture" fill="#1D4ED8" name="Couverture %" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="scoreMoyen" fill="#C62828" name="Score moyen" radius={[6, 6, 0, 0]} />
+                    <Bar yAxisId="right" dataKey="couverture" fill="#1D4ED8" name="Couverture %" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -115,14 +109,14 @@ export default function RoleDirectorDashboardPage({
             {data.levelBreakdown.length === 0 ? (
               <EmptyState message="Aucune répartition hiérarchique n’est disponible." />
             ) : (
-              <div className="h-80">
+              <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.levelBreakdown} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" domain={[0, 5]} />
-                    <YAxis dataKey="niveau" type="category" width={120} />
+                  <BarChart data={data.levelBreakdown} layout="vertical" margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" horizontal={false} />
+                    <XAxis type="number" domain={[0, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                    <YAxis dataKey="niveau" type="category" width={120} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                     <Tooltip formatter={(value: number) => [`${value}/5`, 'Score moyen']} />
-                    <Bar dataKey="scoreMoyen" fill="#C62828" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="scoreMoyen" fill="#C62828" radius={[0, 10, 10, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

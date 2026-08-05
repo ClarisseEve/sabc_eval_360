@@ -6,10 +6,10 @@ export class UpdatePasswordDto {
   current_password!: string;
 
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
   password!: string;
 
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
   password_confirmation!: string;
 }

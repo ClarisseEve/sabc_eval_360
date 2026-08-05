@@ -1,6 +1,13 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  EVALUATED_VISIBILITY_SQL,
+  INTERNAL_RULE_ENVELOPE_FIELD,
+  isVisibleToEvaluated,
+  redactEvaluationForVisibility,
+  resolveEvaluationVisibilityPolicy,
+} from './evaluation-visibility';
 
 const ALLOWED_RECUES_STATUTS = new Set(['soumis', 'valide']);
 const FORBIDDEN_RECUES_STATUTS = new Set(['brouillon', 'rejete']);
@@ -64,7 +71,9 @@ export class EvaluationsConsultationService {
     let paramIdx = 2;
 
     // Base: only soumis/valide for évalué view
-    let whereClause = `WHERE e.evalue_matricule = $1 AND e.statut IN ('soumis', 'valide')`;
+    let whereClause = `WHERE e.evalue_matricule = $1
+      AND e.statut IN ('soumis', 'valide')
+      AND ${EVALUATED_VISIBILITY_SQL}`;
 
     if (filters.statut && ALLOWED_RECUES_STATUTS.has(filters.statut)) {
       whereClause += ` AND e.statut = $${paramIdx++}`;
@@ -84,11 +93,17 @@ export class EvaluationsConsultationService {
     const countParams = [...params];
     const [countRow, rows] = await Promise.all([
       this.pg.queryOne<{ total: string }>(
-        `SELECT COUNT(*)::text AS total FROM evaluations e ${whereClause}`,
+        `SELECT COUNT(*)::text AS total
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         ${whereClause}`,
         countParams,
       ),
       this.pg.query<any>(
-        `SELECT e.* FROM evaluations e ${whereClause}
+        `SELECT e.*, r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         ${whereClause}
          ORDER BY e.date_creation DESC
          LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
         [...params, limit, offset],
@@ -183,12 +198,14 @@ export class EvaluationsConsultationService {
     }>(
       `SELECT
          COUNT(*)::text                                              AS total,
-         COUNT(*) FILTER (WHERE statut = 'valide')::text           AS valide,
-         ROUND(AVG(note_globale) FILTER (WHERE statut = 'valide' AND note_globale IS NOT NULL)::numeric, 2)::text
+         COUNT(*) FILTER (WHERE e.statut = 'valide')::text         AS valide,
+         ROUND(AVG(e.note_globale) FILTER (WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL)::numeric, 2)::text
                                                                     AS note_moyenne
-       FROM evaluations
-       WHERE evalue_matricule = $1
-         AND statut IN ('soumis', 'valide')`,
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.evalue_matricule = $1
+         AND e.statut IN ('soumis', 'valide')
+         AND ${EVALUATED_VISIBILITY_SQL}`,
       [matricule],
     );
 
@@ -251,15 +268,26 @@ export class EvaluationsConsultationService {
   private async enrichRecues(evaluations: any[]): Promise<any[]> {
     if (!evaluations.length) return [];
 
-    const matricules = this.collectMatricules(evaluations, ['evaluateur_matricule', 'evalue_matricule']);
+    const redacted = evaluations.flatMap((evaluation) => {
+      const policy = resolveEvaluationVisibilityPolicy(evaluation);
+      return isVisibleToEvaluated(evaluation, policy)
+        ? [redactEvaluationForVisibility(evaluation, { policy })]
+        : [];
+    });
+    const matricules = this.collectMatricules(redacted, ['evaluateur_matricule', 'evalue_matricule']);
     const users = await this.fetchUsers(matricules);
 
-    return evaluations.map((ev) => {
+    return redacted.map((ev) => {
       const evalue = users.get(ev.evalue_matricule) ?? null;
       const isPairs = ev.type_evaluation === 'pairs';
 
       const evaluateur = isPairs
-        ? { evaluateur_nom: 'Anonyme', evaluateur_matricule: null }
+        ? {
+            evaluateur_nom: 'Anonyme',
+            evaluateur_prenom: null,
+            evaluateur_matricule: null,
+            evaluateur_role_nom: null,
+          }
         : this.buildEvaluateurFields(users.get(ev.evaluateur_matricule) ?? null);
 
       return {
@@ -279,16 +307,31 @@ export class EvaluationsConsultationService {
   private async enrichDonnees(evaluations: any[]): Promise<any[]> {
     if (!evaluations.length) return [];
 
-    const matricules = this.collectMatricules(evaluations, ['evaluateur_matricule', 'evalue_matricule']);
+    const redacted = evaluations.map((evaluation) =>
+      redactEvaluationForVisibility(evaluation, {
+        policy: resolveEvaluationVisibilityPolicy(evaluation),
+        preserveDetails: true,
+      }),
+    );
+    const matricules = this.collectMatricules(redacted, ['evaluateur_matricule', 'evalue_matricule']);
     const users = await this.fetchUsers(matricules);
 
-    return evaluations.map((ev) => {
+    return redacted.map((ev) => {
       const evaluateur = users.get(ev.evaluateur_matricule) ?? null;
       const evalue = users.get(ev.evalue_matricule) ?? null;
+      const evaluateurFields =
+        ev.type_evaluation === 'pairs'
+          ? {
+              evaluateur_nom: 'Anonyme',
+              evaluateur_prenom: null,
+              evaluateur_matricule: null,
+              evaluateur_role_nom: null,
+            }
+          : this.buildEvaluateurFields(evaluateur);
 
       return {
         ...ev,
-        ...this.buildEvaluateurFields(evaluateur),
+        ...evaluateurFields,
         evalue_nom: evalue?.nom ?? null,
         evalue_prenom: evalue?.prenom ?? null,
         evalue_role_nom: evalue?.role_nom ?? null,

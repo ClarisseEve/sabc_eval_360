@@ -187,7 +187,7 @@ const EvaluationsTab: React.FC = () => {
                   <div ref={chartRefTypes} className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={evaluationTypeData} layout="horizontal" margin={{ left: 80 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                         <XAxis type="number" tick={{ fontSize: 12 }} />
                         <YAxis dataKey="type" type="category" tick={{ fontSize: 10 }} width={80} />
                         <Tooltip />
@@ -210,7 +210,7 @@ const EvaluationsTab: React.FC = () => {
                   <div ref={chartRefAnalytics} className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={userAnalytics}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                         <XAxis dataKey="periode" tick={{ fontSize: 12 }} />
                         <YAxis tick={{ fontSize: 12 }} />
                         <Tooltip />
@@ -250,7 +250,7 @@ const EvaluationsTab: React.FC = () => {
                     <div ref={chartRefSuperviseurs} className="h-56">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={supervisorPerformance}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                           <XAxis dataKey="role" tick={{ fontSize: 12 }} />
                           <YAxis tick={{ fontSize: 12 }} />
                           <Tooltip />

@@ -1,31 +1,55 @@
 PNPM := pnpm
 
-.PHONY: web api build up down seed migrate-pg up-scale down-scale config-scale preflight-cutover
+.PHONY: install dev web api build typecheck test verify config up down logs seed migrate migrate-pg preflight-cutover up-scale down-scale config-scale
+
+install:
+	$(PNPM) install:all
+
+dev:
+	$(PNPM) dev
 
 web:
-	$(PNPM) --dir apps/web dev
+	$(PNPM) dev:web
 
 api:
-	$(PNPM) --dir apps/api start:dev
+	$(PNPM) dev:api
 
 build:
-	$(PNPM) --dir apps/web build
-	$(PNPM) --dir apps/api build
+	$(PNPM) build
 
-seed:
-	$(PNPM) --dir apps/api db:seed
+typecheck:
+	$(PNPM) typecheck
 
-migrate-pg:
-	$(PNPM) --dir apps/api db:pg:migrate
+test:
+	$(PNPM) test
 
-preflight-cutover:
-	$(PNPM) --dir apps/api preflight:cutover
+verify:
+	$(PNPM) verify:static
+	$(PNPM) verify:compose
+
+config:
+	docker compose config
 
 up:
 	docker compose up --build
 
 down:
 	docker compose down
+
+logs:
+	docker compose logs -f api frontend
+
+seed:
+	$(PNPM) --dir apps/api db:seed
+
+migrate:
+	$(PNPM) --dir apps/api db:migrate:all
+
+migrate-pg:
+	$(PNPM) --dir apps/api db:pg:migrate
+
+preflight-cutover:
+	$(PNPM) --dir apps/api preflight:cutover
 
 up-scale:
 	docker compose -f docker-compose.scale.yml up --build -d

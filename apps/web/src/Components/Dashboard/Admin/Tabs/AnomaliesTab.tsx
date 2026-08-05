@@ -30,7 +30,7 @@ const AnomaliesTab: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <AnomalySummarySection
         total={data.total}
         severityStats={data.severityStats}

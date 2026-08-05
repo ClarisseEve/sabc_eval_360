@@ -125,7 +125,7 @@ export function BarChart({
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="#E0E0E0"
+              stroke="var(--sabc-gray-200)"
               horizontal={true}
               vertical={layout !== 'vertical'}
             />
@@ -135,11 +135,11 @@ export function BarChart({
             <>
               <XAxis 
                 dataKey={xAxisDataKey} 
-                tick={{ fill: '#616161', fontSize: 11 }}
+                tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
                 axisLine={{ stroke: '#E0E0E0' }}
               />
               <YAxis 
-                tick={{ fill: '#616161', fontSize: 11 }}
+                tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
                 axisLine={{ stroke: '#E0E0E0' }}
               />
             </>
@@ -147,13 +147,13 @@ export function BarChart({
             <>
               <XAxis 
                 type="number"
-                tick={{ fill: '#616161', fontSize: 11 }}
+                tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
                 axisLine={{ stroke: '#E0E0E0' }}
               />
               <YAxis 
                 dataKey={xAxisDataKey}
                 type="category"
-                tick={{ fill: '#616161', fontSize: 11 }}
+                tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
                 width={140}
                 axisLine={{ stroke: '#E0E0E0' }}
               />

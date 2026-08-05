@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
+interface ImportMetaEnv {
+  readonly VITE_API_URL?: string;
+  readonly VITE_APP_NAME?: string;
+}
+
 interface ImportMeta {
-  readonly env: Record<string, string>;
-  readonly glob: (pattern: string) => Record<string, () => Promise<any>>;
+  readonly env: ImportMetaEnv;
 }

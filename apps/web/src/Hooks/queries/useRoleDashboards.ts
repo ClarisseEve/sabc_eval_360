@@ -218,32 +218,46 @@ function getUniqueRules(rules: any[]) {
   });
 }
 
-async function fetchMemberAnalytics(member: {
+type TeamMemberBase = {
   matricule: string;
   nomComplet: string;
   role: string;
   email: string;
   managerMatricule: string | null;
   niveauHierarchique: number | null;
-}): Promise<TeamMemberAnalytics> {
+};
+
+/**
+ * Récupère les analytics (scores + axes) de tous les membres en deux requêtes batch
+ * au lieu de 2 requêtes par membre, évitant le rate-limiting (429) sur les grandes équipes.
+ */
+async function fetchTeamAnalytics(members: TeamMemberBase[]): Promise<TeamMemberAnalytics[]> {
+  if (members.length === 0) return [];
+
+  const matricules = members.map((member) => member.matricule).filter(Boolean);
   const [scoresResult, axesResult] = await Promise.allSettled([
-    analyticsApi.scores(member.matricule),
-    analyticsApi.axesAmelioration(member.matricule),
+    analyticsApi.scoresBatch(matricules),
+    analyticsApi.axesAmeliorationBatch(matricules),
   ]);
 
-  const scores = scoresResult.status === 'fulfilled' ? normalizeScores(scoresResult.value.data) : normalizeScores({});
-  const axes = axesResult.status === 'fulfilled' ? normalizeAxes(axesResult.value.data) : [];
-  const totalEvaluations = scores.parType.reduce((sum, entry) => sum + entry.nbEvaluations, 0);
+  const scoresByMatricule = scoresResult.status === 'fulfilled' ? scoresResult.value.data ?? {} : {};
+  const axesByMatricule = axesResult.status === 'fulfilled' ? axesResult.value.data ?? {} : {};
 
-  return {
-    ...member,
-    scoreGlobal: scores.scoreGlobal,
-    scorePondere: scores.scorePondere,
-    progression: scores.progression,
-    totalEvaluations,
-    topAxes: axes.slice(0, 2),
-    parType: scores.parType,
-  };
+  return members.map((member) => {
+    const scores = normalizeScores(scoresByMatricule[member.matricule] ?? {});
+    const axes = normalizeAxes(axesByMatricule[member.matricule] ?? {});
+    const totalEvaluations = scores.parType.reduce((sum, entry) => sum + entry.nbEvaluations, 0);
+
+    return {
+      ...member,
+      scoreGlobal: scores.scoreGlobal,
+      scorePondere: scores.scorePondere,
+      progression: scores.progression,
+      totalEvaluations,
+      topAxes: axes.slice(0, 2),
+      parType: scores.parType,
+    };
+  });
 }
 
 function buildRulesForRole(rawRules: any[], userRole: string): RoleDashboardRuleGroups {
@@ -385,9 +399,7 @@ export function useRoleDashboardData(scope: DashboardScope, fallbackRole: string
       const directMembers = normalizeMembers(directSubsRes.status === 'fulfilled' ? directSubsRes.value.data : []);
       const allMembers = normalizeMembers(allSubsRes.status === 'fulfilled' ? allSubsRes.value.data : []);
       const scopedMembers = scope === 'director' ? allMembers : scope === 'manager' ? directMembers : [];
-      const teamMembers = scopedMembers.length > 0
-        ? await Promise.all(scopedMembers.map((member) => fetchMemberAnalytics(member)))
-        : [];
+      const teamMembers = await fetchTeamAnalytics(scopedMembers);
 
       const scoredMembers = teamMembers.filter((member) => member.scoreGlobal != null);
       const completionRate = teamMembers.length > 0

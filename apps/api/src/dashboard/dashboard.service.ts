@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../common/cache.service';
+import { getDoualaDate } from '../periodes/douala-date';
 
 export interface DashboardStats {
   evaluations_en_attente: number;
@@ -46,6 +47,7 @@ export interface RolePerformance {
 
 const ROLE_TITLES: Record<string, string> = {
   admin: 'Tableau de Bord Administrateur',
+  collaborateur: 'Tableau de Bord Collaborateur',
   dr: 'Tableau de Bord Directeur Régional',
   cdtt: 'Tableau de Bord Chef Département',
   csc: 'Tableau de Bord Chef Service',
@@ -108,6 +110,7 @@ export class DashboardService {
   }
 
   private async _getAdminStats(matricule: string): Promise<AdminDashboardStats> {
+    const today = new Date(`${getDoualaDate()}T00:00:00.000Z`);
     const [baseStats, userStats, evalStats, remplacements, regions, rolePerf] = await Promise.all([
       this._getStats(matricule),
       this.prisma.utilisateur.count().then(async (total: number) => ({
@@ -125,11 +128,13 @@ export class DashboardService {
            COUNT(*) FILTER (WHERE statut = 'valide') as validees
          FROM evaluations`,
       ),
-      this.pg.queryOne<{ count: string }>(
-        `SELECT COUNT(*)::text as count
-         FROM remplacements_temporaires
-         WHERE est_actif = true AND (date_fin IS NULL OR date_fin >= CURRENT_DATE)`,
-      ),
+      this.prisma.replacement_temporaire.count({
+        where: {
+          est_actif: true,
+          date_debut: { lte: today },
+          OR: [{ date_fin: null }, { date_fin: { gte: today } }],
+        },
+      }),
       this._getRegionStats(),
       this._getRolePerformance(),
     ]);
@@ -146,7 +151,7 @@ export class DashboardService {
       evaluations_en_cours: enCours,
       evaluations_validees: validees,
       taux_completion: totalEval > 0 ? Math.round((validees / totalEval) * 10000) / 100 : 0,
-      remplacements_actifs: Number(remplacements?.count ?? 0),
+      remplacements_actifs: remplacements,
       regions,
       performance_par_role: rolePerf,
       evaluations_par_statut: [
@@ -240,7 +245,7 @@ export class DashboardService {
   }
 
   getRoleTitle(role: string): string {
-    return ROLE_TITLES[role.toLowerCase()] ?? ROLE_TITLES.admin;
+    return ROLE_TITLES[role.toLowerCase()] ?? ROLE_TITLES.collaborateur;
   }
 
   getValidRoles(): string[] {

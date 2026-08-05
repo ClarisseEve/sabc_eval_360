@@ -1,27 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Head } from '@/lib/inertia-shim';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert';
 import Badge from '@/Components/UI/Badge';
 import { Button } from '@/Components/UI/Button';
 import EvaluationModal from '@/Components/Evaluation/EvaluationModal';
-import { useEvaluationWorkflowData, findWorkflowTarget } from '@/Hooks/queries';
+import { useEvaluationWorkflowData } from '@/Hooks/queries';
 import { EvaluationPageLayout, formatDisplayName, formatRole } from './shared';
 import {
   ActiveRulesCard,
   QuickActionsCard,
   formatDateLabel,
-  formatEvaluationType,
 } from '@/Components/Dashboard/RoleDashboardShared';
 import {
   CalendarClock,
   CheckCircle2,
-  ClipboardList,
   Layers3,
   PlayCircle,
   Users2,
 } from 'lucide-react';
-import { filterApplicableRules, getRuleSummary } from '@/utils/rules';
+import { filterApplicableRules } from '@/utils/rules';
 import { useAuthContext } from '@/Contexts/AuthContext';
 
 type Target = Record<string, any>;
@@ -59,47 +57,18 @@ const Mine: React.FC = () => {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const selectedTargetData = useMemo(
-    () => findWorkflowTarget(data.eligibleGroups, selectedTarget),
-    [data.eligibleGroups, selectedTarget],
-  );
+  const isAdmin = (user?.role_nom || user?.role || '').toUpperCase() === 'ADMIN';
 
-  const selectedTargetType = selectedTargetData?.workflowType ?? null;
-  const applicableRules = useMemo(
-    () => filterApplicableRules(
+  const handleEvaluate = (target: Target) => {
+    const targetType = target.workflowType ?? null;
+    const rules = filterApplicableRules(
       data.rules,
       user?.role_nom || user?.role,
-      selectedTargetData?.role_nom || selectedTargetData?.role,
-      selectedTargetType,
-    ),
-    [data.rules, selectedTargetData, selectedTargetType, user?.role, user?.role_nom],
-  );
-
-  useEffect(() => {
-    if (applicableRules.length === 0) {
-      setSelectedTemplate(null);
-      return;
-    }
-
-    setSelectedTemplate((current) => (
-      current && applicableRules.some((rule) => rule.id_regle === current)
-        ? current
-        : applicableRules[0].id_regle
-    ));
-  }, [applicableRules]);
-
-  const selectedRule = useMemo(
-    () => applicableRules.find((rule) => rule.id_regle === selectedTemplate) ?? applicableRules[0] ?? null,
-    [applicableRules, selectedTemplate],
-  );
-
-  const selectedRuleSummary = useMemo(
-    () => (selectedRule ? getRuleSummary(selectedRule) : null),
-    [selectedRule],
-  );
-
-  const launchEvaluation = (targetMatricule: string) => {
-    setSelectedTarget(targetMatricule);
+      target.role_nom || target.role,
+      targetType,
+    );
+    setSelectedTarget(target.matricule);
+    setSelectedTemplate(rules[0]?.id_regle ?? null);
     setModalOpen(true);
   };
 
@@ -134,8 +103,18 @@ const Mine: React.FC = () => {
         {!data.activePeriod ? (
           <Alert>
             <AlertTitle>Aucune période active</AlertTitle>
-            <AlertDescription>
-              Les règles peuvent être publiées, mais aucune création d’évaluation ne doit être lancée tant qu’une période n’est pas ouverte.
+            <AlertDescription className="flex flex-col gap-2">
+              <span>Aucune campagne d’évaluation n’est ouverte pour l’instant.</span>
+              {isAdmin ? (
+                <a
+                  href="/admin/evaluations/periodes"
+                  className="inline-flex items-center text-sm font-medium text-sabc-red-primary underline-offset-4 hover:underline"
+                >
+                  Créer et ouvrir une période →
+                </a>
+              ) : (
+                <span className="text-xs text-sabc-gray-500">Contactez l’administrateur pour ouvrir un cycle d’évaluation.</span>
+              )}
             </AlertDescription>
           </Alert>
         ) : null}
@@ -167,70 +146,12 @@ const Mine: React.FC = () => {
           />
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
+        <div className="grid gap-6">
           <ActiveRulesCard
-            rules={applicableRules}
-            description="Les règles compatibles sont filtrées par rôle évaluateur, rôle évalué et type d’évaluation."
-            emptyMessage={selectedTargetData
-              ? 'Aucune règle active ne couvre ce couple évaluateur / évalué / type.'
-              : 'Sélectionnez une cible pour voir les règles réellement applicables.'}
+            rules={data.rules}
+            description="Les règles compatibles sont filtrées selon votre rôle et les cibles disponibles."
+            emptyMessage="Aucune règle active publiée pour votre rôle."
           />
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ClipboardList className="h-5 w-5 text-sabc-red-primary" />
-                Cadrage de la sélection courante
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!selectedTargetData ? (
-                <Alert>
-                  <AlertTitle>Sélectionnez une cible</AlertTitle>
-                  <AlertDescription>
-                    Le workflow déduit ensuite le type d’évaluation attendu et les règles actives compatibles.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <>
-                  <div className="rounded-lg border border-sabc-gray-200 p-4">
-                    <div className="font-medium text-sabc-gray-900">{formatDisplayName(selectedTargetData)}</div>
-                    <div className="text-sm text-sabc-gray-500">{formatRole(selectedTargetData)}</div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Badge variant="primary">{formatEvaluationType(selectedTargetType)}</Badge>
-                      <Badge variant="info">
-                        {selectedRuleSummary ? `${selectedRuleSummary.criteresCount} critères` : 'Aucune règle'}
-                      </Badge>
-                      {selectedRule ? <Badge variant="warning">visibilité {selectedRule.visibility_policy.detail}</Badge> : null}
-                    </div>
-                  </div>
-
-                  {selectedRuleSummary ? (
-                    <div className="space-y-3 rounded-lg border border-sabc-gray-200 p-4">
-                      <div className="font-medium text-sabc-gray-900">{selectedRuleSummary.name}</div>
-                      <div className="text-sm text-sabc-gray-500">
-                        {selectedRuleSummary.description || 'Règle publiée sans description métier.'}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedRuleSummary.sections.slice(0, 5).map((section) => (
-                          <Badge key={`${selectedRuleSummary.id}-${section.id}`} variant="outline">
-                            {section.titre}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <Alert>
-                      <AlertTitle>Aucune règle exploitable</AlertTitle>
-                      <AlertDescription>
-                        Cette cible est visible, mais aucun formulaire publié ne peut être lancé dans le contexte actuel.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
         <Card>
@@ -244,8 +165,16 @@ const Mine: React.FC = () => {
             {data.eligibleGroups.length === 0 ? (
               <Alert>
                 <AlertTitle>Aucune cible disponible</AlertTitle>
-                <AlertDescription>
-                  Vous n’avez actuellement aucune cible éligible selon la hiérarchie et les règles actives.
+                <AlertDescription className="flex flex-col gap-2">
+                  <span>Votre hiérarchie ne compte aucun subordonné ou pair éligible pour l’instant.</span>
+                  {isAdmin && (
+                    <a
+                      href="/admin/utilisateurs"
+                      className="inline-flex items-center text-sm font-medium text-sabc-red-primary underline-offset-4 hover:underline"
+                    >
+                      Vérifier la configuration des utilisateurs →
+                    </a>
+                  )}
                 </AlertDescription>
               </Alert>
             ) : (
@@ -263,24 +192,34 @@ const Mine: React.FC = () => {
                           <div className="text-sm text-sabc-gray-500">{formatRole(target)}</div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {selectedTarget === target.matricule ? <Badge variant="success">Cible sélectionnée</Badge> : null}
-                          <Button
-                            size="sm"
-                            variant={selectedTarget === target.matricule ? 'outline' : 'default'}
-                            className={selectedTarget === target.matricule ? '' : 'bg-sabc-red-primary text-white hover:bg-sabc-red-dark'}
-                            onClick={() => setSelectedTarget(target.matricule)}
-                          >
-                            Sélectionner
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-                            disabled={!data.activePeriod || !selectedTemplate || selectedTarget !== target.matricule}
-                            onClick={() => launchEvaluation(target.matricule)}
-                          >
-                            <PlayCircle className="mr-2 h-4 w-4" />
-                            Démarrer
-                          </Button>
+                          {(() => {
+                            const targetType = target.workflowType ?? null;
+                            const rules = filterApplicableRules(
+                              data.rules,
+                              user?.role_nom || user?.role,
+                              target.role_nom || target.role,
+                              targetType,
+                            );
+                            const canStart = Boolean(data.activePeriod) && rules.length > 0;
+                            return (
+                              <>
+                                {!canStart && (
+                                  <span className="text-xs text-sabc-gray-400">
+                                    {!data.activePeriod ? 'Aucune période active' : 'Aucune règle applicable'}
+                                  </span>
+                                )}
+                                <Button
+                                  size="sm"
+                                  className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+                                  disabled={!canStart}
+                                  onClick={() => handleEvaluate(target)}
+                                >
+                                  <PlayCircle className="mr-2 h-4 w-4" />
+                                  Évaluer
+                                </Button>
+                              </>
+                            );
+                          })()}
                         </div>
                       </CardContent>
                     </Card>

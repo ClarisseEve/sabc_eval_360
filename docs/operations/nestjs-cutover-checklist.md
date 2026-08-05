@@ -74,14 +74,15 @@ Le runtime Laravel/PHP ne fait plus partie de la cible.
 
 ## Charge minimale avant ouverture
 
-Exécuter:
+Exporter au préalable le même `SEED_PASSWORD` que celui utilisé pour préparer
+l'environnement de test, puis exécuter :
 
 ```bash
 LOAD_BASE_URL=http://localhost:3000 \
 LOAD_ADMIN_EMAIL=admin@sabc.local \
-LOAD_ADMIN_PASSWORD=***REMOVED*** \
+LOAD_ADMIN_PASSWORD="$SEED_PASSWORD" \
 LOAD_USER_EMAIL=cds.littoral@sabc.local \
-LOAD_USER_PASSWORD=***REMOVED*** \
+LOAD_USER_PASSWORD="$SEED_PASSWORD" \
 LOAD_TARGET_MATRICULE=C0001 \
 LOAD_VALIDATION_CYCLE_ID=4 \
 LOAD_ITERATIONS=200 \
@@ -107,6 +108,7 @@ Go si:
 - health vert avec `cache_driver=redis`
 - smoke tests verts
 - charge acceptable
+- `RUN_SEED=false` et `ALLOW_DEMO_SEED=false` sur la stack de production
 
 No-Go si:
 

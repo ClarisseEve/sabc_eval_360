@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createHash, randomUUID } from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import { hashSync } from 'bcryptjs';
 import { Pool } from 'pg';
 
 const prisma = new PrismaClient();
@@ -13,7 +14,14 @@ const pg = new Pool({
   password: process.env.PG_PASSWORD || '***REMOVED***',
 });
 
-const PASSWORD_HASH = '$2y$10$2nVpiclaWIzl5fpH/hyg.u3u1XV1MTbasLFOvT/x3m9waZ/1u8cuK';
+const seedPassword = process.env.SEED_PASSWORD;
+if (!seedPassword) {
+  throw new Error('SEED_PASSWORD est requis pour générer les comptes de démonstration');
+}
+if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_SEED !== 'true') {
+  throw new Error('Seed de démonstration refusé en production (ALLOW_DEMO_SEED=true requis)');
+}
+const PASSWORD_HASH = hashSync(seedPassword, 10);
 const PERIODE_UUID_NAMESPACE = '2d9d2d7e-2c8f-4d5f-9867-334e13ef17d9';
 
 type RegionSeed = {
@@ -82,14 +90,14 @@ type RuleSeed = {
 };
 
 type PeriodSeed = {
-  id: number;
+  id: string;
   code: string;
   nom: string;
   titre: string;
   description: string;
   dateDebut: string;
   dateFin: string;
-  statut: 'ouverte' | 'fermee';
+  statut: 'ouverte' | 'fermee' | 'planifiee';
   estOuverte: boolean;
   estCloturee: boolean;
 };
@@ -98,7 +106,7 @@ type EvaluationSeed = {
   evaluateur: string;
   evalue: string;
   periodeCode: string;
-  regleId: number;
+  regleId: string;
   statut: 'brouillon' | 'soumis' | 'valide';
   type: string;
   notes: Array<{ nom: string; note: number; poids: number; commentaire?: string }>;
@@ -419,7 +427,7 @@ const USERS: UserSeed[] = generateUsers();
 
 const PERIODS: PeriodSeed[] = [
   {
-    id: 2601,
+    id: deterministicUuidFromString('P2601'),
     code: 'P2601',
     nom: 'Cycle 2026 - Semestre 1',
     titre: 'Cycle 2026 - Semestre 1',
@@ -431,7 +439,7 @@ const PERIODS: PeriodSeed[] = [
     estCloturee: false,
   },
   {
-    id: 2502,
+    id: deterministicUuidFromString('P2502'),
     code: 'P2502',
     nom: 'Cycle 2025 - Semestre 2',
     titre: 'Cycle 2025 - Semestre 2',
@@ -441,6 +449,21 @@ const PERIODS: PeriodSeed[] = [
     statut: 'fermee',
     estOuverte: false,
     estCloturee: true,
+  },
+  {
+    // Periode planifiee future SANS evaluation rattachee.
+    // Permet de demontrer l'edition (autorisee uniquement si statut='planifiee')
+    // ET la suppression (autorisee uniquement si aucune evaluation rattachee).
+    id: deterministicUuidFromString('P2602'),
+    code: 'P2602',
+    nom: 'Cycle 2026 - Semestre 2',
+    titre: 'Cycle 2026 - Semestre 2',
+    description: 'Periode planifiee de demonstration (editable et supprimable)',
+    dateDebut: '2026-09-07',
+    dateFin: '2026-12-06',
+    statut: 'planifiee',
+    estOuverte: false,
+    estCloturee: false,
   },
 ];
 
@@ -800,97 +823,7 @@ async function ensureRole(role: RoleSeed) {
   return prisma.role.create({ data: createData });
 }
 
-async function ensureMysqlSupportTables() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS notifications_utilisateurs (
-      id_notification VARCHAR(36) PRIMARY KEY,
-      destinataire_matricule VARCHAR(5) NOT NULL,
-      titre VARCHAR(150) NOT NULL,
-      message TEXT NOT NULL,
-      type VARCHAR(30) NOT NULL,
-      lien VARCHAR(255) NULL,
-      donnees_json JSON NULL,
-      id_evaluation VARCHAR(36) NULL,
-      id_remplacement BIGINT NULL,
-      expediteur_matricule VARCHAR(5) NULL,
-      est_lu TINYINT(1) NOT NULL DEFAULT 0,
-      date_creation DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      date_lecture DATETIME NULL,
-      KEY idx_notifications_destinataire (destinataire_matricule, est_lu, date_creation)
-    )
-  `);
-
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS replacement_temporaire (
-      id_remplacement BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-      titulaire_matricule VARCHAR(5) NOT NULL,
-      remplacant_matricule VARCHAR(5) NOT NULL,
-      role_remplace VARCHAR(50) NOT NULL,
-      region_remplacement VARCHAR(100) NOT NULL,
-      service_remplacement VARCHAR(100) NULL,
-      date_debut DATE NOT NULL,
-      date_fin DATE NULL,
-      date_fin_effective DATE NULL,
-      duree_prevue_jours INT NOT NULL,
-      motif VARCHAR(255) NOT NULL,
-      cree_par VARCHAR(5) NOT NULL,
-      est_actif TINYINT(1) NOT NULL DEFAULT 1,
-      notifications_envoyees TINYINT(1) NOT NULL DEFAULT 0,
-      equipe_notifiee TINYINT(1) NOT NULL DEFAULT 0,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      KEY idx_replacement_titulaire (titulaire_matricule, est_actif),
-      KEY idx_replacement_remplacant (remplacant_matricule, est_actif)
-    )
-  `);
-}
-
-async function ensurePgSupportTables() {
-  await pg.query(`
-    CREATE TABLE IF NOT EXISTS utilisateurs_ref (
-      matricule VARCHAR(5) PRIMARY KEY,
-      nom VARCHAR(100) NOT NULL,
-      prenom VARCHAR(100) NOT NULL,
-      email VARCHAR(100) NOT NULL,
-      role VARCHAR(50) NULL,
-      id_region VARCHAR(5) NULL,
-      id_branche VARCHAR(5) NULL,
-      region_nom VARCHAR(100) NULL,
-      type_region VARCHAR(20) NULL,
-      est_actif BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-    )
-  `);
-
-  await pg.query(`
-    CREATE TABLE IF NOT EXISTS remplacements_temporaires (
-      id_remplacement VARCHAR(5) PRIMARY KEY,
-      titulaire_matricule VARCHAR(5) NOT NULL,
-      remplacant_matricule VARCHAR(5) NOT NULL,
-      role_remplace VARCHAR(50) NOT NULL,
-      region_remplacement VARCHAR(100) NOT NULL,
-      service_remplacement VARCHAR(100) NULL,
-      date_debut DATE NOT NULL,
-      date_fin DATE NULL,
-      duree_prevue_jours INT NOT NULL,
-      motif VARCHAR(255) NOT NULL,
-      cree_par VARCHAR(5) NOT NULL,
-      approuve_par VARCHAR(5) NULL,
-      est_actif BOOLEAN NOT NULL DEFAULT TRUE,
-      date_fin_effective DATE NULL,
-      notifications_envoyees BOOLEAN NOT NULL DEFAULT FALSE,
-      equipe_notifiee BOOLEAN NOT NULL DEFAULT FALSE,
-      created_at TIMESTAMP NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NULL DEFAULT NOW()
-    )
-  `);
-}
-
 async function resetData() {
-  await ensureMysqlSupportTables();
-  await ensurePgSupportTables();
-
   await prisma.$executeRawUnsafe('DELETE FROM logs_administration');
   await prisma.utilisateur.deleteMany();
 
@@ -903,7 +836,6 @@ async function resetData() {
   await pg.query('DELETE FROM templates');
   await pg.query('DELETE FROM regles_evaluation');
   await pg.query('DELETE FROM periodes_evaluation');
-  await pg.query('DELETE FROM remplacements_temporaires');
   await pg.query('DELETE FROM utilisateurs_ref');
 }
 
@@ -1082,7 +1014,7 @@ async function upsertRule(rule: RuleSeed) {
     ],
   );
 
-  const inserted = await pgQueryOne<{ id_regle: number }>(
+  const inserted = await pgQueryOne<{ id_regle: string }>(
     `SELECT id_regle
      FROM regles_evaluation
      WHERE role_evaluateur = $1 AND role_evalue = $2 AND type_evaluation = $3`,
@@ -1128,7 +1060,7 @@ async function upsertTemplate(template: {
   );
 }
 
-async function assignTemplate(roleId: string, periodId: number, templateId: string) {
+async function assignTemplate(roleId: string, periodId: string, templateId: string) {
   await pg.query(
     `INSERT INTO templates_roles_periodes (id_role, id_periode, id_template, est_actif, created_at, updated_at)
      VALUES ($1, $2, $3, TRUE, NOW(), NOW())
@@ -1286,7 +1218,7 @@ async function recalculatePeriodStats(periodCode: string) {
 }
 
 async function seedTemplatesAndRules(roleIdByName: Map<string, string>) {
-  const ruleIdByKey = new Map<string, number>();
+  const ruleIdByKey = new Map<string, string>();
 
   for (const rule of RULE_SPECS) {
     const id = await upsertRule(rule);
@@ -1316,7 +1248,7 @@ async function seedTemplatesAndRules(roleIdByName: Map<string, string>) {
 
 // ----- Evaluation generation -----
 
-async function seedEvaluations(ruleIdByKey: Map<string, number>) {
+async function seedEvaluations(ruleIdByKey: Map<string, string>) {
   const commercial = buildCriteriaBundle('commercial');
   const marketing = buildCriteriaBundle('marketing');
   const sponsoring = buildCriteriaBundle('sponsoring');
@@ -1674,8 +1606,6 @@ async function seedRemplacements() {
     { titulaire: 'AS', remplacant: 'AS', regionIdx: 7, motif: 'Formation interne' },
   ];
 
-  let rtCounter = 1;
-
   for (const repl of replacements) {
     const region = REGIONS[repl.regionIdx];
     if (!region) continue;
@@ -1685,9 +1615,10 @@ async function seedRemplacements() {
     const titulaire = usersOfRole[0];
     const remplacant = usersOfRole[1];
     const drOfRegion = USERS.find(u => u.role === 'DR' && u.regionId === region.id);
-    const duree = rng.int(10, 30);
-
-    const rtId = `RT${String(rtCounter++).padStart(3, '0')}`;
+    const duree = rng.int(30, 45);
+    const startOffset = -rng.int(0, 5);
+    const dateDebut = isoDateFromOffset(startOffset);
+    const dateFin = isoDateFromOffset(startOffset + duree - 1);
 
     await prisma.$executeRawUnsafe(
       `INSERT INTO replacement_temporaire
@@ -1700,47 +1631,23 @@ async function seedRemplacements() {
       repl.titulaire,
       region.nom,
       `Service ${region.nom}`,
-      isoDateFromOffset(-rng.int(0, 5)),
-      isoDateFromOffset(duree),
+      dateDebut,
+      dateFin,
       duree,
       repl.motif,
       drOfRegion?.matricule ?? 'A0001',
     );
 
-    await pg.query(
-      `INSERT INTO remplacements_temporaires
-        (id_remplacement, titulaire_matricule, remplacant_matricule, role_remplace, region_remplacement, service_remplacement,
-         date_debut, date_fin, duree_prevue_jours, motif, cree_par, est_actif, notifications_envoyees, equipe_notifiee, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8::date, $9, $10, $11, TRUE, TRUE, TRUE, NOW(), NOW())
-       ON CONFLICT (id_remplacement) DO UPDATE SET
-         titulaire_matricule = EXCLUDED.titulaire_matricule,
-         remplacant_matricule = EXCLUDED.remplacant_matricule,
-         role_remplace = EXCLUDED.role_remplace,
-         region_remplacement = EXCLUDED.region_remplacement,
-         service_remplacement = EXCLUDED.service_remplacement,
-         date_debut = EXCLUDED.date_debut,
-         date_fin = EXCLUDED.date_fin,
-         duree_prevue_jours = EXCLUDED.duree_prevue_jours,
-         motif = EXCLUDED.motif,
-         cree_par = EXCLUDED.cree_par,
-         est_actif = EXCLUDED.est_actif,
-         notifications_envoyees = EXCLUDED.notifications_envoyees,
-         equipe_notifiee = EXCLUDED.equipe_notifiee,
-         updated_at = NOW()`,
-      [
-        rtId,
-        titulaire.matricule,
-        remplacant.matricule,
-        repl.titulaire,
-        region.nom,
-        `Service ${region.nom}`,
-        isoDateFromOffset(-rng.int(0, 5)),
-        isoDateFromOffset(duree),
-        duree,
-        repl.motif,
-        drOfRegion?.matricule ?? 'A0001',
-      ],
-    );
+    await prisma.utilisateur.update({
+      where: { matricule: titulaire.matricule },
+      data: {
+        statut: 'Indisponible',
+        est_indisponible: true,
+        date_debut_indisponibilite: new Date(`${dateDebut}T00:00:00.000Z`),
+        date_fin_indisponibilite: new Date(`${dateFin}T00:00:00.000Z`),
+        motif_indisponibilite: repl.motif,
+      },
+    });
   }
 }
 
@@ -1852,6 +1759,18 @@ async function seedNotifications() {
 // ----- Main -----
 
 async function main() {
+  const seedMode = process.env.SEED_MODE ?? 'reset';
+  if (!['reset', 'if-empty'].includes(seedMode)) {
+    throw new Error(`SEED_MODE invalide: ${seedMode} (valeurs: reset, if-empty)`);
+  }
+  if (seedMode === 'if-empty') {
+    const existingUsers = await prisma.utilisateur.count();
+    if (existingUsers > 0) {
+      console.log(`Seed skipped: ${existingUsers} utilisateurs existent déjà`);
+      return;
+    }
+  }
+
   console.log('Reset local demo data...');
   await resetData();
 
@@ -1876,7 +1795,7 @@ async function main() {
   console.log('Seeding notifications...');
   const notifCount = await seedNotifications();
 
-  console.log(`Seed completed: ${USERS.length} users, ${RULE_SPECS.length} rules, 2 periods, ${evalCount} evaluations, 8 replacements, ${notifCount} notifications.`);
+  console.log(`Seed completed: ${USERS.length} users, ${RULE_SPECS.length} rules, ${PERIODS.length} periods, ${evalCount} evaluations, 8 replacements, ${notifCount} notifications.`);
 }
 
 main()

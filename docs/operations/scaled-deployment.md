@@ -18,15 +18,11 @@ Ce fichier n'impose pas la mise en production. Il prépare seulement la capacit�
 
 ## Démarrage
 
-Avant le lancement:
+Avant le lancement :
 
-1. appliquer les migrations:
-
-```bash
-pnpm --dir apps/api db:migrate:all
-```
-
-2. arrêter une éventuelle stack locale qui occupe déjà `3000`, `3306`, `5432`, `5173`
+1. copier `.env.example` vers `.env` et remplacer les secrets ;
+2. arrêter une éventuelle stack locale qui occupe déjà `3000`, `3306`,
+   `5432`, `5173`.
 
 Puis:
 
@@ -52,7 +48,11 @@ curl http://localhost:5173
 
 - `frontend` expose `5173`
 - `api` est un gateway Nginx exposé sur `3000`
+- `migrate` applique une seule fois les migrations MySQL et PostgreSQL, puis
+  termine avant le démarrage des réplicas
 - `nestjs-api-1` et `nestjs-api-2` restent internes au réseau Docker
+- `SCHEDULER_ENABLED=true` uniquement sur `nestjs-api-1`; `migrate` et
+  `nestjs-api-2` court-circuitent explicitement tous les crons
 - `redis` fournit le cache partagé entre replicas
 - round-robin Nginx avec `least_conn`
 
@@ -69,8 +69,10 @@ Utiliser cette stack seulement après:
 - les JWT restent stateless, donc compatibles avec `2` replicas
 - Redis devient la couche de cache partagée pour les dashboards et analytics
 - cette variante reste adaptée à une montée en charge modérée sans microservices
+- toute nouvelle réplique doit garder `SCHEDULER_ENABLED=false`; en cas de
+  remplacement d'`api-1`, activer la variable sur exactement une instance
 - choix d'images:
-  - API: `node:20-bookworm-slim` pour éviter les soucis musl/Prisma/bcrypt tout en restant légère
+  - API: `node:20-bookworm-slim` pour assurer la compatibilité Prisma
   - Frontend et gateway: `nginx:1.27-alpine`
   - PostgreSQL: `postgres:16-alpine`
   - Redis: `redis:7-alpine`

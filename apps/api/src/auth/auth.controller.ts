@@ -1,4 +1,14 @@
-import { Controller, Post, Patch, Get, Body, UseGuards, Request, HttpCode, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Patch,
+  Get,
+  Body,
+  UseGuards,
+  Request,
+  HttpCode,
+  BadRequestException,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -9,6 +19,24 @@ import * as bcrypt from 'bcryptjs';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
+
+interface CurrentUserRequest {
+  user: { matricule: string };
+  ip?: string;
+}
+
+interface LocalLoginRequest {
+  user: {
+    matricule: string;
+    email: string;
+    role: string;
+    est_admin: boolean;
+  };
+}
+
+interface LogoutRequest extends CurrentUserRequest {
+  user: { matricule: string; jti: string; exp: number };
+}
 
 @Controller('auth')
 export class AuthController {
@@ -22,22 +50,23 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
-  login(@Request() req: any) {
+  login(@Request() req: LocalLoginRequest) {
     return this.authService.login(req.user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Request() req: any) {
+  me(@Request() req: CurrentUserRequest) {
     return this.authService.me(req.user.matricule);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(200)
-  async logout(@Request() req: any) {
+  async logout(@Request() req: LogoutRequest) {
+    await this.authService.logout(req.user);
     await this.auditLog.log({
-      matricule_utilisateur: req.user?.sub ?? req.user?.matricule ?? null,
+      matricule_utilisateur: req.user.matricule,
       action: 'logout',
       entite: 'auth',
       adresse_ip: req.ip || 'unknown',
@@ -48,13 +77,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Patch('profile')
   async updateProfile(
-    @Request() req: any,
+    @Request() req: CurrentUserRequest,
     @Body() body: UpdateProfileDto,
   ) {
-    const data: Partial<{
-      nom: string; prenom: string; email: string; telephone: string;
-      date_naissance: Date; preferences_json: unknown;
-    }> = {};
+    const data: Record<string, unknown> = {};
     if (body.nom !== undefined) data.nom = body.nom;
     if (body.prenom !== undefined) data.prenom = body.prenom;
     if (body.email !== undefined) {
@@ -65,27 +91,31 @@ export class AuthController {
       data.email = body.email;
     }
     if (body.telephone !== undefined) data.telephone = body.telephone;
-    if (body.date_naissance !== undefined) data.date_naissance = new Date(body.date_naissance);
-    if (body.preferences !== undefined) data.preferences_json = body.preferences;
+    if (body.date_naissance !== undefined)
+      data.date_naissance = new Date(body.date_naissance);
+    if (body.preferences !== undefined)
+      data.preferences_json = body.preferences;
 
-    await this.prisma.utilisateur.update({ where: { matricule: req.user.matricule }, data });
+    await this.prisma.utilisateur.update({
+      where: { matricule: req.user.matricule },
+      data: data as any,
+    });
     return this.usersService.findByMatricule(req.user.matricule);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
   async updatePassword(
-    @Request() req: any,
+    @Request() req: CurrentUserRequest,
     @Body() body: UpdatePasswordDto,
   ) {
     if (body.password !== body.password_confirmation) {
       throw new BadRequestException('Les mots de passe ne correspondent pas');
     }
-    if (body.password.length < 6) {
-      throw new BadRequestException('Le mot de passe doit contenir au moins 6 caractères');
-    }
 
-    const user = await this.prisma.utilisateur.findUnique({ where: { matricule: req.user.matricule } });
+    const user = await this.prisma.utilisateur.findUnique({
+      where: { matricule: req.user.matricule },
+    });
     if (!user) throw new BadRequestException('Utilisateur introuvable');
 
     const valid = await bcrypt.compare(body.current_password, user.password);

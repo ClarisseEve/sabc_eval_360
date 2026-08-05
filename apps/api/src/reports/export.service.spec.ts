@@ -60,6 +60,21 @@ describe('ExportService', () => {
     expect(Buffer.isBuffer(buffer)).toBe(true);
   });
 
+  it("exportXLSX — assainit et déduplique les noms d'onglets", async () => {
+    mockPg.queryOne.mockResolvedValue({
+      ...mockRapport,
+      sections_json: [
+        { ...mockRapport.sections_json[0], id: 's1', titre: 'Ventes / Région' },
+        { ...mockRapport.sections_json[0], id: 's2', titre: 'Ventes / Région' },
+      ],
+    });
+
+    const buffer = await service.exportXLSX('uuid-1');
+
+    expect(Buffer.isBuffer(buffer)).toBe(true);
+    expect(buffer.subarray(0, 2).toString()).toBe('PK');
+  });
+
   it('logExport — appelle pg.query avec les bons paramètres', async () => {
     mockPg.query.mockResolvedValue([]);
     await service.logExport({ rapport_id: 'uuid-1', format: 'pptx', createur_matricule: 'MAT001', fichier_nom: 'test.pptx' });

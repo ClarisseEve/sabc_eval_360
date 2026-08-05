@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-async function login(page: import('@playwright/test').Page, identifier: string, password = '***REMOVED***') {
+async function login(
+  page: import('@playwright/test').Page,
+  identifier: string,
+  password = process.env.SEED_PASSWORD || '***REMOVED***',
+) {
   await page.goto('/login');
   await page.getByLabel('Matricule ou Email').fill(identifier);
   await page.getByLabel('Mot de passe').fill(password);
@@ -17,7 +21,7 @@ test('admin dashboard 360 fonctionne avec les données seedées', async ({ page 
 
   await page.getByRole('tab', { name: 'Recherche individuelle' }).click();
   await expect(page.getByText('Recherche individuelle')).toBeVisible();
-  await expect(page.getByText('T1230')).toBeVisible();
+  await expect(page.getByText('T1210')).toBeVisible();
 
   await page.screenshot({ path: testInfo.outputPath('admin-dashboard.png'), fullPage: true });
 });
@@ -37,7 +41,7 @@ test('dashboard manager et page axes réagissent aux vraies données', async ({ 
 });
 
 test('dashboard individuel et amélioration personnelle sont cohérents', async ({ page }, testInfo) => {
-  await login(page, 'T1230');
+  await login(page, 'T1210');
 
   await expect(page).toHaveURL(/\/tmo\/dashboard/);
   await expect(page.getByText('Recommandations')).toBeVisible();

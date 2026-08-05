@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import Badge from '@/Components/UI/Badge';
 import { Button } from '@/Components/UI/Button';
 import { useQuery } from '@tanstack/react-query';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
+import { periodesApi } from '@/Services/api';
 import { EvaluationPageLayout } from './shared';
 import { AlertTriangle, CheckCheck, ClipboardList, FileEdit, Send, XCircle } from 'lucide-react';
 
@@ -169,10 +171,17 @@ const EvaluationsDonnees: React.FC = () => {
     type_evaluation: '',
   });
 
+  const { data: periodesData } = useQuery({
+    queryKey: ['periodes'],
+    queryFn: () => periodesApi.list().then((r) => (Array.isArray(r.data) ? r.data : [])),
+    staleTime: 60_000,
+  });
+  const periodes = Array.isArray(periodesData) ? periodesData : [];
+
   const { data, isLoading } = useQuery<{ data: EvaluationDonnee[]; stats: StatsDonnees }>({
     queryKey: ['evaluations', 'donnees', filters],
     queryFn: async () => {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('sabc_access_token');
       const params = new URLSearchParams();
       if (filters.statut) params.set('statut', filters.statut);
       if (filters.id_periode) params.set('id_periode', filters.id_periode);
@@ -247,15 +256,24 @@ const EvaluationsDonnees: React.FC = () => {
           <CardContent className="flex flex-wrap gap-4 p-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-sabc-gray-500">Période</label>
-              <input
-                type="text"
-                placeholder="Code ou identifiant…"
+              <Select
                 value={filters.id_periode}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, id_periode: e.target.value }))
+                onValueChange={(val) =>
+                  setFilters((prev) => ({ ...prev, id_periode: val === '__all__' ? '' : val }))
                 }
-                className="h-9 rounded-md border border-sabc-gray-200 bg-white px-3 text-sm text-sabc-gray-900 placeholder:text-sabc-gray-400 focus:outline-none focus:ring-2 focus:ring-sabc-red-primary dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-white"
-              />
+              >
+                <SelectTrigger className="h-9 w-48">
+                  <SelectValue placeholder="Toutes les périodes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Toutes les périodes</SelectItem>
+                  {periodes.map((p: any) => (
+                    <SelectItem key={p.id_periode} value={p.id_periode}>
+                      {p.nom_periode}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex flex-col gap-1">

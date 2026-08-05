@@ -78,7 +78,7 @@ export function CategoricalChart({
           }}
           barSize={barSize}
         >
-          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />}
+          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />}
           
           <XAxis 
             dataKey={xAxisDataKey} 

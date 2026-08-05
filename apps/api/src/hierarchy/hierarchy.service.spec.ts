@@ -91,7 +91,7 @@ describe('HierarchyService', () => {
       mockPrisma.role.findUnique.mockResolvedValue({ id_role: 'DR', peut_cross_branch: true });
       const result = await service.peutSuperviser('S1', 'S2');
       expect(result).toBe(true);
-      expect(mockPrisma.role.findUnique).toHaveBeenCalledWith({ where: { id_role: 'DR' } });
+      expect(mockPrisma.role.findUnique).toHaveBeenCalledWith({ where: { nom_role: 'DR' } });
     });
 
     it('should reject cross-branch when role.peut_cross_branch = false', async () => {

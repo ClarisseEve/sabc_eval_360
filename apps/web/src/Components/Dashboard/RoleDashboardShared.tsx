@@ -1,4 +1,17 @@
 import React from 'react';
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  ClipboardList,
+  Eye,
+  EyeOff,
+  ListChecks,
+  RefreshCw,
+  ScrollText,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { Head } from '@/lib/inertia-shim';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
@@ -73,6 +86,59 @@ export function formatEvaluationType(value: unknown) {
   return labelByType[normalized.toLowerCase()] ?? normalized;
 }
 
+type EvaluationTypeMeta = {
+  Icon: LucideIcon;
+  iconWrap: string;
+  border: string;
+};
+
+/** Ancre visuelle (icône + couleur) par type d'évaluation pour un repérage immédiat. */
+export function getEvaluationTypeMeta(value: unknown): EvaluationTypeMeta {
+  switch (String(value || '').toLowerCase()) {
+    case 'descendante':
+      return {
+        Icon: ArrowDownRight,
+        iconWrap: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+        border: 'border-l-blue-400 dark:border-l-blue-500',
+      };
+    case 'ascendante':
+      return {
+        Icon: ArrowUpRight,
+        iconWrap: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
+        border: 'border-l-emerald-400 dark:border-l-emerald-500',
+      };
+    case 'auto':
+      return {
+        Icon: UserRound,
+        iconWrap: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+        border: 'border-l-amber-400 dark:border-l-amber-500',
+      };
+    case 'pairs':
+      return {
+        Icon: Users,
+        iconWrap: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
+        border: 'border-l-indigo-400 dark:border-l-indigo-500',
+      };
+    case '360':
+      return {
+        Icon: RefreshCw,
+        iconWrap: 'bg-sabc-red-primary/10 text-sabc-red-primary dark:bg-sabc-red-primary/20 dark:text-sabc-red-light',
+        border: 'border-l-sabc-red-primary/60',
+      };
+    default:
+      return {
+        Icon: ClipboardList,
+        iconWrap: 'bg-sabc-gray-100 text-sabc-gray-500 dark:bg-sabc-gray-800 dark:text-sabc-gray-400',
+        border: 'border-l-sabc-gray-300 dark:border-l-sabc-gray-600',
+      };
+  }
+}
+
+/** Traduit la politique de visibilité technique en libellé lisible. */
+export function formatVisibilityLabel(detail: unknown) {
+  return String(detail) === 'detailed' ? 'Visibilité détaillée' : 'Visibilité agrégée';
+}
+
 export function getPriorityBadgeVariant(priority: unknown): 'error' | 'warning' | 'info' | 'secondary' {
   const value = String(priority || '').toLowerCase();
   if (value === 'haute' || value === 'high') return 'error';
@@ -100,7 +166,7 @@ export function DashboardPageFrame({
     <AppLayout user={layoutUser} notifications={[]} pageTitle={title}>
       <Head title={`${title} - SABC Eval360`} />
 
-      <div className="container mx-auto space-y-5 px-4 py-5">
+      <div className="container mx-auto space-y-6 px-4 py-6">
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-xl font-semibold text-sabc-gray-900 dark:text-white">{title}</h1>
@@ -122,9 +188,9 @@ export function DashboardPageFrame({
 export function MetricCard({ label, value, caption, accentClassName }: MetricCardProps) {
   return (
     <Card className={`border-l-4 ${accentClassName}`}>
-      <CardContent className="p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-sabc-gray-500 dark:text-sabc-gray-400">{label}</p>
-        <div className="mt-1 text-2xl font-semibold text-sabc-gray-900 dark:text-white">{value}</div>
+      <CardContent className="p-5">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sabc-gray-500 dark:text-sabc-gray-400">{label}</p>
+        <div className="mt-1.5 text-2xl font-bold text-sabc-gray-900 dark:text-white">{value}</div>
         <p className="mt-1.5 text-xs text-sabc-gray-400 dark:text-sabc-gray-500">{caption}</p>
       </CardContent>
     </Card>
@@ -147,35 +213,78 @@ export function ActiveRulesCard({
   maxItems = 4,
 }: ActiveRulesCardProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+    <Card className="border-sabc-info/40 bg-sabc-info/20 dark:border-sabc-info/30 dark:bg-sabc-info/15">
+      <CardHeader className="flex-row items-center gap-2.5 space-y-0">
+        <span
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sabc-info text-white"
+          aria-hidden
+        >
+          <ScrollText className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="px-5 pb-5 pt-0">
         {rules.length === 0 ? (
           <EmptyState message={emptyMessage} />
         ) : (
-          rules.slice(0, maxItems).map((rule) => (
-            <div key={rule.id_regle} className="rounded-xl border border-sabc-gray-200 p-4 dark:border-sabc-gray-700">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="font-medium text-sabc-gray-900 dark:text-white">{rule.nom_regle}</div>
-                {rule.type_evaluation ? <Badge variant="primary">{formatEvaluationType(rule.type_evaluation)}</Badge> : null}
-                <Badge variant="info">{rule.criteres.length} critères</Badge>
-                <Badge variant="warning">visibilité {rule.visibility_policy.detail}</Badge>
-              </div>
-              {rule.description ? (
-                <p className="mt-2 text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{rule.description}</p>
-              ) : null}
-              <div className="mt-3 flex flex-wrap gap-2">
-                {rule.sections.slice(0, 4).map((section) => (
-                  <Badge key={`${rule.id_regle}-${section.id}`} variant="secondary">
-                    {section.titre}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          ))
+          <ul className="divide-y divide-sabc-gray-100 overflow-hidden rounded-xl border border-sabc-info/15 bg-white shadow-sm dark:divide-sabc-gray-800 dark:border-sabc-info/20 dark:bg-sabc-gray-900">
+            {rules.slice(0, maxItems).map((rule) => {
+              const typeMeta = getEvaluationTypeMeta(rule.type_evaluation);
+              const TypeIcon = typeMeta.Icon;
+              const detailed = String(rule.visibility_policy.detail) === 'detailed';
+              const visibilityLabel = formatVisibilityLabel(rule.visibility_policy.detail);
+              const domains = rule.sections.map((section) => section.titre);
+              const shownDomains = domains.slice(0, 4);
+              const extraDomains = Math.max(0, domains.length - shownDomains.length);
+
+              return (
+                <li
+                  key={rule.id_regle}
+                  className="flex items-start gap-3 px-5 py-3 transition-colors hover:bg-sabc-info/[0.06] dark:hover:bg-sabc-info/10"
+                >
+                  <span
+                    className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${typeMeta.iconWrap}`}
+                    aria-hidden
+                  >
+                    <TypeIcon className="h-4 w-4" strokeWidth={2} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                      <div className="flex min-w-0 items-baseline gap-2">
+                        <span className="truncate text-sm font-semibold text-sabc-gray-900 dark:text-white">
+                          {rule.nom_regle}
+                        </span>
+                        {rule.type_evaluation ? (
+                          <span className="hidden shrink-0 text-xs text-sabc-gray-400 dark:text-sabc-gray-500 sm:inline">
+                            {formatEvaluationType(rule.type_evaluation)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <Badge variant="info" className="gap-1" title={`${rule.criteres.length} critères`}>
+                          <ListChecks className="h-3 w-3" aria-hidden />
+                          {rule.criteres.length}
+                        </Badge>
+                        <Badge variant={detailed ? 'success' : 'warning'} className="gap-1" title={visibilityLabel}>
+                          {detailed ? <Eye className="h-3 w-3" aria-hidden /> : <EyeOff className="h-3 w-3" aria-hidden />}
+                          {detailed ? 'Détaillée' : 'Agrégée'}
+                        </Badge>
+                      </div>
+                    </div>
+                    {shownDomains.length > 0 ? (
+                      <p className="mt-1 truncate text-xs text-sabc-gray-500 dark:text-sabc-gray-400">
+                        {shownDomains.join(' · ')}
+                        {extraDomains > 0 ? ` · +${extraDomains}` : ''}
+                      </p>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </CardContent>
     </Card>

@@ -150,6 +150,11 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
         type="button"
         role="tab"
         className={cn(tabsTriggerVariants({ variant: tabsVariant, className }))}
+        style={
+          isSelected && tabsVariant === 'card'
+            ? { backgroundColor: 'var(--sabc-red-primary)', color: 'white', borderColor: 'var(--sabc-red-primary)' }
+            : undefined
+        }
         aria-selected={isSelected}
         data-state={isSelected ? 'active' : 'inactive'}
         onClick={() => onValueChange(value)}

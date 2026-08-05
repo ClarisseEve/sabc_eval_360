@@ -27,13 +27,11 @@ export class ReglesController {
     return this.service.getCategoriesValides();
   }
 
-  @Get(':id')
-  async show(@Param('id') id: string) {
-    const regle = await this.service.findById(id);
-    if (!regle) {
-      throw new NotFoundException(`Règle introuvable: ${id}`);
-    }
-    return regle;
+  @Get('all')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  listAll() {
+    return this.service.listAll();
   }
 
   @Post('validate')
@@ -41,12 +39,13 @@ export class ReglesController {
     return this.service.validateCriteres(dto.criteres);
   }
 
-  // Admin-only CRUD — placed after static routes to avoid shadowing /:id
-  @Get('all')
-  @UseGuards(RolesGuard)
-  @Roles('ADMIN')
-  listAll() {
-    return this.service.listAll();
+  @Get(':id')
+  async show(@Param('id') id: string) {
+    const regle = await this.service.findById(id);
+    if (!regle) {
+      throw new NotFoundException(`Règle introuvable: ${id}`);
+    }
+    return regle;
   }
 
   @Post()

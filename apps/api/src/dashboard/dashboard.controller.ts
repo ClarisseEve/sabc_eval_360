@@ -16,9 +16,11 @@ export class DashboardController {
   @Get()
   async getMyDashboard(@Request() req: any) {
     const user = req.user;
-    const role = String(user.role_nom ?? user.role ?? 'admin').toLowerCase();
+    const claimedRole = String(user.role_nom ?? user.role ?? '').trim().toLowerCase();
+    const isAdmin = Boolean(user.is_admin) || claimedRole === 'admin';
+    const role = isAdmin ? 'admin' : claimedRole || 'collaborateur';
 
-    if (role === 'admin') {
+    if (isAdmin) {
       return {
         role,
         title: this.dashboardService.getRoleTitle(role),

@@ -73,7 +73,7 @@ export default function ToValidate() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Évaluations à valider</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Évaluations soumises par vos subordonnés directs en attente de votre décision
+            Évaluations soumises dans votre périmètre de validation en attente de votre décision
           </p>
         </div>
 

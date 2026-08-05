@@ -89,7 +89,7 @@ export function RegionSelectionSection({
                     </div>
                     <div>
                       <div className="text-xs font-medium text-sabc-gray-500">{card.label}</div>
-                      <div className="text-xl font-bold text-sabc-gray-900">{card.value}</div>
+                      <div className="text-2xl font-bold text-sabc-gray-900">{card.value}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -113,10 +113,10 @@ export function InterRegionComparisonSection({ data }: Readonly<{ data: InterReg
         {data.length === 0 ? (
           <EmptyState message="Aucune donnée inter-régions disponible." />
         ) : (
-          <div className="h-80">
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#E5E7EB" />
+              <BarChart data={data} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                 <XAxis dataKey="region" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                 <YAxis tickLine={false} axisLine={false} width={36} />
                 <Tooltip content={<ChartTooltip />} />
@@ -163,7 +163,7 @@ export function RegionalRankingSection({
                     </div>
                     <div>
                       <div className="text-xs font-medium text-sabc-gray-500">{card.label}</div>
-                      <div className="text-xl font-bold text-sabc-gray-900">{card.value}</div>
+                      <div className="text-2xl font-bold text-sabc-gray-900">{card.value}</div>
                     </div>
                   </div>
                 </CardContent>

@@ -28,6 +28,9 @@ describe('AnalyticsService', () => {
         count: jest.fn().mockResolvedValue(0),
         findUnique: jest.fn().mockResolvedValue(null),
       },
+      replacement_temporaire: {
+        count: jest.fn().mockResolvedValue(0),
+      },
     } as any;
     service = new AnalyticsService(mockConfig, mockPg, mockCache, mockPrisma, mockNotifications);
   });
@@ -296,7 +299,7 @@ describe('AnalyticsService', () => {
       expect(result.total).toBe(2);
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.stringContaining('SELECT * FROM logs_anomalies'),
-        [],
+        [100],
       );
     });
 
@@ -320,8 +323,16 @@ describe('AnalyticsService', () => {
     it('respecte la limite maximale de 500', async () => {
       mockPg.query.mockResolvedValueOnce([]);
       await service.getAnomaliesHistory({ limit: 1000 });
-      const sql = mockPg.query.mock.calls[0][0] as string;
-      expect(sql).toContain('LIMIT 500');
+      const [sql, params] = mockPg.query.mock.calls[0];
+      expect(sql).toContain('LIMIT $1');
+      expect(params).toEqual([500]);
+    });
+
+    it('ignore une limite non numérique au lieu de produire LIMIT NaN', async () => {
+      mockPg.query.mockResolvedValueOnce([]);
+      await service.getAnomaliesHistory({ limit: 'abc' as any });
+      const [, params] = mockPg.query.mock.calls[0];
+      expect(params).toEqual([100]);
     });
   });
 
@@ -348,6 +359,75 @@ describe('AnalyticsService', () => {
       );
       expect(result.statut).toBe('rejetee');
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('paramétrage SQL des filtres de dates admin', () => {
+    const startDate = "2026-01-01' OR 1=1 --";
+    const endDate = '2026-06-30';
+
+    it('paramètre la requête de synthèse des statuts', async () => {
+      jest.spyOn(service, 'getDashboard').mockResolvedValue({ kpis: {} } as any);
+      jest.spyOn(service, 'getAdminRegionsOverview').mockResolvedValue({ regions: [] } as any);
+      jest.spyOn(service, 'getAdminRoleAnalytics').mockResolvedValue({ roles: [] } as any);
+      mockPg.queryOne.mockImplementation((sql: string) => {
+        return Promise.resolve({
+          total_evaluations: '0',
+          validated_evaluations: '0',
+          submitted_evaluations: '0',
+          draft_evaluations: '0',
+        });
+      });
+
+      await (service as any)._getAdminOverview({ start_date: startDate, end_date: endDate });
+
+      const [sql, params] = mockPg.queryOne.mock.calls.find((call: any[]) =>
+        String(call[0]).includes('validated_evaluations'),
+      );
+      expect(sql).toContain('BETWEEN $1 AND $2');
+      expect(sql).not.toContain(startDate);
+      expect(params).toEqual([startDate, endDate]);
+      expect(mockPrisma.replacement_temporaire.count).toHaveBeenCalledWith({
+        where: {
+          est_actif: true,
+          date_debut: { lte: expect.any(Date) },
+          OR: [
+            { date_fin: null },
+            { date_fin: { gte: expect.any(Date) } },
+          ],
+        },
+      });
+      expect(mockPg.queryOne).not.toHaveBeenCalledWith(
+        expect.stringContaining('remplacements_temporaires'),
+      );
+    });
+
+    it('paramètre la jointure des agrégats régionaux', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await (service as any).getAdminRegionAggregates({
+        start_date: startDate,
+        end_date: endDate,
+      });
+
+      const [sql, params] = mockPg.query.mock.calls[0];
+      expect(sql).toContain('BETWEEN $1 AND $2');
+      expect(sql).not.toContain(startDate);
+      expect(params).toEqual([startDate, endDate]);
+    });
+
+    it('paramètre la jointure des agrégats par rôle', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await (service as any).getAdminRolePerformance({
+        start_date: startDate,
+        end_date: endDate,
+      });
+
+      const [sql, params] = mockPg.query.mock.calls[0];
+      expect(sql).toContain('BETWEEN $1 AND $2');
+      expect(sql).not.toContain(startDate);
+      expect(params).toEqual([startDate, endDate]);
     });
   });
 });

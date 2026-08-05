@@ -7,6 +7,10 @@ import {
   IsBoolean,
   IsIn,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+const emptyStringToNull = ({ value }: { value: unknown }) =>
+  typeof value === 'string' && value.trim() === '' ? null : value;
 
 export class CreateUserDto {
   @IsString()
@@ -37,61 +41,41 @@ export class CreateUserDto {
   @MaxLength(5)
   id_region: string;
 
-  // Denormalized fields stored on Utilisateur
-  @IsString()
-  @MaxLength(50)
-  role: string;
-
-  @IsString()
-  @MaxLength(50)
-  role_nom: string;
-
-  @IsString()
-  @MaxLength(100)
-  region_nom: string;
-
-  @IsString()
-  @MaxLength(20)
-  type_region: string;
-
+  @Transform(emptyStringToNull)
   @IsOptional()
   @IsString()
   @MaxLength(5)
-  id_branche?: string;
+  manager_matricule?: string | null;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(5)
-  manager_matricule?: string;
-
+  @Transform(emptyStringToNull)
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  telephone?: string;
+  telephone?: string | null;
 
+  @Transform(emptyStringToNull)
   @IsOptional()
   @IsString()
   @MaxLength(10)
-  id_service?: string;
+  id_service?: string | null;
 
+  @Transform(emptyStringToNull)
   @IsOptional()
   @IsString()
   @MaxLength(10)
-  id_district?: string;
+  id_district?: string | null;
 
+  @Transform(emptyStringToNull)
   @IsOptional()
   @IsString()
   @MaxLength(10)
-  id_secteur?: string;
+  id_secteur?: string | null;
 
+  @Transform(emptyStringToNull)
   @IsOptional()
   @IsString()
   @MaxLength(10)
-  sexe?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  est_admin?: boolean;
+  sexe?: string | null;
 }
 
 export class UpdateUserDto {

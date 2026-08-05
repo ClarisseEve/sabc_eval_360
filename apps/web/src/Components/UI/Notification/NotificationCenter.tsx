@@ -1,11 +1,9 @@
 import * as React from 'react';
-import { Bell, X, CheckCircle, AlertCircle, Clock, Info } from 'lucide-react';
+import { Bell, X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/utils/helpers';
 import { Button } from '@/Components/UI/Button/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
-import { StatusBadge } from '@/Components/UI/Status/StatusBadge';
 
 export type NotificationType = 'success' | 'warning' | 'error' | 'info';
 
@@ -29,6 +27,26 @@ export interface NotificationCenterProps {
   className?: string;
 }
 
+const DOT_COLORS: Record<NotificationType, string> = {
+  success: 'bg-sabc-success',
+  warning: 'bg-sabc-warning',
+  error: 'bg-sabc-error',
+  info: 'bg-sabc-info',
+};
+
+function relativeTime(dateString: string) {
+  const date = new Date(dateString);
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 1) return "À l'instant";
+  if (diffMin < 60) return `${diffMin}min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 30) return `${diffD}j`;
+  return format(date, 'dd MMM', { locale: fr });
+}
+
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   notifications,
   onMarkAsRead,
@@ -38,159 +56,140 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   className,
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
-  
-  // Nombre de notifications non lues
-  const unreadCount = notifications.filter(notification => !notification.read).length;
-  
-  // Formater la date
-  const formatNotificationDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, 'dd MMM yyyy, HH:mm', { locale: fr });
+  const ref = React.useRef<HTMLDivElement>(null);
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+    };
+    if (isOpen) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isOpen]);
+
+  const handleClick = (n: Notification) => {
+    if (!n.read) onMarkAsRead(n.id);
+    if (n.actionUrl && onAction) onAction(n.id, n.actionUrl);
   };
-  
-  // Icône selon le type de notification
-  const getNotificationIcon = (type: NotificationType) => {
-    switch (type) {
-      case 'success': return <CheckCircle className="h-5 w-5 text-sabc-success" />;
-      case 'warning': return <AlertCircle className="h-5 w-5 text-sabc-warning" />;
-      case 'error': return <AlertCircle className="h-5 w-5 text-sabc-error" />;
-      case 'info': return <Info className="h-5 w-5 text-sabc-info" />;
-    }
-  };
-  
-  // Couleur de bordure selon le type de notification
-  const getNotificationBorderColor = (type: NotificationType) => {
-    switch (type) {
-      case 'success': return 'border-l-sabc-success';
-      case 'warning': return 'border-l-sabc-warning';
-      case 'error': return 'border-l-sabc-error';
-      case 'info': return 'border-l-sabc-info';
-    }
-  };
-  
-  // Gérer le clic sur une notification
-  const handleNotificationClick = (notification: Notification) => {
-    if (!notification.read) {
-      onMarkAsRead(notification.id);
-    }
-    
-    if (notification.actionUrl && onAction) {
-      onAction(notification.id, notification.actionUrl);
-    }
-  };
-  
+
   return (
-    <div className={cn("relative", className)}>
-      <Button 
-        variant="ghost" 
+    <div ref={ref} className={cn('relative', className)}>
+      <Button
+        variant="ghost"
         size="icon"
         onClick={() => setIsOpen(!isOpen)}
         className="relative"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-sabc-red-primary text-xs text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-sabc-red-primary text-[10px] font-bold leading-none text-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </Button>
-      
+
       {isOpen && (
-        <Card className="absolute right-0 top-full z-50 mt-2 w-80 shadow-lg md:w-96">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg">Notifications</CardTitle>
+        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-sabc-gray-200 bg-white shadow-xl dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-sabc-gray-100 px-4 py-2.5 dark:border-sabc-gray-800">
+            <span className="text-sm font-semibold text-sabc-gray-900 dark:text-white">
+              Notifications
+              {unreadCount > 0 && (
+                <span className="ml-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-sabc-red-primary text-[10px] font-bold text-white">
+                  {unreadCount}
+                </span>
+              )}
+            </span>
             {unreadCount > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm"
+              <button
                 onClick={onMarkAllAsRead}
-                className="text-xs text-sabc-gray-500 hover:text-sabc-gray-700 dark:text-sabc-gray-400 dark:hover:text-sabc-gray-300"
+                className="text-[11px] font-medium text-sabc-gray-400 transition hover:text-sabc-red-primary"
               >
-                Tout marquer comme lu
-              </Button>
+                Tout lire
+              </button>
             )}
-          </CardHeader>
-          <CardContent className="max-h-[400px] overflow-y-auto p-0">
+          </div>
+
+          {/* List */}
+          <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Bell className="mb-2 h-8 w-8 text-sabc-gray-400" />
-                <p className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
-                  Aucune notification
-                </p>
+              <div className="flex flex-col items-center py-10 text-center">
+                <Bell className="mb-2 h-6 w-6 text-sabc-gray-300" />
+                <p className="text-xs text-sabc-gray-400">Aucune notification</p>
               </div>
             ) : (
-              <div className="divide-y divide-sabc-gray-200 dark:divide-sabc-gray-800">
-                {notifications.map(notification => (
-                  <div 
-                    key={notification.id}
-                    className={cn(
-                      "relative border-l-4 px-4 py-3 transition-colors",
-                      getNotificationBorderColor(notification.type),
-                      !notification.read && "bg-sabc-gray-50 dark:bg-sabc-gray-800/50",
-                      notification.actionUrl && "cursor-pointer hover:bg-sabc-gray-100 dark:hover:bg-sabc-gray-800"
-                    )}
-                    onClick={() => handleNotificationClick(notification)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-3">
-                        {getNotificationIcon(notification.type)}
-                        <div>
-                          <p className="font-medium text-sabc-gray-900 dark:text-white">
-                            {notification.title}
-                          </p>
-                          <p className="text-sm text-sabc-gray-600 dark:text-sabc-gray-400">
-                            {notification.message}
-                          </p>
-                          <p className="mt-1 text-xs text-sabc-gray-500 dark:text-sabc-gray-500">
-                            {formatNotificationDate(notification.timestamp)}
-                          </p>
-                          
-                          {notification.actionUrl && notification.actionLabel && (
-                            <Button 
-                              variant="link" 
-                              size="sm"
-                              className="mt-1 h-auto p-0 text-xs text-sabc-red-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onAction) onAction(notification.id, notification.actionUrl!);
-                              }}
-                            >
-                              {notification.actionLabel}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      
+              notifications.map(n => (
+                <div
+                  key={n.id}
+                  className={cn(
+                    'group flex gap-2.5 px-4 py-2.5 transition-colors',
+                    !n.read && 'bg-sabc-red-primary/[0.03] dark:bg-sabc-red-primary/[0.06]',
+                    n.actionUrl && 'cursor-pointer',
+                    'hover:bg-sabc-gray-50 dark:hover:bg-sabc-gray-800/60',
+                  )}
+                  onClick={() => handleClick(n)}
+                >
+                  {/* Dot */}
+                  <div className="mt-1.5 flex shrink-0">
+                    <span className={cn('h-2 w-2 rounded-full', DOT_COLORS[n.type])} />
+                  </div>
+
+                  {/* Content */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className={cn(
+                        'truncate text-xs leading-snug text-sabc-gray-800 dark:text-sabc-gray-200',
+                        !n.read && 'font-semibold',
+                      )}>
+                        {n.title}
+                      </p>
+                      <span className="shrink-0 text-[10px] text-sabc-gray-400">
+                        {relativeTime(n.timestamp)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-sabc-gray-500 dark:text-sabc-gray-400">
+                      {n.message}
+                    </p>
+                    {n.actionUrl && n.actionLabel && (
                       <button
+                        className="mt-1 text-[11px] font-medium text-sabc-red-primary hover:underline"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDismiss(notification.id);
+                          if (onAction) onAction(n.id, n.actionUrl!);
                         }}
-                        className="rounded-full p-1 text-sabc-gray-400 hover:bg-sabc-gray-200 hover:text-sabc-gray-700 dark:text-sabc-gray-500 dark:hover:bg-sabc-gray-700 dark:hover:text-sabc-gray-300"
                       >
-                        <X className="h-4 w-4" />
+                        {n.actionLabel} →
                       </button>
-                    </div>
-                    
-                    {!notification.read && (
-                      <div className="absolute right-2 top-2">
-                        <StatusBadge variant="info" withDot size="sm">
-                          Nouveau
-                        </StatusBadge>
-                      </div>
                     )}
                   </div>
-                ))}
-              </div>
+
+                  {/* Dismiss */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDismiss(n.id); }}
+                    className="mt-0.5 shrink-0 rounded p-0.5 text-sabc-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-sabc-gray-600 dark:text-sabc-gray-600 dark:hover:text-sabc-gray-300"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))
             )}
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* Footer */}
+          {notifications.length > 0 && (
+            <div className="border-t border-sabc-gray-100 px-4 py-2 text-center dark:border-sabc-gray-800">
+              <button className="text-[11px] font-medium text-sabc-gray-400 transition hover:text-sabc-red-primary">
+                Voir toutes les notifications
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
 };
 
-// Composant pour afficher une notification toast
+// Toast notification component
 export interface NotificationToastProps {
   notification: Notification;
   onDismiss: (id: string) => void;
@@ -198,6 +197,20 @@ export interface NotificationToastProps {
   autoClose?: boolean;
   autoCloseDelay?: number;
 }
+
+const TOAST_ICONS: Record<NotificationType, React.ReactNode> = {
+  success: <CheckCircle className="h-4 w-4 text-sabc-success" />,
+  warning: <AlertCircle className="h-4 w-4 text-sabc-warning" />,
+  error: <AlertCircle className="h-4 w-4 text-sabc-error" />,
+  info: <Info className="h-4 w-4 text-sabc-info" />,
+};
+
+const TOAST_BORDERS: Record<NotificationType, string> = {
+  success: 'border-l-sabc-success',
+  warning: 'border-l-sabc-warning',
+  error: 'border-l-sabc-error',
+  info: 'border-l-sabc-info',
+};
 
 export const NotificationToast: React.FC<NotificationToastProps> = ({
   notification,
@@ -208,77 +221,42 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
 }) => {
   React.useEffect(() => {
     if (autoClose) {
-      const timer = setTimeout(() => {
-        onDismiss(notification.id);
-      }, autoCloseDelay);
-      
+      const timer = setTimeout(() => onDismiss(notification.id), autoCloseDelay);
       return () => clearTimeout(timer);
     }
   }, [autoClose, autoCloseDelay, notification.id, onDismiss]);
-  
-  // Icône selon le type de notification
-  const getNotificationIcon = (type: NotificationType) => {
-    switch (type) {
-      case 'success': return <CheckCircle className="h-5 w-5 text-sabc-success" />;
-      case 'warning': return <AlertCircle className="h-5 w-5 text-sabc-warning" />;
-      case 'error': return <AlertCircle className="h-5 w-5 text-sabc-error" />;
-      case 'info': return <Info className="h-5 w-5 text-sabc-info" />;
-    }
-  };
-  
-  // Couleur de bordure selon le type de notification
-  const getNotificationBorderColor = (type: NotificationType) => {
-    switch (type) {
-      case 'success': return 'border-l-sabc-success';
-      case 'warning': return 'border-l-sabc-warning';
-      case 'error': return 'border-l-sabc-error';
-      case 'info': return 'border-l-sabc-info';
-    }
-  };
-  
+
   return (
-    <div 
+    <div
       className={cn(
-        "relative mb-3 flex w-full max-w-md animate-slide-in-right items-start rounded-md border border-sabc-gray-200 bg-white p-4 shadow-md dark:border-sabc-gray-800 dark:bg-sabc-gray-900",
-        "border-l-4",
-        getNotificationBorderColor(notification.type)
+        'relative mb-2 flex w-full max-w-xs items-start gap-2.5 rounded-lg border border-l-4 border-sabc-gray-200 bg-white px-3 py-2.5 shadow-lg dark:border-sabc-gray-800 dark:bg-sabc-gray-900',
+        TOAST_BORDERS[notification.type],
       )}
     >
-      <div className="mr-3 flex-shrink-0">
-        {getNotificationIcon(notification.type)}
-      </div>
-      <div className="flex-1">
-        <h4 className="font-medium text-sabc-gray-900 dark:text-white">
-          {notification.title}
-        </h4>
-        <p className="text-sm text-sabc-gray-600 dark:text-sabc-gray-400">
-          {notification.message}
-        </p>
-        
+      <div className="mt-0.5 shrink-0">{TOAST_ICONS[notification.type]}</div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold text-sabc-gray-900 dark:text-white">{notification.title}</p>
+        <p className="mt-0.5 line-clamp-2 text-[11px] text-sabc-gray-500 dark:text-sabc-gray-400">{notification.message}</p>
         {notification.actionUrl && notification.actionLabel && (
-          <Button 
-            variant="link" 
-            size="sm"
-            className="mt-1 h-auto p-0 text-xs text-sabc-red-primary"
-            onClick={() => {
-              if (onAction) onAction(notification.id, notification.actionUrl!);
-            }}
+          <button
+            className="mt-1 text-[11px] font-medium text-sabc-red-primary hover:underline"
+            onClick={() => { if (onAction) onAction(notification.id, notification.actionUrl!); }}
           >
-            {notification.actionLabel}
-          </Button>
+            {notification.actionLabel} →
+          </button>
         )}
       </div>
       <button
         onClick={() => onDismiss(notification.id)}
-        className="absolute right-2 top-2 rounded-full p-1 text-sabc-gray-400 hover:bg-sabc-gray-200 hover:text-sabc-gray-700 dark:text-sabc-gray-500 dark:hover:bg-sabc-gray-700 dark:hover:text-sabc-gray-300"
+        className="shrink-0 rounded p-0.5 text-sabc-gray-400 hover:text-sabc-gray-700 dark:text-sabc-gray-500 dark:hover:text-sabc-gray-300"
       >
-        <X className="h-4 w-4" />
+        <X className="h-3 w-3" />
       </button>
     </div>
   );
 };
 
-// Contexte pour gérer les notifications globalement
+// Global notification context
 export interface NotificationContextType {
   notifications: Notification[];
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
@@ -309,80 +287,46 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 }) => {
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const [toasts, setToasts] = React.useState<Notification[]>([]);
-  
-  // Ajouter une notification
+
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
-    const newNotification: Notification = {
+    const n: Notification = {
       ...notification,
       id: Date.now().toString(),
       timestamp: new Date().toISOString(),
       read: false,
     };
-    
-    setNotifications(prev => {
-      const updated = [newNotification, ...prev];
-      // Limiter le nombre de notifications
-      return updated.slice(0, maxNotifications);
-    });
-    
-    // Ajouter aux toasts pour affichage temporaire
-    setToasts(prev => [newNotification, ...prev]);
+    setNotifications(prev => [n, ...prev].slice(0, maxNotifications));
+    setToasts(prev => [n, ...prev]);
   };
-  
-  // Supprimer une notification
+
   const removeNotification = (id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
-    setToasts(prev => prev.filter(notification => notification.id !== id));
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    setToasts(prev => prev.filter(n => n.id !== id));
   };
-  
-  // Marquer une notification comme lue
+
   const markAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, read: true } 
-          : notification
-      )
-    );
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   };
-  
-  // Marquer toutes les notifications comme lues
+
   const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, read: true }))
-    );
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
-  
-  // Supprimer toutes les notifications
+
   const clearAll = () => {
     setNotifications([]);
     setToasts([]);
   };
-  
+
   return (
-    <NotificationContext.Provider 
-      value={{
-        notifications,
-        addNotification,
-        removeNotification,
-        markAsRead,
-        markAllAsRead,
-        clearAll,
-      }}
-    >
+    <NotificationContext.Provider value={{ notifications, addNotification, removeNotification, markAsRead, markAllAsRead, clearAll }}>
       {children}
-      
-      {/* Affichage des toasts */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
         {toasts.slice(0, 3).map(toast => (
-          <NotificationToast 
+          <NotificationToast
             key={toast.id}
             notification={toast}
             onDismiss={removeNotification}
-            onAction={(id, url) => {
-              markAsRead(id);
-              window.location.href = url;
-            }}
+            onAction={(id, url) => { markAsRead(id); window.location.href = url; }}
           />
         ))}
       </div>

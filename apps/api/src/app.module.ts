@@ -23,11 +23,12 @@ import { HealthModule } from './health/health.module';
 import { CommonModule } from './common/common.module';
 import { EvaluationPermissionModule } from './evaluation-permission/evaluation-permission.module';
 import { ReportsModule } from './reports/reports.module';
+import { validateEnvironment } from './config/validate-env';
 
 @Global()
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {

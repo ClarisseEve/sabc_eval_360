@@ -39,7 +39,7 @@ export default function IndividualSearchTab() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <AdminUserSearchSection
         search={search}
         onSearchChange={setSearch}
@@ -55,7 +55,7 @@ export default function IndividualSearchTab() {
       ) : null}
 
       {selectedMatricule && selectedUser ? (
-        <div className="space-y-6">
+        <div className="space-y-5">
           <SubjectSummaryCard
             title={getFullName(selectedUser)}
             description={`${selectedUser.role_nom || selectedUser.role} · ${selectedUser.region?.nom_region || selectedUser.region_nom || 'Région non renseignée'} · manager ${selectedUser.manager_matricule || '—'}`}

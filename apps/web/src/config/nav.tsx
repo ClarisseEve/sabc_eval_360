@@ -28,6 +28,8 @@ export interface NavItem {
 
 // Roles that have subordinates (can see "Mon équipe") — NOT CDS/AS
 const ROLES_WITH_SUBS: Role[] = ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'SS'];
+// Navigation only: the API remains the authority for every item in the validation queue.
+export const VALIDATION_QUEUE_ROLES: Role[] = [...ROLES_WITH_SUBS, 'CDS'];
 // All non-admin roles
 const ALL_OPERATIONAL: Role[] = ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'CDS', 'SS', 'AS'];
 const ALL_WITH_ADMIN: Role[] = ['ADMIN', ...ALL_OPERATIONAL];
@@ -62,7 +64,7 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'À valider',
         href: '/evaluations/validate',
         icon: <ChevronRight className="h-4 w-4" />,
-        roles: ROLES_WITH_SUBS,
+        roles: VALIDATION_QUEUE_ROLES,
         badge: 'notifications',
       },
       {

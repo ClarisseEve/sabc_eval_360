@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import ExcelJS from 'exceljs';
 import PptxGenJS from 'pptxgenjs';
-import * as XLSX from 'xlsx';
 import { DatabasePgService } from '../database/database-pg.service';
 import { RapportRow, RapportSection } from './dto/section.dto';
 
@@ -59,13 +59,14 @@ export class ExportService {
 
   async exportXLSX(idRapport: string): Promise<Buffer> {
     const rapport = await this.findRapport(idRapport);
-    const wb = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
     const sections = (rapport.sections_json as RapportSection[]);
 
     if (sections.length === 0) {
-      const ws = XLSX.utils.aoa_to_sheet([[rapport.titre], [''], ['Aucune section']]);
-      XLSX.utils.book_append_sheet(wb, ws, 'Rapport');
+      const worksheet = workbook.addWorksheet('Rapport');
+      worksheet.addRows([[rapport.titre], [''], ['Aucune section']]);
     } else {
+      const usedSheetNames = new Set<string>();
       for (const section of sections) {
         const rows: (string | number)[][] = [
           [section.titre],
@@ -78,13 +79,31 @@ export class ExportService {
             rows.push([`- ${g.titre} (${g.type})`]);
           }
         }
-        const sheetName = String(section.titre ?? 'Section').slice(0, 31);
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        const sheetName = this.uniqueSheetName(
+          String(section.titre ?? 'Section'),
+          usedSheetNames,
+        );
+        workbook.addWorksheet(sheetName).addRows(rows);
       }
     }
 
-    return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' }) as Buffer;
+    const data = await workbook.xlsx.writeBuffer();
+    return Buffer.from(data);
+  }
+
+  private uniqueSheetName(rawName: string, usedNames: Set<string>): string {
+    const sanitized = rawName.replace(/[\\/*?:[\]]/g, ' ').trim() || 'Section';
+    const baseName = sanitized.slice(0, 31);
+    let candidate = baseName;
+    let suffix = 2;
+
+    while (usedNames.has(candidate.toLocaleLowerCase('fr-FR'))) {
+      const suffixText = ` (${suffix++})`;
+      candidate = `${baseName.slice(0, 31 - suffixText.length)}${suffixText}`;
+    }
+
+    usedNames.add(candidate.toLocaleLowerCase('fr-FR'));
+    return candidate;
   }
 
   async logExport(data: {

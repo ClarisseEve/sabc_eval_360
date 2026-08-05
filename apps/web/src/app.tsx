@@ -29,6 +29,8 @@ const PageLoader = () => (
 
 // Auth
 const Login = lazy(() => import('./pages/Auth/Login'));
+const ForgotPassword = lazy(() => import('./pages/Auth/ForgotPassword'));
+const Register = lazy(() => import('./pages/Auth/Register'));
 
 // Admin: Dashboard
 const AdminDashboard = lazy(() => import('./pages/Admin/Dashboard/index'));
@@ -96,28 +98,6 @@ const RTMDashboard = lazy(() => import('./pages/RTM/Dashboard/index'));
 const SRMODashboard = lazy(() => import('./pages/SRMO/Dashboard/index'));
 const ASDashboard = lazy(() => import('./pages/AS/Dashboard/index'));
 
-// Role sub-pages (transition pages)
-const DRTeams = lazy(() => import('./pages/DR/Teams'));
-const DRPerformance = lazy(() => import('./pages/DR/Performance'));
-const CDTTCommercial = lazy(() => import('./pages/CDTT/Commercial'));
-const CDTTMarketing = lazy(() => import('./pages/CDTT/Marketing'));
-const CDSObjectives = lazy(() => import('./pages/CDS/Objectives'));
-const CDSPerformance = lazy(() => import('./pages/CDS/Performance'));
-const CDVPerformance = lazy(() => import('./pages/CDV/Performance'));
-const CDVSectors = lazy(() => import('./pages/CDV/Sectors'));
-const CSCDistricts = lazy(() => import('./pages/CSC/Districts/index'));
-const CSCPerformance = lazy(() => import('./pages/CSC/Performance/index'));
-const TMOActivities = lazy(() => import('./pages/TMO/Activities'));
-const TMOPerformance = lazy(() => import('./pages/TMO/Performance'));
-const SSAssistants = lazy(() => import('./pages/SS/Assistants'));
-const SSEvents = lazy(() => import('./pages/SS/Events'));
-const RTMCampaigns = lazy(() => import('./pages/RTM/Campaigns'));
-const RTMOperators = lazy(() => import('./pages/RTM/Operators'));
-const SRMOCampaigns = lazy(() => import('./pages/SRMO/Campaigns'));
-const SRMOOperators = lazy(() => import('./pages/SRMO/Operators'));
-const ASEvents = lazy(() => import('./pages/AS/Events'));
-const ASReports = lazy(() => import('./pages/AS/Reports'));
-
 // Common: Évaluations
 const CommonEvaluationsIndex = lazy(() => import('./pages/Common/Evaluations/index'));
 const CommonEvaluationsMine = lazy(() => import('./pages/Common/Evaluations/Mine'));
@@ -179,33 +159,8 @@ function A({ children }: { children: React.ReactNode }) {
   return <AuthGuard requiredRoles={['ADMIN']}>{children}</AuthGuard>;
 }
 
-function buildLegacyLayoutUser(user: ReturnType<typeof useAuthContext>['user']) {
-  if (!user) {
-    return {
-      name: 'Utilisateur',
-      email: '',
-      role: '',
-      avatar: undefined,
-    };
-  }
-
-  const fullName = user.name || [user.prenom, user.nom].filter(Boolean).join(' ').trim();
-
-  return {
-    name: fullName || user.email,
-    email: user.email,
-    role: user.role_nom || user.role,
-    avatar: user.avatar,
-  };
-}
-
-function LegacyAuthRoute({ component: Component }: { component: React.ElementType }) {
-  const { user } = useAuthContext();
-  return <Component auth={{ user: buildLegacyLayoutUser(user) }} />;
-}
-
-function RulesRedirect() {
-  return <Navigate to="/admin/evaluations/regles" replace />;
+function R({ role, children }: { role: string; children: React.ReactNode }) {
+  return <AuthGuard requiredRoles={[role]}>{children}</AuthGuard>;
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
@@ -224,6 +179,8 @@ function App() {
                     <Routes>
                       {/* ── Public ── */}
                       <Route path="/login" element={<Login />} />
+                      <Route path="/forgot-password" element={<ForgotPassword />} />
+                      <Route path="/register" element={<Register />} />
 
                       {/* ── Root redirect ── */}
                       <Route path="/" element={<G><DashboardRedirect /></G>} />
@@ -287,38 +244,39 @@ function App() {
                       <Route path="/admin/reports/:id/edit" element={<A><AdminReportsBuilder /></A>} />
 
                       {/* ── Role Dashboards — each role → its own component ── */}
-                      <Route path="/dr/dashboard" element={<G><DRDashboard /></G>} />
-                      <Route path="/cdtt/dashboard" element={<G><CDTTDashboard /></G>} />
-                      <Route path="/csc/dashboard" element={<G><CSCDashboard /></G>} />
-                      <Route path="/cdv/dashboard" element={<G><CDVDashboard /></G>} />
-                      <Route path="/cds/dashboard" element={<G><CDSDashboard /></G>} />
-                      <Route path="/tmo/dashboard" element={<G><TMODashboard /></G>} />
-                      <Route path="/ss/dashboard" element={<G><SSDashboard /></G>} />
-                      <Route path="/rtm/dashboard" element={<G><RTMDashboard /></G>} />
-                      <Route path="/srmo/dashboard" element={<G><SRMODashboard /></G>} />
-                      <Route path="/as/dashboard" element={<G><ASDashboard /></G>} />
+                      <Route path="/dr/dashboard" element={<R role="DR"><DRDashboard /></R>} />
+                      <Route path="/cdtt/dashboard" element={<R role="CDTT"><CDTTDashboard /></R>} />
+                      <Route path="/csc/dashboard" element={<R role="CSC"><CSCDashboard /></R>} />
+                      <Route path="/cdv/dashboard" element={<R role="CDV"><CDVDashboard /></R>} />
+                      <Route path="/cds/dashboard" element={<R role="CDS"><CDSDashboard /></R>} />
+                      <Route path="/tmo/dashboard" element={<R role="TMO"><TMODashboard /></R>} />
+                      <Route path="/ss/dashboard" element={<R role="SS"><SSDashboard /></R>} />
+                      <Route path="/rtm/dashboard" element={<R role="RTM"><RTMDashboard /></R>} />
+                      <Route path="/srmo/dashboard" element={<R role="SRMO"><SRMODashboard /></R>} />
+                      <Route path="/as/dashboard" element={<R role="AS"><ASDashboard /></R>} />
 
-                      {/* ── Role sub-pages (transition pages, not all in sidebar) ── */}
-                      <Route path="/dr/teams" element={<G><LegacyAuthRoute component={DRTeams} /></G>} />
-                      <Route path="/dr/performance" element={<G><LegacyAuthRoute component={DRPerformance} /></G>} />
-                      <Route path="/cdtt/commercial" element={<G><LegacyAuthRoute component={CDTTCommercial} /></G>} />
-                      <Route path="/cdtt/marketing" element={<G><LegacyAuthRoute component={CDTTMarketing} /></G>} />
-                      <Route path="/cds/objectives" element={<G><LegacyAuthRoute component={CDSObjectives} /></G>} />
-                      <Route path="/cds/performance" element={<G><LegacyAuthRoute component={CDSPerformance} /></G>} />
-                      <Route path="/cdv/performance" element={<G><LegacyAuthRoute component={CDVPerformance} /></G>} />
-                      <Route path="/cdv/sectors" element={<G><LegacyAuthRoute component={CDVSectors} /></G>} />
-                      <Route path="/csc/districts" element={<G><LegacyAuthRoute component={CSCDistricts} /></G>} />
-                      <Route path="/csc/performance" element={<G><CSCPerformance /></G>} />
-                      <Route path="/tmo/activities" element={<G><LegacyAuthRoute component={TMOActivities} /></G>} />
-                      <Route path="/tmo/performance" element={<G><LegacyAuthRoute component={TMOPerformance} /></G>} />
-                      <Route path="/ss/assistants" element={<G><LegacyAuthRoute component={SSAssistants} /></G>} />
-                      <Route path="/ss/events" element={<G><LegacyAuthRoute component={SSEvents} /></G>} />
-                      <Route path="/rtm/campaigns" element={<G><LegacyAuthRoute component={RTMCampaigns} /></G>} />
-                      <Route path="/rtm/operators" element={<G><LegacyAuthRoute component={RTMOperators} /></G>} />
-                      <Route path="/srmo/campaigns" element={<G><LegacyAuthRoute component={SRMOCampaigns} /></G>} />
-                      <Route path="/srmo/operators" element={<G><LegacyAuthRoute component={SRMOOperators} /></G>} />
-                      <Route path="/as/events" element={<G><ASEvents /></G>} />
-                      <Route path="/as/reports" element={<G><ASReports /></G>} />
+                      {/* Les anciennes sous-pages contenaient des données de démonstration.
+                          Elles redirigent vers le dashboard réel tant qu'elles ne sont pas câblées à l'API. */}
+                      <Route path="/dr/teams" element={<R role="DR"><Navigate to="/dr/dashboard" replace /></R>} />
+                      <Route path="/dr/performance" element={<R role="DR"><Navigate to="/dr/dashboard" replace /></R>} />
+                      <Route path="/cdtt/commercial" element={<R role="CDTT"><Navigate to="/cdtt/dashboard" replace /></R>} />
+                      <Route path="/cdtt/marketing" element={<R role="CDTT"><Navigate to="/cdtt/dashboard" replace /></R>} />
+                      <Route path="/cds/objectives" element={<R role="CDS"><Navigate to="/cds/dashboard" replace /></R>} />
+                      <Route path="/cds/performance" element={<R role="CDS"><Navigate to="/cds/dashboard" replace /></R>} />
+                      <Route path="/cdv/performance" element={<R role="CDV"><Navigate to="/cdv/dashboard" replace /></R>} />
+                      <Route path="/cdv/sectors" element={<R role="CDV"><Navigate to="/cdv/dashboard" replace /></R>} />
+                      <Route path="/csc/districts" element={<R role="CSC"><Navigate to="/csc/dashboard" replace /></R>} />
+                      <Route path="/csc/performance" element={<R role="CSC"><Navigate to="/csc/dashboard" replace /></R>} />
+                      <Route path="/tmo/activities" element={<R role="TMO"><Navigate to="/tmo/dashboard" replace /></R>} />
+                      <Route path="/tmo/performance" element={<R role="TMO"><Navigate to="/tmo/dashboard" replace /></R>} />
+                      <Route path="/ss/assistants" element={<R role="SS"><Navigate to="/ss/dashboard" replace /></R>} />
+                      <Route path="/ss/events" element={<R role="SS"><Navigate to="/ss/dashboard" replace /></R>} />
+                      <Route path="/rtm/campaigns" element={<R role="RTM"><Navigate to="/rtm/dashboard" replace /></R>} />
+                      <Route path="/rtm/operators" element={<R role="RTM"><Navigate to="/rtm/dashboard" replace /></R>} />
+                      <Route path="/srmo/campaigns" element={<R role="SRMO"><Navigate to="/srmo/dashboard" replace /></R>} />
+                      <Route path="/srmo/operators" element={<R role="SRMO"><Navigate to="/srmo/dashboard" replace /></R>} />
+                      <Route path="/as/events" element={<R role="AS"><Navigate to="/as/dashboard" replace /></R>} />
+                      <Route path="/as/reports" element={<R role="AS"><Navigate to="/as/dashboard" replace /></R>} />
 
                       {/* ── Common: Évaluations ── */}
                       <Route path="/evaluations" element={<G><CommonEvaluationsIndex /></G>} />
@@ -364,13 +322,13 @@ function App() {
                       <Route path="/500" element={<ServerError />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
+                    <Toaster />
                   </Suspense>
                 </ErrorBoundary>
               </RouterInit>
             </BrowserRouter>
             </AuthProvider>
             </ConfirmProvider>
-            <Toaster />
           </ToastProvider>
         </DisplayScaleProvider>
       </ThemeProvider>

@@ -71,7 +71,7 @@ function OverviewMetricCard({ title, value, caption, icon: Icon }: OverviewMetri
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{title}</div>
-            <div className="mt-1 text-3xl font-bold text-sabc-gray-900 dark:text-white">{value}</div>
+            <div className="mt-1 text-2xl font-bold text-sabc-gray-900 dark:text-white">{value}</div>
             <div className="mt-2 text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{caption}</div>
           </div>
           <div className="rounded-full bg-sabc-red-primary/10 p-3 text-sabc-red-primary">
@@ -95,7 +95,7 @@ function ChartTooltip({
   if (!active || !payload || payload.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-sabc-gray-200 bg-white px-4 py-3 shadow-lg">
+    <div className="rounded-2xl border border-sabc-gray-200 bg-white px-4 py-3 shadow-lg dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
       {label ? <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">{label}</div> : null}
       <div className="space-y-1.5">
         {payload.map((entry) => (
@@ -178,15 +178,15 @@ export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[]
         ) : (
           <div className="space-y-5">
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3">
+              <div className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Période active</div>
                 <div className="mt-1 text-lg font-semibold text-sabc-gray-900">{latestEntry?.period ?? 'N/A'}</div>
               </div>
-              <div className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3">
+              <div className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Dernier score</div>
                 <div className="mt-1 text-lg font-semibold text-sabc-gray-900">{latestEntry?.score?.toFixed(2) ?? '0.00'}/5</div>
               </div>
-              <div className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3">
+              <div className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Variation</div>
                 <div className="mt-1 text-lg font-semibold text-sabc-gray-900">
                   {variation >= 0 ? '+' : ''}
@@ -204,7 +204,7 @@ export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[]
                       <stop offset="95%" stopColor="#E53E3E" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                   <XAxis dataKey="period" tickLine={false} axisLine={false} />
                   <YAxis yAxisId="left" domain={[0, 5]} tickLine={false} axisLine={false} width={34} />
                   <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} width={34} allowDecimals={false} />
@@ -310,7 +310,7 @@ export function ChannelBreakdownSection({ channelData }: { channelData: ChannelE
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={normalizedData} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
-                  <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                   <XAxis type="number" domain={[0, 5]} tickLine={false} axisLine={false} />
                   <YAxis type="category" dataKey="label" width={92} tickLine={false} axisLine={false} />
                   <Tooltip content={<ChartTooltip />} />
@@ -323,14 +323,14 @@ export function ChannelBreakdownSection({ channelData }: { channelData: ChannelE
               </ResponsiveContainer>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-3 gap-2">
               {normalizedData.map((channel) => (
-                <div key={channel.label} className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/60 p-4">
+                <div key={channel.label} className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/60 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-medium text-sabc-gray-900">{channel.label}</span>
                     <Badge variant="info">{channel.volume}</Badge>
                   </div>
-                  <div className="mt-2 text-sm text-sabc-gray-500">{channel.average_score.toFixed(2)}/5 de moyenne</div>
+                  <div className="mt-2 text-sm text-sabc-gray-500">{Number(channel.average_score).toFixed(2)}/5 de moyenne</div>
                 </div>
               ))}
             </div>
@@ -355,7 +355,7 @@ export function RegionalActivitySection({ regionData }: { regionData: RegionActi
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={regionData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#E5E7EB" />
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                 <XAxis dataKey="region" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                 <YAxis tickLine={false} axisLine={false} width={36} />
                 <Tooltip content={<ChartTooltip />} />

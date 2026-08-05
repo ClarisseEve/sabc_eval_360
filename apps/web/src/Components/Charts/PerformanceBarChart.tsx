@@ -59,9 +59,9 @@ export const PerformanceBarChart: React.FC<PerformanceBarChartProps> = ({
                 data={data}
                 margin={{ top: 12, right: 24, left: 16, bottom: 5 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-                <XAxis dataKey="name" tick={{ fill: '#616161', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
-                <YAxis domain={yAxisDomain} tick={{ fill: '#616161', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
+                <XAxis dataKey="name" tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+                <YAxis domain={yAxisDomain} tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
                 <Tooltip
                   formatter={formatTooltip}
                   contentStyle={{

@@ -22,7 +22,7 @@ export interface AppLayoutProps {
   pageTitle?: string;
   isAdmin?: boolean;
   permissions?: string[];
-  onLogout?: () => void;
+  onLogout?: () => void | Promise<void>;
   children: React.ReactNode;
   className?: string;
   breadcrumbs?: Array<{ title: string; href?: string }>;
@@ -32,7 +32,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   user,
   notifications = [],
   pageTitle = 'Tableau de bord',
-  onLogout = () => console.log('Déconnexion'),
+  onLogout,
   children,
   className,
 }) => {

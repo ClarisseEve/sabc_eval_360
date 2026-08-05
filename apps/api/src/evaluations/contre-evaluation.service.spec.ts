@@ -204,21 +204,33 @@ describe('ContreEvaluationService', () => {
 
   describe('getContreEvaluations', () => {
     it('returns empty array when no contre-evaluations exist', async () => {
+      mockPg.queryOne.mockResolvedValue(makeEvaluation());
       mockPg.query.mockResolvedValue([]);
 
-      const result = await service.getContreEvaluations('eval-uuid-1');
+      const result = await service.getContreEvaluations('eval-uuid-1', {
+        matricule: 'MGR001',
+      });
 
       expect(result).toEqual([]);
     });
 
     it('returns list when contre-evaluations exist', async () => {
       const contreEvals = [
-        { id_evaluation: 'ce-1', evaluation_parent_id: 'eval-uuid-1', statut: 'brouillon' },
+        {
+          id_evaluation: 'ce-1',
+          evaluation_parent_id: 'eval-uuid-1',
+          evaluateur_matricule: 'MGR001',
+          statut: 'brouillon',
+        },
         { id_evaluation: 'ce-2', evaluation_parent_id: 'eval-uuid-1', statut: 'soumis' },
       ];
+      mockPg.queryOne.mockResolvedValue(makeEvaluation());
       mockPg.query.mockResolvedValue(contreEvals);
 
-      const result = await service.getContreEvaluations('eval-uuid-1');
+      const result = await service.getContreEvaluations('eval-uuid-1', {
+        matricule: 'ADMIN001',
+        is_admin: true,
+      });
 
       expect(result).toHaveLength(2);
       expect(result[0].id_evaluation).toBe('ce-1');
@@ -226,14 +238,131 @@ describe('ContreEvaluationService', () => {
     });
 
     it('queries by evaluation_parent_id with correct parameter', async () => {
+      mockPg.queryOne.mockResolvedValue(makeEvaluation());
       mockPg.query.mockResolvedValue([]);
 
-      await service.getContreEvaluations('eval-uuid-1');
+      await service.getContreEvaluations('eval-uuid-1', {
+        matricule: 'ADMIN001',
+        role: 'ADMIN',
+      });
 
       expect(mockPg.query).toHaveBeenCalledWith(
         expect.stringContaining('evaluation_parent_id'),
         ['eval-uuid-1'],
       );
+    });
+
+    it('refuse un acteur sans lien avec l’évaluation', async () => {
+      mockPg.queryOne.mockResolvedValue(makeEvaluation());
+      mockPg.query.mockResolvedValue([]);
+      mockPrisma.utilisateur.findUnique.mockResolvedValue({
+        manager_matricule: 'MGR001',
+      });
+
+      await expect(
+        service.getContreEvaluations('eval-uuid-1', { matricule: 'OTHER' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('ne révèle pas un brouillon au seul évalué de l’évaluation originale', async () => {
+      mockPg.queryOne.mockResolvedValue(makeEvaluation());
+      mockPg.query.mockResolvedValue([
+        {
+          id_evaluation: 'ce-draft',
+          evaluation_parent_id: 'eval-uuid-1',
+          evaluateur_matricule: 'MGR001',
+          statut: 'brouillon',
+        },
+        {
+          id_evaluation: 'ce-submitted',
+          evaluation_parent_id: 'eval-uuid-1',
+          evaluateur_matricule: 'MGR001',
+          statut: 'soumis',
+        },
+      ]);
+
+      const result = await service.getContreEvaluations('eval-uuid-1', {
+        matricule: 'MAT002',
+      });
+
+      expect(result.map((evaluation) => evaluation.id_evaluation)).toEqual(['ce-submitted']);
+    });
+
+    it("anonymise l'identité pair et masque le détail agrégé pour un administrateur", async () => {
+      mockPg.queryOne.mockResolvedValue(makeEvaluation());
+      mockPg.query.mockResolvedValue([
+        makeEvaluation({
+          id_evaluation: 'ce-pairs',
+          evaluation_parent_id: 'eval-uuid-1',
+          evaluateur_matricule: 'PAIR-SECRET',
+          evaluateur: { matricule: 'PAIR-SECRET', nom: 'Identité' },
+          type_evaluation: 'pairs',
+          statut: 'valide',
+          note_globale: 4.5,
+          notations_json: [{ note: 4, commentaire: 'privé' }],
+          commentaire_global: 'privé',
+          __rule_envelope: {
+            visibility_policy: { admin: true, detail: 'aggregated' },
+          },
+        }),
+      ]);
+
+      const result = await service.getContreEvaluations('eval-uuid-1', {
+        matricule: 'ADMIN001',
+        is_admin: true,
+      });
+
+      expect(result[0]).toEqual(expect.objectContaining({
+        evaluateur_matricule: null,
+        evaluateur: null,
+        note_globale: 4.5,
+        notations_json: null,
+        commentaire_global: null,
+      }));
+      expect(result[0].__rule_envelope).toBeUndefined();
+    });
+
+    it("retire une contre-évaluation cachée à l'utilisateur évalué", async () => {
+      mockPg.queryOne.mockResolvedValue(makeEvaluation());
+      mockPg.query.mockResolvedValue([
+        makeEvaluation({
+          id_evaluation: 'ce-hidden',
+          evaluation_parent_id: 'eval-uuid-1',
+          evaluateur_matricule: 'MGR001',
+          evalue_matricule: 'MAT002',
+          statut: 'valide',
+          __rule_envelope: {
+            visibility_policy: { evaluated: false, detail: 'detailed' },
+          },
+        }),
+      ]);
+
+      const result = await service.getContreEvaluations('eval-uuid-1', {
+        matricule: 'MAT002',
+      });
+
+      expect(result).toEqual([]);
+    });
+
+    it('respecte visibility_policy.admin=false', async () => {
+      mockPg.queryOne.mockResolvedValue(makeEvaluation());
+      mockPg.query.mockResolvedValue([
+        makeEvaluation({
+          id_evaluation: 'ce-admin-hidden',
+          evaluation_parent_id: 'eval-uuid-1',
+          __rule_envelope: {
+            visibility_policy: { admin: false, detail: 'detailed' },
+          },
+        }),
+      ]);
+
+      const result = await service.getContreEvaluations('eval-uuid-1', {
+        matricule: 'ADMIN001',
+        is_admin: true,
+      });
+
+      expect(result).toEqual([]);
+      expect(String(mockPg.query.mock.calls[0][0])).toContain('regles_evaluation');
     });
   });
 });

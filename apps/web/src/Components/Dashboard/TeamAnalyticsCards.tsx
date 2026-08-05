@@ -69,7 +69,7 @@ export function TeamAxisFrequencyChartCard({
   emptyMessage = "Aucun axe agrégé n'est disponible sur ce périmètre.",
   barColor = '#C62828',
   tooltipLabel = 'Occurrences',
-  heightClassName = 'h-80',
+  heightClassName = 'h-72',
 }: Readonly<TeamAxisFrequencyChartCardProps>) {
   // Normaliser les données pour le radar (score relatif au max)
   const maxCount = Math.max(...axes.map((a) => a.count), 1);

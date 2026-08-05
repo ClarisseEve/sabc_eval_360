@@ -94,13 +94,12 @@ describe('ReglesService', () => {
 
   describe('create', () => {
     it('creates rule with valid 5 criteres summing to 100%', async () => {
-      mockPg.execute.mockResolvedValue(undefined);
       mockPg.queryOne.mockResolvedValue({
         id_regle: 'uuid-1', nom_regle: 'Règle test', est_active: true,
         criteres_evaluation_json: { criteres: [] }, created_at: new Date(), updated_at: new Date(),
       });
       const result = await service.create(validDto() as any);
-      expect(mockPg.execute).toHaveBeenCalledWith(expect.stringContaining('INSERT'), expect.any(Array));
+      expect(mockPg.queryOne).toHaveBeenCalledWith(expect.stringContaining('INSERT'), expect.any(Array));
       expect(result).toBeDefined();
     });
 
@@ -122,14 +121,83 @@ describe('ReglesService', () => {
       role_evalue: null, type_evaluation: null, description: null, created_at: new Date(), updated_at: new Date(),
     };
 
-    it('updates nom_regle only', async () => {
-      mockPg.queryOne.mockResolvedValue(existingRow);
+    it('updates an inactive, unreferenced rule', async () => {
+      mockPg.queryOne
+        .mockResolvedValueOnce({ ...existingRow, est_active: false })
+        .mockResolvedValueOnce({ count: '0' })
+        .mockResolvedValueOnce({ ...existingRow, nom_regle: 'Nouveau nom', est_active: false });
       mockPg.execute.mockResolvedValue(undefined);
       await service.update('uuid-1', { nom_regle: 'Nouveau nom' });
       expect(mockPg.execute).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE regles_evaluation'),
         expect.arrayContaining(['Nouveau nom', 'uuid-1']),
       );
+    });
+
+    it('rejects in-place changes to an active rule even when it is not referenced', async () => {
+      mockPg.queryOne
+        .mockResolvedValueOnce(existingRow)
+        .mockResolvedValueOnce({ count: '0' });
+
+      await expect(service.update('uuid-1', { nom_regle: 'Nouveau nom' })).rejects.toThrow(
+        /active\/publiée.*Désactivez.*nouvelle règle/i,
+      );
+      expect(mockPg.execute).not.toHaveBeenCalled();
+    });
+
+    it('requires a separate deactivation request before changing an active rule', async () => {
+      mockPg.queryOne
+        .mockResolvedValueOnce(existingRow)
+        .mockResolvedValueOnce({ count: '0' });
+
+      await expect(
+        service.update('uuid-1', { nom_regle: 'Nouveau nom', est_active: false }),
+      ).rejects.toThrow(/Désactivez.*nouvelle règle/i);
+      expect(mockPg.execute).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['nom', { nom_regle: 'Nouveau nom' }],
+      ['description', { description: 'Nouvelle description' }],
+      ['rôle évaluateur', { role_evaluateur: 'MANAGER' }],
+      ['rôle évalué', { role_evalue: 'COLLABORATEUR' }],
+      ['type', { type_evaluation: 'annuelle' }],
+      ['critères', { criteres: validDto().criteres }],
+    ])('rejects changing %s on an inactive referenced rule', async (_label, payload) => {
+      mockPg.queryOne
+        .mockResolvedValueOnce({ ...existingRow, est_active: false })
+        .mockResolvedValueOnce({ count: '2' });
+
+      await expect(service.update('uuid-1', payload as any)).rejects.toThrow(
+        /référencée.*désactivation.*nouvelle règle/i,
+      );
+      expect(mockPg.execute).not.toHaveBeenCalled();
+    });
+
+    it('allows deactivation as the only change on a referenced active rule', async () => {
+      mockPg.queryOne
+        .mockResolvedValueOnce(existingRow)
+        .mockResolvedValueOnce({ ...existingRow, est_active: false });
+      mockPg.execute.mockResolvedValue(undefined);
+
+      await service.update('uuid-1', { est_active: false });
+
+      expect(mockPg.execute).toHaveBeenCalledWith(
+        expect.stringContaining('est_active'),
+        [false, 'uuid-1'],
+      );
+      expect(mockPg.queryOne.mock.calls.some(([sql]: [string]) => sql.includes('COUNT(*)'))).toBe(false);
+    });
+
+    it('rejects reactivation when the inactive rule is already referenced', async () => {
+      mockPg.queryOne
+        .mockResolvedValueOnce({ ...existingRow, est_active: false })
+        .mockResolvedValueOnce({ count: '1' });
+
+      await expect(service.update('uuid-1', { est_active: true })).rejects.toThrow(
+        /référencée.*nouvelle règle/i,
+      );
+      expect(mockPg.execute).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException for unknown id', async () => {
@@ -154,6 +222,18 @@ describe('ReglesService', () => {
     it('throws NotFoundException for unknown id', async () => {
       mockPg.queryOne.mockResolvedValue(null);
       await expect(service.toggleActive('unknown')).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects reactivation of an inactive referenced rule', async () => {
+      mockPg.queryOne
+        .mockResolvedValueOnce({
+          id_regle: 'uuid-1', est_active: false,
+          criteres_evaluation_json: { criteres: [] }, created_at: new Date(), updated_at: new Date(),
+        })
+        .mockResolvedValueOnce({ count: '4' });
+
+      await expect(service.toggleActive('uuid-1')).rejects.toThrow(/référencée.*nouvelle règle/i);
+      expect(mockPg.execute).not.toHaveBeenCalled();
     });
   });
 

@@ -137,15 +137,15 @@ export default function RoleManagerDashboardPage({
             ) : (
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.teamTypeAverages} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <BarChart data={data.teamTypeAverages} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                     <XAxis dataKey="type" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                     <YAxis domain={[0, 5]} tickLine={false} axisLine={false} width={30} />
                     <Tooltip
                       content={({ active, payload, label }: any) => {
                         if (!active || !payload?.length) return null;
                         return (
-                          <div className="rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 shadow-lg">
+                          <div className="rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 shadow-lg dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
                             <div className="mb-1 text-xs font-semibold text-sabc-gray-500">{label}</div>
                             <div className="text-sm font-semibold text-sabc-gray-900">{Number(payload[0].value).toFixed(2)}/5</div>
                           </div>

@@ -269,5 +269,76 @@ describe('DashboardCollaborateurService', () => {
       // progression = 4.5 - 4.0 = 0.5
       expect(result.kpi.progression_vs_periode_precedente).toBe(0.5);
     });
+
+    it("retire du dashboard une évaluation cachée à l'utilisateur évalué", async () => {
+      mockPg.query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id_evaluation: 'eval-hidden',
+            evaluateur_matricule: 'MAT900',
+            evalue_matricule: 'MAT001',
+            type_evaluation: 'descendante',
+            statut: 'valide',
+            id_periode: 'periode-1',
+            note_globale: 5,
+            date_soumission: '2026-01-10T00:00:00Z',
+            created_at: '2026-01-01T00:00:00Z',
+            nom_periode: 'S1 2026',
+            __rule_envelope: {
+              visibility_policy: { evaluated: false, detail: 'detailed' },
+            },
+          },
+        ]);
+      mockPg.queryOne
+        .mockResolvedValueOnce({ score: '0' })
+        .mockResolvedValueOnce(null);
+
+      const result = await service.getStatutPersonnel('MAT001');
+
+      expect(result.recues).toEqual([]);
+      expect(result.kpi.score_global).toBe(0);
+      const receivedSql = String(mockPg.query.mock.calls[1][0]);
+      const scoreSql = String(mockPg.queryOne.mock.calls[0][0]);
+      expect(receivedSql).toContain("'{visibility_policy,evaluated}'");
+      expect(scoreSql).toContain("'{visibility_policy,evaluated}'");
+    });
+
+    it("anonymise l'évaluateur pair avant la récupération des utilisateurs", async () => {
+      mockPg.query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id_evaluation: 'eval-pairs',
+            evaluateur_matricule: 'MAT900',
+            evalue_matricule: 'MAT001',
+            type_evaluation: 'pairs',
+            statut: 'valide',
+            id_periode: 'periode-1',
+            note_globale: 4,
+            date_soumission: '2026-01-10T00:00:00Z',
+            created_at: '2026-01-01T00:00:00Z',
+            nom_periode: 'S1 2026',
+            __rule_envelope: {
+              visibility_policy: { evaluated: true, detail: 'aggregated' },
+            },
+          },
+        ]);
+      mockPg.queryOne
+        .mockResolvedValueOnce({ score: '4' })
+        .mockResolvedValueOnce(null);
+      mockPrisma.utilisateur.findMany.mockResolvedValue([
+        { matricule: 'MAT001', nom: 'Cible', prenom: 'Camille' },
+        { matricule: 'MAT900', nom: 'Identité', prenom: 'Secrète' },
+      ]);
+
+      const result = await service.getStatutPersonnel('MAT001');
+
+      expect(result.recues[0].evaluateur_matricule).toBeNull();
+      expect(result.recues[0].evaluateur_nom).toBe('Anonyme');
+      expect(mockPrisma.utilisateur.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { matricule: { in: ['MAT001'] } } }),
+      );
+    });
   });
 });

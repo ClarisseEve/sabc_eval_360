@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
-import { randomUUID } from 'crypto';
 
 export interface PeriodeEvaluation {
   id_periode: string;
@@ -40,7 +39,8 @@ export class PeriodesService {
     return this.pg.queryOne<PeriodeEvaluation>(
       `SELECT * FROM periodes_evaluation
        WHERE statut = 'ouverte' AND est_ouverte = true AND est_cloturee = false
-         AND date_debut <= NOW() AND date_fin >= NOW()
+         AND (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date
+             BETWEEN date_debut AND date_fin
        ORDER BY date_debut DESC LIMIT 1`,
     );
   }
@@ -49,15 +49,17 @@ export class PeriodesService {
     this.validateDates(new Date(data.date_debut), new Date(data.date_fin), true);
     await this.validateNoChevauchement(new Date(data.date_debut), new Date(data.date_fin));
 
-    const id = randomUUID();
-    await this.pg.execute(
-      `INSERT INTO periodes_evaluation (id_periode, code_periode, nom_periode, description, date_debut, date_fin,
+    // PostgreSQL génère la clé UUID canonique, ensuite propagée telle quelle
+    // aux évaluations, assignations, rapports et statistiques.
+    const created = await this.pg.queryOne<{ id_periode: string }>(
+      `INSERT INTO periodes_evaluation (code_periode, nom_periode, description, date_debut, date_fin,
         statut, est_ouverte, est_cloturee, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'planifiee', false, false, NOW(), NOW())`,
-      [id, data.code_periode, data.nom_periode, data.description ?? null, data.date_debut, data.date_fin],
+       VALUES ($1, $2, $3, $4, $5, 'planifiee', false, false, NOW(), NOW())
+       RETURNING id_periode`,
+      [data.code_periode, data.nom_periode, data.description ?? null, data.date_debut, data.date_fin],
     );
 
-    return this.findById(id);
+    return this.findById(String(created!.id_periode));
   }
 
   async update(id: string, data: Partial<{ nom_periode: string; description: string; date_debut: string; date_fin: string }>): Promise<PeriodeEvaluation> {
@@ -108,14 +110,72 @@ export class PeriodesService {
   }
 
   async ouvrir(id: string): Promise<PeriodeEvaluation> {
-    const p = await this.findById(id);
-    if (p.est_ouverte) throw new BadRequestException('Période déjà ouverte');
-    await this.pg.execute(
-      `UPDATE periodes_evaluation SET est_ouverte = true, est_cloturee = false, statut = 'ouverte', updated_at = NOW()
-       WHERE id_periode = $1`,
-      [id],
-    );
-    return this.findById(id);
+    return this.pg.withTransaction(async (client) => {
+      // Serialize opening attempts across API replicas. A conditional UPDATE alone
+      // would allow two different planned rows to be opened concurrently (write skew).
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtext('sabc_eval360:periode-opening'))`,
+      );
+
+      const updated = await client.query(
+        `UPDATE periodes_evaluation AS p
+         SET est_ouverte = true,
+             est_cloturee = false,
+             statut = 'ouverte',
+             updated_at = NOW()
+         WHERE p.id_periode = $1
+           AND p.statut = 'planifiee'
+           AND p.est_ouverte = false
+           AND p.est_cloturee = false
+           AND (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date
+               BETWEEN p.date_debut AND p.date_fin
+           AND NOT EXISTS (
+             SELECT 1
+             FROM periodes_evaluation AS active
+             WHERE active.id_periode <> p.id_periode
+               AND active.statut = 'ouverte'
+               AND active.est_ouverte = true
+               AND active.est_cloturee = false
+           )
+         RETURNING p.*`,
+        [id],
+      );
+
+      if (updated.rows[0]) {
+        return updated.rows[0] as PeriodeEvaluation;
+      }
+
+      const current = await client.query(
+        `SELECT p.*,
+                ((CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date
+                  BETWEEN p.date_debut AND p.date_fin) AS dans_intervalle,
+                EXISTS (
+                  SELECT 1
+                  FROM periodes_evaluation AS active
+                  WHERE active.id_periode <> p.id_periode
+                    AND active.statut = 'ouverte'
+                    AND active.est_ouverte = true
+                    AND active.est_cloturee = false
+                ) AS autre_periode_ouverte
+         FROM periodes_evaluation AS p
+         WHERE p.id_periode = $1`,
+        [id],
+      );
+      const periode = current.rows[0];
+
+      if (!periode) throw new NotFoundException('Période introuvable');
+      if (periode.autre_periode_ouverte) {
+        throw new BadRequestException('Une autre période est déjà ouverte');
+      }
+      if (periode.statut !== 'planifiee' || periode.est_ouverte || periode.est_cloturee) {
+        throw new BadRequestException("Seule une période planifiée peut être ouverte");
+      }
+      if (!periode.dans_intervalle) {
+        throw new BadRequestException("La période ne peut être ouverte qu'entre ses dates de début et de fin");
+      }
+
+      throw new BadRequestException("La période n'a pas pu être ouverte");
+    });
   }
 
   async fermer(id: string): Promise<PeriodeEvaluation> {
@@ -161,6 +221,7 @@ export class PeriodesService {
   }
 
   async delete(id: string): Promise<void> {
+    await this.findById(id);
     const count = await this.pg.queryOne<{ count: string }>(
       'SELECT COUNT(*) as count FROM evaluations WHERE id_periode = $1', [id],
     );
@@ -171,6 +232,7 @@ export class PeriodesService {
   }
 
   async calculateStatistiques(id: string) {
+    await this.findById(id);
     const stats = await this.pg.queryOne<any>(
       `SELECT
          COUNT(*) as nb_total,

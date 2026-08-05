@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
 import { DatabasePgService } from '../database/database-pg.service';
 import {
   normalizeRuleRow,
@@ -26,6 +25,21 @@ const MIN_CRITERES = 5;
 const TOTAL_PONDERATION = 100;
 const ECHELLE_MIN = 1;
 const ECHELLE_MAX = 5;
+const RULE_DEFINITION_FIELDS: ReadonlyArray<keyof UpdateRegleDto> = [
+  'nom_regle',
+  'description',
+  'criteres',
+  'role_evaluateur',
+  'role_evalue',
+  'type_evaluation',
+];
+const REFERENCED_RULE_IMMUTABLE_MESSAGE =
+  'Cette règle est déjà référencée par une évaluation et ne peut plus être modifiée. ' +
+  'Seule sa désactivation est autorisée. Créez une nouvelle règle pour faire évoluer sa définition.';
+const ACTIVE_RULE_IMMUTABLE_MESSAGE =
+  'Une règle active/publiée ne peut pas être modifiée en place. Désactivez-la d’abord, ' +
+  'puis modifiez-la uniquement si elle n’est référencée par aucune évaluation. ' +
+  'Sinon, créez une nouvelle règle.';
 
 export interface Critere {
   nom: string;
@@ -38,6 +52,37 @@ export interface Critere {
 @Injectable()
 export class ReglesService {
   constructor(private pg: DatabasePgService) {}
+
+  private hasDefinitionChanges(dto: UpdateRegleDto): boolean {
+    return RULE_DEFINITION_FIELDS.some((field) => dto[field] !== undefined);
+  }
+
+  private async countEvaluationReferences(id: string): Promise<number> {
+    const ref = await this.pg.queryOne<{ count: string | number }>(
+      `SELECT COUNT(*)::text AS count FROM evaluations WHERE id_regle = $1`,
+      [id],
+    );
+    return Number(ref?.count ?? 0);
+  }
+
+  private async assertUpdateAllowed(
+    id: string,
+    existing: { est_active?: boolean },
+    dto: UpdateRegleDto,
+  ): Promise<void> {
+    const changesDefinition = this.hasDefinitionChanges(dto);
+    const reactivatesRule = existing.est_active === false && dto.est_active === true;
+
+    if (!changesDefinition && !reactivatesRule) return;
+
+    if ((await this.countEvaluationReferences(id)) > 0) {
+      throw new BadRequestException(REFERENCED_RULE_IMMUTABLE_MESSAGE);
+    }
+
+    if (changesDefinition && existing.est_active === true) {
+      throw new BadRequestException(ACTIVE_RULE_IMMUTABLE_MESSAGE);
+    }
+  }
 
   async listActives() {
     const rows = await this.pg.query(
@@ -161,30 +206,44 @@ export class ReglesService {
       throw new BadRequestException(errors.join('; '));
     }
 
-    const id = randomUUID();
-    await this.pg.execute(
-      `INSERT INTO regles_evaluation
-         (id_regle, nom_regle, description, criteres_evaluation_json, est_active,
-          role_evaluateur, role_evalue, type_evaluation, created_at, updated_at)
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, NOW(), NOW())`,
-      [
-        id,
-        dto.nom_regle,
-        dto.description ?? null,
-        JSON.stringify(envelope),
-        dto.est_active ?? true,
-        dto.role_evaluateur ?? null,
-        dto.role_evalue ?? null,
-        dto.type_evaluation ?? null,
-      ],
-    );
+    // id_regle is a bigint auto-increment column — let the sequence assign it
+    // and return the generated id rather than supplying a UUID.
+    let inserted: { id_regle: string | number } | null;
+    try {
+      inserted = await this.pg.queryOne<{ id_regle: string | number }>(
+        `INSERT INTO regles_evaluation
+           (nom_regle, description, criteres_evaluation_json, est_active,
+            role_evaluateur, role_evalue, type_evaluation, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+         RETURNING id_regle`,
+        [
+          dto.nom_regle,
+          dto.description ?? null,
+          JSON.stringify(envelope),
+          dto.est_active ?? true,
+          dto.role_evaluateur ?? null,
+          dto.role_evalue ?? null,
+          dto.type_evaluation ?? null,
+        ],
+      );
+    } catch (e: any) {
+      // idx_regle_unique enforces a single rule per (role_evaluateur, role_evalue, type_evaluation)
+      if (e?.code === '23505') {
+        throw new BadRequestException(
+          `Une règle existe déjà pour cette combinaison (évaluateur: ${dto.role_evaluateur ?? '—'}, évalué: ${dto.role_evalue ?? '—'}, type: ${dto.type_evaluation ?? '—'})`,
+        );
+      }
+      throw e;
+    }
 
-    return this.findById(id);
+    return this.findById(String(inserted?.id_regle));
   }
 
   async update(id: string, dto: UpdateRegleDto) {
     const existing = await this.findById(id);
     if (!existing) throw new NotFoundException(`Règle introuvable: ${id}`);
+
+    await this.assertUpdateAllowed(id, existing, dto);
 
     const sets: string[] = [];
     const params: any[] = [];
@@ -212,16 +271,25 @@ export class ReglesService {
       } as any)) });
       const errors = validateRuleEnvelope(envelope);
       if (errors.length > 0) throw new BadRequestException(errors.join('; '));
-      sets.push(`criteres_evaluation_json = $${idx++}::jsonb`);
+      sets.push(`criteres_evaluation_json = $${idx++}`);
       params.push(JSON.stringify(envelope));
     }
 
     if (sets.length > 0) {
       params.push(id);
-      await this.pg.execute(
-        `UPDATE regles_evaluation SET ${sets.join(', ')}, updated_at = NOW() WHERE id_regle = $${idx}`,
-        params,
-      );
+      try {
+        await this.pg.execute(
+          `UPDATE regles_evaluation SET ${sets.join(', ')}, updated_at = NOW() WHERE id_regle = $${idx}`,
+          params,
+        );
+      } catch (e: any) {
+        if (e?.code === '23505') {
+          throw new BadRequestException(
+            'Une règle existe déjà pour cette combinaison (évaluateur, évalué, type)',
+          );
+        }
+        throw e;
+      }
     }
 
     return this.findById(id);
@@ -230,6 +298,11 @@ export class ReglesService {
   async toggleActive(id: string) {
     const existing = await this.findById(id);
     if (!existing) throw new NotFoundException(`Règle introuvable: ${id}`);
+
+    if (existing.est_active === false && (await this.countEvaluationReferences(id)) > 0) {
+      throw new BadRequestException(REFERENCED_RULE_IMMUTABLE_MESSAGE);
+    }
+
     await this.pg.execute(
       `UPDATE regles_evaluation SET est_active = NOT est_active, updated_at = NOW() WHERE id_regle = $1`,
       [id],

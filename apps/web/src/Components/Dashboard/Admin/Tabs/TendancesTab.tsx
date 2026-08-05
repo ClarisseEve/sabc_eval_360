@@ -50,13 +50,13 @@ function TendancesContent() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Filtres */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <select
           value={regionFilter}
           onChange={(e) => setRegionFilter(e.target.value)}
-          className="rounded border px-3 py-1.5 text-sm"
+          className="rounded-lg border border-sabc-gray-200 bg-white px-3 py-1.5 text-sm text-sabc-gray-700 shadow-sm focus:outline-none focus:ring-1 focus:ring-sabc-red-primary"
         >
           <option value="all">Toutes les régions</option>
           {(regionOptions as Region[]).map((r) => (
@@ -68,7 +68,7 @@ function TendancesContent() {
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="rounded border px-3 py-1.5 text-sm"
+          className="rounded-lg border border-sabc-gray-200 bg-white px-3 py-1.5 text-sm text-sabc-gray-700 shadow-sm focus:outline-none focus:ring-1 focus:ring-sabc-red-primary"
         >
           <option value="all">Tous les rôles</option>
           {(roleOptions as string[]).map((role) => (
@@ -78,7 +78,7 @@ function TendancesContent() {
           ))}
         </select>
         {generatedAt && (
-          <span className="ml-auto self-center text-xs text-gray-500">
+          <span className="ml-auto self-center text-xs text-sabc-gray-500">
             Mis à jour : {new Date(generatedAt).toLocaleString('fr-FR')}
           </span>
         )}
@@ -86,87 +86,94 @@ function TendancesContent() {
 
       {/* Graphique */}
       {chartData.length === 0 ? (
-        <div className="rounded-lg border p-8 text-center text-gray-500">
+        <div className="rounded-lg border border-dashed border-sabc-gray-300 p-8 text-center text-sabc-gray-500">
           Aucune donnée de tendance disponible pour les filtres sélectionnés.
         </div>
       ) : (
-        <div className="rounded-lg border bg-white p-4">
-          <h3 className="mb-4 font-semibold text-gray-800">Évolution par période</h3>
-          <div className="relative">
-            <div className="absolute top-0 right-0 z-10">
-              <ChartExportButton chartRef={chartRef} filename="sabc-tendances" />
-            </div>
-            <div ref={chartRef}>
-              <ResponsiveContainer width="100%" height={320}>
-                <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 5, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="periode" tick={{ fontSize: 12 }} />
-                  <YAxis
-                    yAxisId="score"
-                    domain={[0, 5]}
-                    label={{ value: 'Score /5', angle: -90, position: 'insideLeft', fontSize: 11 }}
-                  />
-                  <YAxis
-                    yAxisId="completion"
-                    orientation="right"
-                    domain={[0, 100]}
-                    label={{
-                      value: '% complétion',
-                      angle: 90,
-                      position: 'insideRight',
-                      fontSize: 11,
-                    }}
-                  />
-                  <Tooltip
-                    formatter={(value: string | number | (string | number)[], name: string) => {
-                      if (name === 'Score moyen') return value != null ? [`${value}/5`, name] : ['—', name];
-                      if (name === 'Taux complétion') return [`${value}%`, name];
-                      return [value, name];
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    yAxisId="completion"
-                    dataKey="completion"
-                    name="Taux complétion"
-                    fill="#93C5FD"
-                    opacity={0.7}
-                  />
-                  <Line
-                    yAxisId="score"
-                    type="monotone"
-                    dataKey="score"
-                    name="Score moyen"
-                    stroke="#EF4444"
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                    connectNulls
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
+        <div className="rounded-lg border border-sabc-gray-200/80 bg-white p-4 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">
+              Évolution par période
+            </h3>
+            <ChartExportButton chartRef={chartRef} filename="sabc-tendances" />
+          </div>
+          <div ref={chartRef} className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
+                <XAxis dataKey="periode" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                <YAxis
+                  yAxisId="score"
+                  domain={[0, 5]}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11 }}
+                  label={{ value: 'Score /5', angle: -90, position: 'insideLeft', fontSize: 11 }}
+                />
+                <YAxis
+                  yAxisId="completion"
+                  orientation="right"
+                  domain={[0, 100]}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11 }}
+                  label={{
+                    value: '% complétion',
+                    angle: 90,
+                    position: 'insideRight',
+                    fontSize: 11,
+                  }}
+                />
+                <Tooltip
+                  formatter={(value: string | number | (string | number)[], name: string) => {
+                    if (name === 'Score moyen') return value != null ? [`${value}/5`, name] : ['—', name];
+                    if (name === 'Taux complétion') return [`${value}%`, name];
+                    return [value, name];
+                  }}
+                />
+                <Legend />
+                <Bar
+                  yAxisId="completion"
+                  dataKey="completion"
+                  name="Taux complétion"
+                  fill="#93C5FD"
+                  opacity={0.7}
+                  radius={[6, 6, 0, 0]}
+                />
+                <Line
+                  yAxisId="score"
+                  type="monotone"
+                  dataKey="score"
+                  name="Score moyen"
+                  stroke="#EF4444"
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                  connectNulls
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
 
       {/* Table résumé */}
       {(tendances as Tendance[]).length > 0 && (
-        <div className="overflow-x-auto rounded-lg border bg-white">
+        <div className="overflow-x-auto rounded-lg border border-sabc-gray-200/80 bg-white shadow-sm">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead className="bg-sabc-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">Période</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-700">Score moyen</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-700">Δ Score</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-700">Taux complétion</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-700">Évaluations</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Période</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Score moyen</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Δ Score</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Taux complétion</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Évaluations</th>
               </tr>
             </thead>
             <tbody>
               {(tendances as Tendance[]).map((t) => (
-                <tr key={t.id_periode} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{t.nom_periode || t.code_periode}</td>
-                  <td className="px-4 py-3 text-right">
+                <tr key={t.id_periode} className="border-t border-sabc-gray-100 hover:bg-sabc-gray-50">
+                  <td className="px-4 py-3 font-medium text-sabc-gray-900">{t.nom_periode || t.code_periode}</td>
+                  <td className="px-4 py-3 text-right text-sabc-gray-700">
                     {t.score_moyen != null ? `${Number(t.score_moyen).toFixed(2)}/5` : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -177,20 +184,20 @@ function TendancesContent() {
                             ? 'text-green-600'
                             : t.delta_score < 0
                               ? 'text-red-600'
-                              : 'text-gray-500'
+                              : 'text-sabc-gray-500'
                         }
                       >
                         {t.delta_score > 0 ? '+' : ''}
                         {Number(t.delta_score).toFixed(2)}
                       </span>
                     ) : (
-                      '—'
+                      <span className="text-sabc-gray-400">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right text-sabc-gray-700">
                     {Number(t.taux_completion ?? 0).toFixed(1)}%
                   </td>
-                  <td className="px-4 py-3 text-right">{t.nb_evaluations}</td>
+                  <td className="px-4 py-3 text-right text-sabc-gray-700">{t.nb_evaluations}</td>
                 </tr>
               ))}
             </tbody>

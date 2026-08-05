@@ -5,6 +5,15 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AdminStructureService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Generates a short unique id (<= 10 chars) for the varchar(10) primary keys
+   * used by the org-structure tables (no DB auto-increment / default exists).
+   */
+  private generateId(prefix: string): string {
+    const suffix = Math.random().toString(36).slice(2, 2 + (10 - prefix.length)).toUpperCase();
+    return `${prefix}${suffix}`.slice(0, 10);
+  }
+
   // ── Regions ──
 
   async getRegions() {
@@ -43,10 +52,15 @@ export class AdminStructureService {
   }
 
   async createService(data: { nom_service: string; id_region: string }) {
-    return this.prisma.$executeRawUnsafe(
-      `INSERT INTO services_commerciaux (nom_service, id_region, created_at, updated_at) VALUES (?, ?, NOW(), NOW())`,
-      data.nom_service, data.id_region,
-    );
+    const region = await this.prisma.region.findUnique({ where: { id_region: data.id_region } });
+    if (!region) throw new BadRequestException('Région introuvable');
+    return this.prisma.serviceCommercial.create({
+      data: {
+        id_service: this.generateId('SVC'),
+        nom_service: data.nom_service,
+        id_region: data.id_region,
+      },
+    });
   }
 
   async deleteService(id: string) {
@@ -81,10 +95,15 @@ export class AdminStructureService {
   }
 
   async createDistrict(data: { nom_district: string; id_service: string }) {
-    return this.prisma.$executeRawUnsafe(
-      `INSERT INTO districts (nom_district, id_service, created_at, updated_at) VALUES (?, ?, NOW(), NOW())`,
-      data.nom_district, data.id_service,
-    );
+    const service = await this.prisma.serviceCommercial.findUnique({ where: { id_service: data.id_service } });
+    if (!service) throw new BadRequestException('Service introuvable');
+    return this.prisma.district.create({
+      data: {
+        id_district: this.generateId('DIS'),
+        nom_district: data.nom_district,
+        id_service: data.id_service,
+      },
+    });
   }
 
   async deleteDistrict(id: string) {
@@ -119,10 +138,18 @@ export class AdminStructureService {
   }
 
   async createSecteur(data: { nom_secteur: string; id_district: string; id_service?: string }) {
-    return this.prisma.$executeRawUnsafe(
-      `INSERT INTO secteurs (nom_secteur, id_district, id_service, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())`,
-      data.nom_secteur, data.id_district, data.id_service ?? null,
-    );
+    const district = await this.prisma.district.findUnique({ where: { id_district: data.id_district } });
+    if (!district) throw new BadRequestException('District introuvable');
+    // secteurs.id_service is NOT NULL — derive it from the parent district when omitted
+    const id_service = data.id_service ?? district.id_service;
+    return this.prisma.secteur.create({
+      data: {
+        id_secteur: this.generateId('SEC'),
+        nom_secteur: data.nom_secteur,
+        id_district: data.id_district,
+        id_service,
+      },
+    });
   }
 
   async deleteSecteur(id: string) {

@@ -108,7 +108,75 @@ describe('EvaluationsConsultationService', () => {
 
       // Both the COUNT query and the data query should include the base statut filter
       const countSql: string = mockPg.queryOne.mock.calls[0][0];
-      expect(countSql).toContain("statut IN ('soumis', 'valide')");
+      const dataSql: string = mockPg.query.mock.calls[0][0];
+      for (const sql of [countSql, dataSql]) {
+        expect(sql).toContain("statut IN ('soumis', 'valide')");
+        expect(sql).toContain("'{visibility_policy,evaluated}'");
+      }
+    });
+
+    it("retire en défense l'évaluation lorsque visibility_policy.evaluated=false", async () => {
+      mockPg.queryOne.mockResolvedValue({ total: '0' });
+      mockPg.query.mockResolvedValue([
+        makeEvaluation({
+          evalue_matricule: 'MAT001',
+          __rule_envelope: {
+            visibility_policy: { evaluated: false, detail: 'detailed' },
+          },
+        }),
+      ]);
+
+      const result = await service.getRecues('MAT001');
+
+      expect(result.data).toEqual([]);
+      expect(result.meta.total).toBe(0);
+    });
+
+    it("masque notes et commentaires lorsque le niveau de détail est aggregated", async () => {
+      mockPg.queryOne.mockResolvedValue({ total: '1' });
+      mockPg.query.mockResolvedValue([
+        makeEvaluation({
+          evalue_matricule: 'MAT001',
+          note_globale: 4,
+          notations_json: [{ critere_id: 'C1', note: 4, commentaire: 'privé' }],
+          commentaire_global: 'privé',
+          commentaire_validation: 'privé',
+          motif_rejet: 'privé',
+          __rule_envelope: {
+            visibility_policy: { evaluated: true, detail: 'aggregated' },
+          },
+        }),
+      ]);
+
+      const result = await service.getRecues('MAT001');
+      const item = result.data[0];
+
+      expect(item).toEqual(expect.objectContaining({ statut: 'soumis', note_globale: 4 }));
+      expect(item.notations_json).toBeNull();
+      expect(item.commentaire_global).toBeNull();
+      expect(item.commentaire_validation).toBeNull();
+      expect(item.motif_rejet).toBeNull();
+      expect(item.__rule_envelope).toBeUndefined();
+    });
+
+    it("conserve le détail lorsque visibility_policy.detail=detailed", async () => {
+      const notes = [{ critere_id: 'C1', note: 4, commentaire: 'visible' }];
+      mockPg.queryOne.mockResolvedValue({ total: '1' });
+      mockPg.query.mockResolvedValue([
+        makeEvaluation({
+          evalue_matricule: 'MAT001',
+          notations_json: notes,
+          commentaire_global: 'visible',
+          __rule_envelope: {
+            visibility_policy: { evaluated: true, detail: 'detailed' },
+          },
+        }),
+      ]);
+
+      const result = await service.getRecues('MAT001');
+
+      expect(result.data[0].notations_json).toEqual(notes);
+      expect(result.data[0].commentaire_global).toBe('visible');
     });
 
     it('anonymizes evaluateur for pairs type evaluations', async () => {
@@ -130,6 +198,10 @@ describe('EvaluationsConsultationService', () => {
 
       expect(item.evaluateur_nom).toBe('Anonyme');
       expect(item.evaluateur_matricule).toBeNull();
+      expect(item.evaluateur).toBeNull();
+      expect(mockPrisma.utilisateur.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { matricule: { in: ['MAT001'] } } }),
+      );
     });
 
     it('does NOT anonymize evaluateur for non-pairs evaluations', async () => {
@@ -308,6 +380,30 @@ describe('EvaluationsConsultationService', () => {
       expect(countSql).toContain('evaluateur_matricule');
       expect(countSql).not.toContain('evalue_matricule');
     });
+
+    it("n'expose pas l'identité de l'évaluateur pour une évaluation de pairs", async () => {
+      mockPg.queryOne.mockResolvedValue({ total: '1' });
+      mockPg.query.mockResolvedValue([
+        makeEvaluation({
+          type_evaluation: 'pairs',
+          evaluateur_matricule: 'MAT001',
+          evalue_matricule: 'MAT002',
+        }),
+      ]);
+      mockPrisma.utilisateur.findMany.mockResolvedValue([
+        makeUser('MAT001'),
+        makeUser('MAT002'),
+      ]);
+
+      const result = await service.getDonnees('MAT001');
+
+      expect(result.data[0].evaluateur_matricule).toBeNull();
+      expect(result.data[0].evaluateur_nom).toBe('Anonyme');
+      expect(result.data[0].evaluateur).toBeNull();
+      expect(mockPrisma.utilisateur.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { matricule: { in: ['MAT002'] } } }),
+      );
+    });
   });
 
   // =========================================================================
@@ -358,6 +454,7 @@ describe('EvaluationsConsultationService', () => {
       const sql: string = mockPg.queryOne.mock.calls[0][0];
       expect(sql).toContain('evalue_matricule');
       expect(sql).toContain("statut IN ('soumis', 'valide')");
+      expect(sql).toContain("'{visibility_policy,evaluated}'");
     });
   });
 

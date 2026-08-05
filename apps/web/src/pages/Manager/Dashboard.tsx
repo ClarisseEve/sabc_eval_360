@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/C
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button';
 import { EvaluationPageLayout } from '@/pages/Common/Evaluations/shared';
+import api from '@/Services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -93,27 +94,26 @@ function prioriteBadgeClass(priorite: PrioriteType): string {
 }
 
 async function fetchDashboardManager(idPeriode: string): Promise<DashboardManagerData> {
-  const token = localStorage.getItem('access_token');
-  const url = idPeriode
-    ? `/api/dashboard/manager?id_periode=${encodeURIComponent(idPeriode)}`
-    : '/api/dashboard/manager';
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+  const response = await api.get<DashboardManagerData>('/dashboard/manager', {
+    params: {
+      id_periode: idPeriode || undefined,
+    },
   });
-  return res.json() as Promise<DashboardManagerData>;
+  return response.data;
 }
 
 async function fetchValidations(
   idPeriode: string,
   page: number,
 ): Promise<ValidationsData> {
-  const token = localStorage.getItem('access_token');
-  const params = new URLSearchParams({ page: String(page), limit: '20' });
-  if (idPeriode) params.set('id_periode', idPeriode);
-  const res = await fetch(`/api/dashboard/manager/validations?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const response = await api.get<ValidationsData>('/dashboard/manager/validations', {
+    params: {
+      page,
+      limit: 20,
+      id_periode: idPeriode || undefined,
+    },
   });
-  return res.json() as Promise<ValidationsData>;
+  return response.data;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────

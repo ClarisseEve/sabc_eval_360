@@ -1,6 +1,6 @@
 import React from 'react';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { adminApi, reglesApi } from '@/Services/api';
 import { AdminEvaluationsLayout } from '../shared';
 import { RuleForm } from './RuleForm';
@@ -9,7 +9,20 @@ import type { RuleBuilderInput } from '@/types/rules';
 
 export default function CreateRulePage() {
   const navigate = useNavigate();
-  const [formData, setFormData] = React.useState<RuleBuilderInput>(createEmptyRuleBuilderInput());
+  const [searchParams] = useSearchParams();
+  // Pre-fill the couple/type when launched from a matrix cell.
+  const [formData, setFormData] = React.useState<RuleBuilderInput>(() => {
+    const base = createEmptyRuleBuilderInput();
+    const roleEvaluateur = searchParams.get('role_evaluateur');
+    const roleEvalue = searchParams.get('role_evalue');
+    const typeEvaluation = searchParams.get('type_evaluation');
+    return {
+      ...base,
+      role_evaluateur: roleEvaluateur ?? base.role_evaluateur,
+      role_evalue: roleEvalue ?? base.role_evalue,
+      type_evaluation: typeEvaluation ?? base.type_evaluation,
+    };
+  });
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const { data: rolesData } = useSuspenseQuery({

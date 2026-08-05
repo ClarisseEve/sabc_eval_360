@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CalendarClock,
+  Info,
   MessageSquare,
   Pencil,
   ShieldCheck,
@@ -30,6 +31,20 @@ import {
 import { ActiveRulesCard, formatDateLabel, formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
 import { useOfflineSync } from '@/Hooks/useOfflineSync';
 
+type EditableEvaluationNote = {
+  critere_id: string;
+  note: number;
+  commentaire: string;
+};
+
+const getErrorMessage = (error: unknown) => {
+  const apiMessage = (error as any)?.response?.data?.message;
+  if (Array.isArray(apiMessage)) return apiMessage.join('; ');
+  if (typeof apiMessage === 'string') return apiMessage;
+  if (error instanceof Error && error.message) return error.message;
+  return "Impossible d'enregistrer l'évaluation pour le moment.";
+};
+
 const EditEvaluation: React.FC = () => {
   const { id = '' } = useParams();
   const { data: evaluation } = useEvaluation(id);
@@ -37,9 +52,9 @@ const EditEvaluation: React.FC = () => {
   const context = useMemo(() => buildEvaluationContext(evaluation), [evaluation]);
   const criteria = context.criteria;
   const evaluationId = evaluation?.id_evaluation ?? evaluation?.id;
-  const [notes, setNotes] = useState(() =>
+  const [notes, setNotes] = useState<EditableEvaluationNote[]>(() =>
     criteria.map((critere) => ({
-      id: critere.id ?? '',
+      critere_id: String(critere.id ?? ''),
       note: critere.note ?? 3,
       commentaire: critere.commentaire ?? '',
     })),
@@ -49,11 +64,16 @@ const EditEvaluation: React.FC = () => {
 
   const { saveDraft, getDraft, isOnline, pendingCount, isSyncing } = useOfflineSync();
   const draftRestoredRef = useRef(false);
+  const latestDraftRef = useRef({ notes, commentaireGeneral });
+
+  React.useEffect(() => {
+    latestDraftRef.current = { notes, commentaireGeneral };
+  }, [notes, commentaireGeneral]);
 
   React.useEffect(() => {
     setNotes(
       criteria.map((critere) => ({
-        id: critere.id ?? '',
+        critere_id: String(critere.id ?? ''),
         note: critere.note ?? 3,
         commentaire: critere.commentaire ?? '',
       })),
@@ -68,11 +88,19 @@ const EditEvaluation: React.FC = () => {
     draftRestoredRef.current = true;
     getDraft(id).then((draft) => {
       if (!draft || draft.saved_at < new Date(evaluation.updated_at ?? 0).getTime()) return;
-      setNotes(criteria.map((critere, idx) => ({
-        id: critere.id ?? '',
-        note: (draft.notes[idx]?.note as number) ?? critere.note ?? 3,
-        commentaire: (draft.notes[idx]?.commentaire as string) ?? critere.commentaire ?? '',
-      })));
+      setNotes(criteria.map((critere, idx) => {
+        const critereId = String(critere.id ?? '');
+        const matchingDraftNote = draft.notes.find((draftNote) => {
+          const legacyId = draftNote.critere_id ?? draftNote.id_critere ?? draftNote.id;
+          return legacyId !== undefined && String(legacyId) === critereId;
+        }) ?? draft.notes[idx];
+
+        return {
+          critere_id: critereId,
+          note: (matchingDraftNote?.note as number) ?? critere.note ?? 3,
+          commentaire: (matchingDraftNote?.commentaire as string) ?? critere.commentaire ?? '',
+        };
+      }));
       if (draft.commentaire_general) setCommentaireGeneral(draft.commentaire_general);
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -82,10 +110,15 @@ const EditEvaluation: React.FC = () => {
   React.useEffect(() => {
     if (!evaluationId) return;
     const interval = setInterval(() => {
-      saveDraft(String(evaluationId), notes, commentaireGeneral).catch(() => {});
+      const currentDraft = latestDraftRef.current;
+      saveDraft(
+        String(evaluationId),
+        currentDraft.notes,
+        currentDraft.commentaireGeneral,
+      ).catch(() => {});
     }, 30_000);
     return () => clearInterval(interval);
-  }, [evaluationId, notes, commentaireGeneral, saveDraft]);
+  }, [evaluationId, saveDraft]);
 
   const completion = useMemo(() => {
     if (notes.length === 0) return 0;
@@ -108,7 +141,10 @@ const EditEvaluation: React.FC = () => {
         commentaire_general: commentaireGeneral,
       });
       if (submit) {
-        await evaluationsApi.submit(String(evaluationId));
+        const response = await evaluationsApi.submit(String(evaluationId));
+        if (response.data?.success === false) {
+          throw new Error(response.data.message || "La soumission de l'évaluation a été refusée.");
+        }
       }
     },
     onSuccess: async (_, submit) => {
@@ -116,7 +152,9 @@ const EditEvaluation: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['evaluations'] });
       await queryClient.invalidateQueries({ queryKey: ['evaluations', String(evaluationId)] });
       if (submit) {
-        window.location.href = `/evaluations/${evaluationId}`;
+        setTimeout(() => {
+          window.location.href = `/evaluations/${evaluationId}`;
+        }, 3000);
       }
     },
   });
@@ -344,6 +382,12 @@ const EditEvaluation: React.FC = () => {
                         </button>
                       ))}
                     </div>
+                    {(critere.commentaireRequisSiNoteLt ?? 0) > 0 && (
+                      <div className="mt-2 flex items-center gap-1.5 text-xs text-sabc-gray-500">
+                        <Info className="h-3.5 w-3.5 shrink-0" />
+                        <span>Un commentaire sera requis si votre note est inférieure à {critere.commentaireRequisSiNoteLt}/5</span>
+                      </div>
+                    )}
 
                     <div className="mt-4 space-y-2">
                       <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sabc-gray-400">
@@ -406,8 +450,15 @@ const EditEvaluation: React.FC = () => {
         {lastAction && !saveMutation.isPending && !saveMutation.isError && (
           <Alert className="border-sabc-success bg-sabc-success/10 text-sabc-success">
             <AlertTitle>Enregistré</AlertTitle>
-            <AlertDescription>
-              Votre évaluation a été {lastAction === 'submit' ? 'soumise pour validation.' : 'enregistrée en brouillon.'}
+            <AlertDescription className="space-y-1">
+              <div>
+                Votre évaluation a été {lastAction === 'submit' ? 'soumise pour validation.' : 'enregistrée en brouillon.'}
+              </div>
+              {lastAction === 'submit' && (
+                <div className="text-xs opacity-80">
+                  Elle ne pourra être corrigée qu'après un éventuel rejet par le validateur.
+                </div>
+              )}
             </AlertDescription>
           </Alert>
         )}
@@ -416,7 +467,7 @@ const EditEvaluation: React.FC = () => {
           <Alert className="border-red-300 bg-red-50 text-red-700">
             <AlertTitle>Erreur</AlertTitle>
             <AlertDescription>
-              Impossible d'enregistrer l'évaluation pour le moment.
+              {getErrorMessage(saveMutation.error)}
             </AlertDescription>
           </Alert>
         )}

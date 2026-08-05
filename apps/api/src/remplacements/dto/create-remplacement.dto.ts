@@ -1,19 +1,37 @@
-import { IsString, IsOptional, IsDateString, IsInt, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateRemplacementDto {
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(5)
   titulaire_matricule!: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(5)
   remplacant_matricule!: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(50)
   role_remplace!: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   region_remplacement!: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   motif!: string;
 
   @IsDateString()
@@ -29,5 +47,6 @@ export class CreateRemplacementDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(100)
   service_remplacement?: string;
 }

@@ -1,6 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards, Request } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AnalyticsService } from './analytics.service';
+import { BatchMatriculesDto } from './dto/batch-matricules.dto';
+import { DateRangeQueryDto } from './dto/date-range-query.dto';
+import { HierarchyService } from '../hierarchy/hierarchy.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/guards/roles.guard';
 
@@ -8,20 +11,53 @@ import { Roles, RolesGuard } from '../auth/guards/roles.guard';
 @UseGuards(JwtAuthGuard)
 @Throttle({ default: { limit: 30, ttl: 60_000 } })
 export class AnalyticsController {
-  constructor(private service: AnalyticsService) {}
+  constructor(
+    private service: AnalyticsService,
+    private hierarchy: HierarchyService,
+  ) {}
+
+  /**
+   * Contrôle d'accès objet : un utilisateur ne peut consulter les données analytiques
+   * que de lui-même, de ses subordonnés (hiérarchie complète) ou de tous s'il est admin.
+   * Empêche l'IDOR (lecture des scores/axes d'un matricule arbitraire).
+   */
+  private async assertCanViewMatricules(req: any, matricules: string[]): Promise<void> {
+    const user = req?.user;
+    if (!user) throw new ForbiddenException();
+    if (user.is_admin || String(user.role ?? '').toUpperCase() === 'ADMIN') return;
+
+    const allowed = new Set<string>([user.matricule]);
+    const subordinates = await this.hierarchy.getTousSubordonnes(user.matricule);
+    for (const sub of subordinates) allowed.add(sub.matricule);
+
+    const forbidden = matricules.filter((m) => !allowed.has(m));
+    if (forbidden.length > 0) {
+      throw new ForbiddenException("Accès non autorisé aux données d'un ou plusieurs utilisateurs");
+    }
+  }
+
+  private assertCanViewMatricule(req: any, matricule: string): Promise<void> {
+    return this.assertCanViewMatricules(req, [matricule]);
+  }
 
   @Get('dashboard')
-  dashboard(@Query() filters: { start_date?: string; end_date?: string }) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  dashboard(@Query() filters: DateRangeQueryDto) {
     return this.service.getDashboard(filters);
   }
 
   @Get('evaluations')
-  evaluations(@Query() filters: { start_date?: string; end_date?: string }) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  evaluations(@Query() filters: DateRangeQueryDto) {
     return this.service.getEvaluationsStats(filters);
   }
 
   @Get('performances')
-  performances(@Query() filters: { start_date?: string; end_date?: string }) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  performances(@Query() filters: DateRangeQueryDto) {
     return this.service.getPerformances(filters);
   }
 
@@ -40,12 +76,21 @@ export class AnalyticsController {
     return this.service.getAxesAmelioration(req.user.matricule);
   }
 
+  @Post('axes-amelioration/batch')
+  async axesAmeliorationBatch(@Body() dto: BatchMatriculesDto, @Request() req: any) {
+    await this.assertCanViewMatricules(req, dto.matricules ?? []);
+    return this.service.getAxesAmeliorationBatch(dto.matricules);
+  }
+
   @Get('axes-amelioration/:matricule')
-  axesAmelioration(@Param('matricule') matricule: string) {
+  async axesAmelioration(@Param('matricule') matricule: string, @Request() req: any) {
+    await this.assertCanViewMatricule(req, matricule);
     return this.service.getAxesAmelioration(matricule);
   }
 
   @Get('anomalies')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   anomalies(
     @Query('matricule') matricule?: string,
     @Query('id_region') idRegion?: string,
@@ -119,22 +164,22 @@ export class AnalyticsController {
   @Get('admin/overview')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  adminOverview() {
-    return this.service.getAdminOverview();
+  adminOverview(@Query() filters: DateRangeQueryDto) {
+    return this.service.getAdminOverview(filters);
   }
 
   @Get('admin/roles')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  adminRoles() {
-    return this.service.getAdminRoleAnalytics();
+  adminRoles(@Query() filters: DateRangeQueryDto) {
+    return this.service.getAdminRoleAnalytics(filters);
   }
 
   @Get('admin/regions')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  adminRegionsOverview() {
-    return this.service.getAdminRegionsOverview();
+  adminRegionsOverview(@Query() filters: DateRangeQueryDto) {
+    return this.service.getAdminRegionsOverview(filters);
   }
 
   @Get('admin/regions/:idRegion')
@@ -176,7 +221,8 @@ export class AnalyticsController {
   }
 
   @Get('recommandations/:matricule')
-  recommandations(@Param('matricule') matricule: string) {
+  async recommandations(@Param('matricule') matricule: string, @Request() req: any) {
+    await this.assertCanViewMatricule(req, matricule);
     return this.service.getRecommandations(matricule);
   }
 
@@ -185,8 +231,15 @@ export class AnalyticsController {
     return this.service.getScoresUtilisateur(req.user.matricule);
   }
 
+  @Post('scores/batch')
+  async scoresBatch(@Body() dto: BatchMatriculesDto, @Request() req: any) {
+    await this.assertCanViewMatricules(req, dto.matricules ?? []);
+    return this.service.getScoresBatch(dto.matricules);
+  }
+
   @Get('scores/:matricule')
-  scoresUtilisateur(@Param('matricule') matricule: string) {
+  async scoresUtilisateur(@Param('matricule') matricule: string, @Request() req: any) {
+    await this.assertCanViewMatricule(req, matricule);
     return this.service.getScoresUtilisateur(matricule);
   }
 }

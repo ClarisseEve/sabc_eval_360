@@ -1,5 +1,22 @@
 import { Injectable } from '@nestjs/common';
 
+export type CanonicalEvaluationNote = {
+  critere_id: string;
+  note: number;
+  commentaire?: string | null;
+};
+
+type SubmissionCriterion = {
+  id?: string | number | null;
+  critere_id?: string | number | null;
+  poids?: number | null;
+  commentaire_requis_si_note_lt?: number | null;
+  echelle?: {
+    min?: number | null;
+    max?: number | null;
+  } | null;
+};
+
 @Injectable()
 export class ValidationNotationService {
   validateNote(note: number): boolean {
@@ -26,9 +43,10 @@ export class ValidationNotationService {
     return { valid: true };
   }
 
-  validateBornes(
-    notes: Array<{ note: number; [key: string]: any }>,
-  ): { valid: boolean; errors: string[] } {
+  validateBornes(notes: Array<{ note: number; [key: string]: any }>): {
+    valid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
     notes.forEach((n, index) => {
       if (!this.validateNote(n.note)) {
@@ -45,18 +63,19 @@ export class ValidationNotationService {
   }
 
   validateCompletude(
-    notes: Array<{ critere_id?: string; [key: string]: any }>,
-    criteres: Array<{ id?: string; critere_id?: string; [key: string]: any }>,
+    notes: Array<{ critere_id?: unknown; [key: string]: any }>,
+    criteres: Array<{ id?: unknown; critere_id?: unknown; [key: string]: any }>,
   ): { complete: boolean; rated: number; total: number; missing: number } {
     const total = criteres.length;
     const notedIds = new Set(
       notes
         .map((n) => n.critere_id)
-        .filter((id): id is string => id !== undefined && id !== null),
+        .filter((id) => id !== undefined && id !== null)
+        .map((id) => String(id)),
     );
     const rated = criteres.filter((c) => {
       const id = c.id ?? c.critere_id;
-      return id !== undefined && id !== null && notedIds.has(id);
+      return id !== undefined && id !== null && notedIds.has(String(id));
     }).length;
     const missing = total - rated;
     return { complete: missing === 0, rated, total, missing };
@@ -92,14 +111,99 @@ export class ValidationNotationService {
   }
 
   validatePourSoumission(
-    notes: any[],
-    criteres: any[],
+    notes: CanonicalEvaluationNote[],
+    criteres: SubmissionCriterion[],
   ): { valid: boolean; errors: string[] } {
-    const bornesResult = this.validateBornes(notes);
-    const completudeResult = this.validateCompletude(notes, criteres);
-    const commentairesResult = this.validateCommentaires(notes);
+    const errors: string[] = [];
+    const criterionById = new Map<string, SubmissionCriterion>();
 
-    const errors: string[] = [...bornesResult.errors];
+    if (criteres.length === 0) {
+      errors.push("La règle d'évaluation ne contient aucun critère.");
+    }
+
+    criteres.forEach((critere, index) => {
+      const rawId = critere.id ?? critere.critere_id;
+      const id =
+        rawId === undefined || rawId === null ? '' : String(rawId).trim();
+      if (!id) {
+        errors.push(
+          `La règle contient un critère sans identifiant à l'index ${index}.`,
+        );
+        return;
+      }
+      if (criterionById.has(id)) {
+        errors.push(
+          `La règle contient plusieurs critères avec l'identifiant « ${id} ».`,
+        );
+        return;
+      }
+      criterionById.set(id, critere);
+
+      const weight = Number(critere.poids);
+      if (!Number.isFinite(weight) || weight <= 0) {
+        errors.push(
+          `La pondération serveur du critère « ${id} » est invalide.`,
+        );
+      }
+    });
+
+    const seenIds = new Set<string>();
+    notes.forEach((note, index) => {
+      const id = String(note.critere_id ?? '').trim();
+      if (!id) {
+        errors.push(`La note à l'index ${index} ne référence aucun critère.`);
+        return;
+      }
+      if (seenIds.has(id)) {
+        errors.push(
+          `Le critère « ${id} » est présent plusieurs fois dans les notes.`,
+        );
+        return;
+      }
+      seenIds.add(id);
+
+      const critere = criterionById.get(id);
+      if (!critere) {
+        errors.push(
+          `Le critère « ${id} » n'appartient pas à la règle de cette évaluation.`,
+        );
+        return;
+      }
+
+      const serverMin = critere.echelle?.min;
+      const serverMax = critere.echelle?.max;
+      const min =
+        typeof serverMin === 'number' && Number.isFinite(serverMin)
+          ? serverMin
+          : 1;
+      const max =
+        typeof serverMax === 'number' && Number.isFinite(serverMax)
+          ? serverMax
+          : 5;
+      if (!Number.isInteger(note.note) || note.note < min || note.note > max) {
+        errors.push(
+          `La note du critère « ${id} » (${note.note}) est invalide. Valeur attendue : entier entre ${min} et ${max}.`,
+        );
+      }
+
+      const threshold = critere.commentaire_requis_si_note_lt;
+      if (
+        typeof threshold === 'number' &&
+        Number.isFinite(threshold) &&
+        note.note < threshold
+      ) {
+        const hasComment =
+          typeof note.commentaire === 'string' &&
+          note.commentaire.trim().length > 0;
+        if (!hasComment) {
+          errors.push(
+            `critère « ${id} » : Un commentaire est obligatoire pour une note inférieure à ${threshold}.`,
+          );
+        }
+      }
+    });
+
+    const completudeResult = this.validateCompletude(notes, criteres);
 
     if (!completudeResult.complete) {
       errors.push(
@@ -107,9 +211,63 @@ export class ValidationNotationService {
       );
     }
 
-    errors.push(...commentairesResult.errors);
-
     return { valid: errors.length === 0, errors };
+  }
+
+  normaliserNotes(rawNotes: unknown): {
+    notes: CanonicalEvaluationNote[];
+    errors: string[];
+  } {
+    if (!Array.isArray(rawNotes)) {
+      return {
+        notes: [],
+        errors: ["Le format des notes de l'évaluation est invalide."],
+      };
+    }
+
+    const errors: string[] = [];
+    const notes: CanonicalEvaluationNote[] = [];
+
+    rawNotes.forEach((rawNote, index) => {
+      if (!rawNote || typeof rawNote !== 'object' || Array.isArray(rawNote)) {
+        errors.push(`La note à l'index ${index} est invalide.`);
+        return;
+      }
+
+      const record = rawNote as Record<string, unknown>;
+      const rawId = record.critere_id ?? record.id_critere ?? record.id;
+      const critereId =
+        rawId === undefined || rawId === null ? '' : String(rawId).trim();
+      if (!critereId) {
+        errors.push(`La note à l'index ${index} ne référence aucun critère.`);
+        return;
+      }
+
+      if (
+        record.commentaire !== undefined &&
+        record.commentaire !== null &&
+        typeof record.commentaire !== 'string'
+      ) {
+        errors.push(`Le commentaire du critère « ${critereId} » est invalide.`);
+        return;
+      }
+
+      const note =
+        typeof record.note === 'number'
+          ? record.note
+          : typeof record.note === 'string' && record.note.trim().length > 0
+            ? Number(record.note)
+            : Number.NaN;
+      notes.push({
+        critere_id: critereId,
+        note,
+        ...(record.commentaire !== undefined
+          ? { commentaire: record.commentaire as string | null }
+          : {}),
+      });
+    });
+
+    return { notes, errors };
   }
 
   calculerProgression(notes: any[], totalCriteres: number): number {
@@ -121,22 +279,35 @@ export class ValidationNotationService {
   }
 
   calculerNoteGlobale(
-    notes: Array<{
-      note: number;
-      poids?: number;
-      ponderation?: number;
-      [key: string]: any;
-    }>,
+    notes: CanonicalEvaluationNote[],
+    criteres: SubmissionCriterion[],
   ): number | null {
-    const validNotes = notes.filter((n) => n.note >= 1 && n.note <= 5);
-    if (validNotes.length === 0) {
+    if (notes.length === 0 || criteres.length === 0) {
       return null;
     }
+
+    const criterionById = new Map(
+      criteres
+        .map((critere) => {
+          const rawId = critere.id ?? critere.critere_id;
+          return rawId === undefined || rawId === null
+            ? null
+            : ([String(rawId).trim(), critere] as const);
+        })
+        .filter(
+          (entry): entry is readonly [string, SubmissionCriterion] =>
+            entry !== null,
+        ),
+    );
+
     let weightedSum = 0;
     let totalWeight = 0;
-    for (const n of validNotes) {
-      const weight = n.poids ?? n.ponderation ?? 1;
-      weightedSum += n.note * weight;
+    for (const note of notes) {
+      const critere = criterionById.get(String(note.critere_id));
+      if (!critere) continue;
+      const weight = Number(critere.poids);
+      if (!Number.isFinite(weight) || weight <= 0) continue;
+      weightedSum += note.note * weight;
       totalWeight += weight;
     }
     if (totalWeight === 0) {

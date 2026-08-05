@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/C
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button';
 import { EvaluationPageLayout } from '@/pages/Common/Evaluations/shared';
+import api from '@/Services/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,11 +49,8 @@ interface CollaborateurDashboardData {
 // ─── Query ────────────────────────────────────────────────────────────────────
 
 async function fetchCollaborateurDashboard(): Promise<CollaborateurDashboardData> {
-  const token = localStorage.getItem('access_token');
-  const res = await fetch('/api/dashboard/collaborateur', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return res.json();
+  const response = await api.get<CollaborateurDashboardData>('/dashboard/collaborateur');
+  return response.data;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────

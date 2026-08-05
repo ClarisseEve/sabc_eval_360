@@ -1,7 +1,32 @@
-import { Controller, Get, Post, Put, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+  DefaultValuePipe,
+  ParseIntPipe,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { RemplacementsService } from './remplacements.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles, RolesGuard } from '../auth/guards/roles.guard';
 import { CreateRemplacementDto } from './dto/create-remplacement.dto';
+import { UpdateRemplacementDto } from './dto/update-remplacement.dto';
+import { TerminerRemplacementDto } from './dto/terminer-remplacement.dto';
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    matricule: string;
+    email: string;
+    role: string;
+    is_admin: boolean;
+  };
+}
 
 @Controller('remplacements')
 @UseGuards(JwtAuthGuard)
@@ -9,42 +34,64 @@ export class RemplacementsController {
   constructor(private service: RemplacementsService) {}
 
   @Get('actifs')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   getActifs() {
     return this.service.getActifs();
   }
 
   @Get('a-venir')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   getAVenir() {
     return this.service.getAVenir();
   }
 
   @Get('historique')
-  getHistorique(@Query('limit') limit?: string) {
-    return this.service.getHistorique(limit ? parseInt(limit) : 50);
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  getHistorique(
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ) {
+    return this.service.getHistorique(limit);
   }
 
   @Get('par-utilisateur')
-  getPourUtilisateur(@Request() req: any) {
+  getPourUtilisateur(@Req() req: AuthenticatedRequest) {
     return this.service.getPourUtilisateur(req.user.matricule);
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
-    return this.service.getById(parseInt(id));
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  getById(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getById(id);
   }
 
   @Post()
-  create(@Body() dto: CreateRemplacementDto, @Request() req: any) {
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  create(@Body() dto: CreateRemplacementDto, @Req() req: AuthenticatedRequest) {
     return this.service.create({ ...dto, cree_par: req.user.matricule });
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.service.update(parseInt(id), body);
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateRemplacementDto,
+  ) {
+    return this.service.update(id, dto);
   }
 
   @Post(':id/terminer')
-  terminer(@Param('id') id: string, @Body() body: { date_fin?: string }) {
-    return this.service.terminer(parseInt(id), body.date_fin);
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  terminer(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: TerminerRemplacementDto,
+  ) {
+    return this.service.terminer(id, dto.date_fin);
   }
 }

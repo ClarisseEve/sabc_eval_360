@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+// Chemin relatif par défaut: le proxy Vite en dev et nginx en production
+// routent /api vers l'API, ce qui évite d'embarquer une URL absolue au build.
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const TOKEN_KEY = 'sabc_access_token';
 
@@ -76,7 +78,6 @@ async function requestBlob(
       method: 'GET',
       headers,
       signal: controller.signal,
-      credentials: 'include',
     });
 
     if (response.status === 401) {
@@ -148,7 +149,6 @@ async function request<T = any>(
       headers,
       body: body == null ? undefined : isFormData ? body : JSON.stringify(body),
       signal: controller.signal,
-      credentials: 'include',
     });
 
     const data = await parseResponseBody(response);
@@ -197,8 +197,8 @@ const api = {
 export default api;
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post<{ access_token: string; user: any }>('/auth/login', { email, password }),
+  login: (identifier: string, password: string) =>
+    api.post<{ access_token: string; user: any }>('/auth/login', { identifier, password }),
 
   me: () => api.get('/auth/me'),
 
@@ -219,8 +219,12 @@ export const evaluationsApi = {
   update: (id: string, data: { notes: any; commentaire_general?: string }) =>
     api.put(`/evaluations/${id}`, data),
   submit: (id: string) => api.post(`/evaluations/${id}/submit`),
-  validate: (id: string, est_validee: boolean, commentaire_validation?: string) =>
-    api.post(`/evaluations/${id}/validate`, { est_validee, commentaire_validation }),
+  validate: (id: string, est_validee: boolean, commentaire?: string) =>
+    api.post(`/evaluations/${id}/validate`, {
+      est_validee,
+      commentaire_validation: est_validee ? commentaire : undefined,
+      motif_rejet: est_validee ? undefined : commentaire,
+    }),
   periodesActives: () => api.get('/evaluations/periodes-actives'),
   eligibles: () => api.get('/evaluations/eligibles'),
   historique: () => api.get('/evaluations/historique'),
@@ -273,9 +277,9 @@ export const templatesApi = {
   unpublish: (id: string) => api.post(`/templates/${id}/unpublish`),
   getMatrice: (idPeriode: string) => api.get(`/templates/matrice/${idPeriode}`),
   assignTemplate: (data: { id_role: string; id_template: string; id_periode: string }) =>
-    api.post('/templates/assignations', data),
+    api.post('/templates/assign', data),
   removeAssignation: (idRole: string, idPeriode: string) =>
-    api.delete(`/templates/assignations/${idRole}/${idPeriode}`),
+    api.delete(`/templates/${idRole}/${idPeriode}`),
 };
 
 export const reglesApi = {
@@ -338,9 +342,12 @@ export const analyticsApi = {
   dashboard: () => api.get('/analytics/dashboard'),
   evaluations: () => api.get('/analytics/evaluations'),
   performances: () => api.get('/analytics/performances'),
-  adminOverview: () => api.get('/analytics/admin/overview'),
-  adminRoles: () => api.get('/analytics/admin/roles'),
-  adminRegionsOverview: () => api.get('/analytics/admin/regions'),
+  adminOverview: (params?: { start_date?: string; end_date?: string }) =>
+    api.get('/analytics/admin/overview', { params }),
+  adminRoles: (params?: { start_date?: string; end_date?: string }) =>
+    api.get('/analytics/admin/roles', { params }),
+  adminRegionsOverview: (params?: { start_date?: string; end_date?: string }) =>
+    api.get('/analytics/admin/regions', { params }),
   adminRegionDetail: (idRegion: string) => api.get(`/analytics/admin/regions/${idRegion}`),
   region: (idRegion: string) => api.get(`/analytics/region/${idRegion}`),
   classementRegional: (idRegion: string) => api.get(`/analytics/region/${idRegion}/classement`),
@@ -348,6 +355,8 @@ export const analyticsApi = {
     api.get('/analytics/admin/plans-amelioration', { params }),
   axesAmelioration: (matricule?: string) =>
     api.get(matricule ? `/analytics/axes-amelioration/${matricule}` : '/analytics/axes-amelioration'),
+  axesAmeliorationBatch: (matricules: string[]) =>
+    api.post('/analytics/axes-amelioration/batch', { matricules }),
   anomalies: (params?: { matricule?: string; id_region?: string }) =>
     api.get('/analytics/anomalies', { params }),
   anomaliesHistory: (params?: { severite?: string; type?: string; resolue?: string; limit?: number }) =>
@@ -368,6 +377,8 @@ export const analyticsApi = {
     api.post('/analytics/recommandations/run-generation'),
   scores: (matricule?: string) =>
     api.get(matricule ? `/analytics/scores/${matricule}` : '/analytics/scores'),
+  scoresBatch: (matricules: string[]) =>
+    api.post('/analytics/scores/batch', { matricules }),
   tendances: (params?: { id_region?: string; role?: string; limit?: number }) =>
     api.get('/analytics/tendances', { params }),
 };
@@ -435,7 +446,7 @@ export const profileApi = {
       notifications_app?: boolean;
       theme?: string;
     };
-  }) => api.put('/auth/profile', data),
+  }) => api.patch('/auth/profile', data),
   changePassword: (data: { current_password: string; password: string; password_confirmation: string }) =>
-    api.put('/auth/password', data),
+    api.post('/auth/change-password', data),
 };

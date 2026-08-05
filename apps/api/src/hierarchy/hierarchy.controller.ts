@@ -1,6 +1,15 @@
-import { Controller, Get, Post, Param, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { HierarchyService } from './hierarchy.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles, RolesGuard } from '../auth/guards/roles.guard';
 
 @Controller('hierarchy')
 @UseGuards(JwtAuthGuard)
@@ -8,11 +17,15 @@ export class HierarchyController {
   constructor(private service: HierarchyService) {}
 
   @Get('region/:idRegion')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   getRegion(@Param('idRegion') idRegion: string) {
     return this.service.getHierarchieRegion(idRegion);
   }
 
   @Get('region/:idRegion/stats')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   getRegionStats(@Param('idRegion') idRegion: string) {
     return this.service.getRegionStats(idRegion);
   }
@@ -33,22 +46,46 @@ export class HierarchyController {
   }
 
   @Get('managers-eligibles/:matricule')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   getManagersEligibles(@Param('matricule') matricule: string) {
     return this.service.getManagersEligibles(matricule);
   }
 
   @Post('verifier-supervision')
-  verifierSupervision(@Body() body: { superviseur_matricule: string; subordonne_matricule: string }) {
-    return this.service.peutSuperviser(body.superviseur_matricule, body.subordonne_matricule);
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  verifierSupervision(
+    @Body()
+    body: {
+      superviseur_matricule: string;
+      subordonne_matricule: string;
+    },
+  ) {
+    return this.service.peutSuperviser(
+      body.superviseur_matricule,
+      body.subordonne_matricule,
+    );
   }
 
   @Post('valider-assignation')
-  validerAssignation(@Body() body: { matricule: string; manager_matricule: string }) {
-    return this.service.validerAssignationManager(body.matricule, body.manager_matricule);
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  validerAssignation(
+    @Body() body: { matricule: string; manager_matricule: string },
+  ) {
+    return this.service.validerAssignationManager(
+      body.matricule,
+      body.manager_matricule,
+    );
   }
 
   @Post('assigner-manager')
-  assignerManager(@Body() body: { matricule: string; manager_matricule: string }) {
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  assignerManager(
+    @Body() body: { matricule: string; manager_matricule: string },
+  ) {
     return this.service.assignerManager(body.matricule, body.manager_matricule);
   }
 }

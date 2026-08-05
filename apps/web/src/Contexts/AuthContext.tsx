@@ -139,7 +139,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialUse
   }, []);
 
   const updateProfile = useCallback(async (data: Partial<User>) => {
-    const res = await api.patch('/auth/profile', data);
+    const res = await api.patch<Partial<User>>('/auth/profile', data);
     if (user) {
       setUser({ ...user, ...data, ...res.data });
     }

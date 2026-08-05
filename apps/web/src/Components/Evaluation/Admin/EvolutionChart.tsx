@@ -233,9 +233,9 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
                     data={chartData}
                     margin={{ top: 12, right: 24, left: 16, bottom: 12 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-                    <XAxis dataKey="periode" tick={{ fill: '#616161', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
-                    <YAxis domain={[0, 5]} tick={{ fill: '#616161', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
+                    <XAxis dataKey="periode" tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+                    <YAxis domain={[0, 5]} tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: '#FFFFFF',

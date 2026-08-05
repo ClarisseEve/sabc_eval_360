@@ -21,15 +21,39 @@ export class UsersService {
   }
 
   async findByIdentifier(identifier: string) {
-    const value = identifier.trim();
+    const value = identifier.trim().toLowerCase();
     if (!value) return null;
 
     return this.prisma.utilisateur.findFirst({
       where: {
-        OR: [
-          { email: value },
-          { matricule: value.toUpperCase() },
-        ],
+        OR: [{ email: value }, { matricule: value.toUpperCase() }],
+      },
+      select: {
+        matricule: true,
+        nom: true,
+        prenom: true,
+        email: true,
+        role: true,
+        role_nom: true,
+        est_actif: true,
+        est_admin: true,
+        statut: true,
+        password: true,
+      },
+    });
+  }
+
+  async findAuthByMatricule(matricule: string) {
+    return this.prisma.utilisateur.findUnique({
+      where: { matricule },
+      select: {
+        matricule: true,
+        email: true,
+        role: true,
+        est_actif: true,
+        est_admin: true,
+        statut: true,
+        password: true,
       },
     });
   }
@@ -73,6 +97,10 @@ export class UsersService {
       });
     }
 
-    return { ...utilisateur, branche, avatar: utilisateur.photo_url ?? undefined };
+    return {
+      ...utilisateur,
+      branche,
+      avatar: utilisateur.photo_url ?? undefined,
+    };
   }
 }

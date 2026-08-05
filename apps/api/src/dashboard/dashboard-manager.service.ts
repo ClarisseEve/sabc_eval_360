@@ -3,6 +3,12 @@ import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../common/cache.service';
 import { HierarchyService } from '../hierarchy/hierarchy.service';
+import {
+  INTERNAL_RULE_ENVELOPE_FIELD,
+  redactEvaluationForVisibility,
+  resolveEvaluationVisibilityPolicy,
+  ruleVisibilitySql,
+} from '../evaluations/evaluation-visibility';
 
 export interface SubordonneStat {
   matricule: string;
@@ -37,7 +43,7 @@ export interface ProgressionEquipeResult {
 
 export interface ValidationAttente {
   id_evaluation: string;
-  evaluateur_matricule: string;
+  evaluateur_matricule: string | null;
   evaluateur_nom: string;
   evalue_matricule: string;
   evalue_nom: string;
@@ -78,12 +84,14 @@ interface HistoriqueRow {
 
 interface ValidationRow {
   id_evaluation: string;
-  evaluateur_matricule: string;
+  evaluateur_matricule: string | null;
   evalue_matricule: string;
+  type_evaluation: string;
   date_soumission: string;
   jours_attente: number;
   nom_periode: string;
   id_periode: string;
+  __rule_envelope?: unknown;
 }
 
 interface UtilisateurRow {
@@ -288,7 +296,10 @@ export class DashboardManagerService {
 
     if (filters.evaluateur_matricule) {
       params.push(filters.evaluateur_matricule);
-      extraConditions.push(`e.evaluateur_matricule = $${params.length}`);
+      // Never let this filter become an identity oracle for peer evaluations.
+      extraConditions.push(
+        `(e.type_evaluation <> 'pairs' AND e.evaluateur_matricule = $${params.length})`,
+      );
     }
 
     if (filters.id_periode) {
@@ -303,8 +314,10 @@ export class DashboardManagerService {
       `SELECT COUNT(*) as count
        FROM evaluations e
        JOIN periodes_evaluation p ON p.id_periode = e.id_periode
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
        WHERE e.statut = 'soumis'
-         AND e.evalue_matricule IN (${inPlaceholders})${extraWhere}`,
+         AND e.evalue_matricule IN (${inPlaceholders})
+         AND ${ruleVisibilitySql('manager_n1')}${extraWhere}`,
       params,
     );
     const totalBeforeFilter = parseInt(countResult?.count ?? '0', 10);
@@ -313,22 +326,35 @@ export class DashboardManagerService {
     const paginatedParams = [...params, limit, offset];
     const rows = await this.pg.query<ValidationRow>(
       `SELECT e.id_evaluation, e.evaluateur_matricule, e.evalue_matricule,
+              e.type_evaluation,
               e.date_soumission,
               EXTRACT(EPOCH FROM (NOW() - e.date_soumission))/86400 AS jours_attente,
-              p.nom_periode, e.id_periode
+              p.nom_periode, e.id_periode,
+              r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
        FROM evaluations e
        JOIN periodes_evaluation p ON p.id_periode = e.id_periode
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
        WHERE e.statut = 'soumis'
-         AND e.evalue_matricule IN (${inPlaceholders})${extraWhere}
+         AND e.evalue_matricule IN (${inPlaceholders})
+         AND ${ruleVisibilitySql('manager_n1')}${extraWhere}
        ORDER BY e.date_soumission ASC
        LIMIT $${paginatedParams.length - 1} OFFSET $${paginatedParams.length}`,
       paginatedParams,
     );
 
     // Step 3: Enrich with user names
+    const redactedRows = rows.flatMap((row) => {
+      const policy = resolveEvaluationVisibilityPolicy(row);
+      return policy.manager_n1
+        ? [redactEvaluationForVisibility(row, { policy, preserveDetails: true })]
+        : [];
+    });
     const allMatricules = Array.from(
-      new Set([...rows.map((r) => r.evaluateur_matricule), ...rows.map((r) => r.evalue_matricule)]),
-    );
+      new Set([
+        ...redactedRows.map((row) => row.evaluateur_matricule),
+        ...redactedRows.map((row) => row.evalue_matricule),
+      ]),
+    ).filter((candidate): candidate is string => Boolean(candidate));
 
     const utilisateurs = allMatricules.length > 0
       ? await this.prisma.utilisateur.findMany({
@@ -342,13 +368,14 @@ export class DashboardManagerService {
       userMap[u.matricule] = u;
     }
 
-    const formatNom = (matricule: string): string => {
+    const formatNom = (matricule: string | null): string => {
+      if (!matricule) return 'Anonyme';
       const u = userMap[matricule];
       return u ? `${u.prenom} ${u.nom}` : matricule;
     };
 
     // Step 4: Map with priorite
-    let data: ValidationAttente[] = rows.map((row) => {
+    let data: ValidationAttente[] = redactedRows.map((row) => {
       const joursAttente = typeof row.jours_attente === 'number'
         ? row.jours_attente
         : parseFloat(String(row.jours_attente));

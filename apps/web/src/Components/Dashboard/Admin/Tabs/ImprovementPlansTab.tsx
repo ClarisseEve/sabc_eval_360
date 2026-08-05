@@ -61,7 +61,7 @@ export default function ImprovementPlansTab() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <ImprovementPlansFiltersSection
         roleFilter={roleFilter}
         onRoleFilterChange={setRoleFilter}

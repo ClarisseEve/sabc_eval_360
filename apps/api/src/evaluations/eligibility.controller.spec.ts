@@ -20,6 +20,15 @@ describe('EligibilityController', () => {
     expect(result).toEqual({ autorise: true });
   });
 
+  it('allows an admin JWT to check eligibility for another evaluator', async () => {
+    const dto = { evaluateur_matricule: 'M002', evalue_matricule: 'M003', type_evaluation: 'pairs' };
+    const req = { user: { matricule: 'A0001', is_admin: true, role: 'ADMIN' } };
+
+    await controller.checkEligibility(dto as any, req as any);
+
+    expect(mockService.canEvaluate).toHaveBeenCalledWith('M002', 'M003', 'pairs');
+  });
+
   it('getMyTargets extracts matricule from req.user', async () => {
     const req = { user: { matricule: 'M001' } };
     await controller.getMyTargets(req);

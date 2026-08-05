@@ -41,11 +41,12 @@ describe('NotificationsService', () => {
 
   describe('marquerCommeLue', () => {
     it('should mark notification as read', async () => {
-      const result = await service.marquerCommeLue('notif-uuid');
+      const result = await service.marquerCommeLue('notif-uuid', 'MAT001');
       expect(result.success).toBe(true);
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalledWith(
         expect.stringContaining('est_lu = 1'),
         'notif-uuid',
+        'MAT001',
       );
     });
   });

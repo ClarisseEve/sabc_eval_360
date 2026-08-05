@@ -1,4 +1,4 @@
-name: ci
+name: CI
 
 on:
   push:
@@ -11,70 +11,323 @@ on:
       - dev
       - develop
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-web:
+  frontend:
+    name: Frontend checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.14.0
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck web
-        run: pnpm --dir apps/web typecheck
+      - name: Typecheck frontend
+        run: pnpm typecheck
 
-      - name: Build web
-        run: pnpm --dir apps/web build
+      - name: Test frontend
+        run: pnpm test:ci
 
-  build-api:
+      - name: Build frontend
+        run: pnpm build
+
+  backend:
+    name: Backend checks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/api
+    env:
+      NODE_ENV: test
+      DATABASE_URL: mysql://sabc:***REMOVED***@127.0.0.1:3306/sabc_eval360
+      JWT_SECRET: ***REMOVED***-with-at-least-32-characters
+      CACHE_DRIVER: memory
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.14.0
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
+          cache-dependency-path: apps/api/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install backend dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Validate Prisma schema
-        run: pnpm --dir apps/api exec prisma validate
+        run: pnpm exec prisma validate
 
-      - name: Build api
-        run: pnpm --dir apps/api build
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
 
-  api-e2e:
+      - name: Typecheck backend
+        run: pnpm typecheck
+
+      - name: Test backend
+        run: pnpm test:ci
+
+      - name: Build backend
+        run: pnpm build
+
+  api-integration:
+    name: API integration tests
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs:
-      - build-api
-    if: false
+      - backend
+    defaults:
+      run:
+        working-directory: apps/api
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: sabc_eval360
+          MYSQL_USER: sabc
+          MYSQL_PASSWORD: ***REMOVED***
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sabc_business
+          POSTGRES_USER: sabc
+          POSTGRES_PASSWORD: ***REMOVED***
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U sabc -d sabc_business"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      NODE_ENV: test
+      PORT: 3000
+      DATABASE_URL: mysql://sabc:***REMOVED***@127.0.0.1:3306/sabc_eval360
+      PG_HOST: 127.0.0.1
+      PG_PORT: 5432
+      PG_DATABASE: sabc_business
+      PG_USER: sabc
+      PG_PASSWORD: ***REMOVED***
+      REDIS_URL: redis://127.0.0.1:6379
+      CACHE_DRIVER: redis
+      FRONTEND_URL: http://127.0.0.1:5173
+      JWT_SECRET: ***REMOVED***-with-at-least-32-characters
+      SEED_PASSWORD: ***REMOVED***-2026
     steps:
-      - name: Placeholder
-        run: |
-          echo "E2E CI intentionally disabled."
-          echo "Missing portable bootstrap for business PostgreSQL schema."
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: apps/api/pnpm-lock.yaml
+
+      - name: Install backend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      - name: Apply MySQL and PostgreSQL migrations
+        run: pnpm db:migrate:all
+
+      - name: Seed integration databases
+        env:
+          SEED_MODE: reset
+        run: pnpm db:seed
+
+      - name: Run API end-to-end tests
+        run: pnpm test:e2e
+
+  browser-e2e:
+    name: Browser end-to-end tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - frontend
+      - api-integration
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: sabc_eval360
+          MYSQL_USER: sabc
+          MYSQL_PASSWORD: ***REMOVED***
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sabc_business
+          POSTGRES_USER: sabc
+          POSTGRES_PASSWORD: ***REMOVED***
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U sabc -d sabc_business"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      CI: "true"
+      NODE_ENV: test
+      PORT: 3000
+      DATABASE_URL: mysql://sabc:***REMOVED***@127.0.0.1:3306/sabc_eval360
+      PG_HOST: 127.0.0.1
+      PG_PORT: 5432
+      PG_DATABASE: sabc_business
+      PG_USER: sabc
+      PG_PASSWORD: ***REMOVED***
+      REDIS_URL: redis://127.0.0.1:6379
+      CACHE_DRIVER: redis
+      FRONTEND_URL: http://127.0.0.1:4173
+      JWT_SECRET: ***REMOVED***-with-at-least-32-characters
+      SEED_PASSWORD: ***REMOVED***-2026
+      E2E_API_PORT: 3300
+      E2E_WEB_PORT: 4173
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            apps/api/pnpm-lock.yaml
+            apps/web/pnpm-lock.yaml
+
+      - name: Install root dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install backend dependencies
+        run: pnpm --dir apps/api install --frozen-lockfile
+
+      - name: Install frontend dependencies
+        run: pnpm --dir apps/web install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --dir apps/api exec prisma generate
+
+      - name: Apply MySQL and PostgreSQL migrations
+        run: pnpm --dir apps/api db:migrate:all
+
+      - name: Seed browser test databases
+        env:
+          SEED_MODE: reset
+        run: pnpm --dir apps/api db:seed
+
+      - name: Install Chromium and system dependencies
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: pnpm exec playwright test
+
+      - name: Upload Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  docker-images:
+    name: Docker build (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+            context: apps/api
+          - image: web
+            context: apps/web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.image }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          tags: sabc-eval360-${{ matrix.image }}:ci
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

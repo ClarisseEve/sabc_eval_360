@@ -1,11 +1,23 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { createHash } from 'crypto';
 import { normalizeRuleRow, parseRuleEnvelope } from '../regles/rule-schema';
-import { ValidationNotationService } from './validation-notation.service';
+import type { RuleVisibilityPolicy } from '../regles/rule-schema';
+import {
+  CanonicalEvaluationNote,
+  ValidationNotationService,
+} from './validation-notation.service';
 import { ValidationManagerService } from './validation-manager.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EligibilityService } from './eligibility.service';
+import {
+  EVALUATED_VISIBILITY_SQL,
+  INTERNAL_RULE_ENVELOPE_FIELD,
+  isVisibleToEvaluated,
+  redactEvaluationForVisibility,
+  resolveEvaluationVisibilityPolicy,
+  ruleVisibilitySql,
+} from './evaluation-visibility';
 
 export interface Evaluation {
   id_evaluation: string | number;
@@ -36,14 +48,15 @@ type EnrichedEvaluation = Evaluation & {
   validateur?: any;
 };
 
-const PERIODE_UUID_NAMESPACE = '2d9d2d7e-2c8f-4d5f-9867-334e13ef17d9';
+interface EvaluationViewAccess {
+  preserveDetails: boolean;
+}
 
-function deterministicUuidFromString(value: string): string {
-  const hex = createHash('sha1').update(`${PERIODE_UUID_NAMESPACE}:${value}`).digest('hex').slice(0, 32);
-  const chars = hex.split('');
-  chars[12] = '5';
-  chars[16] = ((parseInt(chars[16], 16) & 0x3) | 0x8).toString(16);
-  return `${chars.slice(0, 8).join('')}-${chars.slice(8, 12).join('')}-${chars.slice(12, 16).join('')}-${chars.slice(16, 20).join('')}-${chars.slice(20, 32).join('')}`;
+export interface EvaluationActor {
+  matricule: string;
+  role?: string | null;
+  role_nom?: string | null;
+  is_admin?: boolean;
 }
 
 @Injectable()
@@ -54,6 +67,7 @@ export class EvaluationsService {
     private validationNotation: ValidationNotationService,
     private validationManager: ValidationManagerService,
     private notifications: NotificationsService,
+    private eligibility: EligibilityService,
   ) {}
 
   async canCreate(evaluateurMatricule: string, evalueMatricule: string, idRegle?: string): Promise<boolean> {
@@ -63,7 +77,11 @@ export class EvaluationsService {
 
     const periodeActive = await this.pg.queryOne(
       `SELECT id_periode FROM periodes_evaluation
-       WHERE statut = 'ouverte' AND date_debut <= NOW() AND date_fin >= NOW()
+       WHERE statut = 'ouverte'
+         AND est_ouverte = true
+         AND est_cloturee = false
+         AND (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date
+             BETWEEN date_debut AND date_fin
        ORDER BY date_debut DESC LIMIT 1`,
     );
     if (!periodeActive) return false;
@@ -90,16 +108,23 @@ export class EvaluationsService {
 
     await this.syncUserRefs([evaluateur, evalue]);
 
-    const periode = await this.pg.queryOne<any>('SELECT * FROM periodes_evaluation WHERE id_periode = $1', [idPeriode]);
-    if (!periode || periode.statut !== 'ouverte' || !periode.est_ouverte) {
+    const periode = await this.pg.queryOne<any>(
+      `SELECT * FROM periodes_evaluation
+       WHERE id_periode = $1
+         AND statut = 'ouverte'
+         AND est_ouverte = true
+         AND est_cloturee = false
+         AND (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date
+             BETWEEN date_debut AND date_fin`,
+      [idPeriode],
+    );
+    if (!periode) {
       throw new BadRequestException('Période non active');
     }
 
-    const evaluationPeriodeId = deterministicUuidFromString(String(periode.code_periode));
-
     const existing = await this.pg.queryOne(
       `SELECT * FROM evaluations WHERE evaluateur_matricule = $1 AND evalue_matricule = $2 AND id_periode = $3`,
-      [evaluateurMatricule, evalueMatricule, evaluationPeriodeId],
+      [evaluateurMatricule, evalueMatricule, idPeriode],
     );
     if (existing) return existing;
 
@@ -166,14 +191,42 @@ export class EvaluationsService {
       }
     }
 
+    const eligibilityType = this.toEligibilityType(typeEval);
+    if (eligibilityType) {
+      const eligibility = await this.eligibility.canEvaluate(
+        evaluateurMatricule,
+        evalueMatricule,
+        eligibilityType,
+      );
+      if (!eligibility.autorise) {
+        throw new ForbiddenException(eligibility.raison ?? 'Non autorisé à créer cette évaluation');
+      }
+    } else if (!idRegle) {
+      throw new ForbiddenException(
+        "Ce type d'évaluation requiert une règle active autorisant explicitement la relation",
+      );
+    }
+
     const created = await this.pg.queryOne<Evaluation>(
-      `INSERT INTO evaluations (evaluateur_matricule, evalue_matricule, id_periode, id_regle,
+      `WITH periode_active AS (
+         SELECT id_periode, code_periode
+         FROM periodes_evaluation
+         WHERE id_periode = $6
+           AND statut = 'ouverte'
+           AND est_ouverte = true
+           AND est_cloturee = false
+           AND (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date
+               BETWEEN date_debut AND date_fin
+         FOR UPDATE
+       )
+       INSERT INTO evaluations (evaluateur_matricule, evalue_matricule, id_periode, id_regle,
         date_creation, statut, notations_json, type_evaluation, periode_code, created_at, updated_at)
-       SELECT $1, $2, $3, $4, CURRENT_DATE, 'brouillon', '[]', $5, p.code_periode, NOW(), NOW()
-       FROM periodes_evaluation p
-       WHERE p.id_periode = $6
+       SELECT $1, $2, $3, $4,
+              (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date,
+              'brouillon', '[]', $5, p.code_periode, NOW(), NOW()
+       FROM periode_active AS p
        RETURNING *`,
-      [evaluateurMatricule, evalueMatricule, evaluationPeriodeId, idRegle ?? null, typeEval, idPeriode],
+      [evaluateurMatricule, evalueMatricule, idPeriode, idRegle ?? null, typeEval, idPeriode],
     );
     if (!created) {
       throw new BadRequestException("Impossible de créer l'évaluation");
@@ -181,10 +234,15 @@ export class EvaluationsService {
     return created;
   }
 
-  async findById(id: string): Promise<EnrichedEvaluation> {
-    const eval_ = await this.pg.queryOne<Evaluation>('SELECT * FROM evaluations WHERE id_evaluation = $1', [id]);
-    if (!eval_) throw new NotFoundException('Évaluation introuvable');
-    return this.enrichEvaluation(eval_);
+  async findById(id: string, actor: EvaluationActor): Promise<EnrichedEvaluation> {
+    const eval_ = await this.loadEvaluation(id);
+    const policy = await this.loadVisibilityPolicy(eval_);
+    const access = await this.assertCanViewEvaluation(eval_, actor, policy);
+    const enriched = await this.enrichEvaluation(eval_);
+    return redactEvaluationForVisibility(enriched, {
+      policy,
+      preserveDetails: access.preserveDetails,
+    });
   }
 
   private canEditEvaluation(eval_: any): boolean {
@@ -193,93 +251,179 @@ export class EvaluationsService {
     return false;
   }
 
-  async updateNotes(id: string, notes: any[], commentaire?: string): Promise<boolean> {
-    const eval_ = await this.findById(id);
+  async updateNotes(id: string, actor: EvaluationActor, notes: any[], commentaire?: string): Promise<boolean> {
+    const eval_ = await this.loadEvaluation(id);
+    this.assertEvaluationOwner(eval_, actor);
     if (!this.canEditEvaluation(eval_)) {
       throw new BadRequestException("L'évaluation ne peut plus être modifiée dans son état actuel");
     }
 
-    // Validate note bounds and mandatory comments before saving
-    if (notes && notes.length > 0) {
-      const bornesResult = this.validationNotation.validateBornes(notes);
+    const normalized = this.validationNotation.normaliserNotes(notes);
+    if (normalized.errors.length > 0) {
+      throw new BadRequestException(normalized.errors.join('; '));
+    }
+
+    // A draft may be incomplete, but every value it contains must be valid.
+    if (normalized.notes.length > 0) {
+      const bornesResult = this.validationNotation.validateBornes(normalized.notes);
       if (!bornesResult.valid) {
         throw new BadRequestException(bornesResult.errors.join('; '));
-      }
-      const commentairesResult = this.validationNotation.validateCommentaires(notes);
-      if (!commentairesResult.valid) {
-        throw new BadRequestException(commentairesResult.errors.join('; '));
       }
     }
 
     await this.pg.execute(
       `UPDATE evaluations SET notations_json = $1, commentaire_global = $2, updated_at = NOW()
        WHERE id_evaluation = $3`,
-      [JSON.stringify(notes), commentaire ?? null, id],
+      [JSON.stringify(normalized.notes), commentaire ?? null, id],
     );
     return true;
   }
 
-  async submit(id: string): Promise<{ success: boolean; message: string }> {
-    const eval_ = await this.findById(id);
+  async submit(id: string, actor: EvaluationActor): Promise<{ success: boolean; message: string }> {
+    const eval_ = await this.loadEvaluation(id);
+    this.assertEvaluationOwner(eval_, actor);
 
     if (eval_.statut !== 'brouillon' && eval_.statut !== 'rejete') {
-      return { success: false, message: "L'évaluation ne peut être soumise que depuis le statut brouillon ou rejeté" };
+      throw new BadRequestException(
+        "L'évaluation ne peut être soumise que depuis le statut brouillon ou rejeté",
+      );
     }
 
     // Verify period is still open
     const periode = await this.pg.queryOne<any>(
-      `SELECT statut FROM periodes_evaluation WHERE id_periode = $1`,
+      `SELECT id_periode FROM periodes_evaluation
+       WHERE id_periode = $1
+         AND statut = 'ouverte'
+         AND est_ouverte = true
+         AND est_cloturee = false
+         AND (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date
+             BETWEEN date_debut AND date_fin`,
       [eval_.id_periode],
     );
-    if (!periode || periode.statut !== 'ouverte') {
-      return { success: false, message: 'La période est fermée' };
+    if (!periode) {
+      throw new BadRequestException('La période est fermée');
     }
 
-    const notes = typeof eval_.notations_json === 'string'
-      ? JSON.parse(eval_.notations_json)
-      : eval_.notations_json ?? [];
+    let rawNotes: unknown;
+    try {
+      rawNotes =
+        typeof eval_.notations_json === 'string'
+          ? JSON.parse(eval_.notations_json)
+          : eval_.notations_json ?? [];
+    } catch {
+      throw new BadRequestException("Le format des notes de l'évaluation est invalide");
+    }
 
-    // Load criteres from rule if available
-    let criteres: any[] = [];
-    if (eval_.id_regle) {
-      const regle = await this.pg.queryOne<any>(
-        `SELECT criteres_evaluation_json FROM regles_evaluation WHERE id_regle = $1`,
-        [eval_.id_regle],
+    const normalized = this.validationNotation.normaliserNotes(rawNotes);
+    if (normalized.errors.length > 0) {
+      throw new BadRequestException(normalized.errors.join('; '));
+    }
+    const notes = normalized.notes;
+    if (notes.length === 0) {
+      throw new BadRequestException("L'évaluation est vide");
+    }
+
+    if (!eval_.id_regle) {
+      throw new BadRequestException(
+        "L'évaluation ne peut pas être soumise sans règle d'évaluation associée",
       );
-      if (regle) {
-        const normalized = normalizeRuleRow(regle);
-        const envelope = parseRuleEnvelope(normalized.criteres_evaluation_json);
-        criteres = envelope.criteres;
-      }
     }
 
-    if (!notes.length && !criteres.length) {
-      return { success: false, message: "L'évaluation est vide" };
+    const regle = await this.pg.queryOne<any>(
+      `SELECT criteres_evaluation_json FROM regles_evaluation WHERE id_regle = $1`,
+      [eval_.id_regle],
+    );
+    if (!regle) {
+      throw new BadRequestException("La règle d'évaluation associée est introuvable");
+    }
+
+    const normalizedRule = normalizeRuleRow(regle);
+    const envelope = parseRuleEnvelope(normalizedRule.criteres_evaluation_json);
+    const criteres = envelope.criteres;
+    if (criteres.length === 0) {
+      throw new BadRequestException(
+        "La règle d'évaluation associée ne contient aucun critère exploitable",
+      );
     }
 
     const validResult = this.validationNotation.validatePourSoumission(notes, criteres);
     if (!validResult.valid) {
-      return { success: false, message: validResult.errors.join('; ') };
+      throw new BadRequestException(validResult.errors.join('; '));
     }
 
-    const noteGlobale = this.validationNotation.calculerNoteGlobale(notes);
+    const noteGlobale = this.validationNotation.calculerNoteGlobale(notes, criteres);
+    if (noteGlobale === null) {
+      throw new BadRequestException(
+        "La pondération de la règle ne permet pas de calculer la note globale",
+      );
+    }
 
-    await this.pg.execute(
-      `UPDATE evaluations SET statut = 'soumis', date_soumission = NOW(), note_globale = $1, updated_at = NOW()
-       WHERE id_evaluation = $2`,
-      [noteGlobale, id],
+    const criterionById = new Map(
+      criteres.map((critere) => [String(critere.id).trim(), critere] as const),
+    );
+    const noteByCriterionId = new Map(
+      notes.map((note) => [note.critere_id, note] as const),
+    );
+    const canonicalNotes = Array.from(criterionById.entries()).map(
+      ([critereId, critere]): CanonicalEvaluationNote & { poids: number } => {
+        const note = noteByCriterionId.get(critereId)!;
+        return {
+          critere_id: critereId,
+          note: note.note,
+          ...(note.commentaire !== undefined ? { commentaire: note.commentaire } : {}),
+          // Stored only after validation and sourced exclusively from the published rule.
+          poids: Number(critere.poids),
+        };
+      },
     );
 
+    const updated = await this.pg.execute(
+      `WITH periode_active AS (
+         SELECT id_periode
+         FROM periodes_evaluation
+         WHERE id_periode = $4
+           AND statut = 'ouverte'
+           AND est_ouverte = true
+           AND est_cloturee = false
+           AND (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date
+               BETWEEN date_debut AND date_fin
+         FOR UPDATE
+       )
+       UPDATE evaluations AS evaluation
+       SET statut = 'soumis', date_soumission = NOW(), note_globale = $1,
+           notations_json = $2, updated_at = NOW()
+       FROM periode_active AS periode
+       WHERE evaluation.id_evaluation = $3
+         AND evaluation.id_periode = periode.id_periode
+         AND evaluation.statut IN ('brouillon', 'rejete')`,
+      [noteGlobale, JSON.stringify(canonicalNotes), id, eval_.id_periode],
+    );
+    if (updated === 0) {
+      throw new BadRequestException(
+        "L'état de l'évaluation ou de la période a changé pendant la soumission. Rechargez la page.",
+      );
+    }
+
     // Notify manager (non-blocking)
-    const evalue = await this.prisma.utilisateur.findUnique({ where: { matricule: eval_.evalue_matricule } });
+    const isPairs = eval_.type_evaluation === 'pairs';
+    const [evaluateur, evalue] = await Promise.all([
+      isPairs
+        ? Promise.resolve(null)
+        : this.prisma.utilisateur.findUnique({ where: { matricule: eval_.evaluateur_matricule } }),
+      this.prisma.utilisateur.findUnique({ where: { matricule: eval_.evalue_matricule } }),
+    ]);
     if (evalue?.manager_matricule) {
+      const evaluateurNom = isPairs
+        ? 'un pair anonyme'
+        : [evaluateur?.prenom, evaluateur?.nom].filter(Boolean).join(' ') ||
+          eval_.evaluateur_matricule;
       this.notifications.create({
         destinataire_matricule: evalue.manager_matricule,
         titre: 'Nouvelle évaluation à valider',
-        message: `Une évaluation de ${eval_.evaluateur?.prenom ?? ''} ${eval_.evaluateur?.nom ?? ''} pour ${evalue.prenom} ${evalue.nom} est en attente de validation.`,
+        message: `Une évaluation de ${evaluateurNom} pour ${evalue.prenom} ${evalue.nom} est en attente de validation.`,
         type: 'evaluation',
         id_evaluation: String(id),
-        expediteur_matricule: eval_.evaluateur_matricule,
+        ...(isPairs ? {} : { expediteur_matricule: eval_.evaluateur_matricule }),
       }).catch(() => {});
     }
 
@@ -293,10 +437,10 @@ export class EvaluationsService {
     motifRejet?: string | null,
     commentaireValidation?: string | null,
   ): Promise<{ success: boolean; message: string }> {
-    const eval_ = await this.findById(id);
+    const eval_ = await this.loadEvaluation(id);
 
     if (eval_.statut !== 'soumis') {
-      return { success: false, message: "L'évaluation n'est pas soumise" };
+      throw new BadRequestException("L'évaluation n'est pas soumise");
     }
 
     // Check authorization: manager direct OR DR/CDTT même région
@@ -359,32 +503,88 @@ export class EvaluationsService {
        ORDER BY date_creation DESC`,
       [matricule],
     );
-    return this.enrichEvaluations(evaluations);
+    const enriched = await this.enrichEvaluations(evaluations);
+    return enriched.map((evaluation) =>
+      redactEvaluationForVisibility(evaluation, {
+        policy: resolveEvaluationVisibilityPolicy(evaluation.regle),
+        preserveDetails: true,
+      }),
+    );
   }
 
   async getAValider(managerMatricule: string): Promise<EnrichedEvaluation[]> {
-    const subordonnes = await this.prisma.utilisateur.findMany({
-      where: { manager_matricule: managerMatricule },
-      select: { matricule: true },
+    const validationUserSelect = {
+      matricule: true,
+      manager_matricule: true,
+      role: true,
+      role_nom: true,
+      id_region: true,
+    } as const;
+    const validateur = await this.prisma.utilisateur.findUnique({
+      where: { matricule: managerMatricule },
+      select: validationUserSelect,
     });
+    if (!validateur) return [];
 
-    const matricules = subordonnes.map((s: { matricule: string }) => s.matricule);
+    const scopes: Array<Record<string, unknown>> = [
+      { manager_matricule: managerMatricule },
+    ];
+    if (this.validationManager.aPorteeRegionale(validateur)) {
+      scopes.push({ id_region: validateur.id_region });
+    }
+
+    const candidats = await this.prisma.utilisateur.findMany({
+      where: { OR: scopes },
+      select: validationUserSelect,
+    });
+    const evaluesAutorises = candidats.filter((evalue) =>
+      this.validationManager.peutValiderUtilisateurs(validateur, evalue).canValidate,
+    );
+
+    const matricules = evaluesAutorises.map((evalue) => evalue.matricule);
     if (!matricules.length) return [];
+
+    const evaluesByMatricule = new Map(
+      evaluesAutorises.map((evalue) => [evalue.matricule, evalue]),
+    );
 
     const placeholders = matricules.map((_: string, i: number) => `$${i + 1}`).join(',');
     const evaluations = await this.pg.query<Evaluation>(
-      `SELECT * FROM evaluations WHERE statut = 'soumis' AND evalue_matricule IN (${placeholders})
+      `SELECT e.* FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.statut = 'soumis'
+         AND e.evalue_matricule IN (${placeholders})
+         AND (${ruleVisibilitySql('manager_n1')} OR ${ruleVisibilitySql('upper_management')})
        ORDER BY date_soumission DESC`,
       matricules,
     );
-    return this.enrichEvaluations(evaluations);
+    const enriched = await this.enrichEvaluations(evaluations);
+    return enriched.flatMap((evaluation) => {
+      const evalue = evaluesByMatricule.get(evaluation.evalue_matricule);
+      if (
+        !evalue ||
+        !this.validationManager.peutValiderUtilisateurs(validateur, evalue).canValidate
+      ) {
+        return [];
+      }
+
+      const policy = resolveEvaluationVisibilityPolicy(evaluation.regle);
+      const isDirectManager = evalue.manager_matricule === managerMatricule;
+      const policyAllowsValidation = isDirectManager
+        ? policy.manager_n1
+        : policy.upper_management;
+      return policyAllowsValidation
+        ? [redactEvaluationForVisibility(evaluation, { policy, preserveDetails: true })]
+        : [];
+    });
   }
 
   async getPeriodesActives() {
     return this.pg.query(
       `SELECT * FROM periodes_evaluation
        WHERE statut = 'ouverte' AND est_ouverte = true AND est_cloturee = false
-         AND date_debut <= NOW() AND date_fin >= NOW()
+         AND (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date
+             BETWEEN date_debut AND date_fin
        ORDER BY date_debut DESC`,
     );
   }
@@ -396,19 +596,50 @@ export class EvaluationsService {
 
     const [evaluations, countRow] = await Promise.all([
       this.pg.query<Evaluation>(
-        `SELECT * FROM evaluations
-         WHERE evaluateur_matricule = $1 OR evalue_matricule = $1
-         ORDER BY date_creation DESC LIMIT $2 OFFSET $3`,
+        `SELECT e.* FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.evaluateur_matricule = $1
+            OR e.validateur_matricule = $1
+            OR (
+              e.evalue_matricule = $1
+              AND e.statut IN ('soumis', 'valide')
+              AND ${EVALUATED_VISIBILITY_SQL}
+            )
+         ORDER BY e.date_creation DESC LIMIT $2 OFFSET $3`,
         [matricule, limit, offset],
       ),
       this.pg.queryOne<{ total: string }>(
-        `SELECT COUNT(*)::text as total FROM evaluations
-         WHERE evaluateur_matricule = $1 OR evalue_matricule = $1`,
+        `SELECT COUNT(*)::text as total FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.evaluateur_matricule = $1
+            OR e.validateur_matricule = $1
+            OR (
+              e.evalue_matricule = $1
+              AND e.statut IN ('soumis', 'valide')
+              AND ${EVALUATED_VISIBILITY_SQL}
+            )`,
         [matricule],
       ),
     ]);
 
-    const data = await this.enrichEvaluations(evaluations);
+    const enriched = await this.enrichEvaluations(evaluations);
+    const data = enriched.flatMap((evaluation) => {
+      const policy = resolveEvaluationVisibilityPolicy(evaluation.regle);
+      const isOwner = evaluation.evaluateur_matricule === matricule;
+      const isValidator = evaluation.validateur_matricule === matricule;
+      const isEvaluatedAndVisible =
+        evaluation.evalue_matricule === matricule &&
+        isVisibleToEvaluated(evaluation as unknown as Record<string, unknown>, policy);
+
+      return isOwner || isValidator || isEvaluatedAndVisible
+        ? [
+            redactEvaluationForVisibility(evaluation, {
+              policy,
+              preserveDetails: isOwner || isValidator,
+            }),
+          ]
+        : [];
+    });
     const total = parseInt(countRow?.total ?? '0');
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
@@ -420,17 +651,27 @@ export class EvaluationsService {
 
     const [evaluations, countRow] = await Promise.all([
       this.pg.query<Evaluation>(
-        `SELECT * FROM evaluations
-         ORDER BY COALESCE(date_soumission, updated_at, created_at) DESC
+        `SELECT e.* FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE ${ruleVisibilitySql('admin')}
+         ORDER BY COALESCE(e.date_soumission, e.updated_at, e.created_at) DESC
          LIMIT $1 OFFSET $2`,
         [limit, offset],
       ),
       this.pg.queryOne<{ total: string }>(
-        `SELECT COUNT(*)::text as total FROM evaluations`,
+        `SELECT COUNT(*)::text as total FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE ${ruleVisibilitySql('admin')}`,
       ),
     ]);
 
-    const data = await this.enrichEvaluations(evaluations);
+    const enriched = await this.enrichEvaluations(evaluations);
+    const data = enriched.flatMap((evaluation) => {
+      const policy = resolveEvaluationVisibilityPolicy(evaluation.regle);
+      return policy.admin
+        ? [redactEvaluationForVisibility(evaluation, { policy })]
+        : [];
+    });
     const total = parseInt(countRow?.total ?? '0');
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
@@ -468,10 +709,21 @@ export class EvaluationsService {
     const periode = await this.pg.queryOne('SELECT * FROM periodes_evaluation WHERE id_periode = $1', [idPeriode]);
     if (!periode) throw new NotFoundException('Période introuvable');
 
-    const evaluations = await this.pg.query<Evaluation>(
-      `SELECT * FROM evaluations WHERE id_periode = $1 ORDER BY date_creation DESC`,
+    const rawEvaluations = await this.pg.query<Evaluation & Record<string, unknown>>(
+      `SELECT e.*, r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.id_periode = $1
+         AND ${ruleVisibilitySql('admin')}
+       ORDER BY e.date_creation DESC`,
       [idPeriode],
     );
+    const evaluations = rawEvaluations.flatMap((evaluation) => {
+      const policy = resolveEvaluationVisibilityPolicy(evaluation);
+      return policy.admin
+        ? [redactEvaluationForVisibility(evaluation, { policy })]
+        : [];
+    });
 
     const stats = {
       total: evaluations.length,
@@ -500,10 +752,27 @@ export class EvaluationsService {
       [idPeriode],
     );
 
+    // Send a reminder notification to each evaluator with a pending draft
+    const rappelsEnvoyes: string[] = [];
+    const erreurs: string[] = [];
+
+    for (const brouillon of brouillons) {
+      try {
+        await this.notifications.notifierRappelEvaluation(
+          brouillon.evaluateur_matricule,
+          joursRestants,
+        );
+        rappelsEnvoyes.push(brouillon.evaluateur_matricule);
+      } catch {
+        erreurs.push(brouillon.evaluateur_matricule);
+      }
+    }
+
     return {
-      rappels_envoyes: brouillons.length,
+      rappels_envoyes: rappelsEnvoyes.length,
       jours_restants: joursRestants,
-      matricules: brouillons.map(b => b.evaluateur_matricule),
+      matricules: rappelsEnvoyes,
+      erreurs: erreurs.length > 0 ? erreurs : undefined,
     };
   }
 
@@ -515,6 +784,84 @@ export class EvaluationsService {
     if (evaluateur.manager_matricule === evalue.matricule) return 'ascendante';
     if (evaluateur.niveau_hierarchique === evalue.niveau_hierarchique && evaluateur.id_region === evalue.id_region) return 'pairs';
     return '360';
+  }
+
+  private toEligibilityType(typeEvaluation: string): 'auto' | 'pairs' | 'subordonnes' | null {
+    if (typeEvaluation === 'auto' || typeEvaluation === 'pairs') return typeEvaluation;
+    if (typeEvaluation === 'descendante') return 'subordonnes';
+    return null;
+  }
+
+  private async loadEvaluation(id: string): Promise<Evaluation> {
+    const evaluation = await this.pg.queryOne<Evaluation>(
+      'SELECT * FROM evaluations WHERE id_evaluation = $1',
+      [id],
+    );
+    if (!evaluation) throw new NotFoundException('Évaluation introuvable');
+    return evaluation;
+  }
+
+  private async loadVisibilityPolicy(evaluation: Evaluation): Promise<RuleVisibilityPolicy> {
+    if (!evaluation.id_regle) return resolveEvaluationVisibilityPolicy(null);
+
+    const rule = await this.pg.queryOne<{ criteres_evaluation_json: unknown }>(
+      'SELECT criteres_evaluation_json FROM regles_evaluation WHERE id_regle = $1',
+      [evaluation.id_regle],
+    );
+    return resolveEvaluationVisibilityPolicy(rule);
+  }
+
+  private isAdmin(actor: EvaluationActor): boolean {
+    const role = String(actor.role_nom ?? actor.role ?? '').toUpperCase();
+    return Boolean(actor.is_admin) || role === 'ADMIN';
+  }
+
+  private assertEvaluationOwner(evaluation: Evaluation, actor: EvaluationActor): void {
+    if (!actor?.matricule || actor.matricule !== evaluation.evaluateur_matricule) {
+      throw new ForbiddenException("Seul l'évaluateur propriétaire peut modifier ou soumettre cette évaluation");
+    }
+  }
+
+  private async assertCanViewEvaluation(
+    evaluation: Evaluation,
+    actor: EvaluationActor,
+    policy: RuleVisibilityPolicy,
+  ): Promise<EvaluationViewAccess> {
+    if (!actor?.matricule) throw new ForbiddenException('Identité utilisateur introuvable');
+    if (actor.matricule === evaluation.evaluateur_matricule) {
+      return { preserveDetails: true };
+    }
+
+    const isEvaluated = actor.matricule === evaluation.evalue_matricule;
+    if (isEvaluated && policy.evaluated) {
+      const visibleStatus = evaluation.statut === 'soumis' || evaluation.statut === 'valide';
+      if (visibleStatus) return { preserveDetails: false };
+    }
+
+    if (this.isAdmin(actor) && policy.admin) {
+      return { preserveDetails: false };
+    }
+
+    const isAssignedValidator = actor.matricule === evaluation.validateur_matricule;
+    if (isAssignedValidator || evaluation.statut === 'soumis') {
+      const authorization = await this.validationManager.peutValider(
+        actor.matricule,
+        evaluation.evalue_matricule,
+      );
+      if (authorization.canValidate) {
+        const evalue = await this.prisma.utilisateur.findUnique({
+          where: { matricule: evaluation.evalue_matricule },
+          select: { manager_matricule: true },
+        });
+        const isDirectManager = evalue?.manager_matricule === actor.matricule;
+        const policyAllowsValidator = isDirectManager
+          ? policy.manager_n1
+          : policy.upper_management;
+        if (policyAllowsValidator) return { preserveDetails: true };
+      }
+    }
+
+    throw new ForbiddenException("Accès non autorisé à cette évaluation");
   }
 
   private async updateScores(matricule: string, idPeriode: string): Promise<void> {
@@ -578,7 +925,9 @@ export class EvaluationsService {
     const matricules = Array.from(
       new Set(
         evaluations.flatMap((evaluation) => [
-          evaluation.evaluateur_matricule,
+          ...(evaluation.type_evaluation === 'pairs'
+            ? []
+            : [evaluation.evaluateur_matricule]),
           evaluation.evalue_matricule,
           evaluation.validateur_matricule,
         ]),
@@ -636,7 +985,10 @@ export class EvaluationsService {
 
     return evaluations.map((evaluation) => ({
       ...evaluation,
-      evaluateur: usersByMatricule.get(evaluation.evaluateur_matricule) ?? null,
+      evaluateur:
+        evaluation.type_evaluation === 'pairs'
+          ? null
+          : usersByMatricule.get(evaluation.evaluateur_matricule) ?? null,
       evalue: usersByMatricule.get(evaluation.evalue_matricule) ?? null,
       periode: evaluation.periode_code ? periodesByCode.get(evaluation.periode_code) ?? null : null,
       regle: evaluation.id_regle ? reglesById.get(evaluation.id_regle) ?? null : null,

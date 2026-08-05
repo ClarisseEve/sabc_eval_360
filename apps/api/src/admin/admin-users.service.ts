@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DatabasePgService } from '../database/database-pg.service';
 import * as bcrypt from 'bcryptjs';
@@ -20,8 +24,12 @@ export class AdminUsersService {
   ) {}
 
   async getUsers(filters?: {
-    statut?: string; role?: string; id_region?: string; search?: string;
-    page?: number; limit?: number;
+    statut?: string;
+    role?: string;
+    id_region?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
   }) {
     const where: any = {};
     if (filters?.statut) where.statut = filters.statut;
@@ -54,7 +62,9 @@ export class AdminUsersService {
     ]);
 
     return {
-      data: data.map(({ password, remember_token, ...rest }: Utilisateur) => rest),
+      data: data.map(
+        ({ password, remember_token, ...rest }: Utilisateur) => rest,
+      ),
       meta: {
         total,
         page,
@@ -70,7 +80,11 @@ export class AdminUsersService {
     });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
-    const evalStats = await this.pg.queryOne<{ total: string; validees: string; score_moyen: string }>(
+    const evalStats = await this.pg.queryOne<{
+      total: string;
+      validees: string;
+      score_moyen: string;
+    }>(
       `SELECT
          COUNT(*) as total,
          COUNT(*) FILTER (WHERE statut = 'valide') as validees,
@@ -83,35 +97,57 @@ export class AdminUsersService {
       where: { manager_matricule: matricule },
     });
 
+    const { password: _pw, remember_token: _rt, ...safeUser } = user;
     return {
-      ...user,
-      password: undefined,
+      ...safeUser,
       stats: {
         evaluations_total: parseInt(evalStats?.total ?? '0'),
         evaluations_validees: parseInt(evalStats?.validees ?? '0'),
-        score_moyen: evalStats?.score_moyen ? Math.round(parseFloat(evalStats.score_moyen) * 10) / 10 : null,
+        score_moyen: evalStats?.score_moyen
+          ? Math.round(parseFloat(evalStats.score_moyen) * 10) / 10
+          : null,
         subordonnes: subordinates,
       },
     };
   }
 
   async createUser(data: CreateUserDto, adminMatricule: string, ip: string) {
-    const existing = await this.prisma.utilisateur.findUnique({ where: { matricule: data.matricule } });
+    const existing = await this.prisma.utilisateur.findUnique({
+      where: { matricule: data.matricule },
+    });
     if (existing) throw new BadRequestException('Ce matricule existe déjà');
 
-    const emailExists = await this.prisma.utilisateur.findFirst({ where: { email: data.email } });
-    if (emailExists) throw new BadRequestException('Cet email est déjà utilisé');
+    const [emailExists, role, region] = await Promise.all([
+      this.prisma.utilisateur.findFirst({ where: { email: data.email } }),
+      this.prisma.role.findUnique({ where: { id_role: data.id_role } }),
+      this.prisma.region.findUnique({ where: { id_region: data.id_region } }),
+    ]);
+    if (emailExists)
+      throw new BadRequestException('Cet email est déjà utilisé');
+    if (!role) throw new BadRequestException('Rôle introuvable');
+    if (!region) throw new BadRequestException('Région introuvable');
 
-    if (data.manager_matricule) {
-      const validation = await this.hierarchyService.validerAssignationManager(
-        data.matricule,
-        data.manager_matricule,
+    const niveauHierarchique = region.est_taniere
+      ? role.niveau_taniere
+      : role.niveau_non_taniere;
+    if (niveauHierarchique === null) {
+      throw new BadRequestException(
+        `Le rôle ${role.nom_role} n'est pas configuré pour ce type de région`,
       );
-      if (!validation.valide) {
-        throw new BadRequestException(
-          `Assignation manager invalide: ${validation.erreurs.join('; ')}`,
-        );
-      }
+    }
+
+    const managerMatricule = this.normalizeOptionalString(
+      data.manager_matricule,
+    );
+
+    if (managerMatricule) {
+      await this.validateManagerForNewUser({
+        matricule: data.matricule,
+        managerMatricule,
+        idRegion: region.id_region,
+        idBranche: role.id_branche,
+        niveauHierarchique,
+      });
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -122,19 +158,20 @@ export class AdminUsersService {
       prenom: data.prenom,
       email: data.email,
       password: hashedPassword,
-      role: data.role,
-      role_nom: data.role_nom,
-      id_region: data.id_region,
-      region_nom: data.region_nom,
-      type_region: data.type_region,
-      ...(data.id_branche !== undefined && { id_branche: data.id_branche }),
-      ...(data.manager_matricule !== undefined && { manager_matricule: data.manager_matricule }),
-      ...(data.telephone !== undefined && { telephone: data.telephone }),
-      ...(data.id_service !== undefined && { id_service: data.id_service }),
-      ...(data.id_district !== undefined && { id_district: data.id_district }),
-      ...(data.id_secteur !== undefined && { id_secteur: data.id_secteur }),
-      ...(data.sexe !== undefined && { sexe: data.sexe }),
-      est_admin: data.est_admin ?? false,
+      role: role.nom_role,
+      role_nom: role.nom_role,
+      id_region: region.id_region,
+      region_nom: region.nom_region,
+      type_region: region.est_taniere ? 'taniere' : 'non-taniere',
+      id_branche: role.id_branche,
+      niveau_hierarchique: niveauHierarchique,
+      manager_matricule: managerMatricule,
+      telephone: this.normalizeOptionalString(data.telephone),
+      id_service: this.normalizeOptionalString(data.id_service),
+      id_district: this.normalizeOptionalString(data.id_district),
+      id_secteur: this.normalizeOptionalString(data.id_secteur),
+      sexe: this.normalizeOptionalString(data.sexe),
+      est_admin: role.nom_role.toUpperCase() === 'ADMIN',
       statut: 'Actif',
       est_actif: true,
     };
@@ -147,22 +184,96 @@ export class AdminUsersService {
       entite: 'utilisateur',
       adresse_ip: ip,
       id_entite: created.matricule,
-      details_json: { matricule: created.matricule, nom: created.nom, prenom: created.prenom, role: created.role },
+      details_json: {
+        matricule: created.matricule,
+        nom: created.nom,
+        prenom: created.prenom,
+        role: created.role,
+      },
     });
 
     const { password: _pw, remember_token: _rt, ...safe } = created;
     return safe;
   }
 
-  async updateUser(matricule: string, data: UpdateUserDto, adminMatricule: string, ip: string) {
-    const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
+  private normalizeOptionalString(
+    value: string | null | undefined,
+  ): string | null {
+    if (value === null || value === undefined) return null;
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private async validateManagerForNewUser(candidate: {
+    matricule: string;
+    managerMatricule: string;
+    idRegion: string;
+    idBranche: string | null;
+    niveauHierarchique: number;
+  }): Promise<void> {
+    if (candidate.matricule === candidate.managerMatricule) {
+      throw new BadRequestException(
+        'Assignation manager invalide: un utilisateur ne peut pas être son propre manager',
+      );
+    }
+
+    const manager = await this.prisma.utilisateur.findUnique({
+      where: { matricule: candidate.managerMatricule },
+    });
+    if (!manager) {
+      throw new BadRequestException(
+        'Assignation manager invalide: manager introuvable',
+      );
+    }
+
+    const erreurs: string[] = [];
+    if (!manager.est_actif || manager.statut !== 'Actif') {
+      erreurs.push('Le manager doit être actif');
+    }
+    if (manager.id_region !== candidate.idRegion) {
+      erreurs.push('Le manager doit être dans la même région');
+    }
+    if (manager.niveau_hierarchique >= candidate.niveauHierarchique) {
+      erreurs.push('Le manager doit être à un niveau supérieur');
+    }
+
+    if (manager.id_branche !== candidate.idBranche) {
+      const managerRole = await this.prisma.role.findUnique({
+        where: { nom_role: manager.role },
+      });
+      if (!managerRole?.peut_cross_branch) {
+        erreurs.push(
+          "Seuls les rôles autorisés (peut_cross_branch) peuvent superviser des utilisateurs d'autres branches",
+        );
+      }
+    }
+
+    if (erreurs.length > 0) {
+      throw new BadRequestException(
+        `Assignation manager invalide: ${erreurs.join('; ')}`,
+      );
+    }
+  }
+
+  async updateUser(
+    matricule: string,
+    data: UpdateUserDto,
+    adminMatricule: string,
+    ip: string,
+  ) {
+    const user = await this.prisma.utilisateur.findUnique({
+      where: { matricule },
+    });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
     const managerChanged =
       data.manager_matricule !== undefined &&
       data.manager_matricule !== user.manager_matricule;
 
-    if (data.manager_matricule && data.manager_matricule !== user.manager_matricule) {
+    if (
+      data.manager_matricule &&
+      data.manager_matricule !== user.manager_matricule
+    ) {
       const validation = await this.hierarchyService.validerAssignationManager(
         matricule,
         data.manager_matricule,
@@ -210,7 +321,10 @@ export class AdminUsersService {
     adminMatricule: string,
     ip: string,
   ): Promise<void> {
-    const activeEvals = await this.pg.query<{ id_evaluation: string; statut: string }>(
+    const activeEvals = await this.pg.query<{
+      id_evaluation: string;
+      statut: string;
+    }>(
       `SELECT e.id_evaluation, e.statut
        FROM evaluations e
        JOIN periodes_evaluation p ON p.id_periode = e.id_periode
@@ -231,14 +345,16 @@ export class AdminUsersService {
           ancien_manager: oldManagerMatricule,
           nouveau_manager: newManagerMatricule,
           evaluations_actives: activeEvals.length,
-          evaluations_ids: activeEvals.map(e => e.id_evaluation),
+          evaluations_ids: activeEvals.map((e) => e.id_evaluation),
         },
       });
     }
   }
 
   async deactivateUser(matricule: string, adminMatricule: string, ip: string) {
-    const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
+    const user = await this.prisma.utilisateur.findUnique({
+      where: { matricule },
+    });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
     await this.prisma.utilisateur.update({
@@ -263,7 +379,9 @@ export class AdminUsersService {
       where: { manager_matricule: matricule },
       orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
     });
-    return rows.map(({ password, remember_token, ...rest }: Utilisateur) => rest);
+    return rows.map(
+      ({ password, remember_token, ...rest }: Utilisateur) => rest,
+    );
   }
 
   async getHistorique(matricule: string) {
@@ -277,7 +395,9 @@ export class AdminUsersService {
   }
 
   async getRemplacantsDisponibles(matricule: string) {
-    const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
+    const user = await this.prisma.utilisateur.findUnique({
+      where: { matricule },
+    });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
     const rows = await this.prisma.utilisateur.findMany({
@@ -289,11 +409,15 @@ export class AdminUsersService {
       },
       orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
     });
-    return rows.map(({ password, remember_token, ...rest }: Utilisateur) => rest);
+    return rows.map(
+      ({ password, remember_token, ...rest }: Utilisateur) => rest,
+    );
   }
 
   private async ensureUserExists(matricule: string) {
-    const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
+    const user = await this.prisma.utilisateur.findUnique({
+      where: { matricule },
+    });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
     return user;
   }

@@ -19,6 +19,42 @@ const GLOBAL_ROLES = ['DR', 'CDTT'];
 /** Role names that map to the ADMIN system role */
 const ADMIN_ROLES = ['ADMIN'];
 
+const RULE_DEFINITION_FIELDS = [
+  'nom_regle',
+  'description',
+  'role_evaluateur',
+  'role_evalue',
+  'type_evaluation',
+  'criteres',
+  'sections',
+  'visibility_policy',
+  'analytics_metadata',
+  'meme_region_obligatoire',
+  'meme_branche_obligatoire',
+] as const;
+const REFERENCED_RULE_IMMUTABLE_MESSAGE =
+  'Cette règle est déjà référencée par une évaluation et ne peut plus être modifiée. ' +
+  'Seule sa désactivation est autorisée. Créez une nouvelle règle pour faire évoluer sa définition.';
+const ACTIVE_RULE_IMMUTABLE_MESSAGE =
+  'Une règle active/publiée ne peut pas être modifiée en place. Désactivez-la d’abord, ' +
+  'puis modifiez-la uniquement si elle n’est référencée par aucune évaluation. ' +
+  'Sinon, créez une nouvelle règle.';
+
+interface RegleEvaluationUpdate {
+  nom_regle?: string;
+  description?: string;
+  role_evaluateur?: string;
+  role_evalue?: string;
+  type_evaluation?: string;
+  criteres?: RuleCriterion[];
+  sections?: RuleSection[];
+  visibility_policy?: Partial<RuleVisibilityPolicy>;
+  analytics_metadata?: Partial<RuleAnalyticsMetadata>;
+  est_active?: boolean;
+  meme_region_obligatoire?: boolean;
+  meme_branche_obligatoire?: boolean;
+}
+
 /** Scalar fields for Role create/update — mirrors Prisma.RoleUncheckedCreateInput scalars */
 interface RoleScalarFields {
   id_role?: string;
@@ -63,6 +99,37 @@ export class AdminRolesService {
     private pg: DatabasePgService,
     private auditLog: AuditLogService,
   ) {}
+
+  private hasRegleDefinitionChanges(data: RegleEvaluationUpdate): boolean {
+    return RULE_DEFINITION_FIELDS.some((field) => data[field] !== undefined);
+  }
+
+  private async countEvaluationReferences(id: string): Promise<number> {
+    const ref = await this.pg.queryOne<{ count: string | number }>(
+      'SELECT COUNT(*)::text AS count FROM evaluations WHERE id_regle = $1',
+      [id],
+    );
+    return Number(ref?.count ?? 0);
+  }
+
+  private async assertRegleUpdateAllowed(
+    id: string,
+    existing: { est_active?: boolean },
+    data: RegleEvaluationUpdate,
+  ): Promise<void> {
+    const changesDefinition = this.hasRegleDefinitionChanges(data);
+    const reactivatesRule = existing.est_active === false && data.est_active === true;
+
+    if (!changesDefinition && !reactivatesRule) return;
+
+    if ((await this.countEvaluationReferences(id)) > 0) {
+      throw new BadRequestException(REFERENCED_RULE_IMMUTABLE_MESSAGE);
+    }
+
+    if (changesDefinition && existing.est_active === true) {
+      throw new BadRequestException(ACTIVE_RULE_IMMUTABLE_MESSAGE);
+    }
+  }
 
   async getRoles() {
     return this.prisma.role.findMany({
@@ -282,22 +349,36 @@ export class AdminRolesService {
     return normalizeRuleRow(row as any);
   }
 
-  async updateRegleEvaluation(id: string, data: {
-    nom_regle?: string;
-    description?: string;
-    role_evaluateur?: string;
-    role_evalue?: string;
-    type_evaluation?: string;
-    criteres?: RuleCriterion[];
-    sections?: RuleSection[];
-    visibility_policy?: Partial<RuleVisibilityPolicy>;
-    analytics_metadata?: Partial<RuleAnalyticsMetadata>;
-    est_active?: boolean;
-    meme_region_obligatoire?: boolean;
-    meme_branche_obligatoire?: boolean;
-  }) {
+  async updateRegleEvaluation(id: string, data: RegleEvaluationUpdate) {
     const existing = await this.getRegleEvaluationById(id);
     if (!existing) throw new NotFoundException('Règle introuvable');
+
+    await this.assertRegleUpdateAllowed(id, existing, data);
+
+    if (!this.hasRegleDefinitionChanges(data)) {
+      if (data.est_active === undefined || data.est_active === existing.est_active) {
+        return existing;
+      }
+
+      const row = await this.pg.queryOne(
+        `UPDATE regles_evaluation
+         SET est_active = $1, updated_at = NOW()
+         WHERE id_regle = $2
+         RETURNING
+           id_regle,
+           nom_regle,
+           description,
+           criteres_evaluation_json,
+           est_active,
+           role_evaluateur,
+           role_evalue,
+           type_evaluation,
+           created_at,
+           updated_at`,
+        [data.est_active, id],
+      );
+      return normalizeRuleRow(row as any);
+    }
 
     const envelope = serializeRuleEnvelope({
       sections: data.sections ?? (existing as any).sections,
@@ -365,6 +446,10 @@ export class AdminRolesService {
   async toggleRegleActive(id: string) {
     const existing = await this.pg.queryOne<{ est_active: boolean }>('SELECT est_active FROM regles_evaluation WHERE id_regle = $1', [id]);
     if (!existing) throw new NotFoundException('Règle introuvable');
+
+    if (!existing.est_active && (await this.countEvaluationReferences(id)) > 0) {
+      throw new BadRequestException(REFERENCED_RULE_IMMUTABLE_MESSAGE);
+    }
 
     await this.pg.execute(
       'UPDATE regles_evaluation SET est_active = $1, updated_at = NOW() WHERE id_regle = $2',

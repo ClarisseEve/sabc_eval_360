@@ -3,34 +3,49 @@ services:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
     container_name: sabc-frontend
+    restart: unless-stopped
     ports:
-      - "5173:80"
+      - "${WEB_PORT:-5173}:80"
     depends_on:
-      - nestjs-api
+      api:
+        condition: service_healthy
     networks:
       - sabc-network
 
-  nestjs-api:
+  api:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
-    container_name: sabc-nestjs-api
+    container_name: sabc-api
+    restart: unless-stopped
     environment:
       PORT: 3000
-      FRONTEND_URL: http://localhost:5173
-      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME}
-      DATABASE_URL: ${DATABASE_URL:-mysql://sabc_user:secret@mysql:3306/sabc_core}
+      NODE_ENV: ${NODE_ENV:-development}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET est requis — copiez .env.example vers .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-mysql://sabc_user:secret@mysql:3306/sabc_core}
       PG_HOST: postgres
       PG_PORT: 5432
       PG_DATABASE: ${PG_DATABASE:-sabc_business}
       PG_USER: ${PG_USER:-sabc_user}
       PG_PASSWORD: ${PG_PASSWORD:-***REMOVED***}
       CACHE_DRIVER: ${CACHE_DRIVER:-redis}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL_DOCKER:-redis://redis:6379}
       CACHE_PREFIX: ${CACHE_PREFIX:-sabc_eval360}
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
+      # Le conteneur applique les migrations au démarrage, et peuple la base
+      # au premier lancement pour disposer de comptes de démonstration.
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      RUN_SEED: ${RUN_SEED:-true}
+      SEED_MODE: ${SEED_MODE:-if-empty}
+      SEED_PASSWORD: ${SEED_PASSWORD:?SEED_PASSWORD est requis — copiez .env.example vers .env}
+      ALLOW_DEMO_SEED: ${ALLOW_DEMO_SEED:-false}
     ports:
-      - "3000:3000"
+      - "${API_PORT:-3000}:3000"
     depends_on:
       mysql:
         condition: service_healthy
@@ -38,6 +53,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
     networks:
       - sabc-network
 
@@ -51,7 +72,7 @@ services:
       MYSQL_USER: sabc_user
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-***REMOVED***}
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -72,7 +93,7 @@ services:
       POSTGRES_USER: ${PG_USER:-sabc_user}
       POSTGRES_PASSWORD: ${PG_PASSWORD:-***REMOVED***}
     ports:
-      - "5432:5432"
+      - "${PG_PORT_HOST:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -89,7 +110,7 @@ services:
     container_name: sabc-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

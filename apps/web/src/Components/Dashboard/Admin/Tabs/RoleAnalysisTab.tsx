@@ -8,11 +8,11 @@ import {
   RoleScoreChartSection,
 } from '@/Components/Dashboard/Admin/Sections/RoleAnalysisSections';
 
-const RoleAnalysisTab: React.FC = () => {
-  const { data } = useAdminRoleAnalysisTabData();
+const RoleAnalysisTab: React.FC<{ dateRange?: { start_date?: string; end_date?: string } }> = ({ dateRange }) => {
+  const { data } = useAdminRoleAnalysisTabData(dateRange);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <RoleAnalysisSummarySection
         roleCount={data.rolePerf.length}
         globalAverage={data.globalAvg}

@@ -62,12 +62,133 @@ describe('PeriodesService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('should let PostgreSQL assign the UUID and return the created row', async () => {
+      // 1er queryOne : validateNoChevauchement (aucun chevauchement)
+      // 2e queryOne : INSERT ... RETURNING id_periode
+      // 3e queryOne : findById
+      mockPg.queryOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id_periode: '11111111-1111-4111-8111-111111111111' })
+        .mockResolvedValueOnce({ id_periode: '11111111-1111-4111-8111-111111111111', code_periode: 'P1', statut: 'planifiee' });
+
+      const result = await service.create({
+        code_periode: 'P1',
+        nom_periode: 'Test',
+        date_debut: '2027-06-01',
+        date_fin: '2027-09-01',
+      });
+
+      // L'INSERT ne doit PAS contenir id_periode dans les colonnes
+      const insertCall = mockPg.queryOne.mock.calls[1];
+      expect(insertCall[0]).toMatch(/INSERT INTO periodes_evaluation/);
+      expect(insertCall[0]).not.toMatch(/\bid_periode\b\s*,/);
+      expect(insertCall[0]).toMatch(/RETURNING id_periode/);
+      expect(mockPg.queryOne.mock.calls[2][1]).toEqual(['11111111-1111-4111-8111-111111111111']);
+      expect(result).toEqual({
+        id_periode: '11111111-1111-4111-8111-111111111111',
+        code_periode: 'P1',
+        statut: 'planifiee',
+      });
+    });
   });
 
   describe('ouvrir', () => {
-    it('should reject already open period', async () => {
-      mockPg.queryOne.mockResolvedValue({ id_periode: 'uuid-1', est_ouverte: true });
+    const configureTransaction = (responses: any[]) => {
+      const client = {
+        query: jest.fn(),
+      };
+      for (const response of responses) {
+        client.query.mockResolvedValueOnce(response);
+      }
+      mockPg.withTransaction.mockImplementation((fn: (c: any) => Promise<any>) => fn(client));
+      return client;
+    };
+
+    it('ouvre atomiquement une période planifiée dans son intervalle', async () => {
+      const opened = {
+        id_periode: 'uuid-1',
+        statut: 'ouverte',
+        est_ouverte: true,
+        est_cloturee: false,
+      };
+      const client = configureTransaction([
+        { rows: [{}] },
+        { rows: [opened], rowCount: 1 },
+      ]);
+
+      await expect(service.ouvrir('uuid-1')).resolves.toEqual(opened);
+
+      expect(mockPg.withTransaction).toHaveBeenCalledTimes(1);
+      expect(client.query.mock.calls[0][0]).toContain('pg_advisory_xact_lock');
+      const transitionSql = String(client.query.mock.calls[1][0]);
+      expect(transitionSql).toContain("p.statut = 'planifiee'");
+      expect(transitionSql).toContain('p.est_ouverte = false');
+      expect(transitionSql).toContain('p.est_cloturee = false');
+      expect(transitionSql).toContain("AT TIME ZONE 'Africa/Douala'");
+      expect(transitionSql).toContain('NOT EXISTS');
+      expect(transitionSql).toContain('RETURNING p.*');
+    });
+
+    it('rejette une période qui est déjà ouverte', async () => {
+      configureTransaction([
+        { rows: [{}] },
+        { rows: [], rowCount: 0 },
+        {
+          rows: [{
+            id_periode: 'uuid-1',
+            statut: 'ouverte',
+            est_ouverte: true,
+            est_cloturee: false,
+            dans_intervalle: true,
+            autre_periode_ouverte: false,
+          }],
+        },
+      ]);
+
       await expect(service.ouvrir('uuid-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejette l’ouverture quand une autre période est déjà ouverte', async () => {
+      configureTransaction([
+        { rows: [{}] },
+        { rows: [], rowCount: 0 },
+        {
+          rows: [{
+            id_periode: 'uuid-1',
+            statut: 'planifiee',
+            est_ouverte: false,
+            est_cloturee: false,
+            dans_intervalle: true,
+            autre_periode_ouverte: true,
+          }],
+        },
+      ]);
+
+      await expect(service.ouvrir('uuid-1')).rejects.toThrow(
+        'Une autre période est déjà ouverte',
+      );
+    });
+
+    it('rejette l’ouverture hors de l’intervalle planifié', async () => {
+      configureTransaction([
+        { rows: [{}] },
+        { rows: [], rowCount: 0 },
+        {
+          rows: [{
+            id_periode: 'uuid-1',
+            statut: 'planifiee',
+            est_ouverte: false,
+            est_cloturee: false,
+            dans_intervalle: false,
+            autre_periode_ouverte: false,
+          }],
+        },
+      ]);
+
+      await expect(service.ouvrir('uuid-1')).rejects.toThrow(
+        "La période ne peut être ouverte qu'entre ses dates de début et de fin",
+      );
     });
   });
 

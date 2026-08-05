@@ -1,4 +1,4 @@
-import { IsString, IsUUID, IsArray, IsOptional, ValidateNested } from 'class-validator';
+import { IsString, IsUUID, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class AssignTemplateDto {

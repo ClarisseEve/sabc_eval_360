@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/guards/roles.guard';
 import { EvaluationsService } from '../evaluations/evaluations.service';
@@ -21,7 +21,7 @@ export class AdminEvaluationsController {
   }
 
   @Get(':id')
-  getOne(@Param('id') id: string) {
-    return this.evaluationsService.findById(id);
+  getOne(@Param('id') id: string, @Request() req: any) {
+    return this.evaluationsService.findById(id, req.user);
   }
 }

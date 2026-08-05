@@ -28,7 +28,6 @@ Les tables métier exploitées par l’API incluent notamment :
 - `templates`
 - `template_role_periode`
 - `notifications`
-- `remplacements_temporaires`
 
 ## Analytics
 

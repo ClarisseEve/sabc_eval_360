@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { EvaluationsService } from './evaluations.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles, RolesGuard } from '../auth/guards/roles.guard';
 import { CreateEvaluationDto } from './dto/create-evaluation.dto';
 import { UpdateEvaluationDto } from './dto/update-evaluation.dto';
 import { ValidateEvaluationDto } from './dto/validate-evaluation.dto';
@@ -50,29 +51,33 @@ export class EvaluationsController {
   }
 
   @Get('rapport/:idPeriode')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   async rapport(@Param('idPeriode') idPeriode: string, @Request() req: any) {
     return this.service.getRapport(idPeriode, req.user.matricule);
   }
 
   @Post('rappels/:idPeriode')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   async rappels(@Param('idPeriode') idPeriode: string) {
     return this.service.envoyerRappels(idPeriode);
   }
 
   @Get(':id')
-  async show(@Param('id') id: string) {
-    return this.service.findById(id);
+  async show(@Param('id') id: string, @Request() req: any) {
+    return this.service.findById(id, req.user);
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateEvaluationDto) {
-    await this.service.updateNotes(id, dto.notes, dto.commentaire_general);
-    return this.service.findById(id);
+  async update(@Param('id') id: string, @Body() dto: UpdateEvaluationDto, @Request() req: any) {
+    await this.service.updateNotes(id, req.user, dto.notes, dto.commentaire_general);
+    return this.service.findById(id, req.user);
   }
 
   @Post(':id/submit')
-  async submit(@Param('id') id: string) {
-    return this.service.submit(id);
+  async submit(@Param('id') id: string, @Request() req: any) {
+    return this.service.submit(id, req.user);
   }
 
   @Post(':id/validate')

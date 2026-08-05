@@ -1,6 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+export interface ValidationScopeUser {
+  matricule: string;
+  manager_matricule?: string | null;
+  role_nom?: string | null;
+  role?: string | null;
+  id_region?: string | null;
+}
+
+export interface ValidationAuthorization {
+  canValidate: boolean;
+  reason?: string;
+}
+
 @Injectable()
 export class ValidationManagerService {
   constructor(private readonly prisma: PrismaService) {}
@@ -8,12 +21,19 @@ export class ValidationManagerService {
   async peutValider(
     validateurMatricule: string,
     evalueMatricule: string,
-  ): Promise<{ canValidate: boolean; reason?: string }> {
+  ): Promise<ValidationAuthorization> {
     const [validateur, evalue] = await Promise.all([
       this.prisma.utilisateur.findUnique({ where: { matricule: validateurMatricule } }),
       this.prisma.utilisateur.findUnique({ where: { matricule: evalueMatricule } }),
     ]);
 
+    return this.peutValiderUtilisateurs(validateur, evalue);
+  }
+
+  peutValiderUtilisateurs(
+    validateur: ValidationScopeUser | null | undefined,
+    evalue: ValidationScopeUser | null | undefined,
+  ): ValidationAuthorization {
     if (!validateur || !evalue) {
       return { canValidate: false, reason: 'Utilisateur introuvable' };
     }
@@ -29,12 +49,15 @@ export class ValidationManagerService {
     return { canValidate: false, reason: 'Non autorisé à valider cette évaluation' };
   }
 
-  verifierDRCDTT(validateur: any, evalue: any): boolean {
+  aPorteeRegionale(validateur: ValidationScopeUser): boolean {
     const role = (validateur.role_nom ?? validateur.role ?? '').toUpperCase().trim();
 
+    return (role === 'DR' || role === 'CDTT') && validateur.id_region != null;
+  }
+
+  verifierDRCDTT(validateur: ValidationScopeUser, evalue: ValidationScopeUser): boolean {
     return (
-      (role === 'DR' || role === 'CDTT') &&
-      validateur.id_region != null &&
+      this.aPorteeRegionale(validateur) &&
       evalue.id_region != null &&
       validateur.id_region === evalue.id_region
     );

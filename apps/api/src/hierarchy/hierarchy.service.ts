@@ -73,11 +73,17 @@ export class HierarchyService {
     });
   }
 
-  async getTousSubordonnes(matricule: string): Promise<any[]> {
+  async getTousSubordonnes(
+    matricule: string,
+    visited = new Set<string>(),
+    depth = 0,
+  ): Promise<any[]> {
+    if (depth > 10 || visited.has(matricule)) return [];
+    visited.add(matricule);
     const directs = await this.getSubordonnesDirects(matricule);
     let all = [...directs];
     for (const sub of directs) {
-      const nested = await this.getTousSubordonnes(sub.matricule);
+      const nested = await this.getTousSubordonnes(sub.matricule, visited, depth + 1);
       all = all.concat(nested);
     }
     return all;
@@ -90,7 +96,14 @@ export class HierarchyService {
       select: { matricule: true, nom: true, prenom: true, role: true, role_nom: true, manager_matricule: true, niveau_hierarchique: true },
     });
 
+    // Un cycle manager_matricule (données importées, assignation manuelle)
+    // ferait tourner cette boucle indéfiniment et figerait le process.
+    const visites = new Set<string>();
+
     while (current) {
+      if (visites.has(current.matricule)) break;
+      visites.add(current.matricule);
+
       chaine.push({
         matricule: current.matricule,
         nom_complet: `${current.prenom} ${current.nom}`,
@@ -174,7 +187,10 @@ export class HierarchyService {
   }
 
   private async getRolePeutCrossBranch(roleCode: string): Promise<boolean> {
-    const role = await this.prisma.role.findUnique({ where: { id_role: roleCode } });
+    // Utilisateur.role contient le nom du rôle ('DR', 'ADMIN'), pas son identifiant:
+    // chercher par id_role renvoyait toujours null et bloquait toute supervision
+    // inter-branches.
+    const role = await this.prisma.role.findUnique({ where: { nom_role: roleCode } });
     return role?.peut_cross_branch ?? false;
   }
 }

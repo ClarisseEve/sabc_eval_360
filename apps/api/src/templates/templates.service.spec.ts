@@ -421,16 +421,18 @@ describe('TemplatesService', () => {
       expect(result).toHaveLength(2);
 
       const cscEntry = result.find((r: any) => r.id_role === 'role-1');
-      expect(cscEntry.est_assigne).toBe(true);
-      expect(cscEntry.template_assigne).toMatchObject({
+      expect(cscEntry).toBeDefined();
+      expect(cscEntry!.est_assigne).toBe(true);
+      expect(cscEntry!.template_assigne).toMatchObject({
         id_template: 'uuid-1',
         nom: 'Template Test',
         statut: 'published',
       });
 
       const drEntry = result.find((r: any) => r.id_role === 'role-2');
-      expect(drEntry.est_assigne).toBe(false);
-      expect(drEntry.template_assigne).toBeNull();
+      expect(drEntry).toBeDefined();
+      expect(drEntry!.est_assigne).toBe(false);
+      expect(drEntry!.template_assigne).toBeNull();
     });
 
     it('returns all roles with est_assigne=false when no assignations exist', async () => {

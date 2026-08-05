@@ -113,10 +113,10 @@ export function ImprovementPlansTotalsSection({ totals }: Readonly<{ totals: any
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
-        <Card key={card.label}>
-          <CardContent className="p-4">
-            <div className="text-sm text-sabc-gray-500">{card.label}</div>
-            <div className="mt-1 text-3xl font-bold text-sabc-gray-900 dark:text-white">{card.value}</div>
+        <Card key={card.label} className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
+          <CardContent className="p-5">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">{card.label}</div>
+            <div className="mt-2 text-2xl font-bold text-sabc-gray-900 dark:text-white">{card.value}</div>
           </CardContent>
         </Card>
       ))}
@@ -126,7 +126,7 @@ export function ImprovementPlansTotalsSection({ totals }: Readonly<{ totals: any
 
 export function RecommendationTypeBreakdownSection({ byType }: Readonly<{ byType: any[] }>) {
   return (
-    <Card>
+    <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
       <CardHeader>
         <CardTitle>Répartition par type de recommandation</CardTitle>
         <CardDescription>Nombre d’actions proposées par famille sur le périmètre filtré</CardDescription>
@@ -137,12 +137,12 @@ export function RecommendationTypeBreakdownSection({ byType }: Readonly<{ byType
         ) : (
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byType} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="type" />
-                <YAxis allowDecimals={false} />
+              <BarChart data={byType} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
+                <XAxis dataKey="type" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
+                <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Bar dataKey="total" fill="#C62828" radius={[4, 4, 0, 0]} name="Recommandations" />
+                <Bar dataKey="total" fill="#C62828" radius={[6, 6, 0, 0]} name="Recommandations" />
               </BarChart>
             </ResponsiveContainer>
           </div>
