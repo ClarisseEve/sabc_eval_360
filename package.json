@@ -21,6 +21,7 @@
     "test:e2e:web": "pnpm --dir apps/api test:e2e:prepare && playwright test",
     "test:e2e:web:headed": "pnpm --dir apps/api test:e2e:prepare && playwright test --headed",
     "test:e2e:web:install": "playwright install --only-shell chromium",
+    "audit:prod": "pnpm --dir apps/api audit:prod && pnpm --dir apps/web audit:prod",
     "verify:static": "pnpm typecheck && pnpm --dir apps/api exec prisma validate && pnpm build && pnpm test",
     "verify:compose": "docker compose --env-file .env.example config --quiet && docker compose --env-file .env.example -f docker-compose.scale.yml config --quiet",
     "format": "pnpm --dir apps/api format",

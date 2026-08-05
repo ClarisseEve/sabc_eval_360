@@ -141,12 +141,13 @@ export class AdminUsersService {
     );
 
     if (managerMatricule) {
-      await this.validateManagerForNewUser({
+      await this.validateManagerForCandidate({
         matricule: data.matricule,
         managerMatricule,
         idRegion: region.id_region,
         idBranche: role.id_branche,
         niveauHierarchique,
+        checkCycle: false,
       });
     }
 
@@ -204,12 +205,13 @@ export class AdminUsersService {
     return normalized.length > 0 ? normalized : null;
   }
 
-  private async validateManagerForNewUser(candidate: {
+  private async validateManagerForCandidate(candidate: {
     matricule: string;
     managerMatricule: string;
     idRegion: string;
     idBranche: string | null;
     niveauHierarchique: number;
+    checkCycle: boolean;
   }): Promise<void> {
     if (candidate.matricule === candidate.managerMatricule) {
       throw new BadRequestException(
@@ -248,6 +250,15 @@ export class AdminUsersService {
       }
     }
 
+    if (candidate.checkCycle) {
+      const chaine = await this.hierarchyService.getChaineHierarchique(
+        candidate.managerMatricule,
+      );
+      if (chaine.some((entry) => entry.matricule === candidate.matricule)) {
+        erreurs.push('Cette assignation créerait un cycle dans la hiérarchie');
+      }
+    }
+
     if (erreurs.length > 0) {
       throw new BadRequestException(
         `Assignation manager invalide: ${erreurs.join('; ')}`,
@@ -266,36 +277,93 @@ export class AdminUsersService {
     });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
-    const managerChanged =
-      data.manager_matricule !== undefined &&
-      data.manager_matricule !== user.manager_matricule;
+    const idRegion = data.id_region ?? user.id_region;
+    if (!idRegion) {
+      throw new BadRequestException('Région introuvable');
+    }
 
-    if (
-      data.manager_matricule &&
-      data.manager_matricule !== user.manager_matricule
-    ) {
-      const validation = await this.hierarchyService.validerAssignationManager(
-        matricule,
-        data.manager_matricule,
+    const [role, region] = await Promise.all([
+      data.id_role
+        ? this.prisma.role.findUnique({ where: { id_role: data.id_role } })
+        : this.prisma.role.findUnique({ where: { nom_role: user.role } }),
+      this.prisma.region.findUnique({ where: { id_region: idRegion } }),
+    ]);
+    if (!role) throw new BadRequestException('Rôle introuvable');
+    if (!region) throw new BadRequestException('Région introuvable');
+
+    const niveauHierarchique = region.est_taniere
+      ? role.niveau_taniere
+      : role.niveau_non_taniere;
+    if (niveauHierarchique === null) {
+      throw new BadRequestException(
+        `Le rôle ${role.nom_role} n'est pas configuré pour ce type de région`,
       );
-      if (!validation.valide) {
-        throw new BadRequestException(
-          `Assignation manager invalide: ${validation.erreurs.join('; ')}`,
-        );
-      }
+    }
+
+    const managerMatricule =
+      data.manager_matricule === undefined
+        ? user.manager_matricule
+        : this.normalizeOptionalString(data.manager_matricule);
+    const managerChanged = managerMatricule !== user.manager_matricule;
+    const hierarchyChanged =
+      managerChanged ||
+      region.id_region !== user.id_region ||
+      role.nom_role !== user.role ||
+      role.id_branche !== user.id_branche ||
+      niveauHierarchique !== user.niveau_hierarchique;
+
+    if (managerMatricule && hierarchyChanged) {
+      await this.validateManagerForCandidate({
+        matricule,
+        managerMatricule,
+        idRegion: region.id_region,
+        idBranche: role.id_branche,
+        niveauHierarchique,
+        checkCycle: true,
+      });
+    }
+
+    const statut = data.statut ?? user.statut;
+    const updateData: Prisma.UtilisateurUncheckedUpdateInput = {
+      role: role.nom_role,
+      role_nom: role.nom_role,
+      id_region: region.id_region,
+      region_nom: region.nom_region,
+      type_region: region.est_taniere ? 'taniere' : 'non-taniere',
+      id_branche: role.id_branche,
+      niveau_hierarchique: niveauHierarchique,
+      est_admin: role.nom_role.toUpperCase() === 'ADMIN',
+      manager_matricule: managerMatricule,
+      statut,
+      est_actif: !['Inactif', 'Suspendu'].includes(statut),
+    };
+    if (data.nom !== undefined) updateData.nom = data.nom;
+    if (data.prenom !== undefined) updateData.prenom = data.prenom;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.telephone !== undefined) {
+      updateData.telephone = this.normalizeOptionalString(data.telephone);
+    }
+    if (data.id_service !== undefined) {
+      updateData.id_service = this.normalizeOptionalString(data.id_service);
+    }
+    if (data.id_district !== undefined) {
+      updateData.id_district = this.normalizeOptionalString(data.id_district);
+    }
+    if (data.id_secteur !== undefined) {
+      updateData.id_secteur = this.normalizeOptionalString(data.id_secteur);
     }
 
     const updated = await this.prisma.utilisateur.update({
       where: { matricule },
-      data,
+      data: updateData,
     });
 
     // AC5: detect and log active evaluations impacted by manager change
-    if (managerChanged && data.manager_matricule) {
+    if (managerChanged) {
       await this.handleManagerChangeEvaluations(
         matricule,
         user.manager_matricule,
-        data.manager_matricule,
+        managerMatricule,
         adminMatricule,
         ip,
       );
@@ -317,7 +385,7 @@ export class AdminUsersService {
   private async handleManagerChangeEvaluations(
     userMatricule: string,
     oldManagerMatricule: string | null,
-    newManagerMatricule: string,
+    newManagerMatricule: string | null,
     adminMatricule: string,
     ip: string,
   ): Promise<void> {

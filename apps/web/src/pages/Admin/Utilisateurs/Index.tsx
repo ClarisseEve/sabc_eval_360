@@ -10,10 +10,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAdminUsers } from '@/Hooks/queries';
 import { adminApi } from '@/Services/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Suspense, useCallback, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buildCreateUserPayload, initialCreateUserForm, isCreateUserFormValid, type CreateUserForm } from './create-user-contract';
 import { AdminUsersLayout } from './shared';
+import {
+    buildUpdateUserForm,
+    buildUpdateUserPayload,
+    initialUpdateUserForm,
+    isUpdateUserFormValid,
+    type EditableUser,
+    type RoleReference,
+    type UpdateUserForm,
+} from './update-user-contract';
 
 const createTextFields: Array<{
     key: keyof CreateUserForm;
@@ -28,7 +37,17 @@ const createTextFields: Array<{
     { key: 'password', label: 'Mot de passe', type: 'password' },
 ];
 
-const editableFields = ['nom', 'prenom', 'email', 'telephone', 'role', 'id_region', 'id_branche', 'manager_matricule', 'statut'] as const;
+const editTextFields: Array<{
+    key: 'nom' | 'prenom' | 'email' | 'telephone' | 'manager_matricule';
+    label: string;
+    type?: string;
+}> = [
+    { key: 'nom', label: 'Nom' },
+    { key: 'prenom', label: 'Prénom' },
+    { key: 'email', label: 'Adresse e-mail', type: 'email' },
+    { key: 'telephone', label: 'Téléphone', type: 'tel' },
+    { key: 'manager_matricule', label: 'Manager (matricule)' },
+];
 
 function Pagination({
     meta,
@@ -82,8 +101,9 @@ function UsersContent() {
     const [createOpen, setCreateOpen] = useState(false);
     const [createForm, setCreateForm] = useState(initialCreateUserForm);
 
-    const [editMatricule, setEditMatricule] = useState<string | null>(null);
-    const [editForm, setEditForm] = useState<Record<string, string>>({});
+    const [editSource, setEditSource] = useState<(EditableUser & { matricule: string }) | null>(null);
+    const [editForm, setEditForm] = useState<UpdateUserForm>(initialUpdateUserForm);
+    const editMatricule = editSource?.matricule ?? null;
 
     const handleSearch = useCallback(
         (value: string) => {
@@ -112,6 +132,11 @@ function UsersContent() {
     const users = response?.data ?? (Array.isArray(response) ? response : []);
     const meta = response?.meta ?? { total: users.length, page: 1, limit: 50, totalPages: 1 };
 
+    useEffect(() => {
+        if (!editSource || editForm.id_role || (roles as RoleReference[]).length === 0) return;
+        setEditForm(buildUpdateUserForm(editSource, roles as RoleReference[]));
+    }, [editForm.id_role, editSource, roles]);
+
     const refresh = async () => {
         await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
     };
@@ -122,23 +147,13 @@ function UsersContent() {
     };
 
     const openEdit = (user: any) => {
-        setEditMatricule(user.matricule);
-        setEditForm({
-            nom: user.nom || '',
-            prenom: user.prenom || '',
-            email: user.email || '',
-            telephone: user.telephone || '',
-            role: user.role || '',
-            id_region: user.id_region || '',
-            id_branche: user.id_branche || '',
-            manager_matricule: user.manager_matricule || '',
-            statut: user.statut || '',
-        });
+        setEditSource(user);
+        setEditForm(buildUpdateUserForm(user, roles as RoleReference[]));
     };
 
     const closeEdit = () => {
-        setEditMatricule(null);
-        setEditForm({});
+        setEditSource(null);
+        setEditForm(initialUpdateUserForm);
     };
 
     const createMutation = useMutation({
@@ -150,7 +165,7 @@ function UsersContent() {
     });
 
     const updateMutation = useMutation({
-        mutationFn: async () => adminApi.users.update(editMatricule!, editForm),
+        mutationFn: async () => adminApi.users.update(editMatricule!, buildUpdateUserPayload(editForm)),
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['admin', 'users', editMatricule] });
             closeEdit();
@@ -340,16 +355,66 @@ function UsersContent() {
                     </DialogHeader>
 
                     <div className="grid max-h-[60vh] gap-4 overflow-y-auto pr-1 md:grid-cols-2">
-                        {editableFields.map((key) => (
-                            <div key={key}>
-                                <Label htmlFor={`edit-${key}`}>{key}</Label>
+                        {editTextFields.map(({ key, label, type = 'text' }) => (
+                            <div key={key} className={key === 'manager_matricule' ? 'md:col-span-2' : undefined}>
+                                <Label htmlFor={`edit-${key}`}>{label}</Label>
                                 <Input
                                     id={`edit-${key}`}
-                                    value={editForm[key] ?? ''}
+                                    type={type}
+                                    value={editForm[key]}
                                     onChange={(e) => setEditForm((prev) => ({ ...prev, [key]: e.target.value }))}
                                 />
                             </div>
                         ))}
+                        <div>
+                            <Label>Rôle</Label>
+                            <Select value={editForm.id_role} onValueChange={(id_role) => setEditForm((prev) => ({ ...prev, id_role }))}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Sélectionner un rôle" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(roles as RoleReference[]).map((role) => (
+                                        <SelectItem key={role.id_role} value={role.id_role}>
+                                            {role.nom_role}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-sabc-gray-500 mt-1 text-xs">Branche, niveau et droits admin recalculés automatiquement.</p>
+                        </div>
+                        <div>
+                            <Label>Région</Label>
+                            <Select value={editForm.id_region} onValueChange={(id_region) => setEditForm((prev) => ({ ...prev, id_region }))}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Sélectionner une région" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(regions as any[]).map((region) => (
+                                        <SelectItem key={region.id_region} value={region.id_region}>
+                                            {region.nom_region}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="md:col-span-2">
+                            <Label>Statut</Label>
+                            <Select value={editForm.statut} onValueChange={(statut) => setEditForm((prev) => ({ ...prev, statut }))}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Conserver le statut géré par le système" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {editForm.statut === 'Indisponible' ? (
+                                        <SelectItem value="Indisponible" disabled>
+                                            Indisponible (géré par les remplacements)
+                                        </SelectItem>
+                                    ) : null}
+                                    <SelectItem value="Actif">Actif</SelectItem>
+                                    <SelectItem value="Inactif">Inactif</SelectItem>
+                                    <SelectItem value="Suspendu">Suspendu</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                         {updateError && <p className="text-sabc-red-primary text-sm md:col-span-2">{updateError}</p>}
                     </div>
 
@@ -359,7 +424,7 @@ function UsersContent() {
                         </Button>
                         <Button
                             className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white"
-                            disabled={updateMutation.isPending}
+                            disabled={!isUpdateUserFormValid(editForm) || updateMutation.isPending}
                             onClick={() => updateMutation.mutate()}
                         >
                             {updateMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}

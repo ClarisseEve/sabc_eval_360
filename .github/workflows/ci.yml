@@ -51,6 +51,9 @@ jobs:
       - name: Test frontend
         run: pnpm test:ci
 
+      - name: Audit frontend production dependencies
+        run: pnpm audit:prod
+
       - name: Build frontend
         run: pnpm build
 
@@ -94,6 +97,9 @@ jobs:
 
       - name: Test backend
         run: pnpm test:ci
+
+      - name: Audit backend production dependencies
+        run: pnpm audit:prod
 
       - name: Build backend
         run: pnpm build

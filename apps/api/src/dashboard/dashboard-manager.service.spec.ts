@@ -74,6 +74,9 @@ describe('DashboardManagerService', () => {
       expect(result.kpi.restantes).toBe(3);
       // taux_completion = 3/6*100 = 50
       expect(result.kpi.taux_completion).toBe(50);
+      expect(String(mockPg.query.mock.calls[1][0])).toContain(
+        "type_evaluation <> 'pairs'",
+      );
     });
 
     // Test 3: couleur statut subordonné correcte (green/orange/red/grey)

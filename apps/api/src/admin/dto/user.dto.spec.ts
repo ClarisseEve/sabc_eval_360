@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { CreateUserDto } from './user.dto';
+import { CreateUserDto, UpdateUserDto } from './user.dto';
 
 const validPayload = {
   matricule: 'U0001',
@@ -67,5 +67,65 @@ describe('CreateUserDto', () => {
     const errors = await validate(dto, { whitelist: true });
 
     expect(errors.some((error) => error.property === 'id_role')).toBe(true);
+  });
+});
+
+describe('UpdateUserDto', () => {
+  it('keeps canonical identifiers and strips every client-controlled derived field', async () => {
+    const dto = plainToInstance(UpdateUserDto, {
+      nom: 'Martin',
+      id_role: 'R0004',
+      id_region: 'RG002',
+      role: 'ADMIN',
+      role_nom: 'Administrateur',
+      region_nom: 'Région falsifiée',
+      type_region: 'taniere',
+      id_branche: 'FAKE',
+      est_admin: true,
+      est_actif: true,
+    });
+
+    const errors = await validate(dto, { whitelist: true });
+
+    expect(errors).toHaveLength(0);
+    expect(dto).toMatchObject({
+      nom: 'Martin',
+      id_role: 'R0004',
+      id_region: 'RG002',
+    });
+    for (const field of [
+      'role',
+      'role_nom',
+      'region_nom',
+      'type_region',
+      'id_branche',
+      'est_admin',
+      'est_actif',
+    ]) {
+      expect(dto).not.toHaveProperty(field);
+    }
+  });
+
+  it('normalizes optional empty strings and validates canonical identifiers', async () => {
+    const dto = plainToInstance(UpdateUserDto, {
+      id_role: '',
+      id_region: '',
+      manager_matricule: '   ',
+      telephone: '',
+      id_service: '',
+      id_district: '',
+      id_secteur: '',
+    });
+
+    const errors = await validate(dto, { whitelist: true });
+
+    expect(errors.map((error) => error.property)).toEqual(
+      expect.arrayContaining(['id_role', 'id_region']),
+    );
+    expect(dto.manager_matricule).toBeNull();
+    expect(dto.telephone).toBeNull();
+    expect(dto.id_service).toBeNull();
+    expect(dto.id_district).toBeNull();
+    expect(dto.id_secteur).toBeNull();
   });
 });

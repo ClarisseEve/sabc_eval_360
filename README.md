@@ -81,11 +81,18 @@ pnpm typecheck
 pnpm build
 pnpm test:api
 pnpm --dir apps/api test:e2e
+pnpm audit:prod
 pnpm lint
 ```
 
 `pnpm lint` est un contrôle non destructif. La CI vérifie séparément le
-frontend, l'API, les migrations sur des bases neuves et les tests E2E API.
+frontend, l'API, leurs dépendances de production, les migrations sur des bases
+neuves et les tests E2E API.
+
+L'audit frontend ignore explicitement `GHSA-qwww-vcr4-c8h2` : l'avis ne touche
+que le mode React Server Components/Actions, tandis que cette application est
+une SPA `BrowserRouter` sans RSC. La dérogation doit être retirée dès qu'une
+version corrigée de React Router est publiée et adoptée.
 
 ## Migrations et données
 
@@ -106,6 +113,10 @@ la structure canonique, autoriser une fois son baselining avec
 `PG_BASELINE_EXISTING=true`, puis retirer immédiatement cette variable. Un
 écart de colonnes, contraintes ou index impose une migration manuelle : le
 script ne devine ni ne transforme les données historiques.
+
+Les remplacements temporaires et l'état d'indisponibilité associé ont MySQL
+comme source unique. PostgreSQL ne doit pas recevoir de copie synchronisée de
+ces lignes.
 
 Le seed exige explicitement `SEED_PASSWORD`. Il est prévu pour les
 environnements locaux ou de recette ; en production, conserver :

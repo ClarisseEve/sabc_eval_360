@@ -13,10 +13,16 @@ export class AdminEvaluationsController {
   history(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('statut') statut?: string,
+    @Query('type_evaluation') typeEvaluation?: string,
+    @Query('id_periode') idPeriode?: string,
   ) {
     return this.evaluationsService.getHistoriqueGlobal({
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      statut,
+      type_evaluation: typeEvaluation,
+      id_periode: idPeriode,
     });
   }
 

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabasePgService } from '../database/database-pg.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../common/cache.service';
+import { EVALUATED_VISIBILITY_SQL } from '../evaluations/evaluation-visibility';
 import { getDoualaDate } from '../periodes/douala-date';
 
 export interface DashboardStats {
@@ -84,9 +85,13 @@ export class DashboardService {
         [matricule],
       ),
       this.pg.queryOne<{ note_globale: number }>(
-        `SELECT note_globale FROM evaluations
-         WHERE evalue_matricule = $1 AND statut = 'valide' AND note_globale IS NOT NULL
-         ORDER BY created_at DESC LIMIT 1`,
+        `SELECT e.note_globale FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.evalue_matricule = $1
+           AND e.statut = 'valide'
+           AND e.note_globale IS NOT NULL
+           AND ${EVALUATED_VISIBILITY_SQL}
+         ORDER BY e.created_at DESC LIMIT 1`,
         [matricule],
       ),
       this.pg.queryOne<{ id_periode: string; nom_periode: string; date_fin: string }>(

@@ -15,6 +15,7 @@ import {
 } from '@/Components/UI/Select';
 import { evaluationsApi, periodesApi } from '@/Services/api';
 import { EvaluationPageLayout, formatDisplayName } from './shared';
+import { buildCommonHistoryParams } from './history-query';
 import { History } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -56,10 +57,6 @@ function formatDate(dateStr?: string | null): string {
   }
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const PAGE_SIZE = 20;
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const Historique: React.FC = () => {
@@ -70,10 +67,12 @@ const Historique: React.FC = () => {
   const [type, setType]       = useState<string>('tous');
   const [page, setPage]       = useState(1);
 
-  // Fetch historique
+  const historyParams = buildCommonHistoryParams({ page, statut, periode, type });
+
+  // Fetch historique already filtered and paginated by the API.
   const { data: historiqueData, isLoading, isError } = useQuery({
-    queryKey: ['evaluations', 'historique', { statut, periode, type }],
-    queryFn: () => evaluationsApi.historique().then((r) => r.data),
+    queryKey: ['evaluations', 'historique', historyParams],
+    queryFn: () => evaluationsApi.historique(historyParams).then((r) => r.data),
   });
 
   // Fetch périodes for the filter dropdown
@@ -82,26 +81,20 @@ const Historique: React.FC = () => {
     queryFn: () => periodesApi.list().then((r) => r.data),
   });
 
-  // Normalise to array
-  const allEvaluations: Evaluation[] = Array.isArray(historiqueData)
+  const evaluations: Evaluation[] = Array.isArray(historiqueData)
     ? historiqueData
     : (historiqueData?.data ?? historiqueData?.evaluations ?? []);
+  const historyMeta = Array.isArray(historiqueData) ? undefined : historiqueData?.meta;
+  const total = Number(historyMeta?.total ?? evaluations.length);
+  const totalPages = Math.max(
+    1,
+    Number(historyMeta?.totalPages ?? Math.ceil(total / historyParams.limit!)),
+  );
+  const currentPage = Number(historyMeta?.page ?? page);
 
   const periodes: Record<string, any>[] = Array.isArray(periodesData)
     ? periodesData
     : (periodesData?.data ?? periodesData?.periodes ?? []);
-
-  // Client-side filtering (API may not support query params)
-  const filtered = allEvaluations.filter((ev) => {
-    if (statut !== 'tous' && ev.statut !== statut) return false;
-    if (periode !== 'tous' && String(ev.id_periode) !== String(periode)) return false;
-    if (type !== 'tous' && ev.type_evaluation !== type) return false;
-    return true;
-  });
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // Reset to page 1 when filters change
   function handleStatutChange(v: string)  { setStatut(v);  setPage(1); }
@@ -182,7 +175,7 @@ const Historique: React.FC = () => {
 
               {/* Result count */}
               <div className="mt-auto hidden text-sm text-sabc-gray-400 sm:block">
-                {filtered.length} résultat{filtered.length !== 1 ? 's' : ''}
+                {total} résultat{total !== 1 ? 's' : ''}
               </div>
             </div>
           </CardContent>
@@ -204,7 +197,7 @@ const Historique: React.FC = () => {
           </Alert>
         )}
 
-        {!isLoading && !isError && filtered.length === 0 && (
+        {!isLoading && !isError && evaluations.length === 0 && (
           <Alert>
             <History className="h-4 w-4" />
             <AlertTitle>Aucune évaluation dans l'historique</AlertTitle>
@@ -214,16 +207,16 @@ const Historique: React.FC = () => {
           </Alert>
         )}
 
-        {!isLoading && !isError && paginated.length > 0 && (
+        {!isLoading && !isError && evaluations.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                Évaluations — page {page} / {totalPages}
+                Évaluations — page {currentPage} / {totalPages}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-sabc-gray-100">
-                {paginated.map((ev) => {
+                {evaluations.map((ev) => {
                   const evalueName = formatDisplayName(ev.evalue ?? {});
                   const statutLabel = STATUT_LABELS[ev.statut] ?? ev.statut ?? '—';
                   const typeLabel   = TYPE_LABELS[ev.type_evaluation] ?? ev.type_evaluation ?? '—';
@@ -289,7 +282,7 @@ const Historique: React.FC = () => {
               Précédent
             </Button>
             <span className="text-sm text-sabc-gray-500">
-              Page {page} sur {totalPages}
+              Page {currentPage} sur {totalPages}
             </span>
             <Button
               variant="outline"

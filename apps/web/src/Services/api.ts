@@ -211,6 +211,14 @@ export const dashboardApi = {
   getAdmin: () => api.get('/dashboard/admin'),
 };
 
+export type EvaluationHistoryParams = {
+  page?: number;
+  limit?: number;
+  statut?: 'brouillon' | 'soumis' | 'valide' | 'rejete';
+  type_evaluation?: 'auto' | 'descendante' | 'ascendante' | 'pairs' | '360';
+  id_periode?: string;
+};
+
 export const evaluationsApi = {
   list: () => api.get('/evaluations'),
   create: (data: { evaluateur_matricule: string; evalue_matricule: string; id_periode: string; id_regle: string }) =>
@@ -227,7 +235,8 @@ export const evaluationsApi = {
     }),
   periodesActives: () => api.get('/evaluations/periodes-actives'),
   eligibles: () => api.get('/evaluations/eligibles'),
-  historique: () => api.get('/evaluations/historique'),
+  historique: (params?: EvaluationHistoryParams) =>
+    api.get('/evaluations/historique', { params }),
   rapport: (idPeriode: string) => api.get(`/evaluations/rapport/${idPeriode}`),
   rappels: (idPeriode: string) => api.post(`/evaluations/rappels/${idPeriode}`),
 };
@@ -292,6 +301,20 @@ export const reglesApi = {
   delete: (id: string) => api.delete(`/regles/${id}`),
 };
 
+export type AdminUserUpdatePayload = {
+  nom?: string;
+  prenom?: string;
+  email?: string;
+  telephone?: string | null;
+  id_role?: string;
+  id_region?: string;
+  manager_matricule?: string | null;
+  id_service?: string | null;
+  id_district?: string | null;
+  id_secteur?: string | null;
+  statut?: 'Actif' | 'Inactif' | 'Suspendu';
+};
+
 export const adminApi = {
   users: {
     list: (params?: any) => api.get('/admin/utilisateurs', { params }),
@@ -299,7 +322,8 @@ export const adminApi = {
     historique: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}/historique`),
     chaine: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}/chaine`),
     create: (data: any) => api.post('/admin/utilisateurs', data),
-    update: (matricule: string, data: any) => api.put(`/admin/utilisateurs/${matricule}`, data),
+    update: (matricule: string, data: AdminUserUpdatePayload) =>
+      api.put(`/admin/utilisateurs/${matricule}`, data),
     delete: (matricule: string) => api.delete(`/admin/utilisateurs/${matricule}`),
     subordonnes: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}/subordonnes`),
   },
@@ -333,7 +357,8 @@ export const adminApi = {
     branches: () => api.get('/admin/structure/branches'),
   },
   evaluations: {
-    history: (params?: any) => api.get('/admin/evaluations/history', { params }),
+    history: (params?: EvaluationHistoryParams) =>
+      api.get('/admin/evaluations/history', { params }),
     get: (id: string) => api.get(`/admin/evaluations/${id}`),
   },
 };

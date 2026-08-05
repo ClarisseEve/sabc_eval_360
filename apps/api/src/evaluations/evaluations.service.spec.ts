@@ -258,6 +258,8 @@ describe('EvaluationsService', () => {
   });
 
   describe('getHistorique', () => {
+    const periodeId = '11111111-1111-4111-8111-111111111111';
+
     it("ne révèle pas les brouillons à l'utilisateur évalué", async () => {
       mockPg.query.mockResolvedValue([]);
       mockPg.queryOne.mockResolvedValue({ total: '0' });
@@ -271,6 +273,94 @@ describe('EvaluationsService', () => {
         expect(sql).toContain("e.statut IN ('soumis', 'valide')");
         expect(sql).toContain("'{visibility_policy,evaluated}'");
       }
+    });
+
+    it('applique les filtres avant la pagination et compte le même périmètre', async () => {
+      mockPg.query.mockResolvedValue([]);
+      mockPg.queryOne.mockResolvedValue({ total: '61' });
+
+      const result = await service.getHistorique('M2', {
+        page: 2,
+        limit: 30,
+        statut: 'valide',
+        type_evaluation: 'pairs',
+        id_periode: periodeId,
+      });
+
+      const [historySql, historyParams] = mockPg.query.mock.calls[0];
+      const [countSql, countParams] = mockPg.queryOne.mock.calls[0];
+      for (const sql of [String(historySql), String(countSql)]) {
+        expect(sql).toContain('e.statut = $2');
+        expect(sql).toContain('e.type_evaluation = $3');
+        expect(sql).toContain('e.id_periode = $4');
+      }
+      expect(String(historySql)).toContain('LIMIT $5 OFFSET $6');
+      expect(historyParams).toEqual(['M2', 'valide', 'pairs', periodeId, 30, 30]);
+      expect(countParams).toEqual(['M2', 'valide', 'pairs', periodeId]);
+      expect(result).toEqual({
+        data: [],
+        meta: {
+          total: 61,
+          page: 2,
+          limit: 30,
+          totalPages: 3,
+          filters: {
+            statut: 'valide',
+            type_evaluation: 'pairs',
+            id_periode: periodeId,
+          },
+        },
+      });
+    });
+
+    it('applique aussi les filtres au périmètre administrateur', async () => {
+      mockPg.query.mockResolvedValue([]);
+      mockPg.queryOne.mockResolvedValue({ total: '45' });
+
+      const result = await service.getHistoriqueGlobal({
+        page: 3,
+        limit: 20,
+        statut: 'rejete',
+        type_evaluation: 'auto',
+        id_periode: periodeId,
+      });
+
+      const [historySql, historyParams] = mockPg.query.mock.calls[0];
+      const [countSql, countParams] = mockPg.queryOne.mock.calls[0];
+      for (const sql of [String(historySql), String(countSql)]) {
+        expect(sql).toContain("'{visibility_policy,admin}'");
+        expect(sql).toContain('e.statut = $1');
+        expect(sql).toContain('e.type_evaluation = $2');
+        expect(sql).toContain('e.id_periode = $3');
+      }
+      expect(String(historySql)).toContain('LIMIT $4 OFFSET $5');
+      expect(historyParams).toEqual(['rejete', 'auto', periodeId, 20, 40]);
+      expect(countParams).toEqual(['rejete', 'auto', periodeId]);
+      expect(result.meta).toEqual({
+        total: 45,
+        page: 3,
+        limit: 20,
+        totalPages: 3,
+        filters: {
+          statut: 'rejete',
+          type_evaluation: 'auto',
+          id_periode: periodeId,
+        },
+      });
+    });
+
+    it.each([
+      [{ page: 0 }, 'page nulle'],
+      [{ page: 1.5 }, 'page décimale'],
+      [{ limit: 0 }, 'limite nulle'],
+      [{ limit: 101 }, 'limite trop élevée'],
+      [{ statut: 'validé' }, 'statut inconnu'],
+      [{ type_evaluation: 'annuelle' }, 'type inconnu'],
+      [{ id_periode: 'pas-un-uuid' }, 'période mal formée'],
+    ])('rejette une requête historique invalide (%s)', async (query, _description) => {
+      await expect(service.getHistorique('M2', query)).rejects.toThrow(BadRequestException);
+      expect(mockPg.query).not.toHaveBeenCalled();
+      expect(mockPg.queryOne).not.toHaveBeenCalled();
     });
   });
 

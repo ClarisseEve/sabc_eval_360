@@ -46,7 +46,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigate = useNavigate();
 
   // The role only controls navigation/badge loading; the API authorizes every queue item.
-  const canValidate = Boolean(authUser?.role) && VALIDATION_QUEUE_ROLES.includes(normalizeRole(authUser?.role));
+  const canValidate =
+    Boolean(authUser?.role) &&
+    VALIDATION_QUEUE_ROLES.includes(normalizeRole(authUser?.role));
 
   const { data: pendingCount = 0 } = useQuery({
     queryKey: ['evaluations', 'pending', 'count'],

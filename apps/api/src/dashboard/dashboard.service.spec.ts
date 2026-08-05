@@ -52,6 +52,9 @@ describe('DashboardService', () => {
         nom: 'S1 2027',
         fin: '2027-06-30',
       });
+      expect(String(mockPg.queryOne.mock.calls[2][0])).toContain(
+        "'{visibility_policy,evaluated}'",
+      );
     });
 
     it('should return null score when no validated evaluation exists', async () => {

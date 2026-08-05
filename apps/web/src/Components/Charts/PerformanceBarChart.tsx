@@ -4,7 +4,6 @@ import {
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/Components/UI/Card/Card';
 import { cn } from '@/utils/helpers';
-import { error } from 'console';
 
 export interface BarChartData {
   name: string;

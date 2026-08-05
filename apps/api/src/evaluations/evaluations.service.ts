@@ -59,6 +59,26 @@ export interface EvaluationActor {
   is_admin?: boolean;
 }
 
+export interface EvaluationHistoryQuery {
+  page?: number;
+  limit?: number;
+  statut?: string;
+  type_evaluation?: string;
+  id_periode?: string;
+}
+
+interface NormalizedEvaluationHistoryQuery {
+  page: number;
+  limit: number;
+  statut?: string;
+  type_evaluation?: string;
+  id_periode?: string;
+}
+
+const EVALUATION_HISTORY_STATUSES = new Set(['brouillon', 'soumis', 'valide', 'rejete']);
+const EVALUATION_HISTORY_TYPES = new Set(['auto', 'descendante', 'ascendante', 'pairs', '360']);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class EvaluationsService {
   constructor(
@@ -69,6 +89,60 @@ export class EvaluationsService {
     private notifications: NotificationsService,
     private eligibility: EligibilityService,
   ) {}
+
+  private normalizeHistoryQuery(query: EvaluationHistoryQuery = {}): NormalizedEvaluationHistoryQuery {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    if (!Number.isSafeInteger(page) || page < 1) {
+      throw new BadRequestException('Le numéro de page doit être un entier supérieur ou égal à 1');
+    }
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw new BadRequestException('La limite doit être un entier compris entre 1 et 100');
+    }
+
+    const statut = query.statut?.trim() || undefined;
+    if (statut && !EVALUATION_HISTORY_STATUSES.has(statut)) {
+      throw new BadRequestException(`Statut historique invalide: ${statut}`);
+    }
+
+    const typeEvaluation = query.type_evaluation?.trim() || undefined;
+    if (typeEvaluation && !EVALUATION_HISTORY_TYPES.has(typeEvaluation)) {
+      throw new BadRequestException(`Type d'évaluation historique invalide: ${typeEvaluation}`);
+    }
+
+    const idPeriode = query.id_periode?.trim() || undefined;
+    if (idPeriode && !UUID_PATTERN.test(idPeriode)) {
+      throw new BadRequestException('Identifiant de période invalide');
+    }
+
+    return {
+      page,
+      limit,
+      statut,
+      type_evaluation: typeEvaluation,
+      id_periode: idPeriode,
+    };
+  }
+
+  private appendHistoryFilters(
+    query: NormalizedEvaluationHistoryQuery,
+    params: unknown[],
+  ): string[] {
+    const clauses: string[] = [];
+    if (query.statut) {
+      params.push(query.statut);
+      clauses.push(`e.statut = $${params.length}`);
+    }
+    if (query.type_evaluation) {
+      params.push(query.type_evaluation);
+      clauses.push(`e.type_evaluation = $${params.length}`);
+    }
+    if (query.id_periode) {
+      params.push(query.id_periode);
+      clauses.push(`e.id_periode = $${params.length}`);
+    }
+    return clauses;
+  }
 
   async canCreate(evaluateurMatricule: string, evalueMatricule: string, idRegle?: string): Promise<boolean> {
     const evaluateur = await this.prisma.utilisateur.findUnique({ where: { matricule: evaluateurMatricule } });
@@ -589,36 +663,48 @@ export class EvaluationsService {
     );
   }
 
-  async getHistorique(matricule: string, pagination?: { page?: number; limit?: number }) {
-    const page = Math.max(1, pagination?.page ?? 1);
-    const limit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+  async getHistorique(matricule: string, query: EvaluationHistoryQuery = {}) {
+    const normalized = this.normalizeHistoryQuery(query);
+    const { page, limit } = normalized;
     const offset = (page - 1) * limit;
+    const filterParams: unknown[] = [matricule];
+    const filterClauses = this.appendHistoryFilters(normalized, filterParams);
+    const filtersSql = filterClauses.length > 0 ? `AND ${filterClauses.join(' AND ')}` : '';
+    const dataParams = [...filterParams, limit, offset];
+    const limitParam = filterParams.length + 1;
+    const offsetParam = filterParams.length + 2;
 
     const [evaluations, countRow] = await Promise.all([
       this.pg.query<Evaluation>(
         `SELECT e.* FROM evaluations e
          LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
-         WHERE e.evaluateur_matricule = $1
-            OR e.validateur_matricule = $1
-            OR (
-              e.evalue_matricule = $1
-              AND e.statut IN ('soumis', 'valide')
-              AND ${EVALUATED_VISIBILITY_SQL}
-            )
-         ORDER BY e.date_creation DESC LIMIT $2 OFFSET $3`,
-        [matricule, limit, offset],
+         WHERE (
+           e.evaluateur_matricule = $1
+           OR e.validateur_matricule = $1
+           OR (
+             e.evalue_matricule = $1
+             AND e.statut IN ('soumis', 'valide')
+             AND ${EVALUATED_VISIBILITY_SQL}
+           )
+         )
+         ${filtersSql}
+         ORDER BY e.date_creation DESC LIMIT $${limitParam} OFFSET $${offsetParam}`,
+        dataParams,
       ),
       this.pg.queryOne<{ total: string }>(
         `SELECT COUNT(*)::text as total FROM evaluations e
          LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
-         WHERE e.evaluateur_matricule = $1
-            OR e.validateur_matricule = $1
-            OR (
-              e.evalue_matricule = $1
-              AND e.statut IN ('soumis', 'valide')
-              AND ${EVALUATED_VISIBILITY_SQL}
-            )`,
-        [matricule],
+         WHERE (
+           e.evaluateur_matricule = $1
+           OR e.validateur_matricule = $1
+           OR (
+             e.evalue_matricule = $1
+             AND e.statut IN ('soumis', 'valide')
+             AND ${EVALUATED_VISIBILITY_SQL}
+           )
+         )
+         ${filtersSql}`,
+        filterParams,
       ),
     ]);
 
@@ -640,28 +726,50 @@ export class EvaluationsService {
           ]
         : [];
     });
-    const total = parseInt(countRow?.total ?? '0');
-    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+    const total = parseInt(countRow?.total ?? '0', 10);
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        filters: {
+          statut: normalized.statut ?? null,
+          type_evaluation: normalized.type_evaluation ?? null,
+          id_periode: normalized.id_periode ?? null,
+        },
+      },
+    };
   }
 
-  async getHistoriqueGlobal(pagination?: { page?: number; limit?: number }) {
-    const page = Math.max(1, pagination?.page ?? 1);
-    const limit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+  async getHistoriqueGlobal(query: EvaluationHistoryQuery = {}) {
+    const normalized = this.normalizeHistoryQuery(query);
+    const { page, limit } = normalized;
     const offset = (page - 1) * limit;
+    const filterParams: unknown[] = [];
+    const filterClauses = this.appendHistoryFilters(normalized, filterParams);
+    const filtersSql = filterClauses.length > 0 ? `AND ${filterClauses.join(' AND ')}` : '';
+    const dataParams = [...filterParams, limit, offset];
+    const limitParam = filterParams.length + 1;
+    const offsetParam = filterParams.length + 2;
 
     const [evaluations, countRow] = await Promise.all([
       this.pg.query<Evaluation>(
         `SELECT e.* FROM evaluations e
          LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
          WHERE ${ruleVisibilitySql('admin')}
+         ${filtersSql}
          ORDER BY COALESCE(e.date_soumission, e.updated_at, e.created_at) DESC
-         LIMIT $1 OFFSET $2`,
-        [limit, offset],
+         LIMIT $${limitParam} OFFSET $${offsetParam}`,
+        dataParams,
       ),
       this.pg.queryOne<{ total: string }>(
         `SELECT COUNT(*)::text as total FROM evaluations e
          LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
-         WHERE ${ruleVisibilitySql('admin')}`,
+         WHERE ${ruleVisibilitySql('admin')}
+         ${filtersSql}`,
+        filterParams,
       ),
     ]);
 
@@ -672,8 +780,21 @@ export class EvaluationsService {
         ? [redactEvaluationForVisibility(evaluation, { policy })]
         : [];
     });
-    const total = parseInt(countRow?.total ?? '0');
-    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+    const total = parseInt(countRow?.total ?? '0', 10);
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        filters: {
+          statut: normalized.statut ?? null,
+          type_evaluation: normalized.type_evaluation ?? null,
+          id_periode: normalized.id_periode ?? null,
+        },
+      },
+    };
   }
 
   async getEligibles(matricule: string) {

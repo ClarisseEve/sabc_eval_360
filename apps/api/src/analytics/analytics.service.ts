@@ -5,6 +5,13 @@ import { CacheService } from '../common/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { getDoualaDate } from '../periodes/douala-date';
+import {
+  EVALUATED_VISIBILITY_SQL,
+  ruleVisibilityDetailSql,
+  ruleVisibilitySql,
+} from '../evaluations/evaluation-visibility';
+
+type AnalyticsVisibilityAudience = 'evaluated' | 'admin';
 
 type ImprovementPlanFilters = {
   role?: string;
@@ -47,6 +54,8 @@ function clampLimit(value: unknown, fallback = 100, max = 500): number {
 
 const EVALUATION_EFFECTIVE_TS_SQL = `COALESCE(date_validation, date_soumission, created_at, date_creation::timestamp)`;
 const EVALUATION_EFFECTIVE_DATE_SQL = `COALESCE(date_validation::date, date_soumission::date, created_at::date, date_creation)`;
+const EVALUATION_EFFECTIVE_TS_E_SQL = `COALESCE(e.date_validation, e.date_soumission, e.created_at, e.date_creation::timestamp)`;
+const EVALUATION_EFFECTIVE_DATE_E_SQL = `COALESCE(e.date_validation::date, e.date_soumission::date, e.created_at::date, e.date_creation)`;
 const USER_REF_TABLE = 'utilisateurs_ref';
 
 @Injectable()
@@ -115,11 +124,16 @@ export class AnalyticsService {
 
   async runRecommandationsBatch(): Promise<{ inserted: number }> {
     const usersWithEvals = await this.pg.query<{ matricule: string }>(
-      `SELECT DISTINCT evalue_matricule as matricule FROM evaluations WHERE statut = 'valide' AND note_globale IS NOT NULL LIMIT 200`,
+      `SELECT DISTINCT e.evalue_matricule as matricule
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
+         AND ${ruleVisibilitySql('admin')}
+       LIMIT 200`,
     );
     let inserted = 0;
     for (const row of usersWithEvals) {
-      const recos = await this._getRecommandations(row.matricule);
+      const recos = await this._getRecommandations(row.matricule, 'admin');
       for (const reco of recos.recommandations ?? []) {
         await this.pg.query(
           `INSERT INTO recommandations_admin (type, priorite, matricule, titre, description, details)
@@ -208,10 +222,12 @@ export class AnalyticsService {
     const endDate = filters.end_date ?? new Date().toISOString().split('T')[0];
 
     return this.pg.query(
-      `SELECT statut, COUNT(*) as count
-       FROM evaluations
-       WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2
-       GROUP BY statut`,
+      `SELECT e.statut, COUNT(*) as count
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2
+         AND ${ruleVisibilitySql('admin')}
+       GROUP BY e.statut`,
       [startDate, endDate],
     );
   }
@@ -221,26 +237,34 @@ export class AnalyticsService {
     const endDate = filters.end_date ?? new Date().toISOString().split('T')[0];
 
     return this.pg.query(
-      `SELECT type_evaluation as channel,
-              AVG(note_globale) as average_score,
+      `SELECT e.type_evaluation as channel,
+              AVG(e.note_globale) as average_score,
               COUNT(*) as count
-       FROM evaluations
-       WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2 AND note_globale IS NOT NULL
-       GROUP BY type_evaluation`,
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2
+         AND e.note_globale IS NOT NULL
+         AND ${ruleVisibilitySql('admin')}
+       GROUP BY e.type_evaluation`,
       [startDate, endDate],
     );
   }
 
-  async getRegionAnalytics(idRegion: string) {
+  async getRegionAnalytics(
+    idRegion: string,
+    audience: AnalyticsVisibilityAudience = 'evaluated',
+  ) {
     return this.pg.query(
       `SELECT
          COUNT(*) as total_evaluations,
-         COUNT(*) FILTER (WHERE statut = 'valide') as validees,
-         AVG(note_globale) FILTER (WHERE note_globale IS NOT NULL) as score_moyen
-       FROM evaluations
-       WHERE evalue_matricule IN (
+         COUNT(*) FILTER (WHERE e.statut = 'valide') as validees,
+         AVG(e.note_globale) FILTER (WHERE e.note_globale IS NOT NULL) as score_moyen
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.evalue_matricule IN (
          SELECT matricule FROM ${USER_REF_TABLE} WHERE id_region = $1
-       )`,
+       )
+         AND ${audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL}`,
       [idRegion],
     );
   }
@@ -262,16 +286,18 @@ export class AnalyticsService {
         const startDate = filters.start_date;
         const endDate = filters.end_date;
         const dateFilter = startDate && endDate
-          ? `WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2`
+          ? `AND ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2`
           : '';
         const dateParams = startDate && endDate ? [startDate, endDate] : [];
         return this.pg.queryOne<any>(
           `SELECT
              COUNT(*)::text as total_evaluations,
-             COUNT(*) FILTER (WHERE statut = 'valide')::text as validated_evaluations,
-             COUNT(*) FILTER (WHERE statut = 'soumis')::text as submitted_evaluations,
-             COUNT(*) FILTER (WHERE statut = 'brouillon')::text as draft_evaluations
-           FROM evaluations ${dateFilter}`,
+             COUNT(*) FILTER (WHERE e.statut = 'valide')::text as validated_evaluations,
+             COUNT(*) FILTER (WHERE e.statut = 'soumis')::text as submitted_evaluations,
+             COUNT(*) FILTER (WHERE e.statut = 'brouillon')::text as draft_evaluations
+           FROM evaluations e
+           LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+           WHERE ${ruleVisibilitySql('admin')} ${dateFilter}`,
           dateParams,
         );
       })(),
@@ -379,8 +405,8 @@ export class AnalyticsService {
   private async _getAdminRegionDetail(idRegion: string) {
     const [overview, statsRows, classement] = await Promise.all([
       this.getAdminRegionsOverview(),
-      this.getRegionAnalytics(idRegion),
-      this.getClassementRegional(idRegion),
+      this.getRegionAnalytics(idRegion, 'admin'),
+      this.getClassementRegional(idRegion, 'admin'),
     ]);
 
     const region = Array.isArray(overview.regions)
@@ -410,27 +436,33 @@ export class AnalyticsService {
     const kpis = await this.pg.queryOne<any>(
       `SELECT
          COUNT(*) as total_evaluations,
-         COUNT(DISTINCT evalue_matricule) as unique_users,
-         AVG(note_globale) as average_score
-       FROM evaluations
-       WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2`,
+         COUNT(DISTINCT e.evalue_matricule) as unique_users,
+         AVG(e.note_globale) as average_score
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2
+         AND ${ruleVisibilitySql('admin')}`,
       [startDate, endDate],
     );
 
     const channels = await this.pg.query(
-      `SELECT type_evaluation as channel, COUNT(*) as total, AVG(note_globale) as average_score
-       FROM evaluations
-       WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2
-       GROUP BY type_evaluation`,
+      `SELECT e.type_evaluation as channel, COUNT(*) as total, AVG(e.note_globale) as average_score
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2
+         AND ${ruleVisibilitySql('admin')}
+       GROUP BY e.type_evaluation`,
       [startDate, endDate],
     );
 
     const trends = await this.pg.query(
-      `SELECT TO_CHAR(${EVALUATION_EFFECTIVE_DATE_SQL}, 'YYYY-MM') as period,
-              AVG(note_globale) as score, COUNT(*) as count
-       FROM evaluations
-       WHERE ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2
-       GROUP BY TO_CHAR(${EVALUATION_EFFECTIVE_DATE_SQL}, 'YYYY-MM')
+      `SELECT TO_CHAR(${EVALUATION_EFFECTIVE_DATE_E_SQL}, 'YYYY-MM') as period,
+              AVG(e.note_globale) as score, COUNT(*) as count
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2
+         AND ${ruleVisibilitySql('admin')}
+       GROUP BY TO_CHAR(${EVALUATION_EFFECTIVE_DATE_E_SQL}, 'YYYY-MM')
        ORDER BY period`,
       [startDate, endDate],
     );
@@ -447,16 +479,31 @@ export class AnalyticsService {
   }
 
   // ─── Axes d'amélioration pour un utilisateur ─────────────────────────────
-  async getAxesAmelioration(matricule: string) {
-    return this.cache.getOrCompute(`analytics:axes:${matricule}`, 300, () => this._getAxesAmelioration(matricule));
+  async getAxesAmelioration(
+    matricule: string,
+    audience: AnalyticsVisibilityAudience = 'evaluated',
+  ) {
+    return this.cache.getOrCompute(`analytics:axes:${audience}:${matricule}`, 300, () =>
+      this._getAxesAmelioration(matricule, audience),
+    );
   }
 
-  private async _getAxesAmelioration(matricule: string) {
+  private async _getAxesAmelioration(
+    matricule: string,
+    audience: AnalyticsVisibilityAudience,
+  ) {
+    const visibilitySql =
+      audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL;
     const evaluations = await this.pg.query<any>(
-      `SELECT notations_json, type_evaluation, note_globale
-       FROM evaluations
-       WHERE evalue_matricule = $1 AND statut = 'valide' AND notations_json IS NOT NULL
-       ORDER BY ${EVALUATION_EFFECTIVE_TS_SQL} DESC LIMIT 20`,
+      `SELECT e.notations_json, e.type_evaluation, e.note_globale
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.evalue_matricule = $1
+         AND e.statut = 'valide'
+         AND e.notations_json IS NOT NULL
+         AND ${visibilitySql}
+         AND ${ruleVisibilityDetailSql('detailed')}
+       ORDER BY ${EVALUATION_EFFECTIVE_TS_E_SQL} DESC LIMIT 20`,
       [matricule],
     );
 
@@ -543,7 +590,9 @@ export class AnalyticsService {
       orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
     });
 
-    const snapshots = await this.mapWithConcurrency(users, 8, async (user) => this.buildImprovementPlanSnapshot(user));
+    const snapshots = await this.mapWithConcurrency(users, 8, async (user) =>
+      this.buildImprovementPlanSnapshot(user, 'admin'),
+    );
     const allRows = this.buildImprovementRows(snapshots);
     const filteredRows = filters.type ? allRows.filter((row) => row.type === filters.type) : allRows;
     const groupedByType = new Map<string, { total: number; highPriority: number; users: Set<string> }>();
@@ -629,7 +678,12 @@ export class AnalyticsService {
                ELSE 0
              END as taux_completion
       FROM periodes_evaluation p
-      LEFT JOIN evaluations e ON e.id_periode = p.id_periode
+      LEFT JOIN (
+        SELECT evaluation.*
+        FROM evaluations evaluation
+        LEFT JOIN regles_evaluation rule ON rule.id_regle = evaluation.id_regle
+        WHERE ${ruleVisibilitySql('admin', 'rule')}
+      ) e ON e.id_periode = p.id_periode
         ${regionClause}
         ${roleClause}
       ${whereClause}
@@ -715,9 +769,13 @@ export class AnalyticsService {
        FROM evaluations e_auto
        JOIN evaluations e_autres ON e_auto.evalue_matricule = e_autres.evalue_matricule
          AND e_auto.id_periode = e_autres.id_periode
+       LEFT JOIN regles_evaluation r_auto ON r_auto.id_regle = e_auto.id_regle
+       LEFT JOIN regles_evaluation r_autres ON r_autres.id_regle = e_autres.id_regle
        WHERE e_auto.type_evaluation = 'auto' AND e_auto.statut = 'valide'
          AND e_autres.type_evaluation != 'auto' AND e_autres.statut = 'valide'
          AND e_auto.note_globale IS NOT NULL AND e_autres.note_globale IS NOT NULL
+         AND ${ruleVisibilitySql('admin', 'r_auto')}
+         AND ${ruleVisibilitySql('admin', 'r_autres')}
          ${matricule ? 'AND e_auto.evalue_matricule = $1' : ''}
        GROUP BY e_auto.evalue_matricule
        HAVING ABS(AVG(e_auto.note_globale) - AVG(e_autres.note_globale)) > 1.5`,
@@ -740,22 +798,26 @@ export class AnalyticsService {
 
     // 2. Baisse de performance (progression < -1 pt sur 3 mois)
     const baisses = await this.pg.query<any>(
-      `WITH recent AS (
-         SELECT evalue_matricule, AVG(note_globale) as score_recent
-         FROM evaluations
-         WHERE statut = 'valide' AND note_globale IS NOT NULL
-           AND ${EVALUATION_EFFECTIVE_TS_SQL} >= NOW() - INTERVAL '3 months'
-           ${matricule ? 'AND evalue_matricule = $1' : ''}
-         GROUP BY evalue_matricule
+       `WITH recent AS (
+         SELECT e.evalue_matricule, AVG(e.note_globale) as score_recent
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
+           AND ${ruleVisibilitySql('admin')}
+           AND ${EVALUATION_EFFECTIVE_TS_E_SQL} >= NOW() - INTERVAL '3 months'
+           ${matricule ? 'AND e.evalue_matricule = $1' : ''}
+         GROUP BY e.evalue_matricule
        ),
        ancien AS (
-         SELECT evalue_matricule, AVG(note_globale) as score_ancien
-         FROM evaluations
-         WHERE statut = 'valide' AND note_globale IS NOT NULL
-           AND ${EVALUATION_EFFECTIVE_TS_SQL} < NOW() - INTERVAL '3 months'
-           AND ${EVALUATION_EFFECTIVE_TS_SQL} >= NOW() - INTERVAL '6 months'
-           ${matricule ? 'AND evalue_matricule = $1' : ''}
-         GROUP BY evalue_matricule
+         SELECT e.evalue_matricule, AVG(e.note_globale) as score_ancien
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
+           AND ${ruleVisibilitySql('admin')}
+           AND ${EVALUATION_EFFECTIVE_TS_E_SQL} < NOW() - INTERVAL '3 months'
+           AND ${EVALUATION_EFFECTIVE_TS_E_SQL} >= NOW() - INTERVAL '6 months'
+           ${matricule ? 'AND e.evalue_matricule = $1' : ''}
+         GROUP BY e.evalue_matricule
        )
        SELECT r.evalue_matricule as matricule,
               r.score_recent, a.score_ancien,
@@ -781,15 +843,18 @@ export class AnalyticsService {
 
     // 3. Uniformité des évaluations (variance < 0.5 = manque de différenciation)
     const uniformites = await this.pg.query<any>(
-      `SELECT evaluateur_matricule as matricule,
+      `SELECT e.evaluateur_matricule as matricule,
               COUNT(*) as nb_evaluations,
-              VARIANCE(note_globale) as variance_notes,
-              AVG(note_globale) as moyenne_notes
-       FROM evaluations
-       WHERE statut = 'valide' AND note_globale IS NOT NULL AND type_evaluation != 'auto'
-         ${matricule ? 'AND evaluateur_matricule = $1' : ''}
-       GROUP BY evaluateur_matricule
-       HAVING COUNT(*) >= 3 AND VARIANCE(note_globale) < 0.5`,
+              VARIANCE(e.note_globale) as variance_notes,
+              AVG(e.note_globale) as moyenne_notes
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
+         AND e.type_evaluation NOT IN ('auto', 'pairs')
+         AND ${ruleVisibilitySql('admin')}
+         ${matricule ? 'AND e.evaluateur_matricule = $1' : ''}
+       GROUP BY e.evaluateur_matricule
+       HAVING COUNT(*) >= 3 AND VARIANCE(e.note_globale) < 0.5`,
       params,
     );
 
@@ -810,16 +875,24 @@ export class AnalyticsService {
     // 4. Biais évaluateur (moyenne systématiquement haute/basse vs moyenne globale)
     const biaisResult = await this.pg.query<any>(
       `WITH global_avg AS (
-         SELECT AVG(note_globale) as avg_global FROM evaluations
-         WHERE statut = 'valide' AND note_globale IS NOT NULL AND type_evaluation != 'auto'
+         SELECT AVG(e.note_globale) as avg_global
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
+           AND e.type_evaluation NOT IN ('auto', 'pairs')
+           AND ${ruleVisibilitySql('admin')}
        )
        SELECT e.evaluateur_matricule as matricule,
               AVG(e.note_globale) as moyenne_evaluateur,
               g.avg_global,
               AVG(e.note_globale) - g.avg_global as ecart_vs_global,
               COUNT(*) as nb_evaluations
-       FROM evaluations e, global_avg g
-       WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL AND e.type_evaluation != 'auto'
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       CROSS JOIN global_avg g
+       WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
+         AND e.type_evaluation NOT IN ('auto', 'pairs')
+         AND ${ruleVisibilitySql('admin')}
          ${matricule ? 'AND e.evaluateur_matricule = $1' : ''}
        GROUP BY e.evaluateur_matricule, g.avg_global
        HAVING COUNT(*) >= 3 AND ABS(AVG(e.note_globale) - g.avg_global) > 1`,
@@ -855,14 +928,22 @@ export class AnalyticsService {
   }
 
   // ─── Recommandations personnalisées ─────────────────────────────────────
-  async getRecommandations(matricule: string) {
-    return this.cache.getOrCompute(`analytics:reco:${matricule}`, 300, () => this._getRecommandations(matricule));
+  async getRecommandations(
+    matricule: string,
+    audience: AnalyticsVisibilityAudience = 'evaluated',
+  ) {
+    return this.cache.getOrCompute(`analytics:reco:${audience}:${matricule}`, 300, () =>
+      this._getRecommandations(matricule, audience),
+    );
   }
 
-  private async _getRecommandations(matricule: string) {
+  private async _getRecommandations(
+    matricule: string,
+    audience: AnalyticsVisibilityAudience,
+  ) {
     const [axes, scores, user] = await Promise.all([
-      this.getAxesAmelioration(matricule),
-      this.getScoresUtilisateur(matricule),
+      this.getAxesAmelioration(matricule, audience),
+      this.getScoresUtilisateur(matricule, audience),
       this.prisma.utilisateur.findUnique({
         where: { matricule },
         select: {
@@ -909,9 +990,11 @@ export class AnalyticsService {
                 AVG(e.note_globale) as score_moyen
          FROM evaluations e
          JOIN ${USER_REF_TABLE} u ON e.evalue_matricule = u.matricule
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
          WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
            AND u.id_region = $1 AND u.est_actif = true
            AND e.evalue_matricule != $2
+           AND ${audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL}
          GROUP BY e.evalue_matricule, u.nom, u.prenom, u.role
          HAVING AVG(e.note_globale) >= 4
          ORDER BY AVG(e.note_globale) DESC LIMIT 3`,
@@ -987,8 +1070,13 @@ export class AnalyticsService {
   }
 
   // ─── Scores détaillés utilisateur ────────────────────────────────────────
-  async getScoresUtilisateur(matricule: string) {
-    return this.cache.getOrCompute(`analytics:scores:${matricule}`, 120, () => this._getScoresUtilisateur(matricule));
+  async getScoresUtilisateur(
+    matricule: string,
+    audience: AnalyticsVisibilityAudience = 'evaluated',
+  ) {
+    return this.cache.getOrCompute(`analytics:scores:${audience}:${matricule}`, 120, () =>
+      this._getScoresUtilisateur(matricule, audience),
+    );
   }
 
   /**
@@ -1027,29 +1115,40 @@ export class AnalyticsService {
     return result;
   }
 
-  private async _getScoresUtilisateur(matricule: string) {
+  private async _getScoresUtilisateur(
+    matricule: string,
+    audience: AnalyticsVisibilityAudience,
+  ) {
+    const visibilitySql =
+      audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL;
     const recent = await this.pg.queryOne<any>(
-      `SELECT AVG(note_globale) as score_recent
-       FROM evaluations
-       WHERE evalue_matricule = $1 AND statut = 'valide' AND note_globale IS NOT NULL
-         AND ${EVALUATION_EFFECTIVE_TS_SQL} >= NOW() - INTERVAL '6 months'`,
+      `SELECT AVG(e.note_globale) as score_recent
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.evalue_matricule = $1 AND e.statut = 'valide' AND e.note_globale IS NOT NULL
+         AND ${visibilitySql}
+         AND ${EVALUATION_EFFECTIVE_TS_E_SQL} >= NOW() - INTERVAL '6 months'`,
       [matricule],
     );
 
     const ancien = await this.pg.queryOne<any>(
-      `SELECT AVG(note_globale) as score_ancien
-       FROM evaluations
-       WHERE evalue_matricule = $1 AND statut = 'valide' AND note_globale IS NOT NULL
-         AND ${EVALUATION_EFFECTIVE_TS_SQL} < NOW() - INTERVAL '6 months'
-         AND ${EVALUATION_EFFECTIVE_TS_SQL} >= NOW() - INTERVAL '12 months'`,
+      `SELECT AVG(e.note_globale) as score_ancien
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.evalue_matricule = $1 AND e.statut = 'valide' AND e.note_globale IS NOT NULL
+         AND ${visibilitySql}
+         AND ${EVALUATION_EFFECTIVE_TS_E_SQL} < NOW() - INTERVAL '6 months'
+         AND ${EVALUATION_EFFECTIVE_TS_E_SQL} >= NOW() - INTERVAL '12 months'`,
       [matricule],
     );
 
     const parType = await this.pg.query<any>(
-      `SELECT type_evaluation, AVG(note_globale) as moyenne, COUNT(*) as nb
-       FROM evaluations
-       WHERE evalue_matricule = $1 AND statut = 'valide' AND note_globale IS NOT NULL
-       GROUP BY type_evaluation`,
+      `SELECT e.type_evaluation, AVG(e.note_globale) as moyenne, COUNT(*) as nb
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.evalue_matricule = $1 AND e.statut = 'valide' AND e.note_globale IS NOT NULL
+         AND ${visibilitySql}
+       GROUP BY e.type_evaluation`,
       [matricule],
     );
 
@@ -1084,11 +1183,19 @@ export class AnalyticsService {
   }
 
   // ─── Classement régional (anonymisé) ────────────────────────────────────
-  async getClassementRegional(idRegion: string) {
-    return this.cache.getOrCompute(`analytics:classement:${idRegion}`, 300, () => this._getClassementRegional(idRegion));
+  async getClassementRegional(
+    idRegion: string,
+    audience: AnalyticsVisibilityAudience = 'evaluated',
+  ) {
+    return this.cache.getOrCompute(`analytics:classement:${audience}:${idRegion}`, 300, () =>
+      this._getClassementRegional(idRegion, audience),
+    );
   }
 
-  private async _getClassementRegional(idRegion: string) {
+  private async _getClassementRegional(
+    idRegion: string,
+    audience: AnalyticsVisibilityAudience,
+  ) {
     const classement = await this.pg.query<any>(
       `SELECT
          e.evalue_matricule,
@@ -1096,7 +1203,9 @@ export class AnalyticsService {
          COUNT(*) as nb_evaluations
        FROM evaluations e
        JOIN ${USER_REF_TABLE} u ON e.evalue_matricule = u.matricule
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
        WHERE u.id_region = $1 AND e.statut = 'valide' AND e.note_globale IS NOT NULL
+         AND ${audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL}
        GROUP BY e.evalue_matricule
        HAVING COUNT(*) >= 2
        ORDER BY AVG(e.note_globale) DESC`,
@@ -1156,10 +1265,13 @@ export class AnalyticsService {
     return d.toISOString().split('T')[0];
   }
 
-  private async buildImprovementPlanSnapshot(user: any): Promise<ImprovementPlanSnapshot> {
+  private async buildImprovementPlanSnapshot(
+    user: any,
+    audience: AnalyticsVisibilityAudience,
+  ): Promise<ImprovementPlanSnapshot> {
     const [axes, recommandations] = await Promise.all([
-      this.getAxesAmelioration(String(user.matricule)),
-      this.getRecommandations(String(user.matricule)),
+      this.getAxesAmelioration(String(user.matricule), audience),
+      this.getRecommandations(String(user.matricule), audience),
     ]);
 
     return {
@@ -1247,7 +1359,7 @@ export class AnalyticsService {
 
   private async getAdminRegionAggregates(filters: { start_date?: string; end_date?: string } = {}): Promise<AdminRegionAggregate[]> {
     const dateJoinCondition = filters.start_date && filters.end_date
-      ? `AND ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2`
+      ? `AND ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2`
       : '';
     const dateParams = filters.start_date && filters.end_date
       ? [filters.start_date, filters.end_date]
@@ -1266,7 +1378,12 @@ export class AnalyticsService {
            ELSE 0
          END as completion_rate
        FROM ${USER_REF_TABLE} u
-       LEFT JOIN evaluations e ON e.evalue_matricule = u.matricule ${dateJoinCondition}
+       LEFT JOIN (
+         SELECT evaluation.*
+         FROM evaluations evaluation
+         LEFT JOIN regles_evaluation rule ON rule.id_regle = evaluation.id_regle
+         WHERE ${ruleVisibilitySql('admin', 'rule')}
+       ) e ON e.evalue_matricule = u.matricule ${dateJoinCondition}
        WHERE COALESCE(u.est_actif, true) = true
        GROUP BY COALESCE(NULLIF(TRIM(u.id_region), ''), 'unknown'),
                 COALESCE(NULLIF(TRIM(u.region_nom), ''), COALESCE(NULLIF(TRIM(u.id_region), ''), 'Région non renseignée'))
@@ -1289,7 +1406,7 @@ export class AnalyticsService {
 
   private async getAdminRolePerformance(filters: { start_date?: string; end_date?: string } = {}) {
     const dateJoinCondition = filters.start_date && filters.end_date
-      ? `AND ${EVALUATION_EFFECTIVE_DATE_SQL} BETWEEN $1 AND $2`
+      ? `AND ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2`
       : '';
     const dateParams = filters.start_date && filters.end_date
       ? [filters.start_date, filters.end_date]
@@ -1305,7 +1422,12 @@ export class AnalyticsService {
            ELSE 0
          END as completion
        FROM ${USER_REF_TABLE} u
-       LEFT JOIN evaluations e ON e.evalue_matricule = u.matricule ${dateJoinCondition}
+       LEFT JOIN (
+         SELECT evaluation.*
+         FROM evaluations evaluation
+         LEFT JOIN regles_evaluation rule ON rule.id_regle = evaluation.id_regle
+         WHERE ${ruleVisibilitySql('admin', 'rule')}
+       ) e ON e.evalue_matricule = u.matricule ${dateJoinCondition}
        WHERE COALESCE(u.est_actif, true) = true
        GROUP BY COALESCE(NULLIF(TRIM(u.role), ''), 'Rôle non renseigné')
        ORDER BY avg_score DESC NULLS LAST, count DESC`,

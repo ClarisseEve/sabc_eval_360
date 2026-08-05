@@ -59,6 +59,7 @@ santé sur `http://localhost:3000/api/health`.
 ```bash
 pnpm typecheck
 pnpm lint:check
+pnpm audit:prod
 pnpm test:ci
 pnpm build
 pnpm test:e2e:prepare
@@ -67,6 +68,9 @@ pnpm test:e2e
 
 `lint:check` est non destructif. Les tests E2E réinitialisent leurs données :
 ne jamais les pointer vers une base contenant des données à conserver.
+
+Les remplacements temporaires sont stockés uniquement dans MySQL via Prisma ;
+PostgreSQL ne constitue pas une seconde source pour ce sous-système.
 
 ## Production
 

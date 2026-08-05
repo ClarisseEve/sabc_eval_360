@@ -24,6 +24,13 @@ export function ruleVisibilitySql(
 
 export const EVALUATED_VISIBILITY_SQL = ruleVisibilitySql('evaluated');
 
+export function ruleVisibilityDetailSql(
+  detail: 'aggregated' | 'detailed',
+  ruleAlias = 'r',
+): string {
+  return `COALESCE(${ruleAlias}.criteres_evaluation_json #>> '{visibility_policy,detail}', 'aggregated') = '${detail}'`;
+}
+
 export const INTERNAL_RULE_ENVELOPE_FIELD = '__rule_envelope';
 
 export function resolveEvaluationVisibilityPolicy(

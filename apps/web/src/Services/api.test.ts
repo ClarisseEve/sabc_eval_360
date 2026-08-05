@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import api, {
+  adminApi,
   evaluationsApi,
   profileApi,
   setToken,
@@ -203,6 +204,36 @@ describe('payloads de validation d evaluation', () => {
         est_validee: false,
         motif_rejet: 'Les notes attribuees sont incoherentes',
       },
+    });
+  });
+});
+
+describe('contrats de l historique des evaluations', () => {
+  it('transmet pagination et filtres à l historique personnel', async () => {
+    await evaluationsApi.historique({
+      page: 2,
+      limit: 20,
+      statut: 'valide',
+      type_evaluation: 'pairs',
+      id_periode: PERIODE_ID,
+    });
+
+    expect(requestAt()).toMatchObject({
+      url: `/api/evaluations/historique?page=2&limit=20&statut=valide&type_evaluation=pairs&id_periode=${PERIODE_ID}`,
+      init: { method: 'GET' },
+    });
+  });
+
+  it('transmet le filtre de statut à l historique administrateur', async () => {
+    await adminApi.evaluations.history({
+      page: 3,
+      limit: 30,
+      statut: 'rejete',
+    });
+
+    expect(requestAt()).toMatchObject({
+      url: '/api/admin/evaluations/history?page=3&limit=30&statut=rejete',
+      init: { method: 'GET' },
     });
   });
 });

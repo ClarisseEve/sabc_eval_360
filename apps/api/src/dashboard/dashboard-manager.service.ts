@@ -199,7 +199,8 @@ export class DashboardManagerService {
     const evalDonneesRows = await this.pg.query<{ evaluateur_matricule: string; count: string }>(
       `SELECT evaluateur_matricule, COUNT(*) as count
        FROM evaluations
-       WHERE evaluateur_matricule IN (${inPlaceholders})${periodFilter}
+       WHERE evaluateur_matricule IN (${inPlaceholders})
+         AND type_evaluation <> 'pairs'${periodFilter}
        GROUP BY evaluateur_matricule`,
       allParams,
     );

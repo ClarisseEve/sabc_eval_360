@@ -362,36 +362,73 @@ describe('AdminUsersService', () => {
   // ─── updateUser ────────────────────────────────────────────────────────────
 
   describe('updateUser', () => {
-    it('should call validerAssignationManager when manager_matricule changes', async () => {
+    it('should validate a changed manager against the prospective user state', async () => {
       const existingUser = makeDbUser({ manager_matricule: 'OLD01' });
-      const updatedUser = makeDbUser({ manager_matricule: 'NEW01' });
-
-      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(
-        existingUser,
-      );
-      (
-        hierarchyService.validerAssignationManager as jest.Mock
-      ).mockResolvedValue({
-        valide: true,
-        erreurs: [],
+      const prospectiveRole = makeRole({
+        id_role: 'R002',
+        nom_role: 'CDV',
+        id_branche: 'BR002',
+        niveau_taniere: 4,
       });
+      const prospectiveRegion = makeRegion({
+        id_region: 'RG02',
+        nom_region: 'Centre',
+      });
+      const manager = makeDbUser({
+        matricule: 'NEW01',
+        id_region: 'RG02',
+        id_branche: 'BR002',
+        niveau_hierarchique: 2,
+      });
+      const updatedUser = makeDbUser({
+        manager_matricule: 'NEW01',
+        role: 'CDV',
+        id_region: 'RG02',
+      });
+
+      (prisma.utilisateur.findUnique as jest.Mock)
+        .mockResolvedValueOnce(existingUser)
+        .mockResolvedValueOnce(manager);
+      (prisma.role.findUnique as jest.Mock).mockResolvedValue(prospectiveRole);
+      (prisma.region.findUnique as jest.Mock).mockResolvedValue(
+        prospectiveRegion,
+      );
       (prisma.utilisateur.update as jest.Mock).mockResolvedValue(updatedUser);
 
       await service.updateUser(
         'U0001',
-        { manager_matricule: 'NEW01' },
+        {
+          id_role: 'R002',
+          id_region: 'RG02',
+          manager_matricule: 'NEW01',
+        },
         ADMIN_MATRICULE,
         ADMIN_IP,
       );
 
-      expect(hierarchyService.validerAssignationManager).toHaveBeenCalledWith(
-        'U0001',
+      expect(hierarchyService.validerAssignationManager).not.toHaveBeenCalled();
+      expect(hierarchyService.getChaineHierarchique).toHaveBeenCalledWith(
         'NEW01',
       );
+      expect(prisma.utilisateur.update).toHaveBeenCalledWith({
+        where: { matricule: 'U0001' },
+        data: expect.objectContaining({
+          role: 'CDV',
+          role_nom: 'CDV',
+          id_region: 'RG02',
+          region_nom: 'Centre',
+          id_branche: 'BR002',
+          niveau_hierarchique: 4,
+          manager_matricule: 'NEW01',
+        }),
+      });
     });
 
     it('should NOT call validerAssignationManager when manager_matricule is unchanged', async () => {
-      const existingUser = makeDbUser({ manager_matricule: 'MGR01' });
+      const existingUser = makeDbUser({
+        manager_matricule: 'MGR01',
+        niveau_hierarchique: 3,
+      });
       const updatedUser = makeDbUser({
         nom: 'Martin',
         manager_matricule: 'MGR01',
@@ -410,6 +447,140 @@ describe('AdminUsersService', () => {
       );
 
       expect(hierarchyService.validerAssignationManager).not.toHaveBeenCalled();
+      expect(hierarchyService.getChaineHierarchique).not.toHaveBeenCalled();
+    });
+
+    it('should derive every denormalized field from canonical role and region identifiers', async () => {
+      const existingUser = makeDbUser();
+      const updatedUser = makeDbUser({
+        role: 'ADMIN',
+        statut: 'Suspendu',
+        est_actif: false,
+        est_admin: true,
+      });
+      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(
+        existingUser,
+      );
+      (prisma.role.findUnique as jest.Mock).mockResolvedValue(
+        makeRole({
+          id_role: 'R0000',
+          nom_role: 'ADMIN',
+          id_branche: null,
+          niveau_taniere: 0,
+          niveau_non_taniere: 0,
+        }),
+      );
+      (prisma.region.findUnique as jest.Mock).mockResolvedValue(
+        makeRegion({
+          id_region: 'RG02',
+          nom_region: 'Ouest',
+          est_taniere: false,
+        }),
+      );
+      (prisma.utilisateur.update as jest.Mock).mockResolvedValue(updatedUser);
+
+      await service.updateUser(
+        'U0001',
+        {
+          id_role: 'R0000',
+          id_region: 'RG02',
+          statut: 'Suspendu',
+          role: 'CSC',
+          role_nom: 'Chef Service',
+          region_nom: 'Fausse région',
+          type_region: 'taniere',
+          id_branche: 'FAKE',
+          est_admin: false,
+          est_actif: true,
+        } as UpdateUserDto,
+        ADMIN_MATRICULE,
+        ADMIN_IP,
+      );
+
+      const updateCall = (prisma.utilisateur.update as jest.Mock).mock
+        .calls[0][0];
+      expect(updateCall.data).toEqual(
+        expect.objectContaining({
+          role: 'ADMIN',
+          role_nom: 'ADMIN',
+          id_region: 'RG02',
+          region_nom: 'Ouest',
+          type_region: 'non-taniere',
+          id_branche: null,
+          niveau_hierarchique: 0,
+          est_admin: true,
+          statut: 'Suspendu',
+          est_actif: false,
+        }),
+      );
+      expect(updateCall.data).not.toHaveProperty('id_role');
+    });
+
+    it('should preserve statut and derive est_actif coherently when status is omitted', async () => {
+      const existingUser = makeDbUser({
+        statut: 'Indisponible',
+        est_actif: true,
+      });
+      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(
+        existingUser,
+      );
+      (prisma.utilisateur.update as jest.Mock).mockResolvedValue(existingUser);
+
+      await service.updateUser(
+        'U0001',
+        { nom: 'Martin' },
+        ADMIN_MATRICULE,
+        ADMIN_IP,
+      );
+
+      expect(prisma.utilisateur.update).toHaveBeenCalledWith({
+        where: { matricule: 'U0001' },
+        data: expect.objectContaining({
+          statut: 'Indisponible',
+          est_actif: true,
+        }),
+      });
+    });
+
+    it('should reject a canonical role unknown to the server', async () => {
+      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(
+        makeDbUser(),
+      );
+      (prisma.role.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.updateUser(
+          'U0001',
+          { id_role: 'BAD' },
+          ADMIN_MATRICULE,
+          ADMIN_IP,
+        ),
+      ).rejects.toThrow('Rôle introuvable');
+      expect(prisma.utilisateur.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject a manager cycle while using prospective attributes', async () => {
+      const existingUser = makeDbUser({ manager_matricule: null });
+      const manager = makeDbUser({
+        matricule: 'SUB01',
+        niveau_hierarchique: 2,
+      });
+      (prisma.utilisateur.findUnique as jest.Mock)
+        .mockResolvedValueOnce(existingUser)
+        .mockResolvedValueOnce(manager);
+      (hierarchyService.getChaineHierarchique as jest.Mock).mockResolvedValue([
+        { matricule: 'U0001' },
+      ]);
+
+      await expect(
+        service.updateUser(
+          'U0001',
+          { manager_matricule: 'SUB01' },
+          ADMIN_MATRICULE,
+          ADMIN_IP,
+        ),
+      ).rejects.toThrow('cycle dans la hiérarchie');
+      expect(prisma.utilisateur.update).not.toHaveBeenCalled();
     });
 
     it('should call auditLogService.log with USER_UPDATE', async () => {

@@ -44,6 +44,7 @@ describe('AnalyticsService', () => {
       const result = await service.getEvaluationsStats({ start_date: '2026-01-01', end_date: '2026-06-01' });
       expect(result).toHaveLength(2);
       expect(mockPg.query).toHaveBeenCalledWith(expect.stringContaining('statut'), ['2026-01-01', '2026-06-01']);
+      expect(String(mockPg.query.mock.calls[0][0])).toContain("'{visibility_policy,admin}'");
     });
   });
 
@@ -55,6 +56,7 @@ describe('AnalyticsService', () => {
       ]);
       const result = await service.getPerformances();
       expect(result).toHaveLength(2);
+      expect(String(mockPg.query.mock.calls[0][0])).toContain("'{visibility_policy,admin}'");
     });
   });
 
@@ -64,6 +66,7 @@ describe('AnalyticsService', () => {
       const result = await service.getRegionAnalytics('R1');
       expect(result).toHaveLength(1);
       expect(mockPg.query).toHaveBeenCalledWith(expect.stringContaining('id_region'), ['R1']);
+      expect(String(mockPg.query.mock.calls[0][0])).toContain("'{visibility_policy,evaluated}'");
     });
   });
 
@@ -75,6 +78,104 @@ describe('AnalyticsService', () => {
       expect(result).toHaveProperty('kpis');
       expect(result).toHaveProperty('channel_distribution');
       expect(result).toHaveProperty('performance_trend');
+      expect(String(mockPg.queryOne.mock.calls[0][0])).toContain("'{visibility_policy,admin}'");
+      expect(mockPg.query.mock.calls.every((call: any[]) =>
+        String(call[0]).includes("'{visibility_policy,admin}'"),
+      )).toBe(true);
+    });
+  });
+
+  describe('visibilité des analyses personnalisées', () => {
+    it("ne lit les axes détaillés que si l'évalué et le détail y sont autorisés", async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getAxesAmelioration('M001');
+
+      const sql = String(mockPg.query.mock.calls[0][0]);
+      expect(sql).toContain("'{visibility_policy,evaluated}'");
+      expect(sql).toContain("'{visibility_policy,detail}'");
+      expect(sql).toContain("= 'detailed'");
+    });
+
+    it('utilise policy.admin, avec détail obligatoire, pour les axes administrateur', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getAxesAmelioration('M001', 'admin');
+
+      const sql = String(mockPg.query.mock.calls[0][0]);
+      expect(sql).toContain("'{visibility_policy,admin}'");
+      expect(sql).toContain("'{visibility_policy,detail}'");
+      expect(sql).not.toContain("'{visibility_policy,evaluated}'");
+    });
+
+    it('filtre toutes les composantes du score avec policy.evaluated', async () => {
+      mockPg.queryOne.mockResolvedValue(null);
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getScoresUtilisateur('M001');
+
+      const scoreSql = [
+        ...mockPg.queryOne.mock.calls.map((call: any[]) => String(call[0])),
+        ...mockPg.query.mock.calls.map((call: any[]) => String(call[0])),
+      ];
+      expect(scoreSql).toHaveLength(3);
+      expect(scoreSql.every((sql) => sql.includes("'{visibility_policy,evaluated}'"))).toBe(true);
+    });
+
+    it('propage la bonne audience aux recommandations et au matching mentor', async () => {
+      jest.spyOn(service, 'getAxesAmelioration').mockResolvedValue({ axes_amelioration: [] } as any);
+      jest.spyOn(service, 'getScoresUtilisateur').mockResolvedValue({
+        score_global: 2.5,
+        progression: 0,
+      } as any);
+      mockPrisma.utilisateur.findUnique.mockResolvedValue({
+        matricule: 'M001',
+        id_region: 'R1',
+        niveau_hierarchique: 2,
+      });
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getRecommandations('M001');
+
+      expect(service.getAxesAmelioration).toHaveBeenCalledWith('M001', 'evaluated');
+      expect(service.getScoresUtilisateur).toHaveBeenCalledWith('M001', 'evaluated');
+      expect(String(mockPg.query.mock.calls[0][0])).toContain(
+        "'{visibility_policy,evaluated}'",
+      );
+    });
+
+    it('utilise policy.admin pour les plans d’amélioration administrateur', async () => {
+      mockPrisma.utilisateur.findMany.mockResolvedValue([
+        {
+          matricule: 'M001',
+          nom: 'Nom',
+          prenom: 'Prénom',
+          role: 'CSC',
+          role_nom: 'CSC',
+          region_nom: 'Région',
+        },
+      ]);
+      jest.spyOn(service, 'getAxesAmelioration').mockResolvedValue({ axes_amelioration: [] } as any);
+      jest.spyOn(service, 'getRecommandations').mockResolvedValue({ recommandations: [] } as any);
+
+      await service.getImprovementPlans();
+
+      expect(service.getAxesAmelioration).toHaveBeenCalledWith('M001', 'admin');
+      expect(service.getRecommandations).toHaveBeenCalledWith('M001', 'admin');
+    });
+
+    it('filtre le classement selon son audience', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getClassementRegional('R1');
+      await service.getClassementRegional('R1', 'admin');
+
+      expect(String(mockPg.query.mock.calls[0][0])).toContain(
+        "'{visibility_policy,evaluated}'",
+      );
+      expect(String(mockPg.query.mock.calls[1][0])).toContain(
+        "'{visibility_policy,admin}'",
+      );
     });
   });
 
@@ -101,6 +202,9 @@ describe('AnalyticsService', () => {
       const result = await service.getTendancesMultiPeriodes({});
       expect(result.tendances[0].code_periode).toBe('P2024-S1');
       expect(result.tendances[1].code_periode).toBe('P2024-S2');
+      expect(String(mockPg.query.mock.calls[0][0])).toContain(
+        "'{visibility_policy,admin}'",
+      );
     });
 
     it('should calculate delta_score correctly between consecutive periods', async () => {
@@ -263,6 +367,35 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('detecterAnomalies', () => {
+    it('exclut les pairs des anomalies nominatives évaluateur', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await service.detecterAnomalies();
+
+      const uniformitySql = String(mockPg.query.mock.calls[2][0]);
+      const evaluatorBiasSql = String(mockPg.query.mock.calls[3][0]);
+      expect(uniformitySql).toContain("type_evaluation NOT IN ('auto', 'pairs')");
+      expect(evaluatorBiasSql).toContain("type_evaluation NOT IN ('auto', 'pairs')");
+      expect((evaluatorBiasSql.match(/NOT IN \('auto', 'pairs'\)/g) ?? [])).toHaveLength(2);
+      expect(uniformitySql).toContain("'{visibility_policy,admin}'");
+      expect((evaluatorBiasSql.match(/\{visibility_policy,admin\}/g) ?? [])).toHaveLength(2);
+    });
+  });
+
+  describe('runRecommandationsBatch', () => {
+    it('ne sélectionne que les évaluations visibles à l’administrateur', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      const result = await service.runRecommandationsBatch();
+
+      expect(result.inserted).toBe(0);
+      expect(String(mockPg.query.mock.calls[0][0])).toContain(
+        "'{visibility_policy,admin}'",
+      );
+    });
+  });
+
   describe('acknowledgeAnomalie', () => {
     it('exécute UPDATE SET resolue=true pour un id donné', async () => {
       mockPg.query.mockResolvedValueOnce(undefined);
@@ -387,6 +520,7 @@ describe('AnalyticsService', () => {
       expect(sql).toContain('BETWEEN $1 AND $2');
       expect(sql).not.toContain(startDate);
       expect(params).toEqual([startDate, endDate]);
+      expect(sql).toContain("'{visibility_policy,admin}'");
       expect(mockPrisma.replacement_temporaire.count).toHaveBeenCalledWith({
         where: {
           est_actif: true,
@@ -414,6 +548,7 @@ describe('AnalyticsService', () => {
       expect(sql).toContain('BETWEEN $1 AND $2');
       expect(sql).not.toContain(startDate);
       expect(params).toEqual([startDate, endDate]);
+      expect(sql).toContain("'{visibility_policy,admin}'");
     });
 
     it('paramètre la jointure des agrégats par rôle', async () => {
@@ -428,6 +563,7 @@ describe('AnalyticsService', () => {
       expect(sql).toContain('BETWEEN $1 AND $2');
       expect(sql).not.toContain(startDate);
       expect(params).toEqual([startDate, endDate]);
+      expect(sql).toContain("'{visibility_policy,admin}'");
     });
   });
 });

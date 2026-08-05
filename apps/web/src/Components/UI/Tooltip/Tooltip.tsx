@@ -20,28 +20,38 @@ const Tooltip: React.FC<TooltipProps> = ({
   const tooltipRef = React.useRef<HTMLDivElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [tooltipPosition, setTooltipPosition] = React.useState({ top: 0, left: 0 });
-  let timeoutId: NodeJS.Timeout;
-  let hideTimeoutId: NodeJS.Timeout;
+  // Des `let` au corps du composant seraient réinitialisés à chaque rendu:
+  // les clearTimeout ne retrouveraient plus les minuteurs à annuler.
+  const timeoutId = React.useRef<ReturnType<typeof setTimeout>>(undefined);
+  const hideTimeoutId = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const showTooltip = () => {
-    clearTimeout(hideTimeoutId);
-    timeoutId = setTimeout(() => {
+    clearTimeout(hideTimeoutId.current);
+    timeoutId.current = setTimeout(() => {
       setVisible(true);
       // Calculer la position après que le tooltip soit visible
       setTimeout(updatePosition, 0);
-      
+
       // Masquer automatiquement le tooltip après 1000ms
-      hideTimeoutId = setTimeout(() => {
+      hideTimeoutId.current = setTimeout(() => {
         setVisible(false);
       }, 1000);
     }, delay);
   };
 
   const hideTooltip = () => {
-    clearTimeout(timeoutId);
-    clearTimeout(hideTimeoutId);
+    clearTimeout(timeoutId.current);
+    clearTimeout(hideTimeoutId.current);
     setVisible(false);
   };
+
+  // Éviter qu'un minuteur en cours ne déclenche un setState après démontage.
+  React.useEffect(() => {
+    return () => {
+      clearTimeout(timeoutId.current);
+      clearTimeout(hideTimeoutId.current);
+    };
+  }, []);
 
   // Fonction pour calculer et mettre à jour la position du tooltip
   const updatePosition = () => {

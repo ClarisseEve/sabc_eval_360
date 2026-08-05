@@ -1,5 +1,9 @@
 # Deep-Dive API/Back-end Bloc 4 - Flux Remplacements
 
+> Archive de l'ancienne implémentation Laravel. L'implémentation NestJS
+> actuelle utilise MySQL/Prisma comme source unique des remplacements ; les
+> références PostgreSQL et Eloquent ci-dessous ne décrivent plus le runtime.
+
 **Generated:** 2026-02-13
 **Scope:** Remplacements temporaires (controllers API/admin, service métier, modèles et exposition routes)
 **Files Analyzed:** 8
