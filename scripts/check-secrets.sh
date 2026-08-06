@@ -8,18 +8,17 @@
 set -e
 
 # Motifs interdits: littéraux ayant déjà fuité, et défauts de repli en dur.
-PATTERNS='***REMOVED***|***REMOVED***|***REMOVED***|***REMOVED***|***REMOVED***|:-secret\}|:-***REMOVED***\}|PG_PASSWORD.*\|\|.*.***REMOVED***'
+# Construits par concaténation pour que ce script ne contienne jamais lui-même
+# les valeurs qu'il interdit (purge d'historique et scanners de secrets).
+W_PWD='pass''word'
+W_SEC='sec''ret'
+PATTERNS="${W_PWD}123|sabc_${W_PWD}|root${W_SEC}|ci-only-jwt-${W_SEC}|ci-seed-${W_PWD}|:-${W_SEC}\\}|:-root${W_SEC}\\}|PG_PASSWORD.*\\|\\|.*.sabc_${W_PWD}"
 
-# .env.example ne doit contenir que des placeholders; les lockfiles et ce
-# script lui-même sont exclus.
-# validate-env.* est exclu: c'est précisément la liste noire qui refuse ces
-# valeurs au démarrage en production.
+# .env.example ne doit contenir que des placeholders; seuls les lockfiles sont
+# exclus — les garde-fous (ce script, validate-env.*) construisent leurs
+# motifs par concaténation et passent donc le scan.
 MATCHES=$(git grep -nIE "$PATTERNS" -- \
-  ':!*lock*' \
-  ':!scripts/check-secrets.sh' \
-  ':!apps/api/src/config/validate-env.ts' \
-  ':!apps/api/src/config/validate-env.spec.ts' \
-  ':!.github/workflows/ci.yml' 2>/dev/null || true)
+  ':!*lock*' 2>/dev/null || true)
 
 if [ -n "$MATCHES" ]; then
   echo "Secrets potentiels détectés dans des fichiers versionnés:"

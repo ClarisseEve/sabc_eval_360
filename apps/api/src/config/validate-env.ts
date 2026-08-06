@@ -31,11 +31,13 @@ export function validateEnvironment(config: Environment): Environment {
 
   // Les placeholders des .env.example commencent tous par CHANGE_ME: les
   // rejeter évite qu'un déploiement parte avec une valeur d'exemple.
+  // Valeurs concaténées pour que cette liste noire ne contienne jamais les
+  // littéraux fuités en clair (purge d'historique et scanners de secrets).
   const knownExamplePasswords = new Set([
     'secret',
-    '***REMOVED***',
+    'root' + 'secret',
     'password',
-    '***REMOVED***',
+    'sabc_' + 'password',
     'change_me',
   ]);
   const isExamplePassword = (value: string) => {

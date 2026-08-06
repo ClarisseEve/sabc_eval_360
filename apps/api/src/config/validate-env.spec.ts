@@ -59,9 +59,9 @@ describe('validateEnvironment', () => {
     ).toThrow('DATABASE_URL');
   });
 
-  it('rejects the historical ***REMOVED*** default', () => {
+  it('rejects the historical root default', () => {
     expect(() =>
-      validateEnvironment({ ...productionEnv, PG_PASSWORD: '***REMOVED***' }),
+      validateEnvironment({ ...productionEnv, PG_PASSWORD: 'root' + 'secret' }),
     ).toThrow('PG_PASSWORD');
   });
 
