@@ -10,6 +10,23 @@ export type ApiRequestConfig = {
   timeout?: number;
 };
 
+/**
+ * Une moyenne absente vaut null et non zéro: aucune donnée ne doit pas
+ * s'afficher comme une contre-performance.
+ */
+export type BenchmarkCritere = {
+  critere_id: string;
+  sujet: number | null;
+  region: number | null;
+  top_performers: number | null;
+};
+
+export type BenchmarksResponse = {
+  matricule: string;
+  criteres: BenchmarkCritere[];
+  generated_at: string;
+};
+
 export type ApiResponse<T = any> = {
   data: T;
   status: number;
@@ -382,6 +399,9 @@ export const analyticsApi = {
     api.get(matricule ? `/analytics/axes-amelioration/${matricule}` : '/analytics/axes-amelioration'),
   axesAmeliorationBatch: (matricules: string[]) =>
     api.post('/analytics/axes-amelioration/batch', { matricules }),
+  /** Comparaison par critère: sujet vs moyenne de sa région vs top performers. */
+  benchmarks: (matricule: string) =>
+    api.get<BenchmarksResponse>(`/analytics/benchmarks/${matricule}`),
   anomalies: (params?: { matricule?: string; id_region?: string }) =>
     api.get('/analytics/anomalies', { params }),
   anomaliesHistory: (params?: { severite?: string; type?: string; resolue?: string; limit?: number }) =>

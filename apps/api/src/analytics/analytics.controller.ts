@@ -242,4 +242,11 @@ export class AnalyticsController {
     await this.assertCanViewMatricule(req, matricule);
     return this.service.getScoresUtilisateur(matricule);
   }
+
+  /** Comparaison par critère: sujet vs moyenne de sa région vs top performers. */
+  @Get('benchmarks/:matricule')
+  async benchmarks(@Param('matricule') matricule: string, @Request() req: any) {
+    await this.assertCanViewMatricule(req, matricule);
+    return this.service.getBenchmarks(matricule);
+  }
 }

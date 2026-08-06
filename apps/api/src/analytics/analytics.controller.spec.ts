@@ -18,6 +18,7 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
       getScoresBatch: jest.fn().mockResolvedValue({}),
       getAxesAmelioration: jest.fn().mockResolvedValue({ axes: [] }),
       getRecommandations: jest.fn().mockResolvedValue({ recommandations: [] }),
+      getBenchmarks: jest.fn().mockResolvedValue({ criteres: [] }),
     };
     // M001 encadre M002 et M003 (hiérarchie complète)
     mockHierarchy = {
@@ -49,6 +50,16 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
   it('refuse l\'accès aux recommandations d\'un tiers non subordonné (IDOR)', async () => {
     await expect(controller.recommandations('X999', reqFor(MANAGER))).rejects.toThrow(ForbiddenException);
     expect(mockService.getRecommandations).not.toHaveBeenCalled();
+  });
+
+  it('autorise un utilisateur à consulter ses propres benchmarks', async () => {
+    await controller.benchmarks('M001', reqFor(MANAGER));
+    expect(mockService.getBenchmarks).toHaveBeenCalledWith('M001');
+  });
+
+  it('refuse les benchmarks d\'un tiers non subordonné (IDOR)', async () => {
+    await expect(controller.benchmarks('X999', reqFor(MANAGER))).rejects.toThrow(ForbiddenException);
+    expect(mockService.getBenchmarks).not.toHaveBeenCalled();
   });
 
   it('autorise un admin à consulter n\'importe quel matricule sans appel hiérarchie', async () => {

@@ -596,4 +596,68 @@ describe('AnalyticsService', () => {
       expect(sql).toContain("'{visibility_policy,admin}'");
     });
   });
+
+  describe('getBenchmarks', () => {
+    // Le cahier des charges attend une comparaison par critère entre le sujet,
+    // la moyenne de sa région et les meilleurs profils. Les critères varient
+    // selon le métier (commercial, marketing, sponsoring, trade): ils sont donc
+    // lus depuis les notes réellement saisies, pas depuis une liste figée.
+    it('retourne, par critère, le sujet, sa région et les top performers', async () => {
+      mockPg.query.mockResolvedValue([
+        { critere_id: 'leadership', sujet: '3.50', region: '3.00', top_performers: '4.20' },
+        { critere_id: 'execution', sujet: '2.80', region: '3.40', top_performers: '4.50' },
+      ]);
+
+      const result = await service.getBenchmarks('M001');
+
+      expect(result.criteres).toEqual([
+        { critere_id: 'leadership', sujet: 3.5, region: 3, top_performers: 4.2 },
+        { critere_id: 'execution', sujet: 2.8, region: 3.4, top_performers: 4.5 },
+      ]);
+    });
+
+    it('agrège en une seule requête, sans boucle par critère ni par utilisateur', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getBenchmarks('M001');
+
+      expect(mockPg.query).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockPg.query.mock.calls[0];
+      // L'explosion du JSONB et le regroupement se font côté PostgreSQL.
+      expect(sql).toContain('jsonb_array_elements');
+      expect(sql).toContain('GROUP BY');
+      expect(params).toContain('M001');
+    });
+
+    it('respecte la visibilité de l’audience demandée', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getBenchmarks('M001', 'admin');
+
+      expect(String(mockPg.query.mock.calls[0][0])).toContain("'{visibility_policy,admin}'");
+    });
+
+    it('renvoie une liste vide quand aucune évaluation validée n’existe', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      const result = await service.getBenchmarks('M001');
+
+      expect(result.criteres).toEqual([]);
+    });
+
+    it('convertit une moyenne absente en null plutôt qu’en zéro', async () => {
+      mockPg.query.mockResolvedValue([
+        { critere_id: 'leadership', sujet: '3.50', region: null, top_performers: null },
+      ]);
+
+      const result = await service.getBenchmarks('M001');
+
+      expect(result.criteres[0]).toEqual({
+        critere_id: 'leadership',
+        sujet: 3.5,
+        region: null,
+        top_performers: null,
+      });
+    });
+  });
 });

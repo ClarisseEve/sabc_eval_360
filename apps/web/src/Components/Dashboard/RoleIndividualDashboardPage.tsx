@@ -1,9 +1,13 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { useRoleDashboardData } from '@/Hooks/queries/useRoleDashboards';
+import { useAuthContext } from '@/Contexts/AuthContext';
+import { analyticsApi } from '@/Services/api';
 import { ScoresByTypeCard } from '@/Components/Dashboard/IndividualAnalyticsCards';
+import { BenchmarksCard } from '@/Components/Dashboard/BenchmarksCard';
 import {
   ActiveRulesCard,
   DashboardPageFrame,
@@ -35,6 +39,18 @@ export default function RoleIndividualDashboardPage({
   subtitle,
 }: RoleIndividualDashboardPageProps) {
   const { data } = useRoleDashboardData('individual', fallbackRole);
+  const { user } = useAuthContext();
+  const matricule = user?.matricule ?? '';
+
+  // Les benchmarks n'ont de sens que si l'agent est lui-même évalué: sans
+  // note reçue, il n'y a rien à situer face à ses pairs.
+  const benchmarksQuery = useQuery({
+    queryKey: ['analytics', 'benchmarks', matricule],
+    queryFn: () => analyticsApi.benchmarks(matricule).then((res) => res.data),
+    enabled: Boolean(matricule) && data.canSeeSelfScore,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const activeRules = data.rules.asEvaluatee.length > 0 ? data.rules.asEvaluatee : data.rules.relevant;
   const completionRate = data.dashboard?.evaluations_total > 0
     ? Math.round(((data.dashboard.evaluations_total - data.dashboard.evaluations_en_attente) / data.dashboard.evaluations_total) * 100)
@@ -148,6 +164,15 @@ export default function RoleIndividualDashboardPage({
           </CardContent>
         </Card>
       </div>
+
+      {data.canSeeSelfScore && (
+        <BenchmarksCard
+          criteres={benchmarksQuery.data?.criteres ?? []}
+          isLoading={benchmarksQuery.isLoading}
+          sujetLabel="Vous"
+          description="Votre position par critère face à la moyenne de votre région et aux meilleurs profils."
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <ScoresByTypeCard

@@ -1123,6 +1123,106 @@ export class AnalyticsService {
     };
   }
 
+  // ─── Benchmarks comparatifs ──────────────────────────────────────────────
+
+  /**
+   * Compare, critère par critère, la moyenne du sujet à celle de sa région et
+   * à celle des meilleurs profils de cette région.
+   *
+   * Les critères ne sont pas une liste figée: chaque métier (commercial,
+   * marketing, sponsoring, trade) a son propre jeu de cinq critères. Ils sont
+   * donc lus depuis les notes réellement saisies.
+   *
+   * L'agrégation est faite entièrement en SQL: exploser le JSONB côté
+   * application aurait imposé de charger toutes les évaluations de la région
+   * en mémoire.
+   */
+  async getBenchmarks(
+    matricule: string,
+    audience: AnalyticsVisibilityAudience = 'evaluated',
+  ) {
+    return this.cache.getOrCompute(`analytics:benchmarks:${audience}:${matricule}`, 300, () =>
+      this._getBenchmarks(matricule, audience),
+    );
+  }
+
+  private async _getBenchmarks(
+    matricule: string,
+    audience: AnalyticsVisibilityAudience,
+  ) {
+    const visibilitySql =
+      audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL;
+
+    const rows = await this.pg.query<{
+      critere_id: string;
+      sujet: string | null;
+      region: string | null;
+      top_performers: string | null;
+    }>(
+      `WITH cible AS (
+         SELECT id_region FROM ${USER_REF_TABLE} WHERE matricule = $1
+       ),
+       notes AS (
+         SELECT e.evalue_matricule,
+                n->>'critere_id' AS critere_id,
+                (n->>'note')::numeric AS note,
+                e.note_globale
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         JOIN ${USER_REF_TABLE} u ON u.matricule = e.evalue_matricule
+         CROSS JOIN LATERAL jsonb_array_elements(e.notations_json) AS n
+         WHERE e.statut = 'valide'
+           AND e.notations_json IS NOT NULL
+           AND n->>'note' IS NOT NULL
+           AND n->>'critere_id' IS NOT NULL
+           AND ${visibilitySql}
+           AND (u.id_region = (SELECT id_region FROM cible)
+                OR e.evalue_matricule = $1)
+       ),
+       -- « Top performers »: bande experte de l'échelle 1-5, cohérente avec la
+       -- légende de la heatmap (4-5 = expert).
+       -- La moyenne est calculée sur les évaluations, pas sur les notes
+       -- éclatées par critère: sinon une évaluation à 8 critères pèserait plus
+       -- qu'une évaluation à 5 critères dans la moyenne du même agent.
+       tops AS (
+         SELECT e.evalue_matricule
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         JOIN ${USER_REF_TABLE} u ON u.matricule = e.evalue_matricule
+         WHERE e.statut = 'valide'
+           AND e.note_globale IS NOT NULL
+           AND ${visibilitySql}
+           AND (u.id_region = (SELECT id_region FROM cible)
+                OR e.evalue_matricule = $1)
+         GROUP BY e.evalue_matricule
+         HAVING AVG(e.note_globale) >= 4
+       )
+       SELECT critere_id,
+              ROUND(AVG(note) FILTER (WHERE evalue_matricule = $1), 2) AS sujet,
+              ROUND(AVG(note), 2) AS region,
+              ROUND(AVG(note) FILTER (
+                WHERE evalue_matricule IN (SELECT evalue_matricule FROM tops)
+              ), 2) AS top_performers
+       FROM notes
+       GROUP BY critere_id
+       ORDER BY critere_id`,
+      [matricule],
+    );
+
+    const toNumber = (value: string | null) => (value == null ? null : Number(value));
+
+    return {
+      matricule,
+      criteres: rows.map((row) => ({
+        critere_id: row.critere_id,
+        sujet: toNumber(row.sujet),
+        region: toNumber(row.region),
+        top_performers: toNumber(row.top_performers),
+      })),
+      generated_at: new Date().toISOString(),
+    };
+  }
+
   // ─── Scores détaillés utilisateur ────────────────────────────────────────
   async getScoresUtilisateur(
     matricule: string,
