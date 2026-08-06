@@ -1123,6 +1123,74 @@ export class AnalyticsService {
     };
   }
 
+  // ─── Heatmap d'équipe ────────────────────────────────────────────────────
+
+  /**
+   * Matrice collaborateurs × critères: moyenne validée de chaque membre sur
+   * chaque critère, pour repérer forces collectives et relais de compétence.
+   *
+   * Une seule requête agrégée quel que soit l'effectif: l'appelant borne déjà
+   * la liste (500 matricules maximum côté DTO).
+   */
+  async getTeamHeatmap(
+    matricules: string[],
+    audience: AnalyticsVisibilityAudience = 'evaluated',
+  ) {
+    const uniques = [...new Set((matricules ?? []).filter(Boolean))];
+    if (uniques.length === 0) {
+      return { membres: [], criteres: [], generated_at: new Date().toISOString() };
+    }
+
+    const visibilitySql =
+      audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL;
+
+    const rows = await this.pg.query<{
+      matricule: string;
+      critere_id: string;
+      moyenne: string | null;
+    }>(
+      `SELECT e.evalue_matricule AS matricule,
+              n->>'critere_id' AS critere_id,
+              ROUND(AVG((n->>'note')::numeric), 2) AS moyenne
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       CROSS JOIN LATERAL jsonb_array_elements(e.notations_json) AS n
+       WHERE e.evalue_matricule = ANY($1)
+         AND e.statut = 'valide'
+         AND e.notations_json IS NOT NULL
+         AND n->>'note' IS NOT NULL
+         AND n->>'critere_id' IS NOT NULL
+         AND ${visibilitySql}
+       GROUP BY e.evalue_matricule, n->>'critere_id'
+       ORDER BY e.evalue_matricule, n->>'critere_id'`,
+      [uniques],
+    );
+
+    const criteres = [...new Set(rows.map((row) => row.critere_id))].sort((a, b) =>
+      a.localeCompare(b),
+    );
+    const parMatricule = new Map<string, Record<string, number>>();
+    for (const row of rows) {
+      const notes = parMatricule.get(row.matricule) ?? {};
+      if (row.moyenne != null) notes[row.critere_id] = Number(row.moyenne);
+      parMatricule.set(row.matricule, notes);
+    }
+
+    // Chaque membre expose la totalité des critères de l'équipe: une case vide
+    // (null) signale « non évalué » et se distingue d'une note faible.
+    const membres = [...parMatricule.keys()].sort((a, b) => a.localeCompare(b)).map((matricule) => {
+      const notes = parMatricule.get(matricule) ?? {};
+      return {
+        matricule,
+        notes: Object.fromEntries(
+          criteres.map((critere) => [critere, notes[critere] ?? null]),
+        ) as Record<string, number | null>,
+      };
+    });
+
+    return { membres, criteres, generated_at: new Date().toISOString() };
+  }
+
   // ─── Benchmarks comparatifs ──────────────────────────────────────────────
 
   /**

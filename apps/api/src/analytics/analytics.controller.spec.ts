@@ -19,6 +19,7 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
       getAxesAmelioration: jest.fn().mockResolvedValue({ axes: [] }),
       getRecommandations: jest.fn().mockResolvedValue({ recommandations: [] }),
       getBenchmarks: jest.fn().mockResolvedValue({ criteres: [] }),
+      getTeamHeatmap: jest.fn().mockResolvedValue({ membres: [], criteres: [] }),
     };
     // M001 encadre M002 et M003 (hiérarchie complète)
     mockHierarchy = {
@@ -60,6 +61,18 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
   it('refuse les benchmarks d\'un tiers non subordonné (IDOR)', async () => {
     await expect(controller.benchmarks('X999', reqFor(MANAGER))).rejects.toThrow(ForbiddenException);
     expect(mockService.getBenchmarks).not.toHaveBeenCalled();
+  });
+
+  it('heatmap : autorise un manager sur ses subordonnés', async () => {
+    await controller.teamHeatmap({ matricules: ['M002', 'M003'] }, reqFor(MANAGER));
+    expect(mockService.getTeamHeatmap).toHaveBeenCalledWith(['M002', 'M003']);
+  });
+
+  it('heatmap : refuse si un seul matricule échappe au périmètre (IDOR de masse)', async () => {
+    await expect(
+      controller.teamHeatmap({ matricules: ['M002', 'X999'] }, reqFor(MANAGER)),
+    ).rejects.toThrow(ForbiddenException);
+    expect(mockService.getTeamHeatmap).not.toHaveBeenCalled();
   });
 
   it('autorise un admin à consulter n\'importe quel matricule sans appel hiérarchie', async () => {

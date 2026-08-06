@@ -597,6 +597,55 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('getTeamHeatmap', () => {
+    // Matrice collaborateurs × critères attendue par le cahier des charges,
+    // pour repérer d'un coup d'œil les forces collectives et les relais de
+    // compétence au sein d'une équipe.
+    it('construit la matrice membre × critère à partir des moyennes', async () => {
+      mockPg.query.mockResolvedValue([
+        { matricule: 'M002', critere_id: 'execution', moyenne: '4.00' },
+        { matricule: 'M002', critere_id: 'leadership', moyenne: '2.50' },
+        { matricule: 'M003', critere_id: 'execution', moyenne: '3.00' },
+      ]);
+
+      const result = await service.getTeamHeatmap(['M002', 'M003']);
+
+      expect(result.criteres).toEqual(['execution', 'leadership']);
+      expect(result.membres).toEqual([
+        { matricule: 'M002', notes: { execution: 4, leadership: 2.5 } },
+        { matricule: 'M003', notes: { execution: 3, leadership: null } },
+      ]);
+    });
+
+    it('agrège en une seule requête quel que soit le nombre de membres', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getTeamHeatmap(['M002', 'M003', 'M004']);
+
+      expect(mockPg.query).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockPg.query.mock.calls[0];
+      expect(sql).toContain('jsonb_array_elements');
+      expect(sql).toContain('GROUP BY');
+      expect(params[0]).toEqual(['M002', 'M003', 'M004']);
+    });
+
+    it('ne requête pas la base pour une équipe vide', async () => {
+      const result = await service.getTeamHeatmap([]);
+
+      expect(mockPg.query).not.toHaveBeenCalled();
+      expect(result.membres).toEqual([]);
+      expect(result.criteres).toEqual([]);
+    });
+
+    it('dédoublonne les matricules pour ne pas gonfler la requête', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getTeamHeatmap(['M002', 'M002', 'M003']);
+
+      expect(mockPg.query.mock.calls[0][1][0]).toEqual(['M002', 'M003']);
+    });
+  });
+
   describe('getBenchmarks', () => {
     // Le cahier des charges attend une comparaison par critère entre le sujet,
     // la moyenne de sa région et les meilleurs profils. Les critères varient

@@ -27,6 +27,12 @@ export type BenchmarksResponse = {
   generated_at: string;
 };
 
+export type TeamHeatmapApiResponse = {
+  criteres: string[];
+  membres: Array<{ matricule: string; notes: Record<string, number | null> }>;
+  generated_at: string;
+};
+
 export type ApiResponse<T = any> = {
   data: T;
   status: number;
@@ -402,6 +408,9 @@ export const analyticsApi = {
   /** Comparaison par critère: sujet vs moyenne de sa région vs top performers. */
   benchmarks: (matricule: string) =>
     api.get<BenchmarksResponse>(`/analytics/benchmarks/${matricule}`),
+  /** Matrice collaborateurs × critères pour une équipe, en une seule requête. */
+  teamHeatmap: (matricules: string[]) =>
+    api.post<TeamHeatmapApiResponse>('/analytics/team-heatmap', { matricules }),
   anomalies: (params?: { matricule?: string; id_region?: string }) =>
     api.get('/analytics/anomalies', { params }),
   anomaliesHistory: (params?: { severite?: string; type?: string; resolue?: string; limit?: number }) =>

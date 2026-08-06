@@ -249,4 +249,11 @@ export class AnalyticsController {
     await this.assertCanViewMatricule(req, matricule);
     return this.service.getBenchmarks(matricule);
   }
+
+  /** Matrice collaborateurs × critères pour une équipe. */
+  @Post('team-heatmap')
+  async teamHeatmap(@Body() dto: BatchMatriculesDto, @Request() req: any) {
+    await this.assertCanViewMatricules(req, dto.matricules);
+    return this.service.getTeamHeatmap(dto.matricules);
+  }
 }

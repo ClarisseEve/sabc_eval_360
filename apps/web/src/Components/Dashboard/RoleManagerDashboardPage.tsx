@@ -10,8 +10,11 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
+import { useQuery } from '@tanstack/react-query';
 import { useRoleDashboardData } from '@/Hooks/queries/useRoleDashboards';
+import { analyticsApi } from '@/Services/api';
 import { TeamAxisFrequencyChartCard, TeamMemberAnalyticsTableCard } from '@/Components/Dashboard/TeamAnalyticsCards';
+import { TeamHeatmapCard } from '@/Components/Dashboard/TeamHeatmapCard';
 import {
   ActiveRulesCard,
   DashboardPageFrame,
@@ -86,6 +89,15 @@ export default function RoleManagerDashboardPage({
 }: RoleManagerDashboardPageProps) {
   const { data } = useRoleDashboardData('manager', fallbackRole);
   const alerts = buildManagerAlerts(data);
+
+  // Une seule requête agrégée pour toute l'équipe, plutôt qu'un appel par membre.
+  const teamMatricules = data.teamMembers.map((member) => member.matricule).filter(Boolean);
+  const heatmapQuery = useQuery({
+    queryKey: ['analytics', 'team-heatmap', ...teamMatricules],
+    queryFn: () => analyticsApi.teamHeatmap(teamMatricules).then((res) => res.data),
+    enabled: teamMatricules.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
 
   return (
     <DashboardPageFrame
@@ -167,6 +179,14 @@ export default function RoleManagerDashboardPage({
           emptyMessage="Aucun axe dominant n’est encore calculable sur l’équipe."
         />
       </div>
+
+      <TeamHeatmapCard
+        data={heatmapQuery.data}
+        isLoading={heatmapQuery.isLoading}
+        resolveName={(matricule) =>
+          data.teamMembers.find((member) => member.matricule === matricule)?.nomComplet ?? matricule
+        }
+      />
 
       <TeamMemberAnalyticsTableCard
         title={teamTitle}
