@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { cn } from '@/utils/helpers';
+import { cn, humanizeDisplayText } from '@/utils/helpers';
 import { Header } from '@/Components/Layout/app/Header';
 import { Sidebar } from '@/Components/Layout/app/Sidebar';
 // Suppression de l'import des breadcrumbs
@@ -37,11 +37,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   children,
   className,
 }) => {
-  const resolvedUser = user ?? {
-    name: 'Utilisateur',
-    email: '',
-    role: '',
-    avatar: undefined,
+  const resolvedUser = {
+    name: humanizeDisplayText(user?.name) || 'Utilisateur',
+    email: user?.email || '',
+    role: user?.role || '',
+    avatar: user?.avatar,
   };
 
   // La réduction desktop et l'ouverture du drawer mobile sont deux états

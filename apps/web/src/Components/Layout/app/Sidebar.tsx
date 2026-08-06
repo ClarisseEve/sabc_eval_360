@@ -6,7 +6,7 @@ import { LogOut, ChevronDown, ChevronRight, AlignLeft, Menu, X } from 'lucide-re
 import { cn } from '@/utils/helpers';
 import { Button } from '@/Components/UI/Button/Button';
 import { Badge } from '@/Components/UI/Badge/Badge';
-import { NAV_ITEMS, NAV_BOTTOM_ITEMS, resolveHref } from '@/config/nav';
+import { NAV_ITEMS, NAV_BOTTOM_ITEMS, VALIDATION_QUEUE_ROLES, resolveHref } from '@/config/nav';
 import { normalizeRole, type Role } from '@/config/rbac';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import api, { hierarchyApi } from '@/Services/api';
@@ -20,6 +20,7 @@ interface NavItem {
   children?: NavItem[];
   roles?: Role[];
   requiresDirectReports?: boolean;
+  requiresValidationAccess?: boolean;
 }
 
 // Types pour les propriétés du composant Sidebar
@@ -70,21 +71,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // si les parcours « Mon équipe » et « À valider » ont un sens.
   const hasDirectReports =
     roleCode !== 'ADMIN' && Array.isArray(directReports) && directReports.length > 0;
-  const canValidate = hasDirectReports;
+  const hasRegionalValidationScope = roleCode === 'DR' || roleCode === 'CDTT';
+  const hasPotentialValidationAccess = VALIDATION_QUEUE_ROLES.includes(roleCode);
 
-  const { data: pendingCount = 0 } = useQuery({
-    queryKey: ['evaluations', 'pending', 'count'],
+  const { data: validationCount = 0 } = useQuery({
+    queryKey: ['evaluations', 'validation-queue', 'count', authUser?.matricule],
     queryFn: async () => {
-      const r = await api.get('/evaluations', { params: { statut: 'soumis' } });
-      const d = r.data;
-      if (Array.isArray(d)) return d.length;
-      if (Array.isArray(d?.data)) return d.data.length;
-      if (Array.isArray(d?.a_valider)) return d.a_valider.length;
-      return d?.total ?? d?.count ?? 0;
+      const response = await api.get('/evaluations');
+      return Array.isArray(response.data?.a_valider) ? response.data.a_valider.length : 0;
     },
-    enabled: canValidate,
+    enabled: Boolean(authUser?.matricule) && hasPotentialValidationAccess,
     staleTime: 60_000,
   });
+  const canValidate = hasPotentialValidationAccess
+    && (hasRegionalValidationScope || hasDirectReports || validationCount > 0);
 
   // État pour suivre les éléments de navigation dépliés (tous rétractés par défaut)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
@@ -118,6 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items
         .filter((it) => !it.roles || it.roles.includes(roleCode))
         .filter((it) => !it.requiresDirectReports || hasDirectReports)
+        .filter((it) => !it.requiresValidationAccess || canValidate)
         .map((it) => ({
           ...it,
           href: resolveHref(it.href, roleCode),
@@ -128,7 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       mainMenuItems: filterByRole(NAV_ITEMS as NavItem[]),
       bottomMenuItems: filterByRole(NAV_BOTTOM_ITEMS as NavItem[]),
     };
-  }, [hasDirectReports, roleCode]);
+  }, [canValidate, hasDirectReports, roleCode]);
   
   // Ouvrir automatiquement le parent si un sous-menu est actif (sans écraser les dépliages manuels)
   useEffect(() => {
@@ -173,9 +174,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />;
 
   const getParentBadgeCount = (item: NavItem): number => {
-    if (!canValidate || pendingCount === 0) return 0;
+    if (!canValidate || validationCount === 0) return 0;
     const hasValidateChild = item.children?.some((c) => c.href === '/evaluations/validate');
-    return hasValidateChild ? pendingCount : 0;
+    return hasValidateChild ? validationCount : 0;
   };
 
   const renderCollapsedParent = (item: NavItem, hasActiveChild: boolean) => {
@@ -270,7 +271,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const renderLeafItem = (item: NavItem, isActive: boolean) => {
     const showPendingBadge =
-      item.href === '/evaluations/validate' && canValidate && pendingCount > 0;
+      item.href === '/evaluations/validate' && canValidate && validationCount > 0;
 
     return (
       <Link
@@ -299,7 +300,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             variant="destructive"
             className="ml-auto border-0 px-2 py-0.5 text-[11px] leading-none"
           >
-            {pendingCount > 99 ? '99+' : pendingCount}
+            {validationCount > 99 ? '99+' : validationCount}
           </Badge>
         )}
       </Link>
@@ -364,7 +365,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
         <Button
-          ref={mobileCloseButtonRef}
           variant="ghost"
           size="icon"
           onClick={onToggle}
@@ -377,6 +377,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {isCollapsed ? <Menu className="h-5 w-5 text-sabc-gray-800" /> : <AlignLeft className="h-5 w-5 text-sabc-gray-800" />}
         </Button>
         <Button
+          ref={mobileCloseButtonRef}
           variant="ghost"
           size="icon"
           onClick={onMobileClose}

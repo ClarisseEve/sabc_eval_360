@@ -4,6 +4,7 @@ import { useAuthContext } from '@/Contexts/AuthContext';
 import { normalizePublishedRule, getRuleSummary } from '@/utils/rules';
 import type { PublishedRule } from '@/types/rules';
 import { findNoteForCriterion, isRequiredCriterionCommentMissing } from './workflow-ui';
+import { formatPersonName } from '@/utils/helpers';
 
 export function useEvaluationLayoutUser(fallbackRole = 'Utilisateur') {
   const { user } = useAuthContext();
@@ -11,7 +12,7 @@ export function useEvaluationLayoutUser(fallbackRole = 'Utilisateur') {
   return {
     authUser: user,
     layoutUser: {
-      name: user ? [user.prenom, user.nom].filter(Boolean).join(' ') || 'Utilisateur' : 'Utilisateur',
+      name: formatPersonName(user),
       email: user?.email || '',
       role: user?.role_nom || user?.role || fallbackRole,
       avatar: user?.avatar,
@@ -36,11 +37,7 @@ export function EvaluationPageLayout({
 }
 
 export const formatDisplayName = (userLike: Record<string, any>) => {
-  if (userLike?.prenom || userLike?.nom) {
-    return `${userLike?.prenom ?? ''} ${userLike?.nom ?? ''}`.trim();
-  }
-  if (userLike?.name) return userLike.name;
-  return userLike?.matricule ?? 'Utilisateur';
+  return formatPersonName(userLike);
 };
 
 export const formatRole = (userLike: Record<string, any>) =>

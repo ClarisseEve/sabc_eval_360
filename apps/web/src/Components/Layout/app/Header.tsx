@@ -51,7 +51,6 @@ const Header: React.FC<HeaderProps> = ({
   user,
   notifications = [],
   className,
-  pageTitle = 'Tableau de bord',
   onMenuClick,
   isMenuOpen = false,
   onLogout,
@@ -198,7 +197,7 @@ const Header: React.FC<HeaderProps> = ({
         className,
       )}
     >
-      <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+      <div className="flex min-w-0 items-center">
         <Button
           ref={menuButtonRef}
           variant="ghost"
@@ -211,11 +210,6 @@ const Header: React.FC<HeaderProps> = ({
         >
           <Menu className="h-5 w-5" />
         </Button>
-
-        {/* Le titre de contenu est le H1 de la page ; l'app bar n'en crée pas un second. */}
-        <span className="truncate text-base font-semibold text-sabc-red-primary transition-colors dark:text-sabc-red-light sm:text-lg">
-          {pageTitle}
-        </span>
       </div>
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">

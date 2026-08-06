@@ -27,6 +27,18 @@ export type BenchmarksResponse = {
   generated_at: string;
 };
 
+export type EvolutionApiResponse = {
+  matricule: string;
+  criteres: string[];
+  periodes: Array<{
+    code_periode: string;
+    nom_periode: string;
+    date_debut: string;
+    notes: Record<string, number | null>;
+  }>;
+  generated_at: string;
+};
+
 export type TeamHeatmapApiResponse = {
   criteres: string[];
   membres: Array<{ matricule: string; notes: Record<string, number | null> }>;
@@ -411,6 +423,9 @@ export const analyticsApi = {
   /** Matrice collaborateurs × critères pour une équipe, en une seule requête. */
   teamHeatmap: (matricules: string[]) =>
     api.post<TeamHeatmapApiResponse>('/analytics/team-heatmap', { matricules }),
+  /** Progression d'un agent période après période, critère par critère. */
+  evolution: (matricule: string) =>
+    api.get<EvolutionApiResponse>(`/analytics/evolution/${matricule}`),
   anomalies: (params?: { matricule?: string; id_region?: string }) =>
     api.get('/analytics/anomalies', { params }),
   anomaliesHistory: (params?: { severite?: string; type?: string; resolue?: string; limit?: number }) =>

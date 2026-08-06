@@ -8,6 +8,7 @@ import { useAuthContext } from '@/Contexts/AuthContext';
 import { analyticsApi } from '@/Services/api';
 import { ScoresByTypeCard } from '@/Components/Dashboard/IndividualAnalyticsCards';
 import { BenchmarksCard } from '@/Components/Dashboard/BenchmarksCard';
+import { EvolutionCard } from '@/Components/Dashboard/EvolutionCard';
 import {
   ActiveRulesCard,
   DashboardPageFrame,
@@ -47,6 +48,13 @@ export default function RoleIndividualDashboardPage({
   const benchmarksQuery = useQuery({
     queryKey: ['analytics', 'benchmarks', matricule],
     queryFn: () => analyticsApi.benchmarks(matricule).then((res) => res.data),
+    enabled: Boolean(matricule) && data.canSeeSelfScore,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const evolutionQuery = useQuery({
+    queryKey: ['analytics', 'evolution', matricule],
+    queryFn: () => analyticsApi.evolution(matricule).then((res) => res.data),
     enabled: Boolean(matricule) && data.canSeeSelfScore,
     staleTime: 5 * 60 * 1000,
   });
@@ -164,6 +172,13 @@ export default function RoleIndividualDashboardPage({
           </CardContent>
         </Card>
       </div>
+
+      {data.canSeeSelfScore && (
+        <EvolutionCard
+          data={evolutionQuery.data}
+          isLoading={evolutionQuery.isLoading}
+        />
+      )}
 
       {data.canSeeSelfScore && (
         <BenchmarksCard

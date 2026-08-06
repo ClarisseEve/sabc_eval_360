@@ -20,6 +20,7 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
       getRecommandations: jest.fn().mockResolvedValue({ recommandations: [] }),
       getBenchmarks: jest.fn().mockResolvedValue({ criteres: [] }),
       getTeamHeatmap: jest.fn().mockResolvedValue({ membres: [], criteres: [] }),
+      getEvolutionCriteres: jest.fn().mockResolvedValue({ periodes: [], criteres: [] }),
     };
     // M001 encadre M002 et M003 (hiérarchie complète)
     mockHierarchy = {
@@ -73,6 +74,16 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
       controller.teamHeatmap({ matricules: ['M002', 'X999'] }, reqFor(MANAGER)),
     ).rejects.toThrow(ForbiddenException);
     expect(mockService.getTeamHeatmap).not.toHaveBeenCalled();
+  });
+
+  it('autorise un utilisateur à consulter sa propre évolution', async () => {
+    await controller.evolutionCriteres('M001', reqFor(MANAGER));
+    expect(mockService.getEvolutionCriteres).toHaveBeenCalledWith('M001');
+  });
+
+  it('refuse l\'évolution d\'un tiers non subordonné (IDOR)', async () => {
+    await expect(controller.evolutionCriteres('X999', reqFor(MANAGER))).rejects.toThrow(ForbiddenException);
+    expect(mockService.getEvolutionCriteres).not.toHaveBeenCalled();
   });
 
   it('autorise un admin à consulter n\'importe quel matricule sans appel hiérarchie', async () => {

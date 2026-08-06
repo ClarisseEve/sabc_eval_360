@@ -14,6 +14,7 @@ import {
   Map,
   Target,
   User,
+  FileText,
 } from 'lucide-react';
 import type { Role } from './rbac';
 
@@ -25,6 +26,7 @@ export interface NavItem {
   roles?: Role[];
   badge?: 'notifications';
   requiresDirectReports?: boolean;
+  requiresValidationAccess?: boolean;
 }
 
 // All non-admin roles
@@ -66,7 +68,7 @@ export const NAV_ITEMS: NavItem[] = [
         href: '/evaluations/validate',
         icon: <ChevronRight className="h-4 w-4" />,
         roles: VALIDATION_QUEUE_ROLES,
-        requiresDirectReports: true,
+        requiresValidationAccess: true,
         badge: 'notifications',
       },
       {
@@ -168,6 +170,13 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/axes-amelioration',
     icon: <Target className="h-5 w-5" />,
     roles: ALL_WITH_ADMIN,
+  },
+
+  {
+    title: 'Rapports',
+    href: '/admin/reports',
+    icon: <FileText className="h-5 w-5" />,
+    roles: ['ADMIN'],
   },
 
   // ── Admin: Utilisateurs ──

@@ -1123,6 +1123,111 @@ export class AnalyticsService {
     };
   }
 
+  // ─── Évolution temporelle par critère ────────────────────────────────────
+
+  /**
+   * Progression d'un agent période après période, critère par critère.
+   *
+   * Complète getTendancesMultiPeriodes, qui agrège tout un périmètre pour les
+   * administrateurs: ici la lecture est individuelle et détaillée par critère,
+   * afin d'alimenter les courbes d'évolution des tableaux de bord de rôle.
+   */
+  async getEvolutionCriteres(
+    matricule: string,
+    audience: AnalyticsVisibilityAudience = 'evaluated',
+    limitPeriodes = 8,
+  ) {
+    return this.cache.getOrCompute(
+      `analytics:evolution:${audience}:${matricule}:${limitPeriodes}`,
+      300,
+      () => this._getEvolutionCriteres(matricule, audience, limitPeriodes),
+    );
+  }
+
+  private async _getEvolutionCriteres(
+    matricule: string,
+    audience: AnalyticsVisibilityAudience,
+    limitPeriodes: number,
+  ) {
+    const visibilitySql =
+      audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL;
+
+    const rows = await this.pg.query<{
+      code_periode: string;
+      nom_periode: string;
+      date_debut: string;
+      critere_id: string;
+      moyenne: string | null;
+    }>(
+      // Les périodes sont bornées puis les moyennes calculées dessus: une
+      // carrière longue ne fait donc pas grossir la réponse indéfiniment.
+      `WITH periodes_retenues AS (
+         SELECT p.id_periode, p.code_periode, p.nom_periode, p.date_debut
+         FROM periodes_evaluation p
+         WHERE EXISTS (
+           SELECT 1 FROM evaluations e
+           LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+           WHERE e.id_periode = p.id_periode
+             AND e.evalue_matricule = $1
+             AND e.statut = 'valide'
+             AND ${visibilitySql}
+         )
+         ORDER BY p.date_debut DESC
+         LIMIT $2
+       )
+       SELECT pr.code_periode,
+              pr.nom_periode,
+              pr.date_debut::text AS date_debut,
+              n->>'critere_id' AS critere_id,
+              ROUND(AVG((n->>'note')::numeric), 2) AS moyenne
+       FROM periodes_retenues pr
+       JOIN evaluations e ON e.id_periode = pr.id_periode
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       CROSS JOIN LATERAL jsonb_array_elements(e.notations_json) AS n
+       WHERE e.evalue_matricule = $1
+         AND e.statut = 'valide'
+         AND e.notations_json IS NOT NULL
+         AND n->>'note' IS NOT NULL
+         AND n->>'critere_id' IS NOT NULL
+         AND ${visibilitySql}
+       GROUP BY pr.code_periode, pr.nom_periode, pr.date_debut, n->>'critere_id'
+       ORDER BY pr.date_debut ASC, n->>'critere_id' ASC`,
+      [matricule, limitPeriodes],
+    );
+
+    const criteres = [...new Set(rows.map((row) => row.critere_id))].sort((a, b) =>
+      a.localeCompare(b),
+    );
+
+    const parPeriode = new Map<
+      string,
+      { code_periode: string; nom_periode: string; date_debut: string; notes: Record<string, number> }
+    >();
+    for (const row of rows) {
+      const existante = parPeriode.get(row.code_periode) ?? {
+        code_periode: row.code_periode,
+        nom_periode: row.nom_periode,
+        date_debut: row.date_debut,
+        notes: {} as Record<string, number>,
+      };
+      if (row.moyenne != null) existante.notes[row.critere_id] = Number(row.moyenne);
+      parPeriode.set(row.code_periode, existante);
+    }
+
+    // Chaque période expose tous les critères rencontrés: une série continue
+    // évite qu'un critère non évalué une fois ne casse la courbe.
+    const periodes = [...parPeriode.values()].map((periode) => ({
+      code_periode: periode.code_periode,
+      nom_periode: periode.nom_periode,
+      date_debut: periode.date_debut,
+      notes: Object.fromEntries(
+        criteres.map((critere) => [critere, periode.notes[critere] ?? null]),
+      ) as Record<string, number | null>,
+    }));
+
+    return { matricule, criteres, periodes, generated_at: new Date().toISOString() };
+  }
+
   // ─── Heatmap d'équipe ────────────────────────────────────────────────────
 
   /**

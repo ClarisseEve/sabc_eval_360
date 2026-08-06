@@ -36,6 +36,26 @@ export function getInitials(name: string) {
     .substring(0, 2);
 }
 
+/** Retire les séparateurs techniques qui ne doivent pas apparaître dans l'interface. */
+export function humanizeDisplayText(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.replace(/_+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+export function formatPersonName(person: any, fallback = 'Utilisateur'): string {
+  if (!person) return fallback;
+  const fullName = [person.prenom, person.nom]
+    .map(humanizeDisplayText)
+    .filter(Boolean)
+    .join(' ');
+
+  return fullName
+    || humanizeDisplayText(person.nom_complet)
+    || humanizeDisplayText(person.name)
+    || humanizeDisplayText(person.matricule)
+    || fallback;
+}
+
 export function isActiveRoute(currentPath: string, path: string) {
   return currentPath === path || currentPath.startsWith(`${path}/`);
 }

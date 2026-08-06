@@ -250,6 +250,13 @@ export class AnalyticsController {
     return this.service.getBenchmarks(matricule);
   }
 
+  /** Progression d'un agent période après période, critère par critère. */
+  @Get('evolution/:matricule')
+  async evolutionCriteres(@Param('matricule') matricule: string, @Request() req: any) {
+    await this.assertCanViewMatricule(req, matricule);
+    return this.service.getEvolutionCriteres(matricule);
+  }
+
   /** Matrice collaborateurs × critères pour une équipe. */
   @Post('team-heatmap')
   async teamHeatmap(@Body() dto: BatchMatriculesDto, @Request() req: any) {

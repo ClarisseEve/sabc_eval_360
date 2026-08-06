@@ -131,7 +131,8 @@ test('évaluateur — formulaire long et état initial', async ({ page }) => {
   const resumeButton = page.getByRole('button', { name: /Reprendre/i }).first();
   if (await resumeButton.isVisible().catch(() => false)) {
     await resumeButton.click();
-    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/evaluations\/[^/]+\/edit$/);
+    await expect(page.getByRole('heading', { name: /Éditer une évaluation/i })).toBeVisible();
     await capture(page, 'evaluation/15-formulaire-initial.png');
   } else {
     await capture(page, 'evaluation/15-file-sans-brouillon.png');

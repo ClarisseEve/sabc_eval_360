@@ -597,6 +597,66 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('getEvolutionCriteres', () => {
+    // Courbes d'évolution temporelle du cahier des charges: suivre la
+    // progression d'un agent période après période, critère par critère.
+    it('assemble les périodes en ordre chronologique avec une série par critère', async () => {
+      mockPg.query.mockResolvedValue([
+        { code_periode: 'P2025-S1', nom_periode: 'Semestre 1', date_debut: '2025-01-01', critere_id: 'leadership', moyenne: '3.00' },
+        { code_periode: 'P2025-S1', nom_periode: 'Semestre 1', date_debut: '2025-01-01', critere_id: 'execution', moyenne: '4.00' },
+        { code_periode: 'P2025-S2', nom_periode: 'Semestre 2', date_debut: '2025-07-01', critere_id: 'leadership', moyenne: '4.00' },
+      ]);
+
+      const result = await service.getEvolutionCriteres('M001');
+
+      expect(result.criteres).toEqual(['execution', 'leadership']);
+      expect(result.periodes).toEqual([
+        {
+          code_periode: 'P2025-S1',
+          nom_periode: 'Semestre 1',
+          date_debut: '2025-01-01',
+          notes: { execution: 4, leadership: 3 },
+        },
+        {
+          code_periode: 'P2025-S2',
+          nom_periode: 'Semestre 2',
+          date_debut: '2025-07-01',
+          notes: { execution: null, leadership: 4 },
+        },
+      ]);
+    });
+
+    it('agrège en une seule requête et borne le nombre de périodes', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getEvolutionCriteres('M001');
+
+      expect(mockPg.query).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockPg.query.mock.calls[0];
+      expect(sql).toContain('jsonb_array_elements');
+      expect(sql).toContain('GROUP BY');
+      expect(sql).toContain('LIMIT');
+      expect(params).toContain('M001');
+    });
+
+    it('respecte la visibilité de l’audience demandée', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getEvolutionCriteres('M001', 'admin');
+
+      expect(String(mockPg.query.mock.calls[0][0])).toContain("'{visibility_policy,admin}'");
+    });
+
+    it('retourne une évolution vide sans évaluation validée', async () => {
+      mockPg.query.mockResolvedValue([]);
+
+      const result = await service.getEvolutionCriteres('M001');
+
+      expect(result.periodes).toEqual([]);
+      expect(result.criteres).toEqual([]);
+    });
+  });
+
   describe('getTeamHeatmap', () => {
     // Matrice collaborateurs × critères attendue par le cahier des charges,
     // pour repérer d'un coup d'œil les forces collectives et les relais de
