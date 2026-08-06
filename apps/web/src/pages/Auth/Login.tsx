@@ -125,6 +125,7 @@ const Login: React.FC = () => {
                     key={account.username}
                     type="button"
                     className="mb-1 flex w-full flex-col rounded-md p-2 text-left transition-colors hover:bg-sabc-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2"
+                    aria-label={`Utiliser le compte ${account.label}`}
                     aria-pressed={identifier === account.username}
                     onClick={() => {
                       setIdentifier(account.username);

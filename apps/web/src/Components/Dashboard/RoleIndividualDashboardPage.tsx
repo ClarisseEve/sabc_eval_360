@@ -6,6 +6,7 @@ import { Button } from '@/Components/UI/Button/Button';
 import { useRoleDashboardData } from '@/Hooks/queries/useRoleDashboards';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { analyticsApi } from '@/Services/api';
+import { formatPersonName } from '@/utils/helpers';
 import { ScoresByTypeCard } from '@/Components/Dashboard/IndividualAnalyticsCards';
 import { BenchmarksCard } from '@/Components/Dashboard/BenchmarksCard';
 import { EvolutionCard } from '@/Components/Dashboard/EvolutionCard';
@@ -29,9 +30,7 @@ type RoleIndividualDashboardPageProps = {
 };
 
 function getDisplayName(person: any, fallback = 'Utilisateur') {
-  if (!person) return fallback;
-  const fullName = [person.prenom, person.nom].filter(Boolean).join(' ').trim();
-  return fullName || person.nom_complet || person.name || person.matricule || fallback;
+  return formatPersonName(person, fallback);
 }
 
 export default function RoleIndividualDashboardPage({

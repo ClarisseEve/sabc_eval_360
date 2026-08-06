@@ -93,11 +93,11 @@ describe('filterByDomaine', () => {
     expect(filterByDomaine(membres, null)).toEqual(membres);
   });
 
-  it('ne perd pas un membre dont le rôle est inconnu: il rejoint le repli commercial', () => {
+  it('ne classe pas arbitrairement un rôle inconnu dans le domaine commercial', () => {
     const avecInconnu = [...membres, { matricule: 'M4', role: 'ROLE_X' }];
     expect(filterByDomaine(avecInconnu, 'commercial')).toEqual([
       { matricule: 'M1', role: 'CDS' },
-      { matricule: 'M4', role: 'ROLE_X' },
     ]);
+    expect(getDomaine('ROLE_X')).toBeNull();
   });
 });

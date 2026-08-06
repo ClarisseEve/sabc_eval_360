@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, AlertTriangle, ArrowUpRight, CheckCircle2, Info, RefreshCw, Shield, Siren, TriangleAlert, Zap } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, Info, RefreshCw, Shield, Siren, TriangleAlert, Zap } from 'lucide-react';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
@@ -260,9 +260,11 @@ export function AnomalySummarySection({
                       </div>
                       <Badge variant={config.badgeVariant}>{row.severite}</Badge>
                     </div>
-                    <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-sabc-gray-50 px-3 py-2 text-sm text-sabc-gray-600">
-                      <span>{buildActionLabel(row)}</span>
-                      <ArrowUpRight className="h-4 w-4 shrink-0 text-sabc-gray-400" />
+                    <div className="mt-4 rounded-2xl bg-sabc-gray-50 px-3 py-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-sabc-gray-500">
+                        Action recommandée
+                      </div>
+                      <p className="mt-1 text-sm leading-5 text-sabc-gray-600">{buildActionLabel(row)}</p>
                     </div>
                   </div>
                 );

@@ -15,6 +15,15 @@ interface FormFieldProps {
   children: React.ReactNode;
 }
 
+type FormFieldControlContextValue = {
+  controlId: string;
+  describedBy?: string;
+  errorId?: string;
+  invalid: boolean;
+};
+
+export const FormFieldControlContext = React.createContext<FormFieldControlContextValue | null>(null);
+
 /**
  * Champ de formulaire normalisé : libellé FR + marqueur requis + contrôle
  * (slot enfant) + aide + message d'erreur. Remplace les boucles sur des clés
@@ -54,7 +63,16 @@ export const FormField: React.FC<FormFieldProps> = ({
         {required ? <span className="ml-0.5 text-sabc-error" aria-hidden="true">*</span> : null}
         {required ? <span className="sr-only"> (obligatoire)</span> : null}
       </Label>
-      {control}
+      <FormFieldControlContext.Provider
+        value={{
+          controlId: fieldId,
+          describedBy,
+          errorId: error ? errorId : undefined,
+          invalid: Boolean(error),
+        }}
+      >
+        {control}
+      </FormFieldControlContext.Provider>
       {error ? (
         <p id={errorId} role="alert" className="text-sm font-medium text-sabc-error">{error}</p>
       ) : hint ? (

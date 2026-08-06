@@ -13,14 +13,16 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Badge } from '@/Components/UI/Badge/Badge';
-import { Button } from '@/Components/UI/Button/Button';
+import { buttonVariants } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Progress } from '@/Components/UI/Progress/Progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
-import { analyticsApi } from '@/Services/api';
-import { usePeriodes } from '@/Hooks/queries/useEvaluationsQuery';
+import { analyticsApi, reglesApi } from '@/Services/api';
+import { useEligibles, usePeriodes } from '@/Hooks/queries/useEvaluationsQuery';
 import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminEvaluationsLayout, PeriodeStatusBadge } from './shared';
+import { useAuthContext } from '@/Contexts/AuthContext';
+import { filterApplicableRules } from '@/utils/rules';
 
 function formatDate(value?: string | null) {
   if (!value) return 'N/A';
@@ -114,7 +116,13 @@ function getChannelPresentation(value: unknown) {
 }
 
 export default function EvaluationManagementPage() {
+  const { user } = useAuthContext();
   const { data: periodesData } = usePeriodes();
+  const { data: eligiblesData } = useEligibles();
+  const { data: reglesData } = useSuspenseQuery({
+    queryKey: ['regles', 'actives'],
+    queryFn: () => reglesApi.list().then((r) => r.data),
+  });
   const { data: dashboard } = useSuspenseQuery({
     queryKey: ['analytics', 'dashboard'],
     queryFn: () => analyticsApi.dashboard().then((r) => r.data),
@@ -131,7 +139,22 @@ export default function EvaluationManagementPage() {
   const periodes = Array.isArray(periodesData) ? periodesData : [];
   const statuses = Array.isArray(evaluations) ? evaluations : [];
   const channels = Array.isArray(performances) ? performances : [];
+  const activeRules = Array.isArray(reglesData) ? reglesData : [];
   const activePeriodes = periodes.filter((periode: any) => periode.est_ouverte || String(periode.statut).toLowerCase() === 'ouverte');
+  const eligibleRuleTargets = [
+    ...(eligiblesData?.auto ? [{ role: eligiblesData.auto.role_nom || eligiblesData.auto.role, type: 'auto' }] : []),
+    ...(Array.isArray(eligiblesData?.subordonnes)
+      ? eligiblesData.subordonnes.map((target: any) => ({ role: target.role_nom || target.role, type: 'descendante' }))
+      : []),
+    ...(Array.isArray(eligiblesData?.pairs)
+      ? eligiblesData.pairs.map((target: any) => ({ role: target.role_nom || target.role, type: 'pairs' }))
+      : []),
+  ];
+  const hasEligibleTargets = eligibleRuleTargets.length > 0;
+  const hasApplicableRule = eligibleRuleTargets.some((target) =>
+    filterApplicableRules(activeRules, user?.role_nom || user?.role, target.role, target.type).length > 0,
+  );
+  const canCreateEvaluation = activePeriodes.length > 0 && hasEligibleTargets && hasApplicableRule;
   const statusTotal = statuses.reduce((sum: number, row: any) => sum + Number(row.count ?? 0), 0);
   const channelTotal = channels.reduce((sum: number, row: any) => sum + Number(row.total ?? row.count ?? 0), 0);
 
@@ -164,11 +187,37 @@ export default function EvaluationManagementPage() {
           <p className="text-sm text-sabc-gray-600">Vue de pilotage basée sur les données réelles des périodes et analytics NestJS.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to="/admin/evaluations/periodes"><Button variant="outline">Périodes</Button></Link>
-          <Link to="/admin/evaluations/history"><Button variant="outline">Historique</Button></Link>
-          <Link to="/admin/evaluations/form"><Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark">Nouvelle évaluation</Button></Link>
+          {canCreateEvaluation ? (
+            <Link to="/admin/evaluations/form" className={buttonVariants()}>Nouvelle évaluation</Link>
+          ) : null}
         </div>
       </div>
+
+      {!canCreateEvaluation ? (
+        <div role="status" className="flex flex-col gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-900">Création d’évaluation indisponible</p>
+            <p className="text-sm text-amber-800">Complétez les prérequis manquants avant de démarrer une évaluation.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {activePeriodes.length === 0 ? (
+              <Link to="/admin/evaluations/periodes" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                Ouvrir une période
+              </Link>
+            ) : null}
+            {!hasApplicableRule ? (
+              <Link to="/admin/evaluations/regles" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                {activeRules.length === 0 ? 'Configurer les règles' : 'Ajouter une règle applicable'}
+              </Link>
+            ) : null}
+            {!hasEligibleTargets ? (
+              <Link to="/admin/utilisateurs/gaps" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                Corriger la hiérarchie
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card><CardContent className="p-5"><div className="mb-2 flex items-center gap-2 text-sm text-sabc-gray-600"><ClipboardList className="h-4 w-4" />Total évaluations</div><div className="text-3xl font-bold text-sabc-gray-900">{dashboard?.kpis?.total_evaluations ?? 0}</div></CardContent></Card>

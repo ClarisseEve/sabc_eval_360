@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuthContext } from '@/Contexts/AuthContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -6,6 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface EvaluationDraft {
   evaluation_id: string;
+  owner_matricule: string;
   notes: Array<{ note: number | null; commentaire?: string; [key: string]: unknown }>;
   commentaire_general?: string;
   saved_at: number; // Date.now()
@@ -85,21 +87,21 @@ function idbDelete(db: IDBDatabase, evaluationId: string): Promise<void> {
   });
 }
 
-function idbGetAllPending(db: IDBDatabase): Promise<EvaluationDraft[]> {
+function idbGetAllPending(db: IDBDatabase, ownerMatricule: string): Promise<EvaluationDraft[]> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
     const req = store.getAll();
     req.onsuccess = () => {
       const all = (req.result as EvaluationDraft[]) ?? [];
-      resolve(all.filter((d) => !d.synced));
+      resolve(all.filter((draft) => !draft.synced && draft.owner_matricule === ownerMatricule));
     };
     req.onerror = () => reject(req.error);
   });
 }
 
-function idbCountPending(db: IDBDatabase): Promise<number> {
-  return idbGetAllPending(db).then((drafts) => drafts.length);
+function idbCountPending(db: IDBDatabase, ownerMatricule: string): Promise<number> {
+  return idbGetAllPending(db, ownerMatricule).then((drafts) => drafts.length);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +109,8 @@ function idbCountPending(db: IDBDatabase): Promise<number> {
 // ---------------------------------------------------------------------------
 
 export function useOfflineSync(): UseOfflineSyncReturn {
+  const { user } = useAuthContext();
+  const ownerMatricule = String(user?.matricule ?? '');
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
@@ -114,8 +118,6 @@ export function useOfflineSync(): UseOfflineSyncReturn {
 
   // Keep a stable reference to the open DB — opened once on mount.
   const dbRef = useRef<IDBDatabase | null>(null);
-  // Track previous online state to detect the offline → online transition.
-  const wasOnlineRef = useRef<boolean>(navigator.onLine);
 
   // ------------------------------------------------------------------
   // DB initialisation
@@ -133,10 +135,14 @@ export function useOfflineSync(): UseOfflineSyncReturn {
   // ------------------------------------------------------------------
 
   const refreshPendingCount = useCallback(async () => {
+    if (!ownerMatricule) {
+      setPendingCount(0);
+      return;
+    }
     const db = await getDb();
-    const count = await idbCountPending(db);
+    const count = await idbCountPending(db, ownerMatricule);
     setPendingCount(count);
-  }, [getDb]);
+  }, [getDb, ownerMatricule]);
 
   // ------------------------------------------------------------------
   // saveDraft
@@ -148,9 +154,11 @@ export function useOfflineSync(): UseOfflineSyncReturn {
       notes: EvaluationDraft['notes'],
       commentaire?: string,
     ): Promise<void> => {
+      if (!ownerMatricule) throw new Error('Utilisateur non identifié');
       const db = await getDb();
       const draft: EvaluationDraft = {
         evaluation_id: evaluationId,
+        owner_matricule: ownerMatricule,
         notes,
         commentaire_general: commentaire,
         saved_at: Date.now(),
@@ -159,7 +167,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
       await idbPut(db, draft);
       await refreshPendingCount();
     },
-    [getDb, refreshPendingCount],
+    [getDb, ownerMatricule, refreshPendingCount],
   );
 
   // ------------------------------------------------------------------
@@ -168,10 +176,24 @@ export function useOfflineSync(): UseOfflineSyncReturn {
 
   const getDraft = useCallback(
     async (evaluationId: string): Promise<EvaluationDraft | null> => {
+      if (!ownerMatricule) return null;
       const db = await getDb();
-      return idbGet(db, evaluationId);
+      const draft = await idbGet(db, evaluationId);
+      if (!draft) return null;
+      if (draft.owner_matricule && draft.owner_matricule !== ownerMatricule) return null;
+
+      // Les brouillons créés avant l'ajout du propriétaire sont rattachés
+      // seulement après que l'API a autorisé cet utilisateur à ouvrir
+      // l'évaluation correspondante.
+      if (!draft.owner_matricule) {
+        const migratedDraft = { ...draft, owner_matricule: ownerMatricule };
+        await idbPut(db, migratedDraft);
+        await refreshPendingCount();
+        return migratedDraft;
+      }
+      return draft;
     },
-    [getDb],
+    [getDb, ownerMatricule, refreshPendingCount],
   );
 
   // ------------------------------------------------------------------
@@ -193,9 +215,11 @@ export function useOfflineSync(): UseOfflineSyncReturn {
 
   const syncDraft = useCallback(
     async (evaluationId: string): Promise<boolean> => {
+      if (!ownerMatricule) return false;
       const db = await getDb();
       const draft = await idbGet(db, evaluationId);
       if (!draft) return false;
+      if (draft.owner_matricule !== ownerMatricule) return false;
       if (draft.synced) return true;
 
       const token = localStorage.getItem(TOKEN_KEY);
@@ -231,7 +255,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
         return false;
       }
     },
-    [getDb, refreshPendingCount],
+    [getDb, ownerMatricule, refreshPendingCount],
   );
 
   // ------------------------------------------------------------------
@@ -245,7 +269,8 @@ export function useOfflineSync(): UseOfflineSyncReturn {
 
     try {
       const db = await getDb();
-      const pending = await idbGetAllPending(db);
+      if (!ownerMatricule) return { synced, failed };
+      const pending = await idbGetAllPending(db, ownerMatricule);
 
       await Promise.all(
         pending.map(async (draft) => {
@@ -266,7 +291,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     }
 
     return { synced, failed };
-  }, [getDb, syncDraft]);
+  }, [getDb, ownerMatricule, syncDraft]);
 
   // ------------------------------------------------------------------
   // Online/offline listeners + auto-sync on reconnect
@@ -290,16 +315,6 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     };
   }, []);
 
-  // Auto-sync when transitioning from offline to online.
-  useEffect(() => {
-    if (isOnline && !wasOnlineRef.current) {
-      syncAll().catch((err) =>
-        console.error('[useOfflineSync] Auto-sync on reconnect failed:', err),
-      );
-    }
-    wasOnlineRef.current = isOnline;
-  }, [isOnline, syncAll]);
-
   // ------------------------------------------------------------------
   // Initial pending count load + DB cleanup on unmount
   // ------------------------------------------------------------------
@@ -310,7 +325,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     openDatabase()
       .then((db) => {
         dbRef.current = db;
-        if (!cancelled) return idbCountPending(db);
+        if (!cancelled && ownerMatricule) return idbCountPending(db, ownerMatricule);
         return 0;
       })
       .then((count) => {
@@ -324,7 +339,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
       dbRef.current?.close();
       dbRef.current = null;
     };
-  }, []);
+  }, [ownerMatricule]);
 
   // ------------------------------------------------------------------
   // Return

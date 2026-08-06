@@ -3,6 +3,7 @@ import { useAuthContext } from '@/Contexts/AuthContext';
 import { analyticsApi, evaluationsApi, hierarchyApi, reglesApi } from '@/Services/api';
 import { useMyDashboard } from './useDashboardQuery';
 import { normalizePublishedRule } from '@/utils/rules';
+import { formatPersonName } from '@/utils/helpers';
 import type { PublishedRule } from '@/types/rules';
 
 export type DashboardScope = 'individual' | 'manager' | 'director';
@@ -140,10 +141,7 @@ function average(values: number[]) {
 }
 
 function getFullName(person: any) {
-  return [person?.prenom, person?.nom].filter(Boolean).join(' ').trim()
-    || person?.name
-    || person?.matricule
-    || 'Utilisateur';
+  return formatPersonName(person);
 }
 
 function normalizeScores(payload: any): NormalizedScores {

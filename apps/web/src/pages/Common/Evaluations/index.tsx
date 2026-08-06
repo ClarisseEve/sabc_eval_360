@@ -7,6 +7,8 @@ import Badge from '@/Components/UI/Badge';
 import { useEvaluationWorkflowData } from '@/Hooks/queries';
 import { EvaluationPageLayout } from './shared';
 import { formatDateLabel } from '@/Components/Dashboard/RoleDashboardShared';
+import { useAuthContext } from '@/Contexts/AuthContext';
+import { filterApplicableRules } from '@/utils/rules';
 import {
   CalendarClock,
   PlayCircle,
@@ -20,11 +22,27 @@ import {
 } from 'lucide-react';
 
 const EvaluationsIndex: React.FC = () => {
+  const { user } = useAuthContext();
   const { data } = useEvaluationWorkflowData();
 
   const hasPeriod = Boolean(data.activePeriod);
   const hasTargets = data.summary.eligibleTargets > 0;
-  const canStart = hasPeriod && hasTargets;
+  const hasApplicableTarget = data.eligibleGroups.some((group) =>
+    group.targets.some((target: Record<string, any>) =>
+      filterApplicableRules(
+        data.rules,
+        user?.role_nom || user?.role,
+        target.role_nom || target.role,
+        target.workflowType ?? null,
+      ).length > 0,
+    ),
+  );
+  const canStart = hasPeriod && hasTargets && hasApplicableTarget;
+  const blockedStartLabel = !hasPeriod
+    ? 'Aucune campagne ouverte'
+    : !hasTargets
+      ? 'Aucune cible éligible'
+      : 'Aucune règle applicable';
 
   const draftsCount = data.summary.drafts;
   const submittedCount = data.summary.submitted;
@@ -164,7 +182,7 @@ const EvaluationsIndex: React.FC = () => {
               variant="outline"
             >
               <PlayCircle className="h-5 w-5" />
-              Aucune évaluation disponible
+              {blockedStartLabel}
             </Button>
           )}
         </div>

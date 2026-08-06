@@ -56,6 +56,7 @@
 - **Tout nouveau SQL doit être exécuté contre un vrai PostgreSQL** avant commit — les tests unitaires mockent `pg` et ne valident pas la syntaxe. Méthode: schéma jetable + fixtures, puis `DROP SCHEMA`.
 - **`pnpm --dir apps/web ...` se lance depuis la racine** — le chemin est relatif au cwd.
 - **Ne jamais lancer `SEED_MODE=reset`** sur la base locale de l'utilisateur sans accord explicite.
+- **Utilisateurs**: les routes vivent sous `/api/admin/utilisateurs` (réservé ADMIN) — il n'existe aucun `@Controller('utilisateurs')` racine.
 
 ## Conventions de code
 
@@ -78,29 +79,6 @@
 ## Vue d'ensemble
 Système d'évaluation 360° pour la SABC (Société Anonyme des Brasseries du Cameroun).
 L’architecture active est désormais un couple React SPA + NestJS API. Les anciens artefacts Laravel/Inertia et services Go ne sont plus la source de vérité et ne doivent plus orienter les décisions d’implémentation.
-
-## Stack technique
-
-### Architecture active
-- **Backend**: NestJS 11 (`apps/api`)
-- **Frontend**: React 19 + TypeScript + Vite (`apps/web`)
-- **Auth**: JWT stateless + bcrypt
-- **BDD Core**: MySQL (utilisateurs, branches, régions, rôles, structure org.)
-- **BDD Business**: PostgreSQL (évaluations, périodes, règles, templates)
-- **Tests**: Jest + Supertest côté API
-
-### Backend actif (`apps/api/`)
-- **Runtime**: Node.js 20 + NestJS 11
-- **ORM**: Prisma 6 (MySQL core) — à étendre pour PostgreSQL
-- **Auth**: Passport (JWT + Local strategy) + bcrypt
-- **Validation**: class-validator + class-transformer
-- **Tests**: Jest + Supertest
-- **Build**: TypeScript 5.9, target ES2023
-
-### Frontend actif (`apps/web/`)
-- React SPA avec React Query + Suspense
-- Routage React Router
-- Layout applicatif unifié
 
 ## Architecture BDD (3 bases)
 

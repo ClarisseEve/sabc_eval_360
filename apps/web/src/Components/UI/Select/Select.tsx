@@ -3,6 +3,7 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 import { cn } from "@/utils/helpers";
+import { FormFieldControlContext } from "@/Components/UI/Form/FormField";
 
 const Select = SelectPrimitive.Root;
 
@@ -13,21 +14,31 @@ const SelectValue = SelectPrimitive.Value;
 const SelectTrigger = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "flex h-10 w-full items-center justify-between rounded-xl border border-sabc-gray-200 bg-white px-3.5 py-2 text-sm transition-colors duration-200 placeholder:text-sabc-gray-400 focus:outline-none focus:border-sabc-gray-400 focus:ring-1 focus:ring-sabc-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:placeholder:text-sabc-gray-400 dark:focus:border-sabc-gray-500 dark:focus:ring-sabc-gray-600",
-      className
-    )}
-    {...props}
-  >
-    {children}
-    <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" />
-    </SelectPrimitive.Icon>
-  </SelectPrimitive.Trigger>
-));
+>(({ className, children, id, 'aria-describedby': ariaDescribedBy, 'aria-errormessage': ariaErrorMessage, 'aria-invalid': ariaInvalid, ...props }, ref) => {
+  const field = React.useContext(FormFieldControlContext);
+  const describedBy = [ariaDescribedBy, field?.describedBy].filter(Boolean).join(' ') || undefined;
+
+  return (
+    <SelectPrimitive.Trigger
+      ref={ref}
+      id={id ?? field?.controlId}
+      aria-describedby={describedBy}
+      aria-errormessage={ariaErrorMessage ?? field?.errorId}
+      aria-invalid={ariaInvalid ?? (field?.invalid || undefined)}
+      className={cn(
+        "flex h-10 w-full items-center justify-between rounded-xl border border-sabc-gray-300 bg-white px-3.5 py-2 text-sm transition-colors duration-200 placeholder:text-sabc-gray-500 focus:outline-none focus:border-sabc-red-dark focus:ring-2 focus:ring-sabc-red-primary/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sabc-gray-600 dark:bg-sabc-gray-900 dark:placeholder:text-sabc-gray-500 dark:focus:border-sabc-red-light dark:focus:ring-sabc-red-primary/30",
+        field?.invalid && "border-sabc-error focus:border-sabc-error focus:ring-sabc-error/25",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <ChevronDown className="h-4 w-4 opacity-50" />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  );
+});
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 const SelectScrollUpButton = React.forwardRef<

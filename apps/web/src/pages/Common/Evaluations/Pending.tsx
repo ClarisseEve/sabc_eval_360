@@ -93,10 +93,10 @@ const Pending: React.FC = () => {
   const actionableEvaluations = useMemo(
     () => selectEvaluatorActionEvaluations(
       data.pendingEvaluations,
-      data.historyList,
+      data.rejectedEvaluations,
       user?.matricule,
     ),
-    [data.historyList, data.pendingEvaluations, user?.matricule],
+    [data.pendingEvaluations, data.rejectedEvaluations, user?.matricule],
   );
 
   const grouped = useMemo(() => {
@@ -283,7 +283,9 @@ const Pending: React.FC = () => {
 
         <QuickActionsCard
           actions={[
-            { label: 'Démarrer une évaluation', href: '/evaluations/mine' },
+            ...(data.activePeriod
+              ? [{ label: 'Démarrer une évaluation', href: '/evaluations/mine' }]
+              : []),
             { label: 'Axes d’amélioration', href: '/axes-amelioration', variant: 'secondary' },
           ]}
         />

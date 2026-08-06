@@ -1,4 +1,5 @@
 import { adminApi, analyticsApi } from '@/Services/api';
+import { formatPersonName } from '@/utils/helpers';
 
 export type HierarchyAxis = {
   critere: string;
@@ -18,9 +19,7 @@ export type HierarchyAnalyticsMember = {
 };
 
 export function resolveHierarchyDisplayName(person: any, fallback = 'Utilisateur') {
-  if (!person) return fallback;
-  const fullName = [person?.prenom, person?.nom].filter(Boolean).join(' ').trim();
-  return fullName || person?.nom_complet || person?.name || person?.matricule || fallback;
+  return formatPersonName(person, fallback);
 }
 
 export function toSafeNumber(value: unknown) {

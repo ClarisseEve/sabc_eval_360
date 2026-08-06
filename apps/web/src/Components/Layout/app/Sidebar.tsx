@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Link } from '@/lib/inertia-shim';
-import { LogOut, ChevronDown, ChevronRight, AlignLeft, Menu, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, AlignLeft, Menu, X } from 'lucide-react';
 import { cn } from '@/utils/helpers';
 import { Button } from '@/Components/UI/Button/Button';
 import { Badge } from '@/Components/UI/Badge/Badge';
-import { NAV_ITEMS, NAV_BOTTOM_ITEMS, VALIDATION_QUEUE_ROLES, resolveHref } from '@/config/nav';
+import { NAV_ITEMS, VALIDATION_QUEUE_ROLES, resolveHref } from '@/config/nav';
 import { normalizeRole, type Role } from '@/config/rbac';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import api, { hierarchyApi } from '@/Services/api';
@@ -35,7 +35,6 @@ interface SidebarProps {
   onToggle: () => void;
   isMobileOpen: boolean;
   onMobileClose: () => void;
-  onLogout?: () => void | Promise<void>;
   className?: string;
 }
 
@@ -45,11 +44,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggle,
   isMobileOpen,
   onMobileClose,
-  onLogout,
   className,
 }): React.ReactElement => {
-  const { user: authUser, logout } = useAuthContext();
-  const navigate = useNavigate();
+  const { user: authUser } = useAuthContext();
   const roleCode = normalizeRole(authUser?.role ?? user.role);
   const mobileCloseButtonRef = React.useRef<HTMLButtonElement>(null);
 
@@ -67,8 +64,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     retry: 1,
   });
 
-  // L'API de hiérarchie, et non une liste de rôles supposés managers, détermine
-  // si les parcours « Mon équipe » et « À valider » ont un sens.
+  // « Mon équipe » dépend des rattachements directs. « À valider » tient aussi
+  // compte des portées régionales et des files confiées par l'API.
   const hasDirectReports =
     roleCode !== 'ADMIN' && Array.isArray(directReports) && directReports.length > 0;
   const hasRegionalValidationScope = roleCode === 'DR' || roleCode === 'CDTT';
@@ -113,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [activePath, activeSearch]);
 
   // Génération des menus depuis la config centrale
-  const { mainMenuItems, bottomMenuItems } = React.useMemo(() => {
+  const mainMenuItems = React.useMemo(() => {
     const filterByRole = (items: NavItem[]): NavItem[] =>
       items
         .filter((it) => !it.roles || it.roles.includes(roleCode))
@@ -125,10 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           children: it.children ? filterByRole(it.children) : undefined,
         }));
 
-    return {
-      mainMenuItems: filterByRole(NAV_ITEMS as NavItem[]),
-      bottomMenuItems: filterByRole(NAV_BOTTOM_ITEMS as NavItem[]),
-    };
+    return filterByRole(NAV_ITEMS as NavItem[]);
   }, [canValidate, hasDirectReports, roleCode]);
   
   // Ouvrir automatiquement le parent si un sous-menu est actif (sans écraser les dépliages manuels)
@@ -397,47 +391,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </ul>
         </nav>
 
-        {/* Menus du bas (Profil et Paramètres) */}
-        <div className="p-2 border-t border-sabc-gray-200 dark:border-sabc-gray-800">
-          <ul className="space-y-1">
-            {bottomMenuItems.map((item) => renderNavItem(item))}
-          </ul>
-        </div>
-
-        {/* Bouton de déconnexion */}
-        <div className="p-4">
-          <Button
-            variant="ghost"
-            className={cn(
-              "transition-colors flex items-center",
-              isCollapsed 
-                ? "w-full justify-center p-2 bg-transparent hover:bg-transparent" 
-                : "w-full justify-start p-2 text-sabc-error hover:bg-sabc-gray-100 hover:text-sabc-red-primary dark:hover:bg-transparent dark:hover:text-sabc-red-light"
-            )}
-            onClick={async () => {
-              if (onLogout) {
-                await onLogout();
-              } else {
-                await logout();
-              }
-              navigate('/login', { replace: true });
-            }}
-            type="button"
-            title={isCollapsed ? "Déconnexion" : undefined}
-            aria-label={isCollapsed ? "Déconnexion" : undefined}
-          >
-            <LogOut 
-              className="h-5 w-5"
-              style={{
-                color: isCollapsed ? "#E53E3E" : "inherit",
-                stroke: isCollapsed ? "#E53E3E" : "currentColor", 
-                strokeWidth: isCollapsed ? 2.5 : 2,
-                filter: isCollapsed ? "drop-shadow(0 0 3px rgba(229, 62, 62, 0.7))" : "none"
-              }}
-            />
-            {!isCollapsed && <span className="ml-2">Déconnexion</span>}
-          </Button>
-        </div>
       </div>
     </aside>
   );

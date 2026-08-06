@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { User, Mail, Save, Info, Building2, Bell } from 'lucide-react';
 import { useAuthContext } from '@/Contexts/AuthContext';
+import { formatPersonName } from '@/utils/helpers';
 
 export default function Profile() {
   const { user, updateProfile } = useAuthContext();
@@ -31,9 +32,7 @@ export default function Profile() {
   const [error, setError] = useState<string | null>(null);
 
   const layoutUser = {
-    name: user
-      ? [user.prenom, user.nom].filter(Boolean).join(' ') || 'Utilisateur'
-      : 'Utilisateur',
+    name: formatPersonName(user),
     email: user?.email || '',
     role: user?.role_nom || user?.role || '',
     avatar: user?.avatar,
@@ -65,6 +64,12 @@ export default function Profile() {
     <AppLayout user={layoutUser} pageTitle="Paramètres - Profil" notifications={[]}>
       <Head title="Paramètres - Profil" />
       <div className="container mx-auto max-w-2xl px-4 py-8 space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold text-sabc-gray-900">Mon profil</h1>
+          <p className="mt-1 text-sm text-sabc-gray-600">
+            Consultez votre rattachement et mettez à jour vos informations personnelles.
+          </p>
+        </header>
 
         {/* Section organisationnelle — read-only */}
         <Card className="bg-gray-50 border-gray-200">

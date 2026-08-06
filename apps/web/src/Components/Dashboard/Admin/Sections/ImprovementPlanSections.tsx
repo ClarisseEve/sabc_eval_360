@@ -22,6 +22,8 @@ export function ImprovementPlansFiltersSection({
   onTypeFilterChange,
   typeOptions,
   generatedAt,
+  onGenerate,
+  isGenerating,
 }: Readonly<{
   roleFilter: string;
   onRoleFilterChange: (value: string) => void;
@@ -33,6 +35,8 @@ export function ImprovementPlansFiltersSection({
   onTypeFilterChange: (value: string) => void;
   typeOptions: Array<{ type: string }>;
   generatedAt?: string;
+  onGenerate: () => void;
+  isGenerating: boolean;
 }>) {
   return (
     <AnalyticsFiltersCard
@@ -97,6 +101,18 @@ export function ImprovementPlansFiltersSection({
               }).format(new Date(generatedAt))}`
             : 'Pas d\'agrégation'}
         </div>
+      </div>
+
+      <div className="flex items-end">
+        <Button
+          type="button"
+          onClick={onGenerate}
+          loading={isGenerating}
+          disabled={isGenerating}
+          className="whitespace-nowrap bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+        >
+          {isGenerating ? 'Génération…' : 'Générer les recommandations'}
+        </Button>
       </div>
     </AnalyticsFiltersCard>
   );
@@ -256,7 +272,7 @@ export function ImprovementRowsSection({
                           </Button>
                         </div>
                       ) : (
-                        <span className="text-xs text-sabc-gray-400" title="Exécuter le batch d'abord">—</span>
+                        <span className="text-xs text-sabc-gray-500">À générer</span>
                       )}
                     </TableCell>
                   </TableRow>

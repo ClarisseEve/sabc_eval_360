@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
-import { Button } from '@/Components/UI/Button/Button';
+import { Button, buttonVariants } from '@/Components/UI/Button/Button';
 import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
@@ -20,6 +20,7 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
+import { Link } from 'react-router-dom';
 
 export default function SecteursIndex() {
   const { data } = useAdminStructure();
@@ -34,6 +35,7 @@ export default function SecteursIndex() {
   const services = Array.isArray(data?.services) ? data.services : [];
   const districts = Array.isArray(data?.districts) ? data.districts : [];
   const secteurs = Array.isArray(data?.secteurs) ? data.secteurs : [];
+  const canCreateSecteur = services.length > 0;
 
   const availableDistricts = useMemo(
     () => districts.filter((district: any) => district.id_service === idService),
@@ -94,7 +96,7 @@ export default function SecteursIndex() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Secteurs existants</CardTitle>
-          {secteurs.length > 0 ? (
+          {secteurs.length > 0 && canCreateSecteur ? (
             <Button
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               onClick={() => setOpen(true)}
@@ -103,19 +105,39 @@ export default function SecteursIndex() {
             </Button>
           ) : null}
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {secteurs.length === 0 ? (
             <EmptyState
-              title="Aucun secteur"
-              description="Créez votre premier secteur pour structurer l'organisation."
+              title={canCreateSecteur ? 'Aucun secteur' : 'Créez d’abord un service'}
+              description={canCreateSecteur
+                ? "Créez votre premier secteur pour structurer l'organisation."
+                : 'Chaque secteur doit être rattaché à un service commercial. Configurez ce prérequis avant de créer un secteur.'}
               action={
-                <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => setOpen(true)}>
-                  Nouveau secteur
-                </Button>
+                canCreateSecteur ? (
+                  <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => setOpen(true)}>
+                    Nouveau secteur
+                  </Button>
+                ) : (
+                  <Link to="/admin/structure/services" className={buttonVariants({ variant: 'outline' })}>
+                    Configurer les services
+                  </Link>
+                )
               }
             />
           ) : (
-          <Table>
+          <>
+            {!canCreateSecteur ? (
+              <div role="status" className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">Création de secteur indisponible</p>
+                  <p className="text-sm text-amber-800">Ajoutez un service commercial avant de créer un nouveau secteur.</p>
+                </div>
+                <Link to="/admin/structure/services" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                  Configurer les services
+                </Link>
+              </div>
+            ) : null}
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Secteur</TableHead>
@@ -150,7 +172,8 @@ export default function SecteursIndex() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+            </Table>
+          </>
           )}
         </CardContent>
       </Card>

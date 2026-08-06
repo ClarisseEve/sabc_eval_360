@@ -23,6 +23,7 @@ async function login(page: Page, identifier: string) {
   await page.getByRole('button', { name: 'Se connecter' }).click();
   await expect(page).not.toHaveURL(/\/login$/, { timeout: 15_000 });
   await page.waitForLoadState('networkidle');
+  await expect(page.locator('main')).toBeVisible({ timeout: 15_000 });
 }
 
 async function visit(page: Page, path: string) {
@@ -30,9 +31,24 @@ async function visit(page: Page, path: string) {
   await page.waitForLoadState('networkidle');
 }
 
+async function findDuplicateIds(page: Page) {
+  return page.evaluate(() => {
+    const counts = new Map<string, number>();
+    document.querySelectorAll<HTMLElement>('[id]').forEach((element) => {
+      if (!element.id) return;
+      counts.set(element.id, (counts.get(element.id) ?? 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .filter(([, count]) => count > 1)
+      .map(([id]) => id);
+  });
+}
+
 test('connexion — référence desktop', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Créer un compte/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Utiliser le compte Admin/i })).toBeVisible();
   await capture(page, '00-login-desktop.png');
 });
 
@@ -76,12 +92,30 @@ for (const [role, identifier] of roles) {
       body: JSON.stringify(metrics, null, 2),
       contentType: 'application/json',
     });
+    expect(metrics.h1Count).toBeGreaterThan(0);
+    expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+    expect(await findDuplicateIds(page)).toEqual([]);
+
+    if (role === 'CDTT' || role === 'TMO') {
+      const evaluationsToggle = page.getByRole('button', { name: /Déplier Évaluations/i });
+      if (await evaluationsToggle.isVisible().catch(() => false)) await evaluationsToggle.click();
+      const validationLink = page.getByRole('link', { name: /À valider/i });
+      if (role === 'CDTT') await expect(validationLink).toBeVisible();
+      if (role === 'TMO') await expect(validationLink).toHaveCount(0);
+    }
+
+    if (role === 'CDS') {
+      await expect(
+        page.locator('main').getByRole('link', { name: /Vue équipe|Évaluations équipe/i }),
+      ).toHaveCount(0);
+    }
 
     await capture(page, `roles/02-dashboard-${role.toLowerCase()}.png`);
   });
 }
 
 test('administration — écrans structurants', async ({ page }) => {
+  test.setTimeout(60_000);
   await login(page, 'A0001');
 
   const screens = [
@@ -96,8 +130,20 @@ test('administration — écrans structurants', async ({ page }) => {
 
   for (const [path, screenshot] of screens) {
     await visit(page, path);
+    if (path === '/admin/reports') {
+      await expect(page.getByRole('link', { name: 'Rapports' })).toHaveAttribute('aria-current', 'page');
+      await expect(page.getByRole('button', { name: /Nouveau rapport/i })).toHaveCount(1);
+    }
     await capture(page, `admin/${screenshot}`);
   }
+
+  await visit(page, '/admin/roles/permissions');
+  await expect(page).toHaveURL(/\/admin\/evaluations\/regles$/);
+  await visit(page, '/admin/evaluations/templates/assignations');
+  await expect(page).toHaveURL(/\/admin\/evaluations\/templates$/);
+
+  await visit(page, '/admin/roles/create');
+  expect(await findDuplicateIds(page)).toEqual([]);
 
   await visit(page, '/admin/dashboard');
   const collapseButton = page.getByRole('button', { name: /réduire|sidebar|menu/i }).first();
@@ -112,13 +158,30 @@ test('administration — écrans structurants', async ({ page }) => {
 });
 
 test('manager — file d’actions et validation', async ({ page }) => {
-  await login(page, 'S1110');
+  await login(page, 'M0008');
+
+  const dashboardExamineButton = page
+    .locator('main')
+    .getByRole('button', { name: /^Examiner l'évaluation de /i })
+    .first();
+  await expect(dashboardExamineButton).toBeVisible();
+  await dashboardExamineButton.click();
+  await expect(page).toHaveURL(/\/evaluations\/validate\?id=/);
+  await expect(page.getByRole('dialog')).toContainText("Validation de l'évaluation");
+  await page.getByRole('dialog').getByRole('button', { name: 'Fermer', exact: true }).first().click();
 
   await visit(page, '/evaluations/pending');
+  await expect(page.getByText('Soumises', { exact: true })).toHaveCount(0);
   await capture(page, 'manager/12-evaluations-a-completer.png');
 
   await visit(page, '/evaluations/validate');
+  const examineButton = page.getByRole('button', { name: /^Examiner l'évaluation de /i }).first();
+  await expect(examineButton).toBeVisible();
   await capture(page, 'manager/13-evaluations-a-valider.png');
+  await examineButton.click();
+  await expect(page.getByRole('dialog')).toContainText("Validation de l'évaluation");
+  await capture(page, 'manager/13b-modale-validation.png');
+  await page.getByRole('dialog').getByRole('button', { name: 'Fermer', exact: true }).first().click();
 
   await visit(page, '/equipe/subordonnes');
   await capture(page, 'manager/14-equipe.png');
@@ -133,6 +196,8 @@ test('évaluateur — formulaire long et état initial', async ({ page }) => {
     await resumeButton.click();
     await expect(page).toHaveURL(/\/evaluations\/[^/]+\/edit$/);
     await expect(page.getByRole('heading', { name: /Éditer une évaluation/i })).toBeVisible();
+    await expect(page.getByText('100%', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Soumettre l'évaluation/i })).toBeDisabled();
     await capture(page, 'evaluation/15-formulaire-initial.png');
   } else {
     await capture(page, 'evaluation/15-file-sans-brouillon.png');
@@ -154,8 +219,15 @@ test('application authentifiée — viewport mobile', async ({ browser }, testIn
     body: JSON.stringify(metrics, null, 2),
     contentType: 'application/json',
   });
+  expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+  expect(metrics.mainWidth).not.toBeNull();
+  expect(metrics.mainWidth ?? 0).toBeGreaterThanOrEqual(380);
 
   await capture(page, 'mobile/16-dashboard-manager.png');
+  await page.getByRole('button', { name: 'Ouvrir le menu de navigation' }).click();
+  await expect(page.getByRole('complementary', { name: 'Navigation principale' })).toBeVisible();
+  await capture(page, 'mobile/18-menu-navigation.png');
+  await page.getByRole('button', { name: 'Fermer le menu de navigation' }).click();
   await visit(page, '/evaluations/pending');
   await capture(page, 'mobile/17-file-evaluations.png');
   await context.close();

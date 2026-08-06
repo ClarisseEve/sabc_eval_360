@@ -59,7 +59,6 @@ const AdminTemplatesIndex = lazy(() => import('./pages/Admin/Evaluations/Templat
 const AdminTemplatesCreate = lazy(() => import('./pages/Admin/Evaluations/Templates/Create'));
 const AdminTemplatesEdit = lazy(() => import('./pages/Admin/Evaluations/Templates/Edit'));
 const AdminTemplatesShow = lazy(() => import('./pages/Admin/Evaluations/Templates/Show'));
-const AdminTemplatesAssignations = lazy(() => import('./pages/Admin/Evaluations/Templates/Assignations'));
 
 // Admin: Remplacements
 const AdminRemplacements = lazy(() => import('./pages/Admin/Remplacements/index'));
@@ -71,7 +70,6 @@ const AdminRemplacementsEdit = lazy(() => import('./pages/Admin/Remplacements/Ed
 const AdminRoles = lazy(() => import('./pages/Admin/Roles/index'));
 const AdminRolesCreate = lazy(() => import('./pages/Admin/Roles/create'));
 const AdminRolesShow = lazy(() => import('./pages/Admin/Roles/show'));
-const AdminRolesPermissions = lazy(() => import('./pages/Admin/Roles/permissions'));
 
 // Admin: Structure
 const AdminStructure = lazy(() => import('./pages/Admin/Structure/index'));
@@ -212,7 +210,7 @@ function App() {
                       {/* ── Admin: Templates ── */}
                       <Route path="/admin/evaluations/templates" element={<A><AdminTemplatesIndex /></A>} />
                       <Route path="/admin/evaluations/templates/create" element={<A><AdminTemplatesCreate /></A>} />
-                      <Route path="/admin/evaluations/templates/assignations" element={<A><AdminTemplatesAssignations /></A>} />
+                      <Route path="/admin/evaluations/templates/assignations" element={<Navigate to="/admin/evaluations/templates" replace />} />
                       <Route path="/admin/evaluations/templates/:id/edit" element={<A><AdminTemplatesEdit /></A>} />
                       <Route path="/admin/evaluations/templates/:id" element={<A><AdminTemplatesShow /></A>} />
 
@@ -225,7 +223,7 @@ function App() {
                       {/* ── Admin: Rôles ── */}
                       <Route path="/admin/roles" element={<A><AdminRoles /></A>} />
                       <Route path="/admin/roles/create" element={<A><AdminRolesCreate /></A>} />
-                      <Route path="/admin/roles/permissions" element={<A><AdminRolesPermissions /></A>} />
+                      <Route path="/admin/roles/permissions" element={<Navigate to="/admin/evaluations/regles" replace />} />
                       <Route path="/admin/roles/:id" element={<A><AdminRolesShow /></A>} />
 
                       {/* ── Admin: Structure Organisationnelle ── */}

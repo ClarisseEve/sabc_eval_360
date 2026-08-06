@@ -1,6 +1,6 @@
 import { DashboardSkeleton } from '@/Components/Dashboard/DashboardSkeleton';
 import { Badge } from '@/Components/UI/Badge';
-import { Button } from '@/Components/UI/Button';
+import { Button, buttonVariants } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/Components/UI/Dialog/Dialog';
 import { Input } from '@/Components/UI/Input';
@@ -120,17 +120,21 @@ function UsersContent() {
 
     const params = { page, limit: 50, ...(searchDebounced ? { search: searchDebounced } : {}) };
     const { data: response } = useAdminUsers(params);
-    const { data: roles = [] } = useQuery({
+    const { data: roles = [], isPending: rolesPending } = useQuery({
         queryKey: ['admin', 'roles'],
         queryFn: () => adminApi.roles.list().then((response) => response.data),
     });
-    const { data: regions = [] } = useQuery({
+    const { data: regions = [], isPending: regionsPending } = useQuery({
         queryKey: ['admin', 'structure', 'regions'],
         queryFn: () => adminApi.structure.regions().then((response) => response.data),
     });
 
     const users = response?.data ?? (Array.isArray(response) ? response : []);
     const meta = response?.meta ?? { total: users.length, page: 1, limit: 50, totalPages: 1 };
+    const hasRoles = Array.isArray(roles) && roles.length > 0;
+    const hasRegions = Array.isArray(regions) && regions.length > 0;
+    const referencesPending = rolesPending || regionsPending;
+    const canCreateUser = !referencesPending && hasRoles && hasRegions;
 
     useEffect(() => {
         if (!editSource || editForm.id_role || (roles as RoleReference[]).length === 0) return;
@@ -186,14 +190,45 @@ function UsersContent() {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Link to="/admin/utilisateurs/gaps">
-                        <Button variant="outline">Analyse des gaps</Button>
+                    <Link to="/admin/utilisateurs/gaps" className={buttonVariants({ variant: 'outline' })}>
+                        Analyse des gaps
                     </Link>
-                    <Button className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white" onClick={() => setCreateOpen(true)}>
-                        Nouvel utilisateur
-                    </Button>
+                    {canCreateUser ? (
+                        <Button className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white" onClick={() => setCreateOpen(true)}>
+                            Nouvel utilisateur
+                        </Button>
+                    ) : referencesPending ? (
+                        <Button disabled>Chargement…</Button>
+                    ) : null}
                 </div>
             </div>
+
+            {!referencesPending && !canCreateUser ? (
+                <div role="status" className="flex flex-col gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <p className="text-sm font-semibold text-amber-900">Création d’utilisateur indisponible</p>
+                        <p className="text-sm text-amber-800">
+                            {!hasRoles && !hasRegions
+                                ? 'Ajoutez au moins un rôle et une région avant de créer un utilisateur.'
+                                : !hasRoles
+                                  ? 'Ajoutez au moins un rôle avant de créer un utilisateur.'
+                                  : 'Ajoutez au moins une région avant de créer un utilisateur.'}
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {!hasRoles ? (
+                            <Link to="/admin/roles" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                                Configurer les rôles
+                            </Link>
+                        ) : null}
+                        {!hasRegions ? (
+                            <Link to="/admin/structure/regions" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                                Configurer les régions
+                            </Link>
+                        ) : null}
+                    </div>
+                </div>
+            ) : null}
 
             <Card>
                 <CardHeader>
@@ -265,7 +300,7 @@ function UsersContent() {
             </Card>
 
             {/* Modal création */}
-            <Dialog open={createOpen} onOpenChange={(value) => (value ? setCreateOpen(true) : closeCreate())}>
+            <Dialog open={createOpen} onOpenChange={(value) => (value && canCreateUser ? setCreateOpen(true) : closeCreate())}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Créer un utilisateur</DialogTitle>
@@ -337,7 +372,7 @@ function UsersContent() {
                         </Button>
                         <Button
                             className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white"
-                            disabled={!isCreateUserFormValid(createForm) || createMutation.isPending}
+                            disabled={!canCreateUser || !isCreateUserFormValid(createForm) || createMutation.isPending}
                             onClick={() => createMutation.mutate()}
                         >
                             {createMutation.isPending ? 'Création...' : 'Créer'}

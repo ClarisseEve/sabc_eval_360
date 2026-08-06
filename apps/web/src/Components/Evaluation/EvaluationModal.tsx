@@ -6,8 +6,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert';
 import { reglesApi, evaluationsApi } from '@/Services/api';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { usePeriodesActives } from '@/Hooks/queries';
-import { getRuleSummary, normalizePublishedRule } from '@/utils/rules';
+import { getRuleSummary, isPublishedRuleReady, normalizePublishedRule } from '@/utils/rules';
 import Badge from '@/Components/UI/Badge';
+import { formatVisibilityLabel } from '@/Components/Dashboard/RoleDashboardShared';
 
 interface EvaluationModalProps {
   open: boolean;
@@ -28,7 +29,13 @@ export default function EvaluationModal({
   const [error, setError] = useState<string | null>(null);
 
   const shouldLoadTemplate = open && !!templateId;
-  const { data: template } = useQuery({
+  const {
+    data: template,
+    isLoading: isTemplateLoading,
+    isFetching: isTemplateFetching,
+    isError: isTemplateError,
+    refetch: refetchTemplate,
+  } = useQuery({
     queryKey: ['regles', templateId],
     queryFn: () => reglesApi.get(String(templateId)).then((r) => r.data),
     enabled: shouldLoadTemplate,
@@ -44,9 +51,10 @@ export default function EvaluationModal({
   const activePeriode = Array.isArray(periodes) ? periodes[0] : null;
   const normalizedTemplate = template ? normalizePublishedRule(template) : null;
   const templateSummary = template ? getRuleSummary(template) : null;
+  const isTemplateReady = isPublishedRuleReady(template, templateId);
 
   const handleCreate = async () => {
-    if (!user?.matricule || !targetMatricule || !activePeriode?.id_periode) return;
+    if (!user?.matricule || !targetMatricule || !activePeriode?.id_periode || !normalizedTemplate || !isTemplateReady) return;
     try {
       setSubmitting(true);
       setError(null);
@@ -54,7 +62,7 @@ export default function EvaluationModal({
         evaluateur_matricule: user.matricule,
         evalue_matricule: targetMatricule,
         id_periode: activePeriode.id_periode,
-        id_regle: template?.id_regle,
+        id_regle: normalizedTemplate.id_regle,
       });
       const evaluationId = created.data?.id_evaluation || created.data?.id;
       onOpenChange(false);
@@ -93,20 +101,46 @@ export default function EvaluationModal({
           </Alert>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-lg border border-sabc-gray-200 p-4 text-sm text-sabc-gray-700">
-              <div className="font-medium text-sabc-gray-900">{template?.nom_regle || 'Template sélectionné'}</div>
-              <div className="mt-1 text-sabc-gray-500">{template?.description || 'Aucune description.'}</div>
-              {normalizedTemplate ? (
+            {isTemplateLoading || isTemplateFetching ? (
+              <Alert>
+                <AlertTitle>Chargement de la règle…</AlertTitle>
+                <AlertDescription>
+                  Nous vérifions les critères et les paramètres avant d’autoriser la création du brouillon.
+                </AlertDescription>
+              </Alert>
+            ) : isTemplateError ? (
+              <Alert className="border-red-300 bg-red-50 text-red-700">
+                <AlertTitle>Règle indisponible</AlertTitle>
+                <AlertDescription className="space-y-3">
+                  <p>Le détail de la règle n’a pas pu être chargé. Aucun brouillon ne sera créé dans cet état.</p>
+                  <Button type="button" size="sm" variant="outline" onClick={() => { void refetchTemplate(); }}>
+                    Réessayer
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : !isTemplateReady ? (
+              <Alert className="border-amber-300 bg-amber-50 text-amber-800">
+                <AlertTitle>Règle non exploitable</AlertTitle>
+                <AlertDescription>
+                  La règle sélectionnée est inactive, vide ou ne correspond plus à la sélection. Choisissez une autre cible ou réessayez plus tard.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="rounded-lg border border-sabc-gray-200 p-4 text-sm text-sabc-gray-700">
+                <div className="font-medium text-sabc-gray-900">{normalizedTemplate?.nom_regle}</div>
+                <div className="mt-1 text-sabc-gray-500">{normalizedTemplate?.description || 'Aucune description.'}</div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Badge variant="info">{templateSummary?.criteresCount ?? 0} critères</Badge>
                   <Badge variant="info">{templateSummary?.sections.length ?? 0} sections</Badge>
-                  <Badge variant="warning">visibilité {normalizedTemplate.visibility_policy.detail}</Badge>
+                  <Badge variant="warning">
+                    {formatVisibilityLabel(normalizedTemplate?.visibility_policy.detail)}
+                  </Badge>
                 </div>
-              ) : null}
-              <div className="mt-3 text-xs text-sabc-gray-500">
-                Période active: {activePeriode?.nom_periode || activePeriode?.nom || activePeriode?.code_periode || activePeriode?.id_periode}
+                <div className="mt-3 text-xs text-sabc-gray-500">
+                  Période active: {activePeriode?.nom_periode || activePeriode?.nom || activePeriode?.code_periode || activePeriode?.id_periode}
+                </div>
               </div>
-            </div>
+            )}
 
             {error && (
               <Alert className="border-red-300 bg-red-50 text-red-700">
@@ -122,9 +156,9 @@ export default function EvaluationModal({
               <Button
                 className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
                 onClick={handleCreate}
-                disabled={submitting}
+                disabled={submitting || isTemplateLoading || isTemplateFetching || isTemplateError || !isTemplateReady}
               >
-                {submitting ? 'Création…' : 'Créer le brouillon'}
+                {submitting ? 'Création…' : isTemplateLoading || isTemplateFetching ? 'Vérification…' : 'Créer le brouillon'}
               </Button>
             </div>
           </div>

@@ -24,29 +24,14 @@ import { CommonModule } from './common/common.module';
 import { EvaluationPermissionModule } from './evaluation-permission/evaluation-permission.module';
 import { ReportsModule } from './reports/reports.module';
 import { validateEnvironment } from './config/validate-env';
+import { APP_THROTTLER_OPTIONS } from './config/throttler-options';
 
 @Global()
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([
-      {
-        name: 'default',
-        ttl: 60_000,
-        limit: 300,
-      },
-      {
-        name: 'login',
-        ttl: 60_000,
-        limit: 10,
-      },
-      {
-        name: 'heavy',
-        ttl: 60_000,
-        limit: 30,
-      },
-    ]),
+    ThrottlerModule.forRoot(APP_THROTTLER_OPTIONS),
     CommonModule,
     PrismaModule,
     DatabasePgModule,

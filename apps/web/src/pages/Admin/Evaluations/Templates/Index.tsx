@@ -75,19 +75,20 @@ export default function TemplatesIndexPage() {
   const published = templates.filter((t: any) => t.statut === 'published').length;
   const drafts = templates.filter((t: any) => t.statut === 'draft').length;
 
+  // La matrice d'assignation n'est volontairement pas exposée ici : ses choix
+  // ne pilotent pas encore la règle réellement utilisée à la création. Son
+  // ancienne URL redirige vers cette liste jusqu'au raccordement métier.
+
   return (
     <AdminEvaluationsLayout title="Templates d'évaluation">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-sabc-gray-900">Templates d'évaluation</h1>
           <p className="mt-1 text-sm text-sabc-gray-400">
-            Formulaires réutilisables assignables aux rôles pour chaque période.
+            Formulaires réutilisables pour structurer les évaluations.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => navigate('/admin/evaluations/templates/assignations')}>
-            Assignations
-          </Button>
           {templates.length > 0 ? (
             <Button
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"

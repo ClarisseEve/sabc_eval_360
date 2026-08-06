@@ -19,3 +19,16 @@ describe('navigation de la file de validation', () => {
     expect(VALIDATION_QUEUE_ROLES).not.toContain('AS');
   });
 });
+
+describe('navigation administrateur', () => {
+  it('garde les parcours utiles sans exposer la matrice de permissions inachevée', () => {
+    const hrefs = NAV_ITEMS.flatMap((item) => [
+      item.href,
+      ...(item.children ?? []).map((child) => child.href),
+    ]);
+
+    expect(hrefs).toContain('/admin/roles');
+    expect(hrefs).toContain('/admin/evaluations/templates');
+    expect(hrefs).not.toContain('/admin/roles/permissions');
+  });
+});

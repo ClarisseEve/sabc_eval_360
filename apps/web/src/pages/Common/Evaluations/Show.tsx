@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useEvaluation } from '@/Hooks/queries';
 import {
   buildEvaluationContext,
@@ -62,8 +62,21 @@ const formatDate = (value?: string | null, withTime = false) => {
   }).format(date);
 };
 
+function hasInternalBrowserHistory() {
+  const routerIndex = Number(window.history.state?.idx);
+  if (Number.isFinite(routerIndex) && routerIndex > 0) return true;
+  if (!document.referrer) return false;
+
+  try {
+    return new URL(document.referrer).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 const ShowEvaluation: React.FC = () => {
   const { id = '' } = useParams();
+  const navigate = useNavigate();
   const { data: evaluation } = useEvaluation(id);
   const { authUser: rawUser } = useEvaluationLayoutUser();
   const statusMeta = STATUS_VARIANTS[evaluation?.statut] ?? STATUS_VARIANTS.brouillon;
@@ -77,13 +90,23 @@ const ShowEvaluation: React.FC = () => {
   const overallScore = evaluation?.note_globale ? Number(evaluation.note_globale) : null;
   const hasComments = Boolean(evaluation?.commentaire_general);
   const decisionDateLabel = evaluation?.statut === 'valide' ? 'Validée le' : 'Dernier retour le';
+  const fallbackBackPath = isEvaluator && ['brouillon', 'rejete'].includes(String(evaluation?.statut))
+    ? '/evaluations/pending'
+    : '/evaluations/historique';
+  const handleBack = () => {
+    if (hasInternalBrowserHistory()) {
+      navigate(-1);
+      return;
+    }
+    navigate(fallbackBackPath, { replace: true });
+  };
 
   return (
     <EvaluationPageLayout pageTitle="Détail de l'évaluation">
       <Head title="Détail de l'évaluation" />
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button asChild={false} variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800" onClick={() => { window.location.href = '/evaluations/pending'; }}>
+          <Button asChild={false} variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800" onClick={handleBack}>
             <span className="inline-flex items-center">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Retour

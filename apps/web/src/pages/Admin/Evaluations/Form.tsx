@@ -1,9 +1,10 @@
 import React from 'react';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowRight, Calendar, ClipboardList, UserRound } from 'lucide-react';
-import { Button } from '@/Components/UI/Button/Button';
+import { Button, buttonVariants } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { EmptyState } from '@/Components/UI/EmptyState';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
 import { reglesApi, evaluationsApi } from '@/Services/api';
 import { useAuthContext } from '@/Contexts/AuthContext';
@@ -60,6 +61,11 @@ export default function EvaluationFormPage() {
   const eligibles = React.useMemo(() => normalizeEligibles(eligiblesData), [eligiblesData]);
   const periodes = Array.isArray(periodesData) ? periodesData : [];
   const regles = Array.isArray(reglesData) ? reglesData : [];
+  const missingPrerequisites = [
+    ...(periodes.length === 0 ? ['une période ouverte'] : []),
+    ...(regles.length === 0 ? ['une règle active'] : []),
+    ...(eligibles.length === 0 ? ['une cible éligible'] : []),
+  ];
 
   React.useEffect(() => {
     if (!selectedPeriode && periodes.length > 0) {
@@ -144,6 +150,35 @@ export default function EvaluationFormPage() {
         </div>
       ) : null}
 
+      {missingPrerequisites.length > 0 ? (
+        <Card>
+          <CardContent className="p-6">
+            <EmptyState
+              title="Impossible de créer une évaluation"
+              description={`Prérequis manquant${missingPrerequisites.length > 1 ? 's' : ''} : ${missingPrerequisites.join(', ')}.`}
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  {periodes.length === 0 ? (
+                    <Link to="/admin/evaluations/periodes" className={buttonVariants({ variant: 'outline' })}>
+                      Ouvrir une période
+                    </Link>
+                  ) : null}
+                  {regles.length === 0 ? (
+                    <Link to="/admin/evaluations/regles" className={buttonVariants({ variant: 'outline' })}>
+                      Configurer les règles
+                    </Link>
+                  ) : null}
+                  {eligibles.length === 0 ? (
+                    <Link to="/admin/utilisateurs/gaps" className={buttonVariants({ variant: 'outline' })}>
+                      Corriger la hiérarchie
+                    </Link>
+                  ) : null}
+                </div>
+              }
+            />
+          </CardContent>
+        </Card>
+      ) : (
       <div className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
         <Card>
           <CardHeader>
@@ -196,6 +231,14 @@ export default function EvaluationFormPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedEligible && applicableRules.length === 0 ? (
+                <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  <p>Aucune règle active ne correspond à cette cible et à ce type d’évaluation.</p>
+                  <Link to="/admin/evaluations/regles" className="mt-1 inline-block font-semibold underline underline-offset-2">
+                    Configurer les règles
+                  </Link>
+                </div>
+              ) : null}
             </div>
 
             <Button
@@ -261,6 +304,7 @@ export default function EvaluationFormPage() {
           </Card>
         </div>
       </div>
+      )}
     </AdminEvaluationsLayout>
   );
 }

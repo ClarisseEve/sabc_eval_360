@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatPersonName } from '@/utils/helpers';
 import {
   Bar,
   BarChart,
@@ -10,6 +11,7 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
+import { Button } from '@/Components/UI/Button/Button';
 import { useQuery } from '@tanstack/react-query';
 import { useRoleDashboardData } from '@/Hooks/queries/useRoleDashboards';
 import { analyticsApi } from '@/Services/api';
@@ -27,6 +29,7 @@ import {
   navigateTo,
 } from './RoleDashboardShared';
 import { TruncatedList } from '@/Components/UI/TruncatedList/TruncatedList';
+import { hasCapability } from '@/config/rbac';
 
 type RoleManagerDashboardPageProps = {
   fallbackRole: string;
@@ -44,15 +47,6 @@ type AlertItem = {
 
 function buildManagerAlerts(data: ReturnType<typeof useRoleDashboardData>['data']): AlertItem[] {
   const alerts: AlertItem[] = [];
-
-  data.toValidateEvaluations.forEach((evaluation: any) => {
-    alerts.push({
-      id: `validate-${evaluation.id_evaluation}`,
-      label: 'Validation en attente',
-      detail: `${evaluation.evalue?.prenom || ''} ${evaluation.evalue?.nom || ''}`.trim() || evaluation.evalue_matricule || 'Collaborateur',
-      severity: 'warning',
-    });
-  });
 
   data.teamMembers
     .filter((member) => member.scoreGlobal == null || member.totalEvaluations === 0)
@@ -89,6 +83,7 @@ export default function RoleManagerDashboardPage({
 }: RoleManagerDashboardPageProps) {
   const { data } = useRoleDashboardData('manager', fallbackRole);
   const alerts = buildManagerAlerts(data);
+  const canUseTeamJourneys = data.directMembers.length > 0 && hasCapability(data.userRole, 'canEvaluateSubs');
 
   // Une seule requête agrégée pour toute l'équipe, plutôt qu'un appel par membre.
   const teamMatricules = data.teamMembers.map((member) => member.matricule).filter(Boolean);
@@ -196,15 +191,13 @@ export default function RoleManagerDashboardPage({
         showTotalEvaluations
         renderIdentityMeta={(member) => member.email ?? ''}
         renderRoleMeta={(member) => `Niveau ${member.niveauHierarchique ?? '—'}`}
-        actionLabel="Évaluer"
-        onAction={() => navigateTo('/common/evaluations/pending')}
       />
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Alertes équipe</CardTitle>
-            <CardDescription>Retards, couvertures manquantes et validations en attente</CardDescription>
+            <CardDescription>Couvertures manquantes et baisses de performance</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {alerts.length === 0 ? (
@@ -235,15 +228,22 @@ export default function RoleManagerDashboardPage({
                 <div className="font-medium text-sabc-gray-900 dark:text-white">Validations reçues</div>
                 <div className="mt-3 space-y-2">
                   {data.toValidateEvaluations.slice(0, 3).map((evaluation: any) => (
-                    <div key={String(evaluation.id_evaluation)} className="flex items-center justify-between gap-3 text-sm">
-                      <div className="text-sabc-gray-600 dark:text-sabc-gray-300">
-                        {evaluation.evalue?.prenom} {evaluation.evalue?.nom}
+                    <div key={String(evaluation.id_evaluation)} className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                      <div className="min-w-0 text-sabc-gray-600 dark:text-sabc-gray-300">
+                        {formatPersonName(evaluation.evalue, evaluation.evalue_matricule || 'Collaborateur')}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{evaluation.statut}</Badge>
                         <span className="text-xs text-sabc-gray-500 dark:text-sabc-gray-400">
                           {formatDateLabel(evaluation.date_soumission || evaluation.date_creation)}
                         </span>
+                        <Button
+                          size="sm"
+                          onClick={() => navigateTo(`/evaluations/validate?id=${encodeURIComponent(String(evaluation.id_evaluation))}`)}
+                          aria-label={`Examiner l'évaluation de ${formatPersonName(evaluation.evalue, evaluation.evalue_matricule || 'Collaborateur')}`}
+                        >
+                          Examiner
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -261,11 +261,18 @@ export default function RoleManagerDashboardPage({
 
       <QuickActionsCard
         actions={[
+          ...(data.toValidateEvaluations.length > 0
+            ? [{ label: `À valider (${data.toValidateEvaluations.length})`, href: '/evaluations/validate' }]
+            : []),
           { label: 'Axes d’amélioration', href: '/axes-amelioration' },
           { label: 'Évaluations à faire', href: '/common/evaluations/pending' },
-          { label: 'Mes évaluations', href: '/common/evaluations/mine' },
-          { label: 'Vue équipe', href: '/common/team/overview' },
-          { label: 'Évaluations équipe', href: '/common/team/evaluations', variant: 'secondary' },
+          { label: 'Démarrer une évaluation', href: '/common/evaluations/mine' },
+          ...(canUseTeamJourneys
+            ? [
+                { label: 'Vue équipe', href: '/common/team/overview' },
+                { label: 'Évaluations équipe', href: '/common/team/evaluations', variant: 'secondary' as const },
+              ]
+            : []),
         ]}
       />
     </DashboardPageFrame>

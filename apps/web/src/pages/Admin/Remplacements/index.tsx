@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { Badge } from '@/Components/UI/Badge';
-import { Button } from '@/Components/UI/Button';
+import { Button, buttonVariants } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Input } from '@/Components/UI/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
@@ -13,6 +13,7 @@ import { remplacementsApi } from '@/Services/api';
 import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { AdminRemplacementsLayout } from './shared';
+import { useAdminUsers } from '@/Hooks/queries';
 
 type Statut = 'actif' | 'avenir' | 'termine';
 
@@ -27,6 +28,7 @@ export default function RemplacementsIndex() {
   const confirm = useConfirm();
   const { success, error } = useToast();
   const [search, setSearch] = useState('');
+  const { data: usersResponse } = useAdminUsers({ page: 1, limit: 2 });
 
   const { data } = useSuspenseQuery({
     queryKey: ['admin', 'remplacements', 'all'],
@@ -98,6 +100,9 @@ export default function RemplacementsIndex() {
       (data?.aVenir?.length ?? 0) +
       (data?.historique?.length ?? 0) >
     0;
+  const loadedUsers = usersResponse?.data ?? (Array.isArray(usersResponse) ? usersResponse : []);
+  const usersCount = Number(usersResponse?.meta?.total ?? loadedUsers.length);
+  const canCreateReplacement = usersCount >= 2;
 
   return (
     <AdminRemplacementsLayout title="Gestion des remplacements">
@@ -105,12 +110,24 @@ export default function RemplacementsIndex() {
         title="Gestion des remplacements"
         description="Remplacements actifs, à venir et historiques, sur les données réelles."
         breadcrumbs={[{ label: 'Administration' }, { label: 'Remplacements' }]}
-        actions={hasRemplacements ? (
-          <Link to="/admin/remplacements/create">
-            <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark">Nouveau remplacement</Button>
+        actions={hasRemplacements && canCreateReplacement ? (
+          <Link to="/admin/remplacements/create" className={buttonVariants()}>
+            Nouveau remplacement
           </Link>
         ) : undefined}
       />
+
+      {hasRemplacements && !canCreateReplacement ? (
+        <div role="status" className="flex flex-col gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-900">Création de remplacement indisponible</p>
+            <p className="text-sm text-amber-800">Au moins deux utilisateurs sont nécessaires pour choisir un titulaire et un remplaçant.</p>
+          </div>
+          <Link to="/admin/utilisateurs" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            Gérer les utilisateurs
+          </Link>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Actifs</div><div className="text-2xl font-bold">{data.actifs.length}</div></CardContent></Card>
@@ -127,12 +144,20 @@ export default function RemplacementsIndex() {
               <EmptyState title="Aucun résultat" description="Aucun remplacement ne correspond à votre recherche." />
             ) : (
               <EmptyState
-                title="Aucun remplacement"
-                description="Créez un remplacement temporaire pour couvrir une absence."
+                title={canCreateReplacement ? 'Aucun remplacement' : 'Ajoutez un second utilisateur'}
+                description={canCreateReplacement
+                  ? 'Créez un remplacement temporaire pour couvrir une absence.'
+                  : 'Au moins deux utilisateurs sont nécessaires pour choisir un titulaire et un remplaçant.'}
                 action={
-                  <Link to="/admin/remplacements/create">
-                    <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark">Nouveau remplacement</Button>
-                  </Link>
+                  canCreateReplacement ? (
+                    <Link to="/admin/remplacements/create" className={buttonVariants()}>
+                      Nouveau remplacement
+                    </Link>
+                  ) : (
+                    <Link to="/admin/utilisateurs" className={buttonVariants({ variant: 'outline' })}>
+                      Gérer les utilisateurs
+                    </Link>
+                  )
                 }
               />
             )

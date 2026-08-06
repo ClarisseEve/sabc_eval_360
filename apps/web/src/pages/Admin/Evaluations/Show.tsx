@@ -23,7 +23,12 @@ import {
   formatDisplayName,
   formatRole,
 } from '@/pages/Common/Evaluations/shared';
-import { ActiveRulesCard, formatDateLabel, formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
+import {
+  ActiveRulesCard,
+  formatDateLabel,
+  formatEvaluationType,
+  formatVisibilityLabel,
+} from '@/Components/Dashboard/RoleDashboardShared';
 
 function formatDate(value?: string | null, withTime = false) {
   if (!value) return 'Non renseigné';
@@ -157,7 +162,7 @@ export default function AdminEvaluationShowPage() {
                   <div className="mt-1 flex flex-wrap gap-2">
                     <Badge variant="info">{context.criteriaCount} critères</Badge>
                     <Badge variant="info">{context.sections.length} sections</Badge>
-                    <Badge variant="info">visibilité {context.visibilityDetail}</Badge>
+                    <Badge variant="info">{formatVisibilityLabel(context.visibilityDetail)}</Badge>
                   </div>
                 </div>
                 <div className="rounded-lg border border-sabc-gray-200 p-3 text-sm">

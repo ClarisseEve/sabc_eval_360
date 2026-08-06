@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
-import { Button } from '@/Components/UI/Button/Button';
+import { Button, buttonVariants } from '@/Components/UI/Button/Button';
 import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
@@ -20,6 +20,7 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
+import { Link } from 'react-router-dom';
 
 export default function ServicesIndex() {
   const { data } = useAdminStructure();
@@ -32,6 +33,7 @@ export default function ServicesIndex() {
 
   const regions = Array.isArray(data?.regions) ? data.regions : [];
   const services = Array.isArray(data?.services) ? data.services : [];
+  const canCreateService = regions.length > 0;
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin', 'structure'] });
@@ -81,7 +83,7 @@ export default function ServicesIndex() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Services existants</CardTitle>
-          {services.length > 0 ? (
+          {services.length > 0 && canCreateService ? (
             <Button
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               onClick={() => setOpen(true)}
@@ -90,19 +92,39 @@ export default function ServicesIndex() {
             </Button>
           ) : null}
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {services.length === 0 ? (
             <EmptyState
-              title="Aucun service"
-              description="Créez votre premier service commercial pour structurer l'organisation."
+              title={canCreateService ? 'Aucun service' : 'Créez d’abord une région'}
+              description={canCreateService
+                ? "Créez votre premier service commercial pour structurer l'organisation."
+                : 'Chaque service doit être rattaché à une région. Configurez ce prérequis avant de créer un service.'}
               action={
-                <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => setOpen(true)}>
-                  Nouveau service
-                </Button>
+                canCreateService ? (
+                  <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => setOpen(true)}>
+                    Nouveau service
+                  </Button>
+                ) : (
+                  <Link to="/admin/structure/regions" className={buttonVariants({ variant: 'outline' })}>
+                    Configurer les régions
+                  </Link>
+                )
               }
             />
           ) : (
-          <Table>
+          <>
+            {!canCreateService ? (
+              <div role="status" className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">Création de service indisponible</p>
+                  <p className="text-sm text-amber-800">Ajoutez une région avant de créer un nouveau service.</p>
+                </div>
+                <Link to="/admin/structure/regions" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                  Configurer les régions
+                </Link>
+              </div>
+            ) : null}
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Service</TableHead>
@@ -135,7 +157,8 @@ export default function ServicesIndex() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+            </Table>
+          </>
           )}
         </CardContent>
       </Card>

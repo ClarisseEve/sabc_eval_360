@@ -28,7 +28,12 @@ import {
   formatRole,
   isCriterionCommentRequired,
 } from './shared';
-import { ActiveRulesCard, formatDateLabel, formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
+import {
+  ActiveRulesCard,
+  formatDateLabel,
+  formatEvaluationType,
+  formatVisibilityLabel,
+} from '@/Components/Dashboard/RoleDashboardShared';
 import { useOfflineSync } from '@/Hooks/useOfflineSync';
 import {
   buildEditableEvaluationNotes,
@@ -61,9 +66,11 @@ const EditEvaluation: React.FC = () => {
   const [pendingAction, setPendingAction] = useState<'draft' | 'submit' | null>(null);
   const [savedLocallyOnly, setSavedLocallyOnly] = useState(false);
   const [localSaveError, setLocalSaveError] = useState<string | null>(null);
+  const [draftRestorationComplete, setDraftRestorationComplete] = useState(false);
 
-  const { saveDraft, getDraft, deleteDraft, isOnline, pendingCount, isSyncing } = useOfflineSync();
+  const { saveDraft, getDraft, deleteDraft, syncAll, isOnline, pendingCount, isSyncing } = useOfflineSync();
   const draftRestoredRef = useRef(false);
+  const onlineSyncAttemptedRef = useRef(false);
   const latestDraftRef = useRef({ notes, commentaireGeneral });
 
   React.useEffect(() => {
@@ -74,6 +81,7 @@ const EditEvaluation: React.FC = () => {
     setNotes(buildEditableEvaluationNotes(criteria));
     setCommentaireGeneral(evaluation?.commentaire_general ?? '');
     draftRestoredRef.current = false;
+    setDraftRestorationComplete(false);
   }, [criteria, evaluation?.commentaire_general]);
 
   // Restore local draft once after evaluation data loads
@@ -84,9 +92,25 @@ const EditEvaluation: React.FC = () => {
       if (!draft || draft.saved_at < new Date(evaluation.updated_at ?? 0).getTime()) return;
       setNotes(buildEditableEvaluationNotes(criteria, draft.notes));
       setCommentaireGeneral(draft.commentaire_general ?? '');
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setDraftRestorationComplete(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evaluation]);
+
+  // Synchroniser seulement après la restauration évite qu'un brouillon soit
+  // marqué « synchronisé » avant d'avoir été réinjecté dans le formulaire.
+  React.useEffect(() => {
+    if (!isOnline) {
+      onlineSyncAttemptedRef.current = false;
+      return;
+    }
+    if (!draftRestorationComplete || pendingCount === 0 || isSyncing || onlineSyncAttemptedRef.current) return;
+    onlineSyncAttemptedRef.current = true;
+    void syncAll().then(async ({ synced }) => {
+      if (synced === 0) return;
+      await queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+      await queryClient.invalidateQueries({ queryKey: ['evaluations', String(evaluationId)] });
+    });
+  }, [draftRestorationComplete, evaluationId, isOnline, isSyncing, pendingCount, queryClient, syncAll]);
 
   // Auto-save to IndexedDB every 30 seconds
   React.useEffect(() => {
@@ -193,23 +217,38 @@ const EditEvaluation: React.FC = () => {
           <Alert className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
             <WifiOff className="h-4 w-4" />
             <AlertTitle>{isOnline ? 'Envoi en attente' : 'Hors ligne'}</AlertTitle>
-            <AlertDescription className="text-xs">
-              {isOnline
-                ? isSyncing
-                  ? 'Synchronisation en cours…'
-                  : `${pendingCount} brouillon(s) non synchronisé(s). Reprise auto dès la connexion.`
-                : 'Vous êtes hors ligne. Les modifications sont sauvegardées localement et envoyées à la reconnexion.'}
+            <AlertDescription className="flex flex-wrap items-center gap-2 text-xs">
+              <span>
+                {isOnline
+                  ? isSyncing
+                    ? 'Synchronisation en cours…'
+                    : `${pendingCount} brouillon(s) non synchronisé(s).`
+                  : 'Vous êtes hors ligne. Les modifications sont sauvegardées localement et envoyées à la reconnexion.'}
+              </span>
+              {isOnline && pendingCount > 0 && !isSyncing ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => void syncAll()}>
+                  Réessayer maintenant
+                </Button>
+              ) : null}
             </AlertDescription>
           </Alert>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button asChild={false} variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800" onClick={() => navigate(`/evaluations/${evaluationId}`)}>
-            <span className="inline-flex items-center">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Retour au détail
-            </span>
-          </Button>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <Button asChild={false} variant="ghost" size="sm" className="-ml-2 text-sabc-gray-500 hover:text-sabc-gray-800" onClick={() => navigate(`/evaluations/${evaluationId}`)}>
+              <span className="inline-flex items-center">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Retour au détail
+              </span>
+            </Button>
+            <h1 className="mt-2 text-2xl font-semibold text-sabc-gray-900 dark:text-white">
+              Éditer une évaluation
+            </h1>
+            <p className="mt-1 text-sm text-sabc-gray-600 dark:text-sabc-gray-300">
+              Notez chaque critère, justifiez les scores faibles, puis soumettez le formulaire complet.
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
@@ -342,7 +381,7 @@ const EditEvaluation: React.FC = () => {
                   <div className="mt-1 flex flex-wrap gap-2">
                     <Badge variant="info">{context.criteriaCount} critères</Badge>
                     <Badge variant="info">{context.sections.length} sections</Badge>
-                    <Badge variant="warning">visibilité {context.visibilityDetail}</Badge>
+                    <Badge variant="warning">{formatVisibilityLabel(context.visibilityDetail)}</Badge>
                   </div>
                 </div>
               </CardContent>

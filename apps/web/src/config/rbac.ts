@@ -97,7 +97,7 @@ function toUpperNoAccent(s: string) {
     .toUpperCase();
 }
 
-export function normalizeRole(input?: string | null): Role {
+export function resolveKnownRole(input?: string | null): Role | null {
   const r = toUpperNoAccent(String(input ?? '').trim());
   if (r.includes('ADMIN')) return 'ADMIN';
   if (r === 'DR' || r.includes('DIRECTEUR REGIONAL')) return 'DR';
@@ -112,8 +112,13 @@ export function normalizeRole(input?: string | null): Role {
   // Doit rester après AS: « assistant superviseur sponsoring » contient aussi
   // « superviseur sponsoring ».
   if (r === 'SS' || r.includes('SUPERVISEUR SPONSORING')) return 'SS';
-  // Fallback conservateur
-  return 'CSC';
+  return null;
+}
+
+export function normalizeRole(input?: string | null): Role {
+  // Compatibilité avec les anciens appels. Les interfaces de filtrage utilisent
+  // resolveKnownRole afin de ne pas classer un rôle inconnu comme commercial.
+  return resolveKnownRole(input) ?? 'CSC';
 }
 
 /**
@@ -138,8 +143,9 @@ const ROLE_DOMAINE: Record<Role, Domaine> = {
   AS: 'sponsoring',
 };
 
-export function getDomaine(roleLike?: string | null): Domaine {
-  return ROLE_DOMAINE[normalizeRole(roleLike)];
+export function getDomaine(roleLike?: string | null): Domaine | null {
+  const role = resolveKnownRole(roleLike);
+  return role ? ROLE_DOMAINE[role] : null;
 }
 
 /**

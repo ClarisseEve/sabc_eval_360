@@ -5,7 +5,6 @@ import {
   BarChart2,
   ChevronRight,
   Users,
-  Settings,
   UserCheck,
   Shield,
   Building,
@@ -13,7 +12,6 @@ import {
   Briefcase,
   Map,
   Target,
-  User,
   FileText,
 } from 'lucide-react';
 import type { Role } from './rbac';
@@ -219,11 +217,8 @@ export const NAV_ITEMS: NavItem[] = [
         href: '/admin/roles',
         icon: <ChevronRight className="h-4 w-4" />,
       },
-      {
-        title: 'Permissions',
-        href: '/admin/roles/permissions',
-        icon: <ChevronRight className="h-4 w-4" />,
-      },
+      // L'ancienne route redirige vers les règles tant qu'une véritable
+      // matrice de permissions n'est pas implémentée.
     ],
   },
 
@@ -255,19 +250,6 @@ export const NAV_ITEMS: NavItem[] = [
         icon: <Target className="h-4 w-4" />,
       },
     ],
-  },
-];
-
-export const NAV_BOTTOM_ITEMS: NavItem[] = [
-  {
-    title: 'Mon profil',
-    href: '/settings/profile',
-    icon: <User className="h-5 w-5" />,
-  },
-  {
-    title: 'Paramètres',
-    href: '/settings/password',
-    icon: <Settings className="h-5 w-5" />,
   },
 ];
 

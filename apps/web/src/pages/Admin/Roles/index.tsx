@@ -114,9 +114,6 @@ export default function RolesIndex() {
           <p className="text-sm text-sabc-gray-600">CRUD réel sur les rôles SABC.</p>
         </div>
         <div className="flex gap-2">
-          <Link to="/admin/roles/permissions">
-            <Button variant="outline">Permissions</Button>
-          </Link>
           <Button
             className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
             onClick={() => setOpen(true)}

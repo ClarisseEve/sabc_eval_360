@@ -88,17 +88,20 @@ export default function CreateRole() {
               </SelectContent>
             </Select>
           </FormField>
-          <FormField label="Niveau hiérarchique" hint="Le niveau s'applique selon le mode tanière / non-tanière.">
+          <fieldset className="space-y-1.5">
+            <legend className="font-medium text-sabc-gray-800">Niveau hiérarchique</legend>
             <div className="flex gap-2">
+              <label htmlFor="niveau_mode" className="sr-only">Mode hiérarchique</label>
               <Select value={form.niveau_mode} onValueChange={(value) => setForm((p) => ({ ...p, niveau_mode: value }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="niveau_mode" aria-label="Mode hiérarchique"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="taniere">Tanière</SelectItem>
                   <SelectItem value="non_taniere">Non tanière</SelectItem>
                 </SelectContent>
               </Select>
+              <label htmlFor="niveau_valeur" className="sr-only">Valeur du niveau</label>
               <Select value={form.niveau} onValueChange={(value) => setForm((p) => ({ ...p, niveau: value }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="niveau_valeur" aria-label="Valeur du niveau"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="1">1</SelectItem>
                   <SelectItem value="2">2</SelectItem>
@@ -108,7 +111,8 @@ export default function CreateRole() {
                 </SelectContent>
               </Select>
             </div>
-          </FormField>
+            <p className="text-xs text-sabc-gray-500">Le niveau s'applique selon le mode tanière / non-tanière.</p>
+          </fieldset>
           <FormField label="Description" htmlFor="description" className="md:col-span-2">
             <Textarea id="description" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} rows={3} />
           </FormField>

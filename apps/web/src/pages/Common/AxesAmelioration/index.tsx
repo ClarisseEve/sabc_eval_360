@@ -13,6 +13,8 @@ import { Search } from 'lucide-react';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { useRoleDashboardData } from '@/Hooks/queries/useRoleDashboards';
 import { adminApi, analyticsApi } from '@/Services/api';
+import { formatPersonName } from '@/utils/helpers';
+import { hasCapability } from '@/config/rbac';
 import { RadarChart } from '@/Components/UI/Charts/RadarChart';
 import { Input } from '@/Components/UI/Input/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
@@ -66,9 +68,7 @@ const MANAGER_ROLES = new Set(['CDV', 'CDS', 'CSC', 'RTM', 'SRMO', 'SS']);
 const DIRECTOR_ROLES = new Set(['DR', 'CDTT']);
 
 function getFullName(person: any, fallback = 'Utilisateur') {
-  if (!person) return fallback;
-  const fullName = [person?.prenom, person?.nom].filter(Boolean).join(' ').trim();
-  return fullName || person?.nom_complet || person?.name || person?.matricule || fallback;
+  return formatPersonName(person, fallback);
 }
 
 function normalizeAxes(payload: any): ImprovementAxis[] {
@@ -235,6 +235,7 @@ function IndividualAxesPage({ fallbackRole }: { fallbackRole: string }) {
 
 function ManagerAxesPage({ fallbackRole }: { fallbackRole: string }) {
   const { data } = useRoleDashboardData('manager', fallbackRole);
+  const canUseTeamJourneys = data.directMembers.length > 0 && hasCapability(data.userRole, 'canEvaluateSubs');
   const [memberSearch, setMemberSearch] = React.useState('');
   const [roleFilter, setRoleFilter] = React.useState('all');
   const [levelFilter, setLevelFilter] = React.useState('all');
@@ -441,8 +442,12 @@ function ManagerAxesPage({ fallbackRole }: { fallbackRole: string }) {
       <QuickActionsCard
         actions={[
           { label: 'Mon dashboard', href: `/${fallbackRole.toLowerCase()}/dashboard` },
-          { label: 'Vue équipe', href: '/equipe/subordonnes' },
-          { label: 'Évaluations équipe', href: '/equipe/evaluations', variant: 'secondary' },
+          ...(canUseTeamJourneys
+            ? [
+                { label: 'Vue équipe', href: '/equipe/subordonnes' },
+                { label: 'Évaluations équipe', href: '/equipe/evaluations', variant: 'secondary' as const },
+              ]
+            : []),
         ]}
       />
     </DashboardPageFrame>
@@ -451,6 +456,7 @@ function ManagerAxesPage({ fallbackRole }: { fallbackRole: string }) {
 
 function DirectorAxesPage({ fallbackRole }: { fallbackRole: string }) {
   const { data } = useRoleDashboardData('director', fallbackRole);
+  const canUseTeamJourneys = data.directMembers.length > 0 && hasCapability(data.userRole, 'canEvaluateSubs');
   const [memberSearch, setMemberSearch] = React.useState('');
   const [roleFilter, setRoleFilter] = React.useState('all');
   const [levelFilter, setLevelFilter] = React.useState('all');
@@ -691,8 +697,12 @@ function DirectorAxesPage({ fallbackRole }: { fallbackRole: string }) {
       <QuickActionsCard
         actions={[
           { label: 'Mon dashboard', href: `/${fallbackRole.toLowerCase()}/dashboard` },
-          { label: 'Vue équipe', href: '/equipe/subordonnes' },
-          { label: 'Évaluations équipe', href: '/equipe/evaluations', variant: 'secondary' },
+          ...(canUseTeamJourneys
+            ? [
+                { label: 'Vue équipe', href: '/equipe/subordonnes' },
+                { label: 'Évaluations équipe', href: '/equipe/evaluations', variant: 'secondary' as const },
+              ]
+            : []),
         ]}
       />
     </DashboardPageFrame>

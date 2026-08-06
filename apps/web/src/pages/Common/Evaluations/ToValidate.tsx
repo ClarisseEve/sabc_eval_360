@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Head } from '@/lib/inertia-shim';
 import { Card, CardContent } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
@@ -6,7 +6,13 @@ import { Button } from '@/Components/UI/Button/Button';
 import ValidationModal from '@/Components/Evaluation/ValidationModal';
 import { useEvaluationWorkflowData } from '@/Hooks/queries';
 import { buildEvaluationContext, EvaluationPageLayout } from './shared';
-import { formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
+import {
+  formatEvaluationType,
+  formatVisibilityLabel,
+} from '@/Components/Dashboard/RoleDashboardShared';
+import { CircleCheckBig } from 'lucide-react';
+import { formatPersonName } from '@/utils/helpers';
+import { useSearchParams } from 'react-router-dom';
 
 type Cible = {
   matricule: string;
@@ -41,7 +47,25 @@ const typeLabel: Record<string, string> = {
 export default function ToValidate() {
   const { data } = useEvaluationWorkflowData();
   const [selected, setSelected] = useState<EvaluationAValider | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const aValider = data.validations as EvaluationAValider[];
+  const requestedEvaluationId = searchParams.get('id');
+
+  useEffect(() => {
+    if (!requestedEvaluationId) return;
+    const requested = aValider.find((evaluation) =>
+      String(evaluation.id_evaluation) === requestedEvaluationId,
+    );
+    if (requested) setSelected(requested);
+  }, [aValider, requestedEvaluationId]);
+
+  const closeValidation = () => {
+    setSelected(null);
+    if (!requestedEvaluationId) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('id');
+    setSearchParams(nextParams, { replace: true });
+  };
   const stats = {
     total: aValider.length,
     urgents: aValider.filter((ev) =>
@@ -99,7 +123,7 @@ export default function ToValidate() {
         {aValider.length === 0 ? (
           <Card>
             <CardContent className="py-16 text-center text-gray-400">
-              <div className="text-4xl mb-3">&#10003;</div>
+              <CircleCheckBig className="mx-auto mb-3 h-10 w-10" aria-hidden="true" />
               <div className="font-medium">Aucune évaluation en attente</div>
               <div className="text-sm mt-1">Toutes les évaluations soumises ont été traitées.</div>
             </CardContent>
@@ -114,32 +138,31 @@ export default function ToValidate() {
               return (
                 <Card
                   key={ev.id_evaluation}
-                  className={`cursor-pointer hover:shadow-md transition-shadow ${isUrgent ? 'border-l-4 border-l-sabc-red-primary' : ''}`}
-                  onClick={() => setSelected(ev)}
+                  className={isUrgent ? 'border-l-4 border-l-sabc-red-primary' : ''}
                 >
                   <CardContent className="py-4 px-5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
                         {/* Avatar */}
                         <div className="w-10 h-10 rounded-full bg-sabc-red-light flex items-center justify-center text-sabc-red-primary font-semibold text-sm flex-shrink-0">
                           {ev.evalue.prenom?.[0]}{ev.evalue.nom?.[0]}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <div className="font-medium text-gray-900">
-                            {ev.evalue.prenom} {ev.evalue.nom}
+                            {formatPersonName(ev.evalue)}
                           </div>
                           <div className="text-xs text-gray-500 mt-0.5">
-                            {ev.evalue.role_nom} · {context.summary.name || formatEvaluationType(ev.type_evaluation)} · Évalué par {ev.evaluateur.prenom} {ev.evaluateur.nom}
+                            {ev.evalue.role_nom} · {context.summary.name || formatEvaluationType(ev.type_evaluation)} · Évalué par {formatPersonName(ev.evaluateur)}
                           </div>
                           <div className="mt-1 flex flex-wrap gap-2 text-[10px] uppercase">
                             <Badge variant="info">{context.periodLabel}</Badge>
                             <Badge variant="info">{context.criteriaCount} critères</Badge>
-                            <Badge variant="warning">visibilité {context.visibilityDetail}</Badge>
+                            <Badge variant="warning">{formatVisibilityLabel(context.visibilityDetail)}</Badge>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap sm:justify-end sm:gap-4">
                         {/* Type */}
                         <Badge variant="primary" className="text-xs hidden sm:block">
                           {typeLabel[ev.type_evaluation] ?? formatEvaluationType(ev.type_evaluation)}
@@ -163,8 +186,9 @@ export default function ToValidate() {
                         {/* CTA */}
                         <Button
                           size="sm"
-                          className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark ml-2"
-                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); setSelected(ev); }}
+                          className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark sm:ml-2"
+                          onClick={() => setSelected(ev)}
+                          aria-label={`Examiner l'évaluation de ${formatPersonName(ev.evalue)}`}
                         >
                           Examiner
                         </Button>
@@ -183,7 +207,7 @@ export default function ToValidate() {
         <ValidationModal
           evaluation={selected}
           open={!!selected}
-          onClose={() => setSelected(null)}
+          onClose={closeValidation}
         />
       )}
     </EvaluationPageLayout>

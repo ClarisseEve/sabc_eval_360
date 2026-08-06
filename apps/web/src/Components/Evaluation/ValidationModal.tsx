@@ -7,7 +7,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert/Alert
 import Badge from '@/Components/UI/Badge';
 import { evaluationsApi } from '@/Services/api';
 import { buildEvaluationContext, isCriterionCommentRequired } from '@/pages/Common/Evaluations/shared';
-import { formatEvaluationType, formatDateLabel } from '@/Components/Dashboard/RoleDashboardShared';
+import {
+  formatEvaluationType,
+  formatDateLabel,
+  formatVisibilityLabel,
+} from '@/Components/Dashboard/RoleDashboardShared';
+import { ArrowRight, Check, RotateCcw } from 'lucide-react';
+import { formatPersonName } from '@/utils/helpers';
 
 type Note = {
   id?: string;
@@ -96,7 +102,11 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
         <DialogHeader>
           <DialogTitle>Validation de l'évaluation</DialogTitle>
           <DialogDescription>
-            {evaluation.evaluateur.prenom} {evaluation.evaluateur.nom} &rarr; {evaluation.evalue.prenom} {evaluation.evalue.nom}
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+              <span>{formatPersonName(evaluation.evaluateur)}</span>
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{formatPersonName(evaluation.evalue)}</span>
+            </span>
             {evaluation.evalue.role_nom && (
               <span className="ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded">{evaluation.evalue.role_nom}</span>
             )}
@@ -113,7 +123,7 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
                 <Badge variant="primary">{context.summary.name || formatEvaluationType(evaluation.type_evaluation)}</Badge>
                 <Badge variant="info">{context.periodLabel}</Badge>
                 <Badge variant="info">{context.criteriaCount} critères</Badge>
-                <Badge variant="warning">visibilité {context.visibilityDetail}</Badge>
+                <Badge variant="warning">{formatVisibilityLabel(context.visibilityDetail)}</Badge>
               </div>
               {context.periodRange ? (
                 <div className="text-xs text-gray-500">
@@ -183,35 +193,48 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
             <div className="text-sm font-medium text-gray-700 mb-3">Votre décision</div>
             <div className="flex gap-3">
               <button
+                type="button"
                 onClick={() => setAction('valide')}
+                aria-pressed={action === 'valide'}
                 className={`flex-1 py-3 rounded-lg border-2 text-sm font-medium transition-all ${
                   action === 'valide'
                     ? 'border-green-500 bg-green-50 text-green-700'
                     : 'border-gray-200 hover:border-green-300 text-gray-600'
                 }`}
               >
-                &#10003; Valider
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                  Valider
+                </span>
               </button>
               <button
+                type="button"
                 onClick={() => setAction('rejete')}
+                aria-pressed={action === 'rejete'}
                 className={`flex-1 py-3 rounded-lg border-2 text-sm font-medium transition-all ${
                   action === 'rejete'
                     ? 'border-red-500 bg-red-50 text-red-700'
                     : 'border-gray-200 hover:border-red-300 text-gray-600'
                 }`}
               >
-                &#10007; Renvoyer en brouillon
+                <span className="inline-flex items-center justify-center gap-2">
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  Renvoyer en brouillon
+                </span>
               </button>
             </div>
           </div>
 
           {/* Commentaire de validation */}
           <div>
-            <label className="text-sm font-medium text-gray-700">
+            <label htmlFor="validation-comment" className="text-sm font-medium text-gray-700">
               Commentaire
               {action === 'rejete' && <span className="text-red-500 ml-1">*</span>}
             </label>
             <textarea
+              id="validation-comment"
+              aria-invalid={Boolean(error && action === 'rejete' && commentaire.trim().length < 20)}
+              aria-describedby={error ? 'validation-comment-error' : undefined}
               className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-sabc-red-primary ${
                 error && action === 'rejete' && commentaire.trim().length < 20 ? 'border-red-400' : 'border-gray-200'
               }`}
@@ -227,7 +250,7 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</div>
+            <div id="validation-comment-error" role="alert" className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</div>
           )}
 
           {/* Actions */}

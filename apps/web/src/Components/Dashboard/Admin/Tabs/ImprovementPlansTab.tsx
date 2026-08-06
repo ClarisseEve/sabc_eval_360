@@ -75,6 +75,15 @@ export default function ImprovementPlansTab() {
     onError: (e: any) => error(readError(e, "La recommandation n'a pas pu être rejetée.")),
   });
 
+  const generateMutation = useMutation({
+    mutationFn: () => analyticsApi.runRecommandationsGeneration(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['analytics', 'admin', 'improvement-plans'] });
+      success('Recommandations générées et plans actualisés.');
+    },
+    onError: (e: any) => error(readError(e, "La génération des recommandations a échoué.")),
+  });
+
   function closeReject() {
     setRejectTarget(null);
     setRejectMotif('');
@@ -104,6 +113,8 @@ export default function ImprovementPlansTab() {
         onTypeFilterChange={setTypeFilter}
         typeOptions={byType}
         generatedAt={plansQuery.data?.generated_at}
+        onGenerate={() => generateMutation.mutate()}
+        isGenerating={generateMutation.isPending}
       />
 
       <ImprovementPlansTotalsSection totals={totals} />

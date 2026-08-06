@@ -7,7 +7,7 @@ export interface InputProps
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, error, id, 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
+  ({ className, type, error, id, 'aria-describedby': ariaDescribedBy, 'aria-errormessage': ariaErrorMessage, ...props }, ref) => {
     const generatedId = React.useId();
     const inputId = id ?? generatedId;
     const errorId = `${inputId}-error`;
@@ -26,7 +26,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {...props}
           aria-invalid={error ? true : props['aria-invalid']}
           aria-describedby={describedBy}
-          aria-errormessage={error ? errorId : undefined}
+          aria-errormessage={error ? errorId : ariaErrorMessage}
           ref={ref}
         />
         {error && (

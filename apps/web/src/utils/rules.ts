@@ -161,6 +161,15 @@ export function normalizePublishedRule(raw: any): PublishedRule {
   };
 }
 
+/** Une règle ne peut initialiser un brouillon que si son détail publié est exploitable. */
+export function isPublishedRuleReady(raw: unknown, expectedId?: string | null) {
+  if (!raw || typeof raw !== 'object') return false;
+
+  const rule = normalizePublishedRule(raw);
+  if (!rule.id_regle || !rule.est_active || rule.criteres.length === 0) return false;
+  return !expectedId || rule.id_regle === String(expectedId);
+}
+
 export function createEmptyRuleBuilderInput(): RuleBuilderInput {
   return {
     nom_regle: '',

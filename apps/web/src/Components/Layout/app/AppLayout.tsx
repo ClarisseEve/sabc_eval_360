@@ -111,13 +111,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         onToggle={toggleSidebar}
         isMobileOpen={mobileSidebarOpen}
         onMobileClose={closeMobileSidebar}
-        onLogout={onLogout}
       />
 
       {mobileSidebarOpen && (
-        <button
-          type="button"
-          aria-label="Fermer le menu de navigation"
+        <div
+          aria-hidden="true"
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] lg:hidden"
           onClick={closeMobileSidebar}
         />

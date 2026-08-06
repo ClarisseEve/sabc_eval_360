@@ -1,6 +1,7 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { adminApi, analyticsApi } from '@/Services/api';
 import { buildFocusHierarchyMember, loadAdminHierarchyBranch } from '@/utils/hierarchyDrilldown';
+import { formatPersonName } from '@/utils/helpers';
 
 function asArray<T = any>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[];
@@ -9,7 +10,7 @@ function asArray<T = any>(value: unknown): T[] {
 }
 
 export function getAdminDisplayName(user: any) {
-  return [user?.prenom, user?.nom].filter(Boolean).join(' ').trim() || user?.matricule || 'Utilisateur';
+  return formatPersonName(user);
 }
 
 export function useAdminOverviewTabData(dateRange?: { start_date?: string; end_date?: string }) {

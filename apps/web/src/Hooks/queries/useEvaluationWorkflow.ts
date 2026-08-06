@@ -16,6 +16,20 @@ function asArray<T = any>(value: unknown): T[] {
   return [];
 }
 
+async function loadAllRejectedEvaluations() {
+  const rejected: any[] = [];
+  const limit = 100;
+
+  for (let page = 1; page <= 100; page += 1) {
+    const response = await evaluationsApi.historique({ statut: 'rejete', page, limit });
+    const batch = asArray(response.data);
+    rejected.push(...batch);
+    if (batch.length < limit) break;
+  }
+
+  return rejected;
+}
+
 function normalizeEligibleGroups(payload: any) {
   if (!payload || typeof payload !== 'object') return [];
 
@@ -54,10 +68,11 @@ export function useEvaluationWorkflowData() {
   return useSuspenseQuery({
     queryKey: ['evaluations', 'workflow', user?.matricule ?? 'current'],
     queryFn: async () => {
-      const [evaluationsResponse, eligiblesResponse, historiqueResponse, periodesResponse, reglesResponse] = await Promise.all([
+      const [evaluationsResponse, eligiblesResponse, historiqueResponse, rejectedEvaluations, periodesResponse, reglesResponse] = await Promise.all([
         evaluationsApi.list(),
         evaluationsApi.eligibles(),
         evaluationsApi.historique(),
+        loadAllRejectedEvaluations(),
         evaluationsApi.periodesActives(),
         reglesApi.list(),
       ]);
@@ -79,6 +94,7 @@ export function useEvaluationWorkflowData() {
         eligibleTargetsCount,
         rules,
         historyList,
+        rejectedEvaluations,
         pendingEvaluations,
         validations,
         summary: {

@@ -7,6 +7,7 @@ import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Lock, Save } from 'lucide-react';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { profileApi } from '@/Services/api';
+import { formatPersonName } from '@/utils/helpers';
 
 export default function Password() {
   const passwordInput = useRef<HTMLInputElement>(null);
@@ -22,7 +23,7 @@ export default function Password() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const layoutUser = {
-    name: user ? [user.prenom, user.nom].filter(Boolean).join(' ') || 'Utilisateur' : 'Utilisateur',
+    name: formatPersonName(user),
     email: user?.email || '',
     role: user?.role_nom || user?.role || '',
     avatar: user?.avatar,
@@ -56,8 +57,14 @@ export default function Password() {
   return (
     <AppLayout user={layoutUser} pageTitle="Paramètres - Mot de passe" notifications={[]}>
       <Head title="Paramètres - Mot de passe" />
-      <div className="container mx-auto px-4 py-8">
-        <Card className="mx-auto max-w-2xl">
+      <div className="container mx-auto max-w-2xl space-y-6 px-4 py-8">
+        <header>
+          <h1 className="text-2xl font-bold text-sabc-gray-900">Sécurité du compte</h1>
+          <p className="mt-1 text-sm text-sabc-gray-600">
+            Choisissez un nouveau mot de passe pour protéger votre accès.
+          </p>
+        </header>
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sabc-red-primary">
               <Lock className="h-5 w-5" />

@@ -11,8 +11,9 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { useRoleDashboardData } from '@/Hooks/queries/useRoleDashboards';
-import { DOMAINES, filterByDomaine, type Domaine } from '@/config/rbac';
+import { DOMAINES, filterByDomaine, hasCapability, type Domaine } from '@/config/rbac';
 import { Button } from '@/Components/UI/Button/Button';
+import { formatPersonName } from '@/utils/helpers';
 import { HierarchyChainCard } from '@/Components/Dashboard/IndividualAnalyticsCards';
 import { TeamAxisFrequencyChartCard, TeamMemberAnalyticsTableCard } from '@/Components/Dashboard/TeamAnalyticsCards';
 import {
@@ -47,6 +48,7 @@ export default function RoleDirectorDashboardPage({
 }: RoleDirectorDashboardPageProps) {
   const { data } = useRoleDashboardData('director', fallbackRole);
   const [domaine, setDomaine] = React.useState<Domaine | null>(null);
+  const canUseTeamJourneys = data.directMembers.length > 0 && hasCapability(data.userRole, 'canEvaluateSubs');
 
   // Le filtrage est purement local: le périmètre est déjà chargé, inutile de
   // relancer une requête à chaque bascule.
@@ -168,7 +170,7 @@ export default function RoleDirectorDashboardPage({
                 <div key={String(evaluation.id_evaluation)} className="rounded-lg border border-sabc-gray-200 p-4 dark:border-sabc-gray-800">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-medium text-sabc-gray-900 dark:text-white">
-                      {evaluation.evalue?.prenom} {evaluation.evalue?.nom}
+                      {formatPersonName(evaluation.evalue, evaluation.evalue_matricule || 'Collaborateur')}
                     </div>
                     <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{evaluation.statut}</Badge>
                   </div>
@@ -186,14 +188,19 @@ export default function RoleDirectorDashboardPage({
       </div>
 
       {enableDomaineToggle && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Filtrer le tableau des collaborateurs par domaine"
+        >
           <span className="text-sm font-medium text-sabc-gray-600 dark:text-sabc-gray-300">
-            Périmètre :
+            Filtrer le tableau des collaborateurs :
           </span>
           <Button
             size="sm"
             variant={domaine === null ? 'default' : 'outline'}
             onClick={() => setDomaine(null)}
+            aria-pressed={domaine === null}
           >
             Tout ({data.teamMembers.length})
           </Button>
@@ -205,6 +212,7 @@ export default function RoleDirectorDashboardPage({
                 size="sm"
                 variant={domaine === valeur ? 'default' : 'outline'}
                 onClick={() => setDomaine(valeur)}
+                aria-pressed={domaine === valeur}
                 // Un domaine sans effectif n'est pas pertinent pour ce périmètre.
                 disabled={effectif === 0}
                 className="capitalize"
@@ -244,7 +252,7 @@ export default function RoleDirectorDashboardPage({
                 <div key={String(evaluation.id_evaluation)} className="rounded-lg border border-sabc-gray-200 p-4 dark:border-sabc-gray-800">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-medium text-sabc-gray-900 dark:text-white">
-                      {evaluation.evalue?.prenom} {evaluation.evalue?.nom}
+                      {formatPersonName(evaluation.evalue, evaluation.evalue_matricule || 'Collaborateur')}
                     </div>
                     <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{evaluation.statut}</Badge>
                   </div>
@@ -254,6 +262,14 @@ export default function RoleDirectorDashboardPage({
                   <div className="mt-1 text-xs text-sabc-gray-400 dark:text-sabc-gray-500">
                     Soumise le {formatDateLabel(evaluation.date_soumission || evaluation.date_creation)}
                   </div>
+                  <Button
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => { window.location.href = `/evaluations/validate?id=${encodeURIComponent(String(evaluation.id_evaluation))}`; }}
+                    aria-label={`Examiner l'évaluation de ${formatPersonName(evaluation.evalue, evaluation.evalue_matricule || 'Collaborateur')}`}
+                  >
+                    Examiner
+                  </Button>
                 </div>
               ))
             )}
@@ -268,11 +284,18 @@ export default function RoleDirectorDashboardPage({
 
       <QuickActionsCard
         actions={[
+          ...(data.toValidateEvaluations.length > 0
+            ? [{ label: `À valider (${data.toValidateEvaluations.length})`, href: '/evaluations/validate' }]
+            : []),
           { label: 'Axes d’amélioration', href: '/axes-amelioration' },
           { label: 'Évaluations en attente', href: '/common/evaluations/pending' },
-          { label: 'Mes évaluations', href: '/common/evaluations/mine' },
-          { label: 'Vue équipe', href: '/common/team/overview' },
-          { label: 'Évaluations équipe', href: '/common/team/evaluations', variant: 'secondary' },
+          { label: 'Démarrer une évaluation', href: '/common/evaluations/mine' },
+          ...(canUseTeamJourneys
+            ? [
+                { label: 'Vue équipe', href: '/common/team/overview' },
+                { label: 'Évaluations équipe', href: '/common/team/evaluations', variant: 'secondary' as const },
+              ]
+            : []),
         ]}
       />
     </DashboardPageFrame>
