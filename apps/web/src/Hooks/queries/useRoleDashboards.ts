@@ -5,6 +5,7 @@ import { useMyDashboard } from './useDashboardQuery';
 import { normalizePublishedRule } from '@/utils/rules';
 import { formatPersonName } from '@/utils/helpers';
 import type { PublishedRule } from '@/types/rules';
+import { failedSources } from './settled-sources';
 
 export type DashboardScope = 'individual' | 'manager' | 'director';
 
@@ -120,6 +121,8 @@ export interface RoleDashboardData {
   teamMembers: TeamMemberAnalytics[];
   teamAverageScore: number;
   completionRate: number;
+  /** Sources dont l'appel a échoué: les chiffres affichés sont partiels. */
+  degradedSources: string[];
   teamTypeAverages: TeamTypeAverage[];
   teamTopAxes: TeamAxisAggregate[];
   roleBreakdown: RoleBreakdownEntry[];
@@ -388,6 +391,20 @@ export function useRoleDashboardData(scope: DashboardScope, fallbackRole: string
         scope === 'director' ? hierarchyApi.getChaine() : Promise.resolve({ data: [] }),
       ]);
 
+      // Un échec ne doit pas se confondre avec une absence de données: sans
+      // cette trace, une panne d'API s'affiche comme « 0 évaluation ».
+      const degradedSources = failedSources({
+        scores: selfScoresRes,
+        'axes d’amélioration': selfAxesRes,
+        recommandations: selfRecommendationsRes,
+        historique: historyRes,
+        évaluations: evaluationIndexRes,
+        règles: reglesRes,
+        subordonnés: directSubsRes,
+        'périmètre complet': allSubsRes,
+        'chaîne hiérarchique': chaineRes,
+      });
+
       const rules = buildRulesForRole(
         reglesRes.status === 'fulfilled' && Array.isArray(reglesRes.value.data) ? reglesRes.value.data : [],
         userRole,
@@ -433,6 +450,7 @@ export function useRoleDashboardData(scope: DashboardScope, fallbackRole: string
         teamMembers,
         teamAverageScore: average(scoredMembers.map((member) => member.scoreGlobal || 0)),
         completionRate,
+        degradedSources,
         teamTypeAverages: buildByTypeAverages(teamMembers),
         teamTopAxes: buildTopTeamAxes(teamMembers),
         roleBreakdown: buildRoleBreakdown(teamMembers),

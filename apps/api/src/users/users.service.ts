@@ -50,6 +50,10 @@ export class UsersService {
         matricule: true,
         email: true,
         role: true,
+        // Sert au contrôle de périmètre régional sur les analytics: la requête
+        // tourne déjà à chaque requête authentifiée, une colonne de plus évite
+        // un aller-retour supplémentaire.
+        id_region: true,
         est_actif: true,
         est_admin: true,
         statut: true,

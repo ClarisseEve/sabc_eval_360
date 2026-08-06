@@ -84,6 +84,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       matricule: currentUser.matricule,
       email: currentUser.email,
       role: currentUser.role,
+      id_region: currentUser.id_region,
       is_admin: currentUser.est_admin,
       jti: payload.jti,
       exp: payload.exp,

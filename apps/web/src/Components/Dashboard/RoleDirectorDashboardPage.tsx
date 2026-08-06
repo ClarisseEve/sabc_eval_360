@@ -62,6 +62,7 @@ export default function RoleDirectorDashboardPage({
       title={title}
       subtitle={subtitle}
       periodName={data.dashboard?.periode_active?.nom ?? null}
+      degradedSources={data.degradedSources}
     >
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <MetricCard

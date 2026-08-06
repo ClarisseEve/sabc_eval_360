@@ -40,6 +40,22 @@ export class AnalyticsController {
     return this.assertCanViewMatricules(req, [matricule]);
   }
 
+  /**
+   * Les analytics régionales exposent des agrégats et un classement nominatif.
+   * Elles restent donc limitées à la région de l'utilisateur, les rôles ayant
+   * tous une portée régionale. Sans ce contrôle, tout porteur d'un JWT pouvait
+   * lire le classement de n'importe quelle région.
+   */
+  private assertCanViewRegion(req: any, idRegion: string): void {
+    const user = req?.user;
+    if (!user) throw new ForbiddenException();
+    if (user.is_admin || String(user.role ?? '').toUpperCase() === 'ADMIN') return;
+
+    if (!user.id_region || user.id_region !== idRegion) {
+      throw new ForbiddenException("Accès non autorisé aux données de cette région");
+    }
+  }
+
   @Get('dashboard')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
@@ -62,12 +78,14 @@ export class AnalyticsController {
   }
 
   @Get('region/:idRegion')
-  region(@Param('idRegion') idRegion: string) {
+  async region(@Param('idRegion') idRegion: string, @Request() req: any) {
+    this.assertCanViewRegion(req, idRegion);
     return this.service.getRegionAnalytics(idRegion);
   }
 
   @Get('region/:idRegion/classement')
-  classementRegional(@Param('idRegion') idRegion: string) {
+  async classementRegional(@Param('idRegion') idRegion: string, @Request() req: any) {
+    this.assertCanViewRegion(req, idRegion);
     return this.service.getClassementRegional(idRegion);
   }
 

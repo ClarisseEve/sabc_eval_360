@@ -31,6 +31,8 @@ type DashboardPageFrameProps = {
   title: string;
   subtitle: string;
   periodName?: string | null;
+  /** Sources en échec: leur absence rend les chiffres partiels, pas nuls. */
+  degradedSources?: string[];
   children: React.ReactNode;
 };
 
@@ -160,6 +162,7 @@ export function DashboardPageFrame({
   title,
   subtitle,
   periodName,
+  degradedSources = [],
   children,
 }: DashboardPageFrameProps) {
   return (
@@ -178,6 +181,17 @@ export function DashboardPageFrame({
             </Badge>
           ) : null}
         </div>
+
+        {degradedSources.length > 0 && (
+          <div
+            role="alert"
+            className="rounded-md border-l-4 border-sabc-warning bg-sabc-gray-50 px-4 py-3 text-sm text-sabc-gray-700 dark:bg-sabc-gray-800 dark:text-sabc-gray-200"
+          >
+            <span className="font-medium">Données partielles — </span>
+            {degradedSources.join(', ')} n'ont pas pu être chargées. Les chiffres
+            affichés sont incomplets: ne les interprétez pas comme des zéros réels.
+          </div>
+        )}
 
         {children}
       </div>

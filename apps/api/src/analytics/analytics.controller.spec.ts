@@ -9,8 +9,8 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
   let mockHierarchy: any;
 
   const reqFor = (user: any) => ({ user }) as any;
-  const MANAGER = { matricule: 'M001', role: 'CDS', is_admin: false };
-  const ADMIN = { matricule: 'A001', role: 'ADMIN', is_admin: true };
+  const MANAGER = { matricule: 'M001', role: 'CDS', is_admin: false, id_region: 'R1' };
+  const ADMIN = { matricule: 'A001', role: 'ADMIN', is_admin: true, id_region: 'R1' };
 
   beforeEach(() => {
     mockService = {
@@ -21,6 +21,8 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
       getBenchmarks: jest.fn().mockResolvedValue({ criteres: [] }),
       getTeamHeatmap: jest.fn().mockResolvedValue({ membres: [], criteres: [] }),
       getEvolutionCriteres: jest.fn().mockResolvedValue({ periodes: [], criteres: [] }),
+      getRegionAnalytics: jest.fn().mockResolvedValue([]),
+      getClassementRegional: jest.fn().mockResolvedValue([]),
     };
     // M001 encadre M002 et M003 (hiérarchie complète)
     mockHierarchy = {
@@ -102,6 +104,36 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
       controller.scoresBatch({ matricules: ['M002', 'X999'] } as any, reqFor(MANAGER)),
     ).rejects.toThrow(ForbiddenException);
     expect(mockService.getScoresBatch).not.toHaveBeenCalled();
+  });
+
+  // Sans contrôle de périmètre, tout porteur d'un JWT — y compris un simple
+  // opérationnel — pouvait lire les agrégats et le classement nominatif de
+  // n'importe quelle région.
+  it('autorise la consultation de sa propre région', async () => {
+    await controller.region('R1', reqFor(MANAGER));
+    expect(mockService.getRegionAnalytics).toHaveBeenCalledWith('R1');
+  });
+
+  it('refuse les analytics d\'une autre région', async () => {
+    await expect(controller.region('R2', reqFor(MANAGER))).rejects.toThrow(ForbiddenException);
+    expect(mockService.getRegionAnalytics).not.toHaveBeenCalled();
+  });
+
+  it('refuse le classement nominatif d\'une autre région', async () => {
+    await expect(controller.classementRegional('R2', reqFor(MANAGER))).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(mockService.getClassementRegional).not.toHaveBeenCalled();
+  });
+
+  it('autorise un admin sur n\'importe quelle région', async () => {
+    await controller.classementRegional('R2', reqFor(ADMIN));
+    expect(mockService.getClassementRegional).toHaveBeenCalledWith('R2');
+  });
+
+  it('refuse quand la région de l\'utilisateur est inconnue', async () => {
+    const sansRegion = { matricule: 'M009', role: 'CDS', is_admin: false };
+    await expect(controller.region('R1', reqFor(sansRegion))).rejects.toThrow(ForbiddenException);
   });
 
   it('refuse en l\'absence d\'utilisateur authentifié', async () => {
