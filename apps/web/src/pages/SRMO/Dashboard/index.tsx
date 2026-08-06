@@ -1,16 +1,21 @@
 import React, { Suspense } from 'react';
-import RoleManagerDashboardPage from '@/Components/Dashboard/RoleManagerDashboardPage';
+import RoleIndividualDashboardPage from '@/Components/Dashboard/RoleIndividualDashboardPage';
 import { ErrorBoundary } from '@/Components/ErrorBoundary';
 import { DashboardSkeleton } from '@/Components/Dashboard/DashboardSkeleton';
 
+/**
+ * Gabarit individuel et non manager: le rôle n'encadre personne — il rapporte
+ * lui-même au RTM et l'API lui refuse l'évaluation de subordonnés
+ * (peut_evaluer_subordonnes = false). Le gabarit manager promettait donc une
+ * équipe inexistante.
+ */
 const SRMODashboard: React.FC = () => (
   <ErrorBoundary>
     <Suspense fallback={<DashboardSkeleton />}>
-      <RoleManagerDashboardPage
+      <RoleIndividualDashboardPage
         fallbackRole="SRMO"
-        title="Tableau de bord Superviseur Regional Marketing Operation"
-        subtitle="Pilotage des scores, de la progression et des subordonnés marketing."
-        teamTitle="Équipe marketing opérationnelle"
+        title="Tableau de bord Superviseur Régional Marketing Opérationnel"
+        subtitle="Suivi de vos évaluations et de votre progression."
       />
     </Suspense>
   </ErrorBoundary>

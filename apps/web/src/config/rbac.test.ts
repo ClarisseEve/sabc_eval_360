@@ -101,3 +101,32 @@ describe('filterByDomaine', () => {
     expect(getDomaine('ROLE_X')).toBeNull();
   });
 });
+
+/**
+ * La table RBAC du front doit refléter les capacités définies côté API
+ * (roles.peut_evaluer_subordonnes dans apps/api/prisma/seed.ts). Une divergence
+ * fait proposer une action que le serveur refusera, ou masque une action
+ * légitime. Quatre rôles divergeaient: CSC, CDS, TMO et SRMO.
+ */
+describe('alignement RBAC front / API', () => {
+  const PEUT_EVALUER_SUBORDONNES: Record<Role, boolean> = {
+    ADMIN: true,
+    DR: true,
+    CDTT: true,
+    CSC: false,
+    CDV: true,
+    CDS: true,
+    RTM: true,
+    TMO: false,
+    SRMO: false,
+    SS: true,
+    AS: false,
+  };
+
+  it.each(Object.keys(PEUT_EVALUER_SUBORDONNES) as Role[])(
+    'canEvaluateSubs de %s correspond au seed',
+    (role) => {
+      expect(RBAC[role].canEvaluateSubs).toBe(PEUT_EVALUER_SUBORDONNES[role]);
+    },
+  );
+});

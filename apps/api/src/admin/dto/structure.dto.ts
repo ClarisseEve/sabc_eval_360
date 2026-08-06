@@ -59,3 +59,44 @@ export class CreateSecteurDto {
   @MaxLength(20)
   id_service?: string;
 }
+
+export class UpdateServiceDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  nom_service?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  id_region?: string;
+}
+
+export class UpdateDistrictDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  nom_district?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  id_service?: string;
+}
+
+export class UpdateSecteurDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  nom_secteur?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  id_district?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  id_service?: string;
+}

@@ -63,6 +63,12 @@ export class AdminStructureService {
     });
   }
 
+  async updateService(id: string, data: { nom_service?: string; id_region?: string }) {
+    const service = await this.prisma.serviceCommercial.findUnique({ where: { id_service: id } });
+    if (!service) throw new NotFoundException('Service introuvable');
+    return this.prisma.serviceCommercial.update({ where: { id_service: id }, data });
+  }
+
   async deleteService(id: string) {
     const users = await this.prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `SELECT COUNT(*) as count FROM utilisateurs WHERE id_service = ?`, id,
@@ -104,6 +110,12 @@ export class AdminStructureService {
         id_service: data.id_service,
       },
     });
+  }
+
+  async updateDistrict(id: string, data: { nom_district?: string; id_service?: string }) {
+    const district = await this.prisma.district.findUnique({ where: { id_district: id } });
+    if (!district) throw new NotFoundException('District introuvable');
+    return this.prisma.district.update({ where: { id_district: id }, data });
   }
 
   async deleteDistrict(id: string) {
@@ -150,6 +162,15 @@ export class AdminStructureService {
         id_service,
       },
     });
+  }
+
+  async updateSecteur(
+    id: string,
+    data: { nom_secteur?: string; id_district?: string; id_service?: string },
+  ) {
+    const secteur = await this.prisma.secteur.findUnique({ where: { id_secteur: id } });
+    if (!secteur) throw new NotFoundException('Secteur introuvable');
+    return this.prisma.secteur.update({ where: { id_secteur: id }, data });
   }
 
   async deleteSecteur(id: string) {

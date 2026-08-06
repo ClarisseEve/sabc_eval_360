@@ -42,7 +42,7 @@ export const RBAC: Record<Role, RoleCapabilities> = {
     canCrossBranch: false,
     canSelfEvaluate: true,
     canEvaluatePeers: true,
-    canEvaluateSubs: true,
+    canEvaluateSubs: false,
   },
   RTM: {
     canCrossBranch: false,
@@ -61,13 +61,13 @@ export const RBAC: Record<Role, RoleCapabilities> = {
     canCrossBranch: false,
     canSelfEvaluate: true,
     canEvaluatePeers: true,
-    canEvaluateSubs: true,
+    canEvaluateSubs: false,
   },
   CDS: {
     canCrossBranch: false,
     canSelfEvaluate: true,
     canEvaluatePeers: true,
-    canEvaluateSubs: false,
+    canEvaluateSubs: true,
   },
   AS: {
     canCrossBranch: false,
@@ -85,7 +85,7 @@ export const RBAC: Record<Role, RoleCapabilities> = {
     canCrossBranch: false,
     canSelfEvaluate: true,
     canEvaluatePeers: false,
-    canEvaluateSubs: true,
+    canEvaluateSubs: false,
     directSubsOnly: true,
   },
 };

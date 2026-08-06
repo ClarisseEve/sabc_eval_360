@@ -8,6 +8,9 @@ import {
   CreateSecteurDto,
   CreateServiceDto,
   UpdateRegionDto,
+  UpdateServiceDto,
+  UpdateDistrictDto,
+  UpdateSecteurDto,
 } from './dto/structure.dto';
 
 @Controller('admin/structure')
@@ -55,6 +58,11 @@ export class AdminStructureController {
     return this.structureService.createService(body);
   }
 
+  @Put('services/:id')
+  updateService(@Param('id') id: string, @Body() body: UpdateServiceDto) {
+    return this.structureService.updateService(id, body);
+  }
+
   @Delete('services/:id')
   deleteService(@Param('id') id: string) {
     return this.structureService.deleteService(id);
@@ -72,6 +80,11 @@ export class AdminStructureController {
     return this.structureService.createDistrict(body);
   }
 
+  @Put('districts/:id')
+  updateDistrict(@Param('id') id: string, @Body() body: UpdateDistrictDto) {
+    return this.structureService.updateDistrict(id, body);
+  }
+
   @Delete('districts/:id')
   deleteDistrict(@Param('id') id: string) {
     return this.structureService.deleteDistrict(id);
@@ -87,6 +100,11 @@ export class AdminStructureController {
   @Post('secteurs')
   createSecteur(@Body() body: CreateSecteurDto) {
     return this.structureService.createSecteur(body);
+  }
+
+  @Put('secteurs/:id')
+  updateSecteur(@Param('id') id: string, @Body() body: UpdateSecteurDto) {
+    return this.structureService.updateSecteur(id, body);
   }
 
   @Delete('secteurs/:id')
