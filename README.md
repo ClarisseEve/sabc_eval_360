@@ -41,6 +41,9 @@ Arrêt sans supprimer les données :
 docker compose down
 ```
 
+Pour reprendre le projet, suivre l'ordre de lecture de la section
+[Prise en main](#prise-en-main).
+
 ## Développement local
 
 Prérequis : Node.js 20 ou 22, pnpm 10.14, MySQL 8, PostgreSQL 16 et, de
@@ -149,9 +152,50 @@ docker compose -f docker-compose.scale.yml up --build -d
 Cette stack exécute les migrations une seule fois dans le service `migrate`,
 puis démarre les deux réplicas derrière Nginx.
 
-## Documentation
+## Prise en main
 
-- [Comptes de test](docs/comptes-de-test.md)
+Ordre de lecture conseillé pour reprendre le projet.
+
+**1. Faire tourner l'application** — la section « Démarrage avec Docker »
+ci-dessus, puis se connecter avec chaque rôle via les
+[comptes de test](docs/comptes-de-test.md).
+
+**2. Comprendre le domaine** — [vue d'ensemble](docs/project-overview.md),
+[architecture applicative](docs/architecture-app.md) et
+[arborescence du code](docs/source-tree-analysis.md).
+
+**3. Connaître l'état réel** — [synthèse de l'audit par
+rôle](tasks/role-audit/00-SYNTHESE.md) : ce qui fonctionne, ce qui reste à
+faire, priorisé. Une fiche détaillée par rôle dans le même dossier. C'est le
+document le plus utile avant de toucher au code.
+
+**4. Respecter les conventions** — [claude.md](claude.md) réunit les pièges
+connus (ordre des contrôleurs NestJS, validation du SQL, agrégation en base) et
+les règles de code. [tasks/lessons.md](tasks/lessons.md) complète avec les
+erreurs déjà commises.
+
+### Références
+
+- [Contrats d'API](docs/api-contracts-app.md) — la source de vérité reste les
+  contrôleurs sous `apps/api/src/**/*.controller.ts`.
+- [Modèles de données](docs/data-models-app.md) et
+  [modèles évaluation](docs/data-models-evaluation.md).
+- [Guide de développement frontend](docs/development-guide-app.md).
+
+### Mise en production
+
+- La section « Production » ci-dessus liste les variables obligatoires.
 - [Checklist de bascule](docs/operations/nestjs-cutover-checklist.md)
 - [Déploiement multi-réplicas](docs/operations/scaled-deployment.md)
 - [Plan de performance](docs/operations/performance-rollout.md)
+
+> Avant toute mise en production, traiter le point de sécurité P1 identifié dans
+> la synthèse d'audit : `GET /analytics/region/:idRegion` et son classement sont
+> protégés par le seul JWT, sans contrôle de périmètre.
+
+### Documents historiques
+
+Conservés pour mémoire, ils décrivent des choix abandonnés (Laravel/Inertia,
+microservices Go, ClickHouse, pipelines Python) et ne doivent pas guider une
+implémentation : `docs/*-pipelines.md`, `docs/clickhouse-datagrip-setup.md`,
+`docs/deep-dive-api-backend-bloc-*.md`, `docs/superpowers/`.
