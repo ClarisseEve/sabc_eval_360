@@ -78,11 +78,16 @@ const TabsContext = React.createContext<{
   value: string;
   onValueChange: (value: string) => void;
   variant: VariantProps<typeof tabsRootVariants>['variant'];
+  baseId: string;
 } | null>(null);
+
+const tabDomId = (baseId: string, kind: 'tab' | 'panel', value: string) =>
+  `${baseId}-${kind}-${value.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
 const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
   ({ className, variant, defaultValue, value, onValueChange, ...props }, ref) => {
     const [tabValue, setTabValue] = React.useState(value || defaultValue || '');
+    const baseId = React.useId();
     
     const handleValueChange = React.useCallback((newValue: string) => {
       setTabValue(newValue);
@@ -97,7 +102,7 @@ const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
     }, [value, tabValue]);
     
     return (
-      <TabsContext.Provider value={{ value: tabValue, onValueChange: handleValueChange, variant }}>
+      <TabsContext.Provider value={{ value: tabValue, onValueChange: handleValueChange, variant, baseId }}>
         <div
           ref={ref}
           className={cn(tabsRootVariants({ variant, className }))}
@@ -134,13 +139,13 @@ export interface TabsTriggerProps
 }
 
 const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
-  ({ className, variant, value, ...props }, ref) => {
+  ({ className, variant, value, onClick, onKeyDown, id, ...props }, ref) => {
     const context = React.useContext(TabsContext);
     if (!context) {
       throw new Error('TabsTrigger must be used within a Tabs component');
     }
     
-    const { value: selectedValue, onValueChange } = context;
+    const { value: selectedValue, onValueChange, baseId } = context;
     const tabsVariant = variant || context.variant;
     const isSelected = selectedValue === value;
     
@@ -149,6 +154,7 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
         ref={ref}
         type="button"
         role="tab"
+        id={id ?? tabDomId(baseId, 'tab', value)}
         className={cn(tabsTriggerVariants({ variant: tabsVariant, className }))}
         style={
           isSelected && tabsVariant === 'card'
@@ -156,8 +162,37 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
             : undefined
         }
         aria-selected={isSelected}
+        aria-controls={tabDomId(baseId, 'panel', value)}
+        tabIndex={isSelected ? 0 : -1}
         data-state={isSelected ? 'active' : 'inactive'}
-        onClick={() => onValueChange(value)}
+        onClick={(event) => {
+          onClick?.(event);
+          if (!event.defaultPrevented) onValueChange(value);
+        }}
+        onKeyDown={(event) => {
+          onKeyDown?.(event);
+          if (event.defaultPrevented) return;
+
+          const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+          if (!keys.includes(event.key)) return;
+          const tabList = event.currentTarget.closest('[role="tablist"]');
+          const tabs = Array.from(
+            tabList?.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)') ?? [],
+          );
+          if (tabs.length === 0) return;
+
+          event.preventDefault();
+          const currentIndex = tabs.indexOf(event.currentTarget);
+          const nextIndex = event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? tabs.length - 1
+              : event.key === 'ArrowRight'
+                ? (currentIndex + 1) % tabs.length
+                : (currentIndex - 1 + tabs.length) % tabs.length;
+          tabs[nextIndex]?.focus();
+          tabs[nextIndex]?.click();
+        }}
         {...props}
       />
     );
@@ -172,13 +207,13 @@ export interface TabsContentProps
 }
 
 const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(
-  ({ className, variant, value, ...props }, ref) => {
+  ({ className, variant, value, id, ...props }, ref) => {
     const context = React.useContext(TabsContext);
     if (!context) {
       throw new Error('TabsContent must be used within a Tabs component');
     }
     
-    const { value: selectedValue } = context;
+    const { value: selectedValue, baseId } = context;
     const tabsVariant = variant || context.variant;
     const isSelected = selectedValue === value;
     
@@ -188,6 +223,9 @@ const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(
       <div
         ref={ref}
         role="tabpanel"
+        id={id ?? tabDomId(baseId, 'panel', value)}
+        aria-labelledby={tabDomId(baseId, 'tab', value)}
+        tabIndex={0}
         className={cn(tabsContentVariants({ variant: tabsVariant, className }))}
         data-state={isSelected ? 'active' : 'inactive'}
         {...props}

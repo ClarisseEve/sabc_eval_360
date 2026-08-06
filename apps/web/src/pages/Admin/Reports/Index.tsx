@@ -10,6 +10,10 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { EmptyState } from '@/Components/UI/EmptyState';
 import { Skeleton } from '@/Components/UI/Skeleton';
+import { Button } from '@/Components/UI/Button/Button';
+import { Input } from '@/Components/UI/Input/Input';
+import { Label } from '@/Components/UI/Label/Label';
+import { AdminReportsLayout } from './shared';
 
 export default function ReportsIndex() {
   const navigate = useNavigate();
@@ -51,95 +55,108 @@ export default function ReportsIndex() {
   };
 
   return (
-    <PageContainer width="narrow">
-      <PageHeader
-        title="Rapports"
-        breadcrumbs={[{ label: 'Administration' }, { label: 'Rapports' }]}
-        actions={
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-sabc-red-primary text-white rounded-lg hover:bg-sabc-red-dark"
-          >
-            <Plus size={18} />
-            Nouveau rapport
-          </button>
-        }
-      />
-
-      {showCreate && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6 flex gap-3">
-          <input
-            type="text"
-            value={newTitre}
-            onChange={(e) => setNewTitre(e.target.value)}
-            placeholder="Titre du rapport..."
-            className="flex-1 border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-sabc-red-primary"
-            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-            autoFocus
-          />
-          <button
-            onClick={handleCreate}
-            disabled={createReport.isPending}
-            className="px-4 py-2 bg-sabc-red-primary text-white rounded text-sm hover:bg-sabc-red-dark disabled:opacity-60"
-          >
-            {createReport.isPending ? 'Création…' : 'Créer'}
-          </button>
-          <button onClick={() => setShowCreate(false)} className="px-3 py-2 border border-gray-200 rounded text-sm hover:bg-gray-50">
-            Annuler
-          </button>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} height={72} className="w-full rounded-lg" />
-          ))}
-        </div>
-      ) : rapports.length === 0 ? (
-        <EmptyState
-          icon={FileText}
-          title="Aucun rapport"
-          description="Créez votre premier rapport pour assembler des sections et l'exporter en PowerPoint ou Excel."
-          action={
-            <button
-              onClick={() => setShowCreate(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-sabc-red-primary text-white rounded-lg hover:bg-sabc-red-dark"
-            >
-              <Plus size={18} />
+    <AdminReportsLayout title="Rapports">
+      <PageContainer width="narrow">
+        <PageHeader
+          title="Rapports"
+          description="Assemblez, organisez et exportez vos rapports d'évaluation."
+          breadcrumbs={[{ label: 'Administration' }, { label: 'Rapports' }]}
+          actions={rapports.length > 0 && !showCreate ? (
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus size={18} aria-hidden="true" />
               Nouveau rapport
-            </button>
-          }
+            </Button>
+          ) : undefined}
         />
-      ) : (
-        <div className="space-y-3">
-          {rapports.map((r: any) => (
-            <div key={r.id_rapport} className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-900">{r.titre}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {r.sections_json?.length ?? 0} section(s) · Statut : {r.statut}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => navigate(`/admin/reports/${r.id_rapport}/edit`)}
-                  className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50"
-                >
-                  <Edit2 size={14} />
-                  Éditer
-                </button>
-                <button
-                  onClick={() => handleDelete(r.id_rapport)}
-                  className="flex items-center gap-1 px-3 py-1.5 border border-red-200 text-red-500 rounded text-sm hover:bg-red-50"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
+
+        {showCreate && (
+          <form
+            className="flex flex-col gap-3 rounded-lg border border-sabc-gray-200 bg-white p-4 sm:flex-row sm:items-end"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleCreate();
+            }}
+          >
+            <div className="min-w-0 flex-1">
+              <Label htmlFor="report-title" className="mb-1.5 block">
+                Titre du rapport
+              </Label>
+              <Input
+                id="report-title"
+                type="text"
+                value={newTitre}
+                onChange={(e) => setNewTitre(e.target.value)}
+                placeholder="Ex. Synthèse annuelle 2026"
+                autoFocus
+              />
             </div>
-          ))}
-        </div>
-      )}
-    </PageContainer>
+            <div className="flex gap-2">
+              <Button type="submit" loading={createReport.isPending} disabled={!newTitre.trim()}>
+                {createReport.isPending ? 'Création…' : 'Créer'}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
+                Annuler
+              </Button>
+            </div>
+          </form>
+        )}
+
+        {isLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} height={72} className="w-full rounded-lg" />
+            ))}
+          </div>
+        ) : rapports.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title="Aucun rapport"
+            description="Créez votre premier rapport pour assembler des sections et l'exporter en PowerPoint ou Excel."
+            action={!showCreate ? (
+              <Button onClick={() => setShowCreate(true)}>
+                <Plus size={18} aria-hidden="true" />
+                Nouveau rapport
+              </Button>
+            ) : undefined}
+          />
+        ) : (
+          <div className="space-y-3">
+            {rapports.map((rapport: any) => (
+              <div
+                key={rapport.id_rapport}
+                className="flex flex-col gap-4 rounded-lg border border-sabc-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-sabc-gray-900">{rapport.titre}</p>
+                  <p className="mt-1 text-xs text-sabc-gray-500">
+                    {rapport.sections_json?.length ?? 0} section(s) · Statut : {rapport.statut}
+                  </p>
+                </div>
+                <div className="flex flex-shrink-0 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/admin/reports/${rapport.id_rapport}/edit`)}
+                  >
+                    <Edit2 size={14} aria-hidden="true" />
+                    Éditer
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => handleDelete(rapport.id_rapport)}
+                    aria-label={`Supprimer le rapport ${rapport.titre}`}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </PageContainer>
+    </AdminReportsLayout>
   );
 }

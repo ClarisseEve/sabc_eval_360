@@ -17,31 +17,24 @@ const Tooltip: React.FC<TooltipProps> = ({
   ...props
 }) => {
   const [visible, setVisible] = React.useState(false);
+  const tooltipId = React.useId();
   const tooltipRef = React.useRef<HTMLDivElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [tooltipPosition, setTooltipPosition] = React.useState({ top: 0, left: 0 });
   // Des `let` au corps du composant seraient réinitialisés à chaque rendu:
   // les clearTimeout ne retrouveraient plus les minuteurs à annuler.
   const timeoutId = React.useRef<ReturnType<typeof setTimeout>>(undefined);
-  const hideTimeoutId = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const showTooltip = () => {
-    clearTimeout(hideTimeoutId.current);
+    clearTimeout(timeoutId.current);
     timeoutId.current = setTimeout(() => {
       setVisible(true);
-      // Calculer la position après que le tooltip soit visible
       setTimeout(updatePosition, 0);
-
-      // Masquer automatiquement le tooltip après 1000ms
-      hideTimeoutId.current = setTimeout(() => {
-        setVisible(false);
-      }, 1000);
     }, delay);
   };
 
   const hideTooltip = () => {
     clearTimeout(timeoutId.current);
-    clearTimeout(hideTimeoutId.current);
     setVisible(false);
   };
 
@@ -49,9 +42,17 @@ const Tooltip: React.FC<TooltipProps> = ({
   React.useEffect(() => {
     return () => {
       clearTimeout(timeoutId.current);
-      clearTimeout(hideTimeoutId.current);
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!visible) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') hideTooltip();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [visible]);
 
   // Fonction pour calculer et mettre à jour la position du tooltip
   const updatePosition = () => {
@@ -129,17 +130,34 @@ const Tooltip: React.FC<TooltipProps> = ({
   return (
     <div className="relative inline-block" ref={containerRef} {...props}>
       {React.cloneElement(children, {
-        onMouseEnter: showTooltip,
-        onMouseLeave: hideTooltip,
-        onFocus: showTooltip,
-        onBlur: hideTooltip,
+        'aria-describedby': visible
+          ? tooltipId
+          : (children.props as React.HTMLAttributes<HTMLElement>)['aria-describedby'],
+        onMouseEnter: (event: React.MouseEvent<HTMLElement>) => {
+          children.props.onMouseEnter?.(event);
+          showTooltip();
+        },
+        onMouseLeave: (event: React.MouseEvent<HTMLElement>) => {
+          children.props.onMouseLeave?.(event);
+          hideTooltip();
+        },
+        onFocus: (event: React.FocusEvent<HTMLElement>) => {
+          children.props.onFocus?.(event);
+          showTooltip();
+        },
+        onBlur: (event: React.FocusEvent<HTMLElement>) => {
+          children.props.onBlur?.(event);
+          hideTooltip();
+        },
       })}
       {visible && (
         <div
+          id={tooltipId}
+          role="tooltip"
           ref={tooltipRef}
           className={cn(
             'fixed z-50 px-3 py-2 text-sm font-medium rounded-md shadow-md',
-            'text-white dark:text-gray-700',
+            'text-white dark:text-white',
             'bg-sabc-gray-900 dark:bg-sabc-gray-800',
             'border border-sabc-gray-700 dark:border-sabc-gray-600',
             className

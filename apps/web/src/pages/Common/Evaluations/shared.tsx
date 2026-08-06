@@ -3,6 +3,7 @@ import AppLayout from '@/Components/Layout/app/AppLayout';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { normalizePublishedRule, getRuleSummary } from '@/utils/rules';
 import type { PublishedRule } from '@/types/rules';
+import { findNoteForCriterion, isRequiredCriterionCommentMissing } from './workflow-ui';
 
 export function useEvaluationLayoutUser(fallbackRole = 'Utilisateur') {
   const { user } = useAuthContext();
@@ -47,6 +48,8 @@ export const formatRole = (userLike: Record<string, any>) =>
 
 type RawEvaluationNote = {
   id?: string | number | null;
+  id_critere?: string | number | null;
+  critere_id?: string | number | null;
   note?: number | null;
   commentaire?: string | null;
   critere_nom?: string;
@@ -82,7 +85,7 @@ export function buildEvaluationCriteria(evaluation: Record<string, any>): Evalua
 
   if (!normalizedRule.criteres || normalizedRule.criteres.length === 0) {
     return rawNotes.map((note, index) => ({
-      id: note.id ?? index,
+      id: note.critere_id ?? note.id_critere ?? note.id ?? index,
       libelle: note.critere_nom ?? `Critère ${index + 1}`,
       description: null,
       section: 'Compétences',
@@ -94,13 +97,7 @@ export function buildEvaluationCriteria(evaluation: Record<string, any>): Evalua
   }
 
   return normalizedRule.criteres.map((critere, index) => {
-    const matched = rawNotes.find((note, noteIndex) => {
-      if (!note) return false;
-      if (note.id != null && critere.id != null) {
-        return String(note.id) === String(critere.id);
-      }
-      return index === noteIndex;
-    });
+    const matched = findNoteForCriterion(rawNotes, String(critere.id ?? ''), index);
 
     return {
       id: critere.id ?? index,
@@ -143,9 +140,11 @@ export function buildEvaluationContext(evaluation: Record<string, any>) {
 export function isCriterionCommentRequired(
   criterion: Pick<EvaluationCriterionView, 'note' | 'commentaire' | 'commentaireRequisSiNoteLt'>,
 ) {
-  const threshold = criterion.commentaireRequisSiNoteLt ?? 3;
-  const note = criterion.note ?? 0;
-  return note < threshold && (!criterion.commentaire || criterion.commentaire.trim().length === 0);
+  return isRequiredCriterionCommentMissing({
+    note: criterion.note,
+    commentaire: criterion.commentaire,
+    threshold: criterion.commentaireRequisSiNoteLt,
+  });
 }
 
 export function getPublishedRuleForEvaluation(evaluation: Record<string, any>): PublishedRule {

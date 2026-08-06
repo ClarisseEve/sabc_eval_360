@@ -166,7 +166,7 @@ export default function ToValidate() {
                           className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark ml-2"
                           onClick={(e: React.MouseEvent) => { e.stopPropagation(); setSelected(ev); }}
                         >
-                          Valider
+                          Examiner
                         </Button>
                       </div>
                     </div>

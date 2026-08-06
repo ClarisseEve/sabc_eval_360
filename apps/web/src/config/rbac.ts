@@ -116,6 +116,45 @@ export function normalizeRole(input?: string | null): Role {
   return 'CSC';
 }
 
+/**
+ * Branches métier de la SABC. Chaque rôle est rattaché à l'une d'elles côté
+ * API (roles.id_branche): BR001 Commercial, BR002 Marketing, BR003 Sponsoring.
+ * Les jeux de critères d'évaluation suivent ce même découpage.
+ */
+export const DOMAINES = ['commercial', 'marketing', 'sponsoring'] as const;
+export type Domaine = (typeof DOMAINES)[number];
+
+const ROLE_DOMAINE: Record<Role, Domaine> = {
+  ADMIN: 'commercial',
+  DR: 'commercial',
+  CSC: 'commercial',
+  CDV: 'commercial',
+  CDS: 'commercial',
+  CDTT: 'marketing',
+  RTM: 'marketing',
+  TMO: 'marketing',
+  SRMO: 'marketing',
+  SS: 'sponsoring',
+  AS: 'sponsoring',
+};
+
+export function getDomaine(roleLike?: string | null): Domaine {
+  return ROLE_DOMAINE[normalizeRole(roleLike)];
+}
+
+/**
+ * Restreint un périmètre à un domaine. Un domaine nul signifie « tout le
+ * périmètre » plutôt qu'« aucun résultat »: c'est l'état par défaut de la
+ * bascule des chefs de département.
+ */
+export function filterByDomaine<T extends { role?: string | null }>(
+  membres: T[],
+  domaine: Domaine | null,
+): T[] {
+  if (!domaine) return membres;
+  return membres.filter((membre) => getDomaine(membre.role) === domaine);
+}
+
 export function getCapabilities(roleLike?: string | null): RoleCapabilities {
   const code = normalizeRole(roleLike);
   return RBAC[code];

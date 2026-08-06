@@ -94,12 +94,14 @@ export default function SecteursIndex() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Secteurs existants</CardTitle>
-          <Button
-            className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-            onClick={() => setOpen(true)}
-          >
-            Nouveau secteur
-          </Button>
+          {secteurs.length > 0 ? (
+            <Button
+              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+              onClick={() => setOpen(true)}
+            >
+              Nouveau secteur
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent>
           {secteurs.length === 0 ? (

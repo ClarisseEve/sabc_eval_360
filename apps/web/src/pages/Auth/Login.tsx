@@ -120,11 +120,16 @@ const Login: React.FC = () => {
             <div className="mb-6">
               <p className="text-sm text-sabc-gray-800 mb-2 font-medium">Comptes de démonstration (dev) :</p>
               <div className="border border-sabc-gray-200 rounded-md p-2 bg-white">
-                {testAccounts.map((account, index) => (
-                  <div
-                    key={index}
-                    className="flex flex-col p-2 hover:bg-sabc-gray-50 cursor-pointer rounded-md mb-1 transition-colors"
-                    onClick={() => setIdentifier(account.username)}
+                {testAccounts.map((account) => (
+                  <button
+                    key={account.username}
+                    type="button"
+                    className="mb-1 flex w-full flex-col rounded-md p-2 text-left transition-colors hover:bg-sabc-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2"
+                    aria-pressed={identifier === account.username}
+                    onClick={() => {
+                      setIdentifier(account.username);
+                      setErrors((current) => ({ ...current, identifier: undefined }));
+                    }}
                   >
                     <div className="flex items-center">
                       <span className="font-medium text-sabc-gray-800">{account.label}</span>
@@ -135,10 +140,10 @@ const Login: React.FC = () => {
                       )}
                     </div>
                     <span className="text-xs text-sabc-gray-400">{account.description}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
-              <p className="text-xs text-sabc-gray-400 mt-1">Cliquez sur un compte pour remplir un identifiant local cohérent</p>
+              <p className="text-xs text-sabc-gray-400 mt-1">Sélectionnez un compte pour remplir son identifiant local.</p>
             </div>
           )}
 
@@ -153,11 +158,14 @@ const Login: React.FC = () => {
                   onChange={(e) => setIdentifier(e.target.value)}
                   required
                   autoFocus
+                  autoComplete="username"
+                  aria-invalid={Boolean(errors.identifier)}
+                  aria-describedby={errors.identifier ? 'identifier-error' : undefined}
                   className={`h-11 rounded-lg ${errors.identifier ? 'border-sabc-error' : 'border-sabc-gray-200'}`}
                   placeholder="A0001 ou utilisateur@sabc.local"
                 />
                 {errors.identifier && (
-                  <p className="text-sm text-sabc-error font-medium">{errors.identifier}</p>
+                  <p id="identifier-error" role="alert" className="text-sm text-sabc-error font-medium">{errors.identifier}</p>
                 )}
               </div>
               
@@ -178,6 +186,9 @@ const Login: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="current-password"
+                    aria-invalid={Boolean(errors.password)}
+                    aria-describedby={errors.password ? 'password-error' : undefined}
                     className={`h-11 rounded-lg pr-12 ${errors.password ? 'border-sabc-error' : 'border-sabc-gray-200'}`}
                   />
                   <button
@@ -190,7 +201,7 @@ const Login: React.FC = () => {
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="text-sm text-sabc-error font-medium">{errors.password}</p>
+                  <p id="password-error" role="alert" className="text-sm text-sabc-error font-medium">{errors.password}</p>
                 )}
               </div>
             </div>
@@ -208,11 +219,8 @@ const Login: React.FC = () => {
         </CardContent>
         
         <CardFooter className="flex justify-center border-t border-sabc-gray-200 p-6 bg-white rounded-b-xl">
-          <p className="text-sm text-sabc-gray-700">
-            Pas encore de compte ?{' '}
-            <Link href="/register" className="text-sabc-red-primary hover:underline font-medium">
-              Créer un compte
-            </Link>
+          <p className="text-center text-sm text-sabc-gray-700">
+            Besoin d’un accès ? Contactez votre administrateur.
           </p>
         </CardFooter>
       </Card>

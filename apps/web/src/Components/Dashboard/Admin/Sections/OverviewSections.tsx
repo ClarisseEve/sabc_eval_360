@@ -93,18 +93,23 @@ function ChartTooltip({
   label?: string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
+  const visiblePayload = payload.filter((entry) => entry.name !== 'Tendance');
+  const formatTooltipValue = (value: number | string | undefined) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return value ?? '—';
+    return Number.isInteger(value) ? value.toLocaleString('fr-FR') : value.toFixed(2);
+  };
 
   return (
     <div className="rounded-2xl border border-sabc-gray-200 bg-white px-4 py-3 shadow-lg dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
       {label ? <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">{label}</div> : null}
       <div className="space-y-1.5">
-        {payload.map((entry) => (
+        {visiblePayload.map((entry) => (
           <div key={entry.name} className="flex items-center justify-between gap-4 text-sm">
             <div className="flex items-center gap-2 text-sabc-gray-600">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
               <span>{entry.name}</span>
             </div>
-            <span className="font-semibold text-sabc-gray-900">{entry.value}</span>
+            <span className="font-semibold text-sabc-gray-900">{formatTooltipValue(entry.value)}</span>
           </div>
         ))}
       </div>

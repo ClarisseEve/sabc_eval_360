@@ -92,26 +92,45 @@ function DataTable<TData, TValue>({
                   const canSort = header.column.getCanSort();
                   const sorted = header.column.getIsSorted();
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead
+                      key={header.id}
+                      aria-sort={
+                        sorted === 'asc'
+                          ? 'ascending'
+                          : sorted === 'desc'
+                            ? 'descending'
+                            : canSort
+                              ? 'none'
+                              : undefined
+                      }
+                    >
                       {header.isPlaceholder ? null : (
-                        <button
-                          className={cn(
-                            'inline-flex items-center gap-1',
-                            canSort ? 'cursor-pointer select-none text-sabc-gray-900' : 'cursor-default'
-                          )}
-                          onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
-                          aria-label={canSort ? 'Trier' : undefined}
-                        >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          {canSort && (
+                        canSort ? (
+                          <button
+                            type="button"
+                            className="inline-flex cursor-pointer select-none items-center gap-1 rounded-md text-sabc-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40"
+                            onClick={header.column.getToggleSortingHandler()}
+                            aria-label={`Trier la colonne ${header.column.id}${
+                              sorted === 'asc'
+                                ? ' par ordre décroissant'
+                                : sorted === 'desc'
+                                  ? ' sans tri'
+                                  : ' par ordre croissant'
+                            }`}
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
                             <ArrowUpDown
                               className={cn(
                                 'ml-1 h-3.5 w-3.5 text-sabc-gray-400',
                                 sorted ? 'text-sabc-red-primary' : ''
                               )}
                             />
-                          )}
-                        </button>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1">
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                          </span>
+                        )
                       )}
                     </TableHead>
                   );
@@ -161,16 +180,18 @@ function DataTable<TData, TValue>({
             size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
+            aria-label="Page précédente"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
+            aria-label="Page suivante"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
       </div>

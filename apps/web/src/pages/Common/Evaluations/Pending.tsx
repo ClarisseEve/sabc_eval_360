@@ -9,8 +9,11 @@ import { useEvaluationWorkflowData } from '@/Hooks/queries';
 import { EvaluationPageLayout, formatDisplayName, formatRole } from './shared';
 import { QuickActionsCard, formatDateLabel } from '@/Components/Dashboard/RoleDashboardShared';
 import { TruncatedList } from '@/Components/UI/TruncatedList/TruncatedList';
-import { CheckCheck, ClipboardList, Clock, FileEdit, Send } from 'lucide-react';
+import { ClipboardList, Clock, FileEdit, RotateCcw } from 'lucide-react';
 import { cn } from '@/utils/helpers';
+import { useNavigate } from 'react-router-dom';
+import { useAuthContext } from '@/Contexts/AuthContext';
+import { selectEvaluatorActionEvaluations } from './workflow-ui';
 
 type StatusMeta = {
   label: string;
@@ -22,7 +25,7 @@ type StatusMeta = {
   action: string;
 };
 
-/** Code couleur cohérent avec les tuiles du haut : brouillon = ambre, soumis = bleu. */
+/** Code couleur cohérent avec les tuiles du haut : brouillon = ambre, retour = rouge. */
 const STATUS_META: Record<string, StatusMeta> = {
   brouillon: {
     label: 'Brouillon',
@@ -33,14 +36,14 @@ const STATUS_META: Record<string, StatusMeta> = {
     chip: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
     action: 'Reprendre',
   },
-  soumis: {
-    label: 'Soumise',
-    groupLabel: 'Soumises',
-    Icon: Send,
-    badgeVariant: 'info',
-    accent: 'border-l-blue-400 dark:border-l-blue-500',
-    chip: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    action: 'Voir',
+  rejete: {
+    label: 'À corriger',
+    groupLabel: 'Retours à corriger',
+    Icon: RotateCcw,
+    badgeVariant: 'warning',
+    accent: 'border-l-sabc-red-primary',
+    chip: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    action: 'Corriger',
   },
 };
 
@@ -54,7 +57,7 @@ const FALLBACK_STATUS_META: StatusMeta = {
   action: 'Voir',
 };
 
-const STATUS_ORDER = ['brouillon', 'soumis'];
+const STATUS_ORDER = ['rejete', 'brouillon'];
 
 function MetricTile({
   label,
@@ -83,24 +86,37 @@ function MetricTile({
 }
 
 const Pending: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuthContext();
   const { data } = useEvaluationWorkflowData();
   const [activeTab, setActiveTab] = useState<string>('all');
+  const actionableEvaluations = useMemo(
+    () => selectEvaluatorActionEvaluations(
+      data.pendingEvaluations,
+      data.historyList,
+      user?.matricule,
+    ),
+    [data.historyList, data.pendingEvaluations, user?.matricule],
+  );
 
   const grouped = useMemo(() => {
     const groups = new Map<string, any[]>();
-    for (const evaluation of data.pendingEvaluations) {
+    for (const evaluation of actionableEvaluations) {
       const key = evaluation.type_evaluation || 'autre';
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(evaluation);
     }
     return Array.from(groups.entries());
-  }, [data.pendingEvaluations]);
+  }, [actionableEvaluations]);
 
   const filtered = activeTab === 'all'
-    ? data.pendingEvaluations
-    : data.pendingEvaluations.filter((evaluation) => (evaluation.type_evaluation || 'autre') === activeTab);
+    ? actionableEvaluations
+    : actionableEvaluations.filter((evaluation) => (evaluation.type_evaluation || 'autre') === activeTab);
 
-  // Regroupe par statut (brouillons d'abord), sans mélanger soumis et brouillons.
+  const draftsCount = actionableEvaluations.filter((evaluation) => evaluation.statut === 'brouillon').length;
+  const rejectedCount = actionableEvaluations.filter((evaluation) => evaluation.statut === 'rejete').length;
+
+  // Regroupe par statut sans mélanger les retours prioritaires et les brouillons.
   const statusOrder = [...STATUS_ORDER];
   for (const evaluation of filtered) {
     if (!statusOrder.includes(evaluation.statut)) statusOrder.push(evaluation.statut);
@@ -137,12 +153,7 @@ const Pending: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              window.location.href =
-                evaluation.statut === 'brouillon'
-                  ? `/evaluations/${evaluation.id_evaluation}/edit`
-                  : `/evaluations/${evaluation.id_evaluation}`;
-            }}
+            onClick={() => navigate(`/evaluations/${evaluation.id_evaluation}/edit`)}
           >
             {meta.action}
           </Button>
@@ -160,11 +171,11 @@ const Pending: React.FC = () => {
           <CardContent className="flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-2">
               <Badge variant="primary">
-                Workflow d’exécution
+                Actions de l’évaluateur
               </Badge>
-              <h1 className="text-2xl font-semibold text-sabc-gray-900">Brouillons, soumissions et validations</h1>
+              <h1 className="text-2xl font-semibold text-sabc-gray-900">Vos évaluations à compléter</h1>
               <p className="max-w-2xl text-sm text-sabc-gray-600">
-                Cette page regroupe désormais vos évaluations à reprendre ainsi que les validations qui vous reviennent comme manager.
+                Reprenez un brouillon ou corrigez une évaluation renvoyée. Les soumissions envoyées et les validations manager sont suivies dans leurs espaces dédiés.
               </p>
             </div>
             <div className="rounded-xl border border-sabc-gray-200 bg-sabc-gray-50 p-4 text-sm">
@@ -183,35 +194,29 @@ const Pending: React.FC = () => {
           <Alert>
             <AlertTitle>Aucune période active</AlertTitle>
             <AlertDescription>
-              Vous pouvez encore consulter les brouillons ou les soumissions existantes, mais aucun nouveau cycle ne doit être lancé tant qu’une période n’est pas ouverte.
+              Vous pouvez encore consulter vos brouillons et retours existants, mais aucun nouveau cycle ne peut être lancé tant qu’une période n’est pas ouverte.
             </AlertDescription>
           </Alert>
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <MetricTile
-            label="Évaluations en attente"
-            value={data.summary.pendingTotal}
+            label="À compléter"
+            value={actionableEvaluations.length}
             icon={ClipboardList}
             iconClassName="bg-sabc-red-primary/10 text-sabc-red-primary"
           />
           <MetricTile
             label="Brouillons"
-            value={data.summary.drafts}
+            value={draftsCount}
             icon={FileEdit}
             iconClassName="bg-amber-100 text-amber-700"
           />
           <MetricTile
-            label="Soumises"
-            value={data.summary.submitted}
-            icon={Send}
-            iconClassName="bg-blue-100 text-blue-700"
-          />
-          <MetricTile
-            label="À valider"
-            value={data.summary.validations}
-            icon={CheckCheck}
-            iconClassName="bg-emerald-100 text-emerald-700"
+            label="Retours à corriger"
+            value={rejectedCount}
+            icon={RotateCcw}
+            iconClassName="bg-red-100 text-red-700"
           />
         </div>
 
@@ -219,12 +224,12 @@ const Pending: React.FC = () => {
           <CardHeader className="space-y-4">
             <CardTitle className="flex items-center gap-2 text-base">
               <Clock className="h-5 w-5 text-sabc-red-primary" />
-              Mes brouillons et soumissions
+              Mes évaluations en cours
             </CardTitle>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="w-full justify-start overflow-x-auto">
-                <TabsTrigger value="all">Toutes ({data.pendingEvaluations.length})</TabsTrigger>
+                <TabsTrigger value="all">Toutes ({actionableEvaluations.length})</TabsTrigger>
                 {grouped.map(([type, list]) => (
                   <TabsTrigger key={type} value={type}>
                     {type} ({list.length})
@@ -234,9 +239,9 @@ const Pending: React.FC = () => {
               <TabsContent value={activeTab} className="mt-4 space-y-6">
                 {filtered.length === 0 ? (
                   <Alert>
-                    <AlertTitle>Aucune évaluation</AlertTitle>
+                    <AlertTitle>Tout est à jour</AlertTitle>
                     <AlertDescription>
-                      Aucun élément ne correspond au filtre sélectionné.
+                      Vous n’avez aucune évaluation à compléter pour ce filtre.
                     </AlertDescription>
                   </Alert>
                 ) : (
@@ -274,62 +279,6 @@ const Pending: React.FC = () => {
               </TabsContent>
             </Tabs>
           </CardHeader>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CheckCheck className="h-5 w-5 text-sabc-success" />
-              Évaluations à valider
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {data.validations.length === 0 ? (
-              <Alert>
-                <AlertTitle>Aucune validation en attente</AlertTitle>
-                <AlertDescription>
-                  Aucun collaborateur de votre périmètre n’a actuellement de soumission en attente de validation.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <TruncatedList
-                items={data.validations}
-                previewCount={5}
-                keyExtractor={(evaluation: any) => evaluation.id_evaluation}
-                modalTitle="Évaluations à valider"
-                modalDescription={`${data.validations.length} validation(s) en attente`}
-                className="space-y-3"
-                modalClassName="space-y-3"
-                renderItem={(evaluation: any) => (
-                  <div className="flex flex-col gap-3 rounded-lg border border-sabc-gray-200 p-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <div className="font-medium text-sabc-gray-900">
-                        {formatDisplayName(evaluation.evalue || {})}
-                      </div>
-                      <div className="text-sm text-sabc-gray-500">
-                        Soumise par {formatDisplayName(evaluation.evaluateur || {})} · {evaluation.regle?.nom_regle || evaluation.type_evaluation || 'Évaluation'}
-                      </div>
-                      <div className="text-xs text-sabc-gray-400">
-                        {formatRole(evaluation.evalue || {})}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="primary">soumis</Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          window.location.href = `/evaluations/${evaluation.id_evaluation}`;
-                        }}
-                      >
-                        Contrôler
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              />
-            )}
-          </CardContent>
         </Card>
 
         <QuickActionsCard

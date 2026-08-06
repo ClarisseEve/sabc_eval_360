@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Link } from '@/lib/inertia-shim';
-import { LogOut, ChevronDown, ChevronRight, AlignLeft, Menu, PlayCircle } from 'lucide-react';
+import { LogOut, ChevronDown, ChevronRight, AlignLeft, Menu, X } from 'lucide-react';
 import { cn } from '@/utils/helpers';
 import { Button } from '@/Components/UI/Button/Button';
 import { Badge } from '@/Components/UI/Badge/Badge';
-import { NAV_ITEMS, NAV_BOTTOM_ITEMS, VALIDATION_QUEUE_ROLES, resolveHref } from '@/config/nav';
+import { NAV_ITEMS, NAV_BOTTOM_ITEMS, resolveHref } from '@/config/nav';
 import { normalizeRole, type Role } from '@/config/rbac';
 import { useAuthContext } from '@/Contexts/AuthContext';
-import api from '@/Services/api';
+import api, { hierarchyApi } from '@/Services/api';
 
 // Types pour les éléments de navigation
 interface NavItem {
@@ -19,6 +19,7 @@ interface NavItem {
   isActive?: boolean;
   children?: NavItem[];
   roles?: Role[];
+  requiresDirectReports?: boolean;
 }
 
 // Types pour les propriétés du composant Sidebar
@@ -31,6 +32,8 @@ interface SidebarProps {
   };
   isCollapsed: boolean;
   onToggle: () => void;
+  isMobileOpen: boolean;
+  onMobileClose: () => void;
   onLogout?: () => void | Promise<void>;
   className?: string;
 }
@@ -39,16 +42,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
   user,
   isCollapsed,
   onToggle,
+  isMobileOpen,
+  onMobileClose,
   onLogout,
   className,
 }): React.ReactElement => {
   const { user: authUser, logout } = useAuthContext();
   const navigate = useNavigate();
+  const roleCode = normalizeRole(authUser?.role ?? user.role);
+  const mobileCloseButtonRef = React.useRef<HTMLButtonElement>(null);
 
-  // The role only controls navigation/badge loading; the API authorizes every queue item.
-  const canValidate =
-    Boolean(authUser?.role) &&
-    VALIDATION_QUEUE_ROLES.includes(normalizeRole(authUser?.role));
+  useEffect(() => {
+    if (isMobileOpen) {
+      window.requestAnimationFrame(() => mobileCloseButtonRef.current?.focus());
+    }
+  }, [isMobileOpen]);
+
+  const { data: directReports = [] } = useQuery({
+    queryKey: ['hierarchy', 'subordonnes', 'navigation', authUser?.matricule],
+    queryFn: () => hierarchyApi.getSubordonnes().then((response) => response.data),
+    enabled: Boolean(authUser?.matricule) && roleCode !== 'ADMIN',
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  // L'API de hiérarchie, et non une liste de rôles supposés managers, détermine
+  // si les parcours « Mon équipe » et « À valider » ont un sens.
+  const hasDirectReports =
+    roleCode !== 'ADMIN' && Array.isArray(directReports) && directReports.length > 0;
+  const canValidate = hasDirectReports;
 
   const { data: pendingCount = 0 } = useQuery({
     queryKey: ['evaluations', 'pending', 'count'],
@@ -92,10 +114,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Génération des menus depuis la config centrale
   const { mainMenuItems, bottomMenuItems } = React.useMemo(() => {
-    const roleCode = normalizeRole(user.role);
     const filterByRole = (items: NavItem[]): NavItem[] =>
       items
         .filter((it) => !it.roles || it.roles.includes(roleCode))
+        .filter((it) => !it.requiresDirectReports || hasDirectReports)
         .map((it) => ({
           ...it,
           href: resolveHref(it.href, roleCode),
@@ -106,7 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       mainMenuItems: filterByRole(NAV_ITEMS as NavItem[]),
       bottomMenuItems: filterByRole(NAV_BOTTOM_ITEMS as NavItem[]),
     };
-  }, [user.role]);
+  }, [hasDirectReports, roleCode]);
   
   // Ouvrir automatiquement le parent si un sous-menu est actif (sans écraser les dépliages manuels)
   useEffect(() => {
@@ -126,6 +148,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     markParentsWithActiveChild(mainMenuItems);
     setExpandedItems((prev) => ({ ...prev, ...nextExpanded }));
   }, [isHrefActive, mainMenuItems]);
+
+  // Une navigation client-side referme automatiquement le drawer mobile.
+  useEffect(() => {
+    onMobileClose();
+  }, [activePath, activeSearch, onMobileClose]);
   
   // Fonction pour basculer l'état déplié d'un élément
   const toggleExpand = (title: string) => {
@@ -157,11 +184,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <button
         type="button"
         className={cn(
-          "relative flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out",
+          "relative flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40",
           getActiveClassName(hasActiveChild),
           hoverClassName
         )}
-        onClick={() => toggleExpand(item.title)}
+        onClick={() => {
+          setExpandedItems((previous) => ({ ...previous, [item.title]: true }));
+          onToggle();
+        }}
+        aria-label={`Ouvrir ${item.title}`}
+        aria-expanded={false}
+        title={item.title}
       >
         {item.icon}
         {badgeCount > 0 && (
@@ -186,9 +219,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isSectionToggle ? (
         <button
           type="button"
-          className="flex w-full items-center justify-between bg-transparent text-inherit focus:outline-none"
+          className="flex w-full items-center justify-between bg-transparent text-inherit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40"
           onClick={() => toggleExpand(item.title)}
           aria-expanded={isExpanded}
+          aria-label={`${isExpanded ? 'Replier' : 'Déplier'} ${item.title}`}
         >
           <span className="flex items-center">
             {item.icon}
@@ -211,6 +245,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Link
             href={item.href}
             className="flex flex-1 items-center text-inherit transition-colors"
+            aria-current={isHrefActive(item.href) ? 'page' : undefined}
+            onClick={onMobileClose}
           >
             {item.icon}
             <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
@@ -247,8 +283,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             : "text-sabc-gray-800 dark:text-sabc-gray-200",
           hoverClassName
         )}
+        aria-current={isActive ? 'page' : undefined}
+        aria-label={isCollapsed ? item.title : undefined}
+        title={isCollapsed ? item.title : undefined}
+        onClick={onMobileClose}
       >
-        <span className="flex flex-1 items-center">
+        <span className={cn('flex items-center', isCollapsed ? 'justify-center' : 'flex-1')}>
           {item.icon}
           {!isCollapsed && (
             <span className="ml-2 block whitespace-normal text-left leading-tight">{item.title}</span>
@@ -303,10 +343,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
+      id="app-sidebar"
+      aria-label="Navigation principale"
       className={cn(
-        // Hauteur complète et position sticky pour grands écrans
-        "h-screen sticky top-0 flex flex-col bg-white dark:bg-sabc-gray-900 shadow-[1px_0_3px_rgba(0,0,0,0.04)] dark:shadow-[1px_0_3px_rgba(0,0,0,0.2)] transition-all duration-300 ease-in-out",
-        isCollapsed ? "w-16" : "w-60",
+        "fixed inset-y-0 left-0 z-50 flex h-dvh w-72 max-w-[85vw] flex-col bg-white shadow-[1px_0_3px_rgba(0,0,0,0.04)] transition-[width,transform] duration-300 ease-in-out dark:bg-sabc-gray-900 dark:shadow-[1px_0_3px_rgba(0,0,0,0.2)] lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:max-w-none lg:translate-x-0",
+        isMobileOpen ? "visible translate-x-0" : "invisible -translate-x-full lg:visible",
+        isCollapsed ? "lg:w-16" : "lg:w-60",
         className
       )}
     >
@@ -322,37 +364,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
         <Button
+          ref={mobileCloseButtonRef}
           variant="ghost"
           size="icon"
           onClick={onToggle}
-          className={`text-sabc-gray-500 hover:text-sabc-gray-900 dark:text-sabc-gray-400 dark:hover:text-white ${isCollapsed ? 'mx-auto' : ''}`}
+          className={cn(
+            'hidden text-sabc-gray-500 hover:text-sabc-gray-900 dark:text-sabc-gray-400 dark:hover:text-white lg:inline-flex',
+            isCollapsed && 'mx-auto',
+          )}
           aria-label={isCollapsed ? "Déployer la sidebar" : "Rétracter la sidebar"}
         >
           {isCollapsed ? <Menu className="h-5 w-5 text-sabc-gray-800" /> : <AlignLeft className="h-5 w-5 text-sabc-gray-800" />}
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onMobileClose}
+          className="text-sabc-gray-500 hover:text-sabc-gray-900 dark:text-sabc-gray-400 dark:hover:text-white lg:hidden"
+          aria-label="Fermer le menu de navigation"
+        >
+          <X className="h-5 w-5" />
+        </Button>
       </div>
-
-      {/* CTA Évaluations — visible uniquement pour les rôles non-admin */}
-      {(authUser?.role || '').toUpperCase() !== 'ADMIN' && (
-        <div className={cn('px-3 pb-3 pt-3', isCollapsed && 'px-2')}>
-          <a
-            href="/evaluations/mine"
-            className={cn(
-              'flex items-center gap-2 rounded-xl bg-sabc-red-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sabc-red-dark transition-colors',
-              isCollapsed && 'justify-center px-2'
-            )}
-            title={isCollapsed ? 'Mes évaluations' : undefined}
-          >
-            <PlayCircle className="h-4 w-4 shrink-0" />
-            {!isCollapsed && <span>Mes évaluations</span>}
-          </a>
-        </div>
-      )}
 
       {/* Contenu du sidebar avec scroll */}
       <div className="flex flex-1 flex-col overflow-y-auto">
         {/* Navigation principale */}
-        <nav className="flex-1 p-2">
+        <nav className="flex-1 p-2" aria-label="Menu principal">
           <ul className="space-y-1">
             {mainMenuItems.map((item) => renderNavItem(item))}
           </ul>
@@ -385,6 +423,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }}
             type="button"
             title={isCollapsed ? "Déconnexion" : undefined}
+            aria-label={isCollapsed ? "Déconnexion" : undefined}
           >
             <LogOut 
               className="h-5 w-5"

@@ -18,7 +18,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { evaluationsApi } from '@/Services/api';
 import { useEvaluation } from '@/Hooks/queries';
 import {
@@ -30,12 +30,12 @@ import {
 } from './shared';
 import { ActiveRulesCard, formatDateLabel, formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
 import { useOfflineSync } from '@/Hooks/useOfflineSync';
-
-type EditableEvaluationNote = {
-  critere_id: string;
-  note: number;
-  commentaire: string;
-};
+import {
+  buildEditableEvaluationNotes,
+  getEvaluationSubmissionState,
+  serializeRatedEvaluationNotes,
+  type EditableEvaluationNote,
+} from './workflow-ui';
 
 const getErrorMessage = (error: unknown) => {
   const apiMessage = (error as any)?.response?.data?.message;
@@ -47,22 +47,22 @@ const getErrorMessage = (error: unknown) => {
 
 const EditEvaluation: React.FC = () => {
   const { id = '' } = useParams();
+  const navigate = useNavigate();
   const { data: evaluation } = useEvaluation(id);
   const queryClient = useQueryClient();
   const context = useMemo(() => buildEvaluationContext(evaluation), [evaluation]);
   const criteria = context.criteria;
   const evaluationId = evaluation?.id_evaluation ?? evaluation?.id;
   const [notes, setNotes] = useState<EditableEvaluationNote[]>(() =>
-    criteria.map((critere) => ({
-      critere_id: String(critere.id ?? ''),
-      note: critere.note ?? 3,
-      commentaire: critere.commentaire ?? '',
-    })),
+    buildEditableEvaluationNotes(criteria),
   );
   const [commentaireGeneral, setCommentaireGeneral] = useState(evaluation?.commentaire_general ?? '');
   const [lastAction, setLastAction] = useState<'draft' | 'submit' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'draft' | 'submit' | null>(null);
+  const [savedLocallyOnly, setSavedLocallyOnly] = useState(false);
+  const [localSaveError, setLocalSaveError] = useState<string | null>(null);
 
-  const { saveDraft, getDraft, isOnline, pendingCount, isSyncing } = useOfflineSync();
+  const { saveDraft, getDraft, deleteDraft, isOnline, pendingCount, isSyncing } = useOfflineSync();
   const draftRestoredRef = useRef(false);
   const latestDraftRef = useRef({ notes, commentaireGeneral });
 
@@ -71,13 +71,7 @@ const EditEvaluation: React.FC = () => {
   }, [notes, commentaireGeneral]);
 
   React.useEffect(() => {
-    setNotes(
-      criteria.map((critere) => ({
-        critere_id: String(critere.id ?? ''),
-        note: critere.note ?? 3,
-        commentaire: critere.commentaire ?? '',
-      })),
-    );
+    setNotes(buildEditableEvaluationNotes(criteria));
     setCommentaireGeneral(evaluation?.commentaire_general ?? '');
     draftRestoredRef.current = false;
   }, [criteria, evaluation?.commentaire_general]);
@@ -88,27 +82,15 @@ const EditEvaluation: React.FC = () => {
     draftRestoredRef.current = true;
     getDraft(id).then((draft) => {
       if (!draft || draft.saved_at < new Date(evaluation.updated_at ?? 0).getTime()) return;
-      setNotes(criteria.map((critere, idx) => {
-        const critereId = String(critere.id ?? '');
-        const matchingDraftNote = draft.notes.find((draftNote) => {
-          const legacyId = draftNote.critere_id ?? draftNote.id_critere ?? draftNote.id;
-          return legacyId !== undefined && String(legacyId) === critereId;
-        }) ?? draft.notes[idx];
-
-        return {
-          critere_id: critereId,
-          note: (matchingDraftNote?.note as number) ?? critere.note ?? 3,
-          commentaire: (matchingDraftNote?.commentaire as string) ?? critere.commentaire ?? '',
-        };
-      }));
-      if (draft.commentaire_general) setCommentaireGeneral(draft.commentaire_general);
+      setNotes(buildEditableEvaluationNotes(criteria, draft.notes));
+      setCommentaireGeneral(draft.commentaire_general ?? '');
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evaluation]);
 
   // Auto-save to IndexedDB every 30 seconds
   React.useEffect(() => {
-    if (!evaluationId) return;
+    if (!evaluationId || isOnline) return;
     const interval = setInterval(() => {
       const currentDraft = latestDraftRef.current;
       saveDraft(
@@ -118,26 +100,18 @@ const EditEvaluation: React.FC = () => {
       ).catch(() => {});
     }, 30_000);
     return () => clearInterval(interval);
-  }, [evaluationId, saveDraft]);
+  }, [evaluationId, isOnline, saveDraft]);
 
-  const completion = useMemo(() => {
-    if (notes.length === 0) return 0;
-    const completed = notes.filter((note) => note.note != null).length;
-    return Math.round((completed / notes.length) * 100);
-  }, [notes]);
-
-  const requiresJustification = notes.some(
-    (note, index) => isCriterionCommentRequired({
-      note: note.note,
-      commentaire: note.commentaire,
-      commentaireRequisSiNoteLt: criteria[index]?.commentaireRequisSiNoteLt ?? 3,
-    })
+  const submissionState = useMemo(
+    () => getEvaluationSubmissionState(notes, criteria),
+    [criteria, notes],
   );
+  const requiresJustification = submissionState.missingComments > 0;
 
   const saveMutation = useMutation({
     mutationFn: async (submit: boolean) => {
       await evaluationsApi.update(String(evaluationId), {
-        notes,
+        notes: serializeRatedEvaluationNotes(notes),
         commentaire_general: commentaireGeneral,
       });
       if (submit) {
@@ -148,15 +122,19 @@ const EditEvaluation: React.FC = () => {
       }
     },
     onSuccess: async (_, submit) => {
+      setPendingAction(null);
       setLastAction(submit ? 'submit' : 'draft');
+      setSavedLocallyOnly(false);
+      await deleteDraft(String(evaluationId)).catch(() => {});
       await queryClient.invalidateQueries({ queryKey: ['evaluations'] });
       await queryClient.invalidateQueries({ queryKey: ['evaluations', String(evaluationId)] });
       if (submit) {
         setTimeout(() => {
-          window.location.href = `/evaluations/${evaluationId}`;
-        }, 3000);
+          navigate(`/evaluations/${evaluationId}`);
+        }, 1200);
       }
     },
+    onError: () => setPendingAction(null),
   });
 
   const handleScoreChange = (index: number, value: number) => {
@@ -177,8 +155,33 @@ const EditEvaluation: React.FC = () => {
     setNotes(updated);
   };
 
-  const handleSave = (submit: boolean) => {
-    setLastAction(submit ? 'submit' : 'draft');
+  const handleSave = async (submit: boolean) => {
+    if (!evaluationId || (submit && (!submissionState.canSubmit || !isOnline))) return;
+
+    const action = submit ? 'submit' : 'draft';
+    saveMutation.reset();
+    setPendingAction(action);
+    setLastAction(null);
+    setSavedLocallyOnly(false);
+    setLocalSaveError(null);
+
+    try {
+      await saveDraft(String(evaluationId), notes, commentaireGeneral);
+    } catch (error) {
+      if (!isOnline) {
+        setPendingAction(null);
+        setLocalSaveError(getErrorMessage(error));
+        return;
+      }
+    }
+
+    if (!isOnline) {
+      setPendingAction(null);
+      setLastAction('draft');
+      setSavedLocallyOnly(true);
+      return;
+    }
+
     saveMutation.mutate(submit);
   };
 
@@ -201,7 +204,7 @@ const EditEvaluation: React.FC = () => {
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button asChild={false} variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800" onClick={() => { window.location.href = `/evaluations/${evaluationId}`; }}>
+          <Button asChild={false} variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800" onClick={() => navigate(`/evaluations/${evaluationId}`)}>
             <span className="inline-flex items-center">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Retour au détail
@@ -212,7 +215,8 @@ const EditEvaluation: React.FC = () => {
               variant="secondary"
               size="sm"
               onClick={() => handleSave(false)}
-              loading={saveMutation.isPending && lastAction === 'draft'}
+              disabled={!evaluationId || pendingAction !== null}
+              loading={pendingAction === 'draft'}
             >
               Enregistrer le brouillon
             </Button>
@@ -220,8 +224,8 @@ const EditEvaluation: React.FC = () => {
               size="sm"
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               onClick={() => handleSave(true)}
-              disabled={requiresJustification}
-              loading={saveMutation.isPending && lastAction === 'submit'}
+              disabled={!evaluationId || !isOnline || !submissionState.canSubmit || pendingAction !== null}
+              loading={pendingAction === 'submit'}
             >
               Soumettre l'évaluation
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -267,22 +271,48 @@ const EditEvaluation: React.FC = () => {
               <div>
                 <div className="text-xs uppercase text-sabc-gray-400">Progression</div>
                 <div className="mt-2 flex items-baseline gap-2 text-2xl font-semibold text-sabc-gray-900 dark:text-white">
-                  {completion}%
+                  {submissionState.completion}%
                   <span className="text-xs text-sabc-gray-500">complété</span>
+                </div>
+                <div className="mt-1 text-xs text-sabc-gray-500">
+                  {submissionState.ratedCount} critère(s) noté(s) sur {submissionState.totalCount}
                 </div>
                 <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-sabc-gray-200 dark:bg-sabc-gray-800">
                   <div
                     className="h-full rounded-full bg-sabc-red-primary transition-all"
-                    style={{ width: `${completion}%` }}
+                    style={{ width: `${submissionState.completion}%` }}
                   />
                 </div>
               </div>
 
-              {requiresJustification && (
+              {!submissionState.canSubmit && (
                 <Alert className="border-sabc-warning bg-sabc-warning/10 text-xs text-sabc-warning">
-                  <AlertTitle>Commentaires requis</AlertTitle>
+                  <AlertTitle>Avant de soumettre</AlertTitle>
+                  <AlertDescription className="space-y-1">
+                    {submissionState.missingRatings > 0 && (
+                      <div>
+                        Notez encore {submissionState.missingRatings} critère(s).
+                      </div>
+                    )}
+                    {requiresJustification && (
+                      <div>
+                        Ajoutez {submissionState.missingComments} commentaire(s) obligatoire(s) sous le seuil défini.
+                      </div>
+                    )}
+                    {submissionState.invalidCriteria > 0 && (
+                      <div>
+                        Le cadre contient un critère invalide. Contactez l’administrateur.
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {!isOnline && (
+                <Alert className="border-sabc-gray-300 bg-sabc-gray-50 text-xs text-sabc-gray-600">
+                  <AlertTitle>Soumission indisponible hors ligne</AlertTitle>
                   <AlertDescription>
-                    Les seuils de justification sont imposés par la règle publiée. Toute note sous le seuil d’un critère doit être commentée.
+                    Enregistrez le brouillon. Vous pourrez le soumettre après le retour de la connexion.
                   </AlertDescription>
                 </Alert>
               )}
@@ -358,6 +388,7 @@ const EditEvaluation: React.FC = () => {
                           <Badge variant="secondary">{critere.section}</Badge>
                           {critere.poids != null ? <Badge variant="secondary">Poids {critere.poids}</Badge> : null}
                           <Badge variant="secondary">Critère {index + 1}</Badge>
+                          {notes[index]?.note == null && <Badge variant="warning">Non noté</Badge>}
                         </div>
                         {critere.description && (
                           <div className="mt-2 text-xs text-sabc-gray-500">{critere.description}</div>
@@ -371,6 +402,8 @@ const EditEvaluation: React.FC = () => {
                           key={value}
                           type="button"
                           onClick={() => handleScoreChange(index, value)}
+                          aria-label={`Attribuer la note ${value} sur 5 au critère ${index + 1}`}
+                          aria-pressed={notes[index]?.note === value}
                           className={cn(
                             'h-9 w-9 rounded-full border text-sm font-semibold transition',
                             notes[index]?.note === value
@@ -393,7 +426,7 @@ const EditEvaluation: React.FC = () => {
                       <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sabc-gray-400">
                         <MessageSquare className="h-3.5 w-3.5" />
                         Commentaire
-                        {((notes[index]?.note ?? 0) < (critere.commentaireRequisSiNoteLt ?? 3)) && (
+                        {(notes[index]?.note != null && notes[index].note < (critere.commentaireRequisSiNoteLt ?? 3)) && (
                           <span className="rounded bg-sabc-red-light px-1.5 py-0.5 text-[10px] text-sabc-red-primary">
                             Obligatoire sous {critere.commentaireRequisSiNoteLt ?? 3}
                           </span>
@@ -452,8 +485,17 @@ const EditEvaluation: React.FC = () => {
             <AlertTitle>Enregistré</AlertTitle>
             <AlertDescription className="space-y-1">
               <div>
-                Votre évaluation a été {lastAction === 'submit' ? 'soumise pour validation.' : 'enregistrée en brouillon.'}
+                {lastAction === 'submit'
+                  ? 'Votre évaluation a été soumise pour validation.'
+                  : savedLocallyOnly
+                    ? 'Votre brouillon a été enregistré sur cet appareil.'
+                    : 'Votre évaluation a été enregistrée en brouillon.'}
               </div>
+              {savedLocallyOnly && (
+                <div className="text-xs opacity-80">
+                  Il sera synchronisé automatiquement au retour de la connexion.
+                </div>
+              )}
               {lastAction === 'submit' && (
                 <div className="text-xs opacity-80">
                   Elle ne pourra être corrigée qu'après un éventuel rejet par le validateur.
@@ -463,11 +505,11 @@ const EditEvaluation: React.FC = () => {
           </Alert>
         )}
 
-        {saveMutation.isError && (
+        {(saveMutation.isError || localSaveError) && (
           <Alert className="border-red-300 bg-red-50 text-red-700">
             <AlertTitle>Erreur</AlertTitle>
             <AlertDescription>
-              {getErrorMessage(saveMutation.error)}
+              {localSaveError || getErrorMessage(saveMutation.error)}
             </AlertDescription>
           </Alert>
         )}

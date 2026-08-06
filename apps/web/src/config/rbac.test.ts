@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { RBAC, normalizeRole, type Role } from './rbac';
+import {
+  DOMAINES,
+  RBAC,
+  filterByDomaine,
+  getDomaine,
+  normalizeRole,
+  type Role,
+} from './rbac';
 
 /**
  * La sidebar construit le lien « Tableau de bord » avec normalizeRole, alors
@@ -34,5 +41,63 @@ describe('normalizeRole', () => {
     expect(normalizeRole('ROLE_INCONNU')).toBe('CSC');
     expect(normalizeRole('')).toBe('CSC');
     expect(normalizeRole(null)).toBe('CSC');
+  });
+});
+
+/**
+ * Le cahier des charges prévoit, pour les chefs de département, une bascule
+ * entre les périmètres commercial et marketing. Le rattachement d'un rôle à
+ * une branche est la donnée de référence côté API (table roles.id_branche);
+ * cette table doit rester alignée dessus.
+ */
+describe('getDomaine', () => {
+  it.each([
+    ['DR', 'commercial'],
+    ['CSC', 'commercial'],
+    ['CDV', 'commercial'],
+    ['CDS', 'commercial'],
+    ['CDTT', 'marketing'],
+    ['RTM', 'marketing'],
+    ['TMO', 'marketing'],
+    ['SRMO', 'marketing'],
+    ['SS', 'sponsoring'],
+    ['AS', 'sponsoring'],
+  ] as const)('rattache %s au domaine %s', (role, domaine) => {
+    expect(getDomaine(role)).toBe(domaine);
+  });
+
+  it('couvre tous les rôles déclarés, sans exception', () => {
+    const codes = Object.keys(RBAC) as Role[];
+    for (const code of codes) {
+      expect(DOMAINES).toContain(getDomaine(code));
+    }
+  });
+
+  it('accepte un libellé complet et non seulement un code', () => {
+    expect(getDomaine('Superviseur sponsoring')).toBe('sponsoring');
+  });
+});
+
+describe('filterByDomaine', () => {
+  const membres = [
+    { matricule: 'M1', role: 'CDS' },
+    { matricule: 'M2', role: 'TMO' },
+    { matricule: 'M3', role: 'AS' },
+  ];
+
+  it('ne garde que les membres du domaine demandé', () => {
+    expect(filterByDomaine(membres, 'marketing')).toEqual([{ matricule: 'M2', role: 'TMO' }]);
+  });
+
+  it('retourne tout le périmètre quand aucun domaine n’est demandé', () => {
+    expect(filterByDomaine(membres, null)).toEqual(membres);
+  });
+
+  it('ne perd pas un membre dont le rôle est inconnu: il rejoint le repli commercial', () => {
+    const avecInconnu = [...membres, { matricule: 'M4', role: 'ROLE_X' }];
+    expect(filterByDomaine(avecInconnu, 'commercial')).toEqual([
+      { matricule: 'M1', role: 'CDS' },
+      { matricule: 'M4', role: 'ROLE_X' },
+    ]);
   });
 });

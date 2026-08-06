@@ -117,12 +117,14 @@ export default function RegionsIndex() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Régions existantes</CardTitle>
-          <Button
-            className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-            onClick={openCreate}
-          >
-            Nouvelle région
-          </Button>
+          {regions.length > 0 ? (
+            <Button
+              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+              onClick={openCreate}
+            >
+              Nouvelle région
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent>
           {regions.length === 0 ? (

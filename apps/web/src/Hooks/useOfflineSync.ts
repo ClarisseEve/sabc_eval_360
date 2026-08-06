@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface EvaluationDraft {
   evaluation_id: string;
-  notes: Array<{ note: number; commentaire?: string; [key: string]: unknown }>;
+  notes: Array<{ note: number | null; commentaire?: string; [key: string]: unknown }>;
   commentaire_general?: string;
   saved_at: number; // Date.now()
   synced: boolean;
@@ -209,7 +209,13 @@ export function useOfflineSync(): UseOfflineSyncReturn {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
-            notes: draft.notes,
+            // Le serveur accepte un brouillon incomplet, mais chaque entrée
+            // transmise doit contenir une note valide. Les valeurs nulles sont
+            // conservées localement uniquement pour restaurer fidèlement l'UI.
+            notes: draft.notes.filter(
+              (entry): entry is typeof entry & { note: number } =>
+                Number.isInteger(entry.note) && Number(entry.note) >= 1 && Number(entry.note) <= 5,
+            ),
             commentaire_general: draft.commentaire_general,
           }),
         });

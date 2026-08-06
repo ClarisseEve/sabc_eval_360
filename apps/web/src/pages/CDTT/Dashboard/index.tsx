@@ -11,6 +11,7 @@ const CDTTDashboard: React.FC = () => (
         title="Tableau de bord Chef Département Trade"
         subtitle="Pilotage opérationnel des évaluations et de la performance de l'équipe Trade."
         perimeterTitle="Périmètre Trade"
+        enableDomaineToggle
       />
     </Suspense>
   </ErrorBoundary>

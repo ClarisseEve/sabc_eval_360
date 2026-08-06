@@ -81,12 +81,14 @@ export default function ServicesIndex() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Services existants</CardTitle>
-          <Button
-            className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-            onClick={() => setOpen(true)}
-          >
-            Nouveau service
-          </Button>
+          {services.length > 0 ? (
+            <Button
+              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+              onClick={() => setOpen(true)}
+            >
+              Nouveau service
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent>
           {services.length === 0 ? (

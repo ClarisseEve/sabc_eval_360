@@ -93,17 +93,23 @@ export default function RemplacementsIndex() {
     });
   }, [data, search]);
 
+  const hasRemplacements =
+    (data?.actifs?.length ?? 0) +
+      (data?.aVenir?.length ?? 0) +
+      (data?.historique?.length ?? 0) >
+    0;
+
   return (
     <AdminRemplacementsLayout title="Gestion des remplacements">
       <PageHeader
         title="Gestion des remplacements"
         description="Remplacements actifs, à venir et historiques, sur les données réelles."
         breadcrumbs={[{ label: 'Administration' }, { label: 'Remplacements' }]}
-        actions={
+        actions={hasRemplacements ? (
           <Link to="/admin/remplacements/create">
             <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark">Nouveau remplacement</Button>
           </Link>
-        }
+        ) : undefined}
       />
 
       <div className="grid gap-4 md:grid-cols-3">

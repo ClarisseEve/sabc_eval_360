@@ -88,13 +88,15 @@ export default function TemplatesIndexPage() {
           <Button variant="outline" onClick={() => navigate('/admin/evaluations/templates/assignations')}>
             Assignations
           </Button>
-          <Button
-            className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-            onClick={() => navigate('/admin/evaluations/templates/create')}
-          >
-            <Plus size={16} className="mr-2" />
-            Nouveau template
-          </Button>
+          {templates.length > 0 ? (
+            <Button
+              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+              onClick={() => navigate('/admin/evaluations/templates/create')}
+            >
+              <Plus size={16} className="mr-2" />
+              Nouveau template
+            </Button>
+          ) : null}
         </div>
       </div>
 

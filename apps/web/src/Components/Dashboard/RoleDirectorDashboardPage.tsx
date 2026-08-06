@@ -11,6 +11,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { useRoleDashboardData } from '@/Hooks/queries/useRoleDashboards';
+import { DOMAINES, filterByDomaine, type Domaine } from '@/config/rbac';
+import { Button } from '@/Components/UI/Button/Button';
 import { HierarchyChainCard } from '@/Components/Dashboard/IndividualAnalyticsCards';
 import { TeamAxisFrequencyChartCard, TeamMemberAnalyticsTableCard } from '@/Components/Dashboard/TeamAnalyticsCards';
 import {
@@ -29,6 +31,11 @@ type RoleDirectorDashboardPageProps = {
   title: string;
   subtitle: string;
   perimeterTitle: string;
+  /**
+   * Active la bascule entre domaines. Attendue pour les chefs de département,
+   * dont le périmètre couvre à la fois le commercial et le marketing.
+   */
+  enableDomaineToggle?: boolean;
 };
 
 export default function RoleDirectorDashboardPage({
@@ -36,8 +43,16 @@ export default function RoleDirectorDashboardPage({
   title,
   subtitle,
   perimeterTitle,
+  enableDomaineToggle = false,
 }: RoleDirectorDashboardPageProps) {
   const { data } = useRoleDashboardData('director', fallbackRole);
+  const [domaine, setDomaine] = React.useState<Domaine | null>(null);
+
+  // Le filtrage est purement local: le périmètre est déjà chargé, inutile de
+  // relancer une requête à chaque bascule.
+  const perimetre = enableDomaineToggle
+    ? filterByDomaine(data.teamMembers, domaine)
+    : data.teamMembers;
 
   return (
     <DashboardPageFrame
@@ -170,10 +185,45 @@ export default function RoleDirectorDashboardPage({
         </Card>
       </div>
 
+      {enableDomaineToggle && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-sabc-gray-600 dark:text-sabc-gray-300">
+            Périmètre :
+          </span>
+          <Button
+            size="sm"
+            variant={domaine === null ? 'default' : 'outline'}
+            onClick={() => setDomaine(null)}
+          >
+            Tout ({data.teamMembers.length})
+          </Button>
+          {DOMAINES.map((valeur) => {
+            const effectif = filterByDomaine(data.teamMembers, valeur).length;
+            return (
+              <Button
+                key={valeur}
+                size="sm"
+                variant={domaine === valeur ? 'default' : 'outline'}
+                onClick={() => setDomaine(valeur)}
+                // Un domaine sans effectif n'est pas pertinent pour ce périmètre.
+                disabled={effectif === 0}
+                className="capitalize"
+              >
+                {valeur} ({effectif})
+              </Button>
+            );
+          })}
+        </div>
+      )}
+
       <TeamMemberAnalyticsTableCard
         title={perimeterTitle}
-        description="Vue consolidée du périmètre hiérarchique complet"
-        members={data.teamMembers}
+        description={
+          enableDomaineToggle && domaine
+            ? `Périmètre ${domaine} du département`
+            : 'Vue consolidée du périmètre hiérarchique complet'
+        }
+        members={perimetre}
         emptyMessage="Aucun subordonné n’a été trouvé dans le périmètre complet."
         showLevelColumn
         showTotalEvaluations

@@ -143,6 +143,21 @@
     --color-sabc-success: var(--sabc-success);
     --color-sabc-warning: var(--sabc-warning);
     --color-sabc-info: var(--sabc-info);
+    --color-sabc-red-primary: var(--sabc-red-primary);
+    --color-sabc-red-light: var(--sabc-red-light);
+    --color-sabc-red-dark: var(--sabc-red-dark);
+    --color-sabc-accent: var(--sabc-accent);
+    --color-sabc-accent-light: var(--sabc-accent-light);
+    --color-sabc-gray-50: var(--sabc-gray-50);
+    --color-sabc-gray-100: var(--sabc-gray-100);
+    --color-sabc-gray-200: var(--sabc-gray-200);
+    --color-sabc-gray-300: var(--sabc-gray-300);
+    --color-sabc-gray-400: var(--sabc-gray-400);
+    --color-sabc-gray-500: var(--sabc-gray-500);
+    --color-sabc-gray-600: var(--sabc-gray-600);
+    --color-sabc-gray-700: var(--sabc-gray-700);
+    --color-sabc-gray-800: var(--sabc-gray-800);
+    --color-sabc-gray-900: var(--sabc-gray-900);
 
     --color-border: var(--border);
     --color-input: var(--input);
@@ -272,5 +287,16 @@
 @media (min-width: 1600px) {
     :root {
         font-size: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
     }
 }

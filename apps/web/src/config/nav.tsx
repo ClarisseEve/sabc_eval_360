@@ -24,15 +24,16 @@ export interface NavItem {
   children?: NavItem[];
   roles?: Role[];
   badge?: 'notifications';
+  requiresDirectReports?: boolean;
 }
 
-// Roles that have subordinates (can see "Mon équipe") — NOT CDS/AS
-const ROLES_WITH_SUBS: Role[] = ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'SS'];
-// Navigation only: the API remains the authority for every item in the validation queue.
-export const VALIDATION_QUEUE_ROLES: Role[] = [...ROLES_WITH_SUBS, 'CDS'];
 // All non-admin roles
 const ALL_OPERATIONAL: Role[] = ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'CDS', 'SS', 'AS'];
 const ALL_WITH_ADMIN: Role[] = ['ADMIN', ...ALL_OPERATIONAL];
+// Premier filtre d'affichage ; la sidebar confirme ensuite la présence réelle
+// de subordonnés directs auprès de l'API avant d'afficher ces parcours.
+const ROLES_WITH_POTENTIAL_REPORTS: Role[] = ['DR', 'CDTT', 'CSC', 'RTM', 'SRMO', 'CDV', 'TMO', 'SS'];
+export const VALIDATION_QUEUE_ROLES: Role[] = [...ROLES_WITH_POTENTIAL_REPORTS, 'CDS'];
 
 export const NAV_ITEMS: NavItem[] = [
   {
@@ -65,6 +66,7 @@ export const NAV_ITEMS: NavItem[] = [
         href: '/evaluations/validate',
         icon: <ChevronRight className="h-4 w-4" />,
         roles: VALIDATION_QUEUE_ROLES,
+        requiresDirectReports: true,
         badge: 'notifications',
       },
       {
@@ -100,12 +102,13 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
 
-  // ── Mon équipe (only roles with subordinates — NOT CDS/AS) ──
+  // ── Mon équipe (affiché seulement si l'API retourne des subordonnés directs) ──
   {
     title: 'Mon équipe',
     href: '#',
     icon: <Users className="h-5 w-5" />,
-    roles: ROLES_WITH_SUBS,
+    roles: ROLES_WITH_POTENTIAL_REPORTS,
+    requiresDirectReports: true,
     children: [
       {
         title: 'Subordonnés',
