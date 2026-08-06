@@ -4,37 +4,36 @@ Application d'évaluation 360° composée d'un frontend React, d'une API NestJS,
 d'une base MySQL pour le référentiel, d'une base PostgreSQL pour le métier et
 de Redis pour le cache.
 
-## Démarrage le plus simple avec Docker
+## Démarrage avec Docker
 
 Prérequis : Docker avec Compose v2.
 
 ```bash
 cp .env.example .env
-openssl rand -base64 48
 ```
 
-Reporter la valeur générée dans `JWT_SECRET`, choisir un `SEED_PASSWORD`,
-puis lancer :
+Remplacer dans `.env` toutes les valeurs `CHANGE_ME_*`. Pour `JWT_SECRET`,
+générer la valeur avec `openssl rand -base64 48`.
+
+> Le mot de passe MySQL apparaît dans `MYSQL_PASSWORD`, `DATABASE_URL` et
+> `DATABASE_URL_DOCKER` : les trois doivent porter la même valeur. Les
+> variantes `*_DOCKER` visent les services internes à Compose, les autres
+> `localhost` pour les commandes lancées depuis votre machine.
 
 ```bash
 docker compose up --build
 ```
 
-`DATABASE_URL` et `REDIS_URL` servent aux commandes lancées depuis l'hôte ;
-Compose utilise leurs variantes `DATABASE_URL_DOCKER` et
-`REDIS_URL_DOCKER`, qui ciblent les noms de services internes. Si un mot de
-passe de base contient des caractères réservés dans une URL, l'encoder dans le
-DSN Docker.
-
-La première exécution applique les migrations des deux bases et crée les
-données de démonstration si la base est vide. Les exécutions suivantes les
-conservent grâce à `SEED_MODE=if-empty`.
+Le premier démarrage applique les migrations des deux bases et crée les données
+de démonstration. Les démarrages suivants les conservent.
 
 - application : http://localhost:5173
 - API : http://localhost:3000/api
 - santé : http://localhost:3000/api/health
-- compte administrateur local : `admin@sabc.local`
-- mot de passe : la valeur choisie pour `SEED_PASSWORD`
+
+Connexion : `admin@sabc.local` (ou le matricule `A0001`) avec le mot de passe
+choisi pour `SEED_PASSWORD`. Les autres comptes sont listés dans
+[docs/comptes-de-test.md](docs/comptes-de-test.md).
 
 Arrêt sans supprimer les données :
 
@@ -150,8 +149,9 @@ docker compose -f docker-compose.scale.yml up --build -d
 Cette stack exécute les migrations une seule fois dans le service `migrate`,
 puis démarre les deux réplicas derrière Nginx.
 
-## Documentation d'exploitation
+## Documentation
 
+- [Comptes de test](docs/comptes-de-test.md)
 - [Checklist de bascule](docs/operations/nestjs-cutover-checklist.md)
 - [Déploiement multi-réplicas](docs/operations/scaled-deployment.md)
 - [Plan de performance](docs/operations/performance-rollout.md)
