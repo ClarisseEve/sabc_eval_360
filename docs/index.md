@@ -6,7 +6,6 @@
 - Backend API: `apps/api`
 - Base core: MySQL
 - Base business: PostgreSQL
-- Pipelines analytiques: `data_pipelines`
 
 ## Références utiles
 

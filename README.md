@@ -189,13 +189,12 @@ erreurs déjà commises.
 - [Déploiement multi-réplicas](docs/operations/scaled-deployment.md)
 - [Plan de performance](docs/operations/performance-rollout.md)
 
-> Avant toute mise en production, traiter le point de sécurité P1 identifié dans
-> la synthèse d'audit : `GET /analytics/region/:idRegion` et son classement sont
-> protégés par le seul JWT, sans contrôle de périmètre.
+Les cinq points P1 de la synthèse d'audit ont été traités : accès inter-régions
+fermé, pannes d'API distinguées des valeurs nulles, gabarits CDS et SRMO
+corrigés, capacités RBAC alignées sur l'API, et mise à jour de la structure
+débloquée. Les points P2 et P3 restent ouverts et sont listés par rôle.
 
 ### Documents historiques
 
-Conservés pour mémoire, ils décrivent des choix abandonnés (Laravel/Inertia,
-microservices Go, ClickHouse, pipelines Python) et ne doivent pas guider une
-implémentation : `docs/*-pipelines.md`, `docs/clickhouse-datagrip-setup.md`,
-`docs/deep-dive-api-backend-bloc-*.md`, `docs/superpowers/`.
+`docs/superpowers/` conserve les plans de développement passés. Ils décrivent
+l'intention d'origine, pas l'état actuel du code.

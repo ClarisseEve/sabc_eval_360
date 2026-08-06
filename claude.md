@@ -180,5 +180,4 @@ Migrations, seed et builds d'images sont donc couverts par la CI.
    partielle.
 3. **Code mort** — `Components/Analytics/*` (orphelin, avec `MOCK_ANALYTICS_DATA`),
    `pages/_legacy/`, plusieurs composants jamais montés.
-4. **`data_pipelines/`** — 12 fichiers Python vides, non câblés. À supprimer ou
-   documenter comme non implémenté.
+
