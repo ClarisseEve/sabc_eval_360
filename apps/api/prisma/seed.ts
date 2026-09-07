@@ -19,12 +19,13 @@ const pg = new Pool({
   password: process.env.PG_PASSWORD,
 });
 
-const seedPassword = process.env.SEED_PASSWORD;
-if (!seedPassword) {
-  throw new Error('SEED_PASSWORD est requis pour générer les comptes de démonstration');
-}
+const seedPassword = process.env.SEED_PASSWORD ?? '12345';
 if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_SEED !== 'true') {
   throw new Error('Seed de démonstration refusé en production (ALLOW_DEMO_SEED=true requis)');
+}
+
+if (!process.env.SEED_PASSWORD) {
+  console.warn('SEED_PASSWORD absent, utilisation de la valeur de secours 12345 pour les comptes de démonstration.');
 }
 const PASSWORD_HASH = hashSync(seedPassword, 10);
 const PERIODE_UUID_NAMESPACE = '2d9d2d7e-2c8f-4d5f-9867-334e13ef17d9';

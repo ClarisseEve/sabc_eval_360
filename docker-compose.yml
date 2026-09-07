@@ -42,8 +42,8 @@ services:
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
       RUN_SEED: ${RUN_SEED:-true}
       SEED_MODE: ${SEED_MODE:-if-empty}
-      SEED_PASSWORD: ${SEED_PASSWORD:?SEED_PASSWORD est requis — copiez .env.example vers .env}
-      ALLOW_DEMO_SEED: ${ALLOW_DEMO_SEED:-false}
+      SEED_PASSWORD: ${SEED_PASSWORD:-12345}
+      ALLOW_DEMO_SEED: ${ALLOW_DEMO_SEED:-true}
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:

@@ -169,11 +169,15 @@ export default function ToValidate() {
                         </Badge>
 
                         {/* Note */}
-                        {ev.note_globale !== null && (
-                          <div className={`text-lg font-bold ${noteColor(ev.note_globale)}`}>
-                            {ev.note_globale.toFixed(1)}<span className="text-xs font-normal text-gray-400">/5</span>
-                          </div>
-                        )}
+                        {(() => {
+                          const note = ev.note_globale == null ? null : Number(ev.note_globale);
+                          if (note == null || !Number.isFinite(note)) return null;
+                          return (
+                            <div className={`text-lg font-bold ${noteColor(note)}`}>
+                              {note.toFixed(1)}<span className="text-xs font-normal text-gray-400">/5</span>
+                            </div>
+                          );
+                        })()}
 
                         {/* Date */}
                         <div className="text-xs text-gray-400 text-right hidden sm:block">

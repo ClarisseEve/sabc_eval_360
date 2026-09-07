@@ -259,16 +259,6 @@ const EditEvaluation: React.FC = () => {
             >
               Enregistrer le brouillon
             </Button>
-            <Button
-              size="sm"
-              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-              onClick={() => handleSave(true)}
-              disabled={!evaluationId || !isOnline || !submissionState.canSubmit || pendingAction !== null}
-              loading={pendingAction === 'submit'}
-            >
-              Soumettre l'évaluation
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
           </div>
         </div>
 
@@ -516,6 +506,29 @@ const EditEvaluation: React.FC = () => {
                 Une synthèse claire facilite la validation et la compréhension par l'évalué.
               </AlertDescription>
             </Alert>
+          </CardContent>
+        </Card>
+
+        <Card className="border-sabc-red-primary/30 bg-sabc-red-light/20 dark:border-sabc-red-primary/40 dark:bg-sabc-red-primary/10">
+          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="font-semibold text-sabc-gray-900 dark:text-white">Prêt à soumettre ?</div>
+              <div className="mt-1 text-sm text-sabc-gray-600 dark:text-sabc-gray-300">
+                {submissionState.canSubmit
+                  ? 'Toutes les notes et justifications obligatoires sont complètes.'
+                  : 'Complétez les critères obligatoires et les commentaires demandés pour continuer.'}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              className="w-full bg-sabc-red-primary text-white hover:bg-sabc-red-dark sm:w-auto"
+              onClick={() => handleSave(true)}
+              disabled={!evaluationId || !isOnline || !submissionState.canSubmit || pendingAction !== null}
+              loading={pendingAction === 'submit'}
+            >
+              Soumettre l'évaluation
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </CardContent>
         </Card>
 

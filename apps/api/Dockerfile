@@ -1,14 +1,20 @@
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends openssl \
+	&& rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@10.14.0
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
-RUN pnpm exec prisma generate && pnpm run build
+RUN pnpm exec prisma generate --binary-targets=debian-openssl-3.0.x && pnpm run build
 
 FROM node:20-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends openssl \
+	&& rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@10.14.0
 # node_modules is copied whole (rather than reinstalled with --prod) so that the
 # generated Prisma client, the prisma CLI and ts-node stay available: the

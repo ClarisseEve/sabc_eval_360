@@ -29,7 +29,11 @@ import { APP_THROTTLER_OPTIONS } from './config/throttler-options';
 @Global()
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', '../../.env'],
+      validate: validateEnvironment,
+    }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot(APP_THROTTLER_OPTIONS),
     CommonModule,

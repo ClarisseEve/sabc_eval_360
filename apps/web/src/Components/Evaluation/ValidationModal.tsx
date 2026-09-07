@@ -70,6 +70,7 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const context = buildEvaluationContext(evaluation as any);
+  const overallScore = evaluation.note_globale == null ? null : Number(evaluation.note_globale);
 
   const handleSubmit = () => {
     if (!action) return;
@@ -134,11 +135,11 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
           </Card>
 
           {/* Note globale */}
-          {evaluation.note_globale !== null && (
+          {overallScore != null && Number.isFinite(overallScore) && (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <span className="text-sm font-medium text-gray-700">Note globale</span>
-              <span className={`text-2xl font-bold px-3 py-1 rounded-lg ${noteColor(Math.round(evaluation.note_globale))}`}>
-                {evaluation.note_globale.toFixed(2)}<span className="text-sm font-normal">/5</span>
+              <span className={`text-2xl font-bold px-3 py-1 rounded-lg ${noteColor(Math.round(overallScore))}`}>
+                {overallScore.toFixed(2)}<span className="text-sm font-normal">/5</span>
               </span>
             </div>
           )}

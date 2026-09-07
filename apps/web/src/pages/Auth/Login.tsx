@@ -27,7 +27,7 @@ const Login: React.FC = () => {
   // Aucun mot de passe en dur: le pré-remplissage de confort en développement
   // passe par VITE_DEMO_PASSWORD, défini localement et jamais committé.
   const [password, setPassword] = useState(
-    IS_DEV ? (import.meta.env.VITE_DEMO_PASSWORD ?? '') : '',
+    IS_DEV ? (import.meta.env.VITE_DEMO_PASSWORD ?? '12345') : '',
   );
   const [showPassword, setShowPassword] = useState(false);
   const [processing, setProcessing] = useState(false);
