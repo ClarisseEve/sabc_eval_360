@@ -10,7 +10,6 @@ import { Label } from '@/Components/UI/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import { Textarea } from '@/Components/UI/Textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
-import { TruncatedTableBody } from '@/Components/UI/TruncatedList/TruncatedList';
 import {
   Dialog,
   DialogContent,
@@ -19,10 +18,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/Components/UI/Dialog/Dialog';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/Components/UI/Pagination';
 import { adminApi } from '@/Services/api';
 import { useAdminRoles } from '@/Hooks/queries';
 import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
+import { paginateList } from '@/utils/adminUi';
 import { AdminRolesLayout } from './shared';
 
 const initialForm = {
@@ -44,6 +45,7 @@ export default function RolesIndex() {
   const confirm = useConfirm();
   const { success, error } = useToast();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
   const roles = Array.isArray(data) ? data : [];
@@ -102,6 +104,14 @@ export default function RolesIndex() {
     );
   }, [roles, search]);
 
+  const pageSize = 8;
+  const paginatedRoles = useMemo(() => paginateList(filteredRoles, { page, pageSize }), [filteredRoles, page]);
+  const activePageCount = paginatedRoles.pageCount;
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [search]);
+
   const errorMessage =
     (createMutation.error as any)?.response?.data?.message ||
     (createMutation.error ? 'Une erreur est survenue.' : null);
@@ -152,12 +162,12 @@ export default function RolesIndex() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TruncatedTableBody
-                items={filteredRoles}
-                previewCount={10}
-                colSpan={6}
-                keyExtractor={(role: any) => role.id_role}
-                renderRow={(role: any) => (
+              {paginatedRoles.items.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-sabc-gray-500">Aucun rôle trouvé.</TableCell>
+                </TableRow>
+              ) : (
+                paginatedRoles.items.map((role: any) => (
                   <TableRow key={role.id_role}>
                     <TableCell className="font-medium">{role.id_role}</TableCell>
                     <TableCell>
@@ -201,10 +211,28 @@ export default function RolesIndex() {
                       </div>
                     </TableCell>
                   </TableRow>
-                )}
-              />
+                ))
+              )}
             </TableBody>
           </Table>
+
+          {filteredRoles.length > pageSize && (
+            <Pagination className="pt-2">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious onClick={() => setPage((current) => Math.max(1, current - 1))} aria-disabled={page === 1} className={page === 1 ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+                {Array.from({ length: activePageCount }, (_, index) => index + 1).map((pageNumber) => (
+                  <PaginationItem key={pageNumber}>
+                    <PaginationLink isActive={page === pageNumber} onClick={() => setPage(pageNumber)}>{pageNumber}</PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext onClick={() => setPage((current) => Math.min(activePageCount, current + 1))} aria-disabled={page === activePageCount} className={page === activePageCount ? 'pointer-events-none opacity-50' : ''} />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
         </CardContent>
       </Card>
 

@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, RefreshCw, Shield, Siren, TriangleAlert, Zap } from 'lucide-react';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Progress } from '@/Components/UI/Progress/Progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/Components/UI/Pagination';
 import { EmptyState } from '@/Components/Dashboard/RoleDashboardShared';
+import { paginateList } from '@/utils/adminUi';
 import { cn } from '@/utils/helpers';
 
 type AlertFilter = 'all' | 'critical' | 'warning' | 'info';
@@ -320,6 +322,14 @@ export function AnomaliesTableSection({
   onRunDetection: () => void;
   isRunningDetection: boolean;
 }) {
+  const [page, setPage] = useState(1);
+  const pageSize = 8;
+  const paginatedRows = useMemo(() => paginateList(rows, { page, pageSize }), [rows, page]);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [rows.length]);
+
   return (
     <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
       <CardHeader className="border-b border-sabc-gray-100 bg-gradient-to-r from-white to-sabc-gray-50">

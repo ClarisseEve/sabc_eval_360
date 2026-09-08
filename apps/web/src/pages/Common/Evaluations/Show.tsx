@@ -219,14 +219,20 @@ const ShowEvaluation: React.FC = () => {
                   <div className="flex w-44 shrink-0 flex-col items-center justify-center border-r border-sabc-gray-200 bg-gradient-to-b from-sabc-red-light/50 to-white py-6 dark:border-sabc-gray-700 dark:from-sabc-red-primary/10 dark:to-sabc-gray-900">
                     <ShieldCheck className="mb-1.5 h-6 w-6 text-sabc-success" />
                     <div className="text-[10px] font-semibold uppercase tracking-widest text-sabc-gray-400">Note globale</div>
-                    <div className="mt-1 text-5xl font-extrabold leading-none text-sabc-red-primary">
+                    <div
+                      className={`mt-1 text-5xl font-extrabold leading-none ${
+                        overallScore != null && getScoreTone(overallScore) === 'success' ? 'text-sabc-success' : 'text-sabc-red-primary'
+                      }`}
+                    >
                       {overallScore != null ? overallScore.toFixed(2) : '—'}
                     </div>
                     <div className="mt-0.5 text-sm font-medium text-sabc-gray-400">/5</div>
                     {overallScore != null && (
                       <div className="mt-3 h-2 w-20 overflow-hidden rounded-full bg-sabc-gray-200 dark:bg-sabc-gray-700">
                         <div
-                          className="h-full rounded-full bg-sabc-red-primary transition-all"
+                          className={`h-full rounded-full transition-all ${
+                            getScoreTone(overallScore) === 'success' ? 'bg-sabc-success' : 'bg-sabc-red-primary'
+                          }`}
                           style={{ width: `${Math.min((overallScore / 5) * 100, 100)}%` }}
                         />
                       </div>

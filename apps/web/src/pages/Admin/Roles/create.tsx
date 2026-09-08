@@ -76,7 +76,19 @@ export default function CreateRole() {
             <Input id="id_role" value={form.id_role} onChange={(e) => setForm((p) => ({ ...p, id_role: e.target.value.toUpperCase() }))} />
           </FormField>
           <FormField label="Nom du rôle" htmlFor="nom_role" required>
-            <Input id="nom_role" value={form.nom_role} onChange={(e) => setForm((p) => ({ ...p, nom_role: e.target.value }))} placeholder="Directeur Régional" />
+            <Select value={form.nom_role || 'custom'} onValueChange={(value) => setForm((p) => ({ ...p, nom_role: value === 'custom' ? '' : value }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner un nom de rôle" />
+              </SelectTrigger>
+              <SelectContent>
+                {['Directeur Régional', 'Chef de Service', 'Superviseur', 'Manager', 'Collaborateur', 'Chef de Branche', 'Chef de Secteur', 'Commercial', 'Marketing', 'Autre'].map((roleName) => (
+                  <SelectItem key={roleName} value={roleName}>{roleName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.nom_role && form.nom_role !== 'Autre' ? null : (
+              <Input className="mt-2" value={form.nom_role} onChange={(e) => setForm((p) => ({ ...p, nom_role: e.target.value }))} placeholder="Ou saisissez un nom personnalisé" />
+            )}
           </FormField>
           <FormField label="Branche" required>
             <Select value={form.id_branche} onValueChange={(v) => setForm((p) => ({ ...p, id_branche: v }))}>

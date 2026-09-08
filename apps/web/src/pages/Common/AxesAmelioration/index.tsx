@@ -819,7 +819,7 @@ function AdminAxesPage() {
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Rechercher un collaborateur"
+                placeholder="Saisissez soit le code, le matricule ou bien le nom d'une personne ou d'un collaborateur"
                 className="h-9 pl-10"
               />
             </div>

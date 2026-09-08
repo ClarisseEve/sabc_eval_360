@@ -13,6 +13,7 @@ import {
   formatVisibilityLabel,
 } from '@/Components/Dashboard/RoleDashboardShared';
 import { ArrowRight, Check, RotateCcw } from 'lucide-react';
+import { getScoreTone } from '@/utils/adminUi';
 import { formatPersonName } from '@/utils/helpers';
 
 type Note = {
@@ -60,6 +61,11 @@ const noteColor = (n: number) => {
   if (n >= 4) return 'text-green-600 bg-green-50';
   if (n === 3) return 'text-yellow-700 bg-yellow-50';
   return 'text-red-600 bg-red-50';
+};
+
+const overallScoreColor = (score: number | null) => {
+  if (score == null) return 'text-sabc-gray-500 bg-sabc-gray-100';
+  return getScoreTone(score) === 'success' ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100';
 };
 
 export default function ValidationModal({ evaluation, open, onClose }: Props) {
@@ -138,7 +144,7 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
           {overallScore != null && Number.isFinite(overallScore) && (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <span className="text-sm font-medium text-gray-700">Note globale</span>
-              <span className={`text-2xl font-bold px-3 py-1 rounded-lg ${noteColor(Math.round(overallScore))}`}>
+              <span className={`text-2xl font-bold px-3 py-1 rounded-lg ${overallScoreColor(overallScore)}`}>
                 {overallScore.toFixed(2)}<span className="text-sm font-normal">/5</span>
               </span>
             </div>

@@ -4,8 +4,10 @@ import { Input } from '@/Components/UI/Input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
 import { PageHeader } from '@/Components/UI/Page';
 import { EmptyState } from '@/Components/UI/EmptyState';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/Components/UI/Pagination';
 import { CheckCircle2 } from 'lucide-react';
 import { useAdminUsers } from '@/Hooks/queries';
+import { paginateList } from '@/utils/adminUi';
 import { AdminUsersLayout } from './shared';
 
 function detectGaps(user: any) {
@@ -22,6 +24,7 @@ function detectGaps(user: any) {
 export default function UserGaps() {
   const { data } = useAdminUsers({ limit: 1000 });
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const users = data?.data ?? (Array.isArray(data) ? data : []);
 
   const rows = useMemo(() => {
@@ -36,6 +39,13 @@ export default function UserGaps() {
           .some((value) => String(value).toLowerCase().includes(term));
       });
   }, [users, search]);
+
+  const pageSize = 8;
+  const paginatedRows = useMemo(() => paginateList(rows, { page, pageSize }), [rows, page]);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   return (
     <AdminUsersLayout title="Analyse des gaps utilisateurs">
@@ -62,26 +72,46 @@ export default function UserGaps() {
               <EmptyState icon={CheckCircle2} title="Aucun gap détecté" description="Toutes les données utilisateurs exploitées sont complètes." />
             )
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Matricule</TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Rôle</TableHead>
-                  <TableHead>Gaps</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map(({ user, gaps }: { user: any; gaps: string[] }) => (
-                  <TableRow key={user.matricule}>
-                    <TableCell>{user.matricule}</TableCell>
-                    <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
-                    <TableCell>{user.role}</TableCell>
-                    <TableCell>{gaps.join(', ')}</TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Matricule</TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Rôle</TableHead>
+                    <TableHead>Gaps</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedRows.items.map(({ user, gaps }: { user: any; gaps: string[] }) => (
+                    <TableRow key={user.matricule}>
+                      <TableCell>{user.matricule}</TableCell>
+                      <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
+                      <TableCell>{user.role}</TableCell>
+                      <TableCell>{gaps.join(', ')}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {rows.length > pageSize && (
+                <Pagination className="pt-2">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious onClick={() => setPage((current) => Math.max(1, current - 1))} aria-disabled={page === 1} className={page === 1 ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                    {Array.from({ length: paginatedRows.pageCount }, (_, index) => index + 1).map((pageNumber) => (
+                      <PaginationItem key={pageNumber}>
+                        <PaginationLink isActive={page === pageNumber} onClick={() => setPage(pageNumber)}>{pageNumber}</PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext onClick={() => setPage((current) => Math.min(paginatedRows.pageCount, current + 1))} aria-disabled={page === paginatedRows.pageCount} className={page === paginatedRows.pageCount ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
