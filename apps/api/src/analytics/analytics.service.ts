@@ -973,14 +973,30 @@ export class AnalyticsService {
 
   async getEvaluationGaps(matricule?: string) {
     const params = matricule ? [matricule] : [];
+    const scoreRows = await this.pg.query<any>(
+      `SELECT
+         e.evalue_matricule AS matricule,
+         e.type_evaluation,
+         ROUND(AVG(e.note_globale), 2) AS score,
+         COUNT(*)::int AS nb_evaluations,
+         COUNT(DISTINCT e.evaluateur_matricule)::int AS nb_evaluateurs
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.statut = 'valide'
+         AND e.note_globale IS NOT NULL
+         AND ${ruleVisibilitySql('admin')}
+         ${matricule ? 'AND e.evalue_matricule = $1' : ''}
+       GROUP BY e.evalue_matricule, e.type_evaluation`,
+      params,
+    );
     const rows = await this.pg.query<any>(
       `SELECT
          e.evalue_matricule AS matricule,
          e.type_evaluation,
          n->>'critere_id' AS critere_id,
          ROUND(AVG((n->>'note')::numeric), 2) AS score,
-         COALESCE(MAX((critere->>'niveau_requis')::numeric), 3) AS niveau_requis,
-         COUNT(*)::int AS nb_evaluations
+         COALESCE(AVG((critere->>'niveau_requis')::numeric), 3) AS niveau_requis,
+         COUNT(*)::int AS nb_notes
        FROM evaluations e
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
        CROSS JOIN LATERAL jsonb_array_elements(e.notations_json) AS n
@@ -1004,6 +1020,21 @@ export class AnalyticsService {
     );
 
     const profiles = new Map<string, any>();
+    for (const row of scoreRows) {
+      const profile = profiles.get(row.matricule) ?? {
+        matricule: row.matricule,
+        types: {},
+        competences: new Map<string, any>(),
+      };
+      profile.types[row.type_evaluation] = {
+        score: Number(row.score),
+        nb_evaluations: Number(row.nb_evaluations ?? 0),
+        nb_evaluateurs: Number(row.nb_evaluateurs ?? 0),
+        competences: 0,
+      };
+      profiles.set(row.matricule, profile);
+    }
+
     for (const row of rows) {
       const score = Number(row.score);
       const required = Number(row.niveau_requis ?? 3);
@@ -1013,12 +1044,11 @@ export class AnalyticsService {
         competences: new Map<string, any>(),
       };
       profile.types[row.type_evaluation] = profile.types[row.type_evaluation] ?? {
-        score: 0,
-        count: 0,
+        score: null,
+        nb_evaluations: 0,
+        nb_evaluateurs: 0,
         competences: 0,
       };
-      profile.types[row.type_evaluation].score += score * Number(row.nb_evaluations ?? 1);
-      profile.types[row.type_evaluation].count += Number(row.nb_evaluations ?? 1);
       profile.types[row.type_evaluation].competences += 1;
 
       const competence = profile.competences.get(row.critere_id) ?? {
@@ -1039,12 +1069,7 @@ export class AnalyticsService {
     return {
       seuil_divergence: 1.5,
       profils: [...profiles.values()].map((profile) => {
-        const types = Object.fromEntries(
-          Object.entries(profile.types).map(([type, value]: [string, any]) => [
-            type,
-            { ...value, score: value.count > 0 ? Math.round((value.score / value.count) * 100) / 100 : null },
-          ]),
-        );
+        const types = profile.types;
         const typeScores = Object.values(types)
           .map((value: any) => value.score)
           .filter((value): value is number => typeof value === 'number');

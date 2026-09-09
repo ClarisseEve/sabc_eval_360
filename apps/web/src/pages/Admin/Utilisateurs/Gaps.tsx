@@ -25,6 +25,16 @@ function formatScore(score: number | null | undefined) {
   return score == null ? '—' : `${Number(score).toFixed(2)}/5`;
 }
 
+function AggregatedScore({ entry }: { entry?: { score?: number | null; nb_evaluateurs?: number; nb_evaluations?: number } }) {
+  if (!entry) return <span>—</span>;
+  return (
+    <span title={`${entry.nb_evaluations ?? 0} évaluation(s), ${entry.nb_evaluateurs ?? 0} évaluateur(s)`}>
+      {formatScore(entry.score)}
+      <span className="ml-1 text-xs text-sabc-gray-500">({entry.nb_evaluateurs ?? 0})</span>
+    </span>
+  );
+}
+
 export default function UserGaps() {
   const { data: usersData } = useAdminUsers({ limit: 1000 });
   const { data: gapData, isLoading } = useQuery({
@@ -98,9 +108,9 @@ export default function UserGaps() {
                           <TableRow className={profile.anomalie ? 'bg-amber-50/40' : undefined}>
                             <TableCell><div className="font-medium">{[user?.prenom, user?.nom].filter(Boolean).join(' ') || profile.matricule}</div><div className="text-xs text-sabc-gray-500">{profile.matricule}</div></TableCell>
                             <TableCell>{user?.role ?? '—'}</TableCell>
-                            <TableCell>{formatScore(profile.types?.auto?.score)}</TableCell>
-                            <TableCell>{formatScore(profile.types?.pairs?.score)}</TableCell>
-                            <TableCell>{formatScore(profile.types?.descendante?.score)}</TableCell>
+                            <TableCell><AggregatedScore entry={profile.types?.auto} /></TableCell>
+                            <TableCell><AggregatedScore entry={profile.types?.pairs} /></TableCell>
+                            <TableCell><AggregatedScore entry={profile.types?.descendante} /></TableCell>
                             <TableCell><span className={Number(profile.divergence) >= 1.5 ? 'font-semibold text-sabc-error' : 'text-sabc-gray-700'}>{Number(profile.divergence).toFixed(2)} pts</span></TableCell>
                             <TableCell>{profile.deficits > 0 ? <Badge variant="destructive">{profile.deficits} déficit(s)</Badge> : <Badge variant="success">Concordant</Badge>}</TableCell>
                             <TableCell className="text-right"><button type="button" className="inline-flex items-center gap-1 text-sm font-medium text-sabc-red-primary" onClick={() => setSelectedMatricule(expanded ? null : profile.matricule)}>{expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}Voir</button></TableCell>
