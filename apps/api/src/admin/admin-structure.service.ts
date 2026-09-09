@@ -5,6 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 export class AdminStructureService {
   constructor(private prisma: PrismaService) {}
 
+  private serializeRawRows<T extends Record<string, any>>(rows: T[]): T[] {
+    return rows.map((row) =>
+      Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [key, typeof value === 'bigint' ? Number(value) : value]),
+      ) as T,
+    );
+  }
+
   /**
    * Generates a short unique id (<= 10 chars) for the varchar(10) primary keys
    * used by the org-structure tables (no DB auto-increment / default exists).
@@ -41,7 +49,7 @@ export class AdminStructureService {
   // ── Services Commerciaux ──
 
   async getServices() {
-    return this.prisma.$queryRawUnsafe<any[]>(
+    const rows = await this.prisma.$queryRawUnsafe<any[]>(
       `SELECT sc.*, r.nom_region,
               (SELECT COUNT(*) FROM utilisateurs u WHERE u.id_service = sc.id_service) as nb_utilisateurs,
               (SELECT COUNT(*) FROM districts d WHERE d.id_service = sc.id_service) as nb_districts
@@ -49,6 +57,7 @@ export class AdminStructureService {
        LEFT JOIN regions r ON sc.id_region = r.id_region
        ORDER BY r.nom_region, sc.nom_service`,
     );
+    return this.serializeRawRows(rows);
   }
 
   async createService(data: { nom_service: string; id_region: string }) {
@@ -89,7 +98,7 @@ export class AdminStructureService {
   // ── Districts ──
 
   async getDistricts() {
-    return this.prisma.$queryRawUnsafe<any[]>(
+    const rows = await this.prisma.$queryRawUnsafe<any[]>(
       `SELECT d.*, sc.nom_service, r.nom_region,
               (SELECT COUNT(*) FROM utilisateurs u WHERE u.id_district = d.id_district) as nb_utilisateurs,
               (SELECT COUNT(*) FROM secteurs s WHERE s.id_district = d.id_district) as nb_secteurs
@@ -98,6 +107,7 @@ export class AdminStructureService {
        LEFT JOIN regions r ON sc.id_region = r.id_region
        ORDER BY r.nom_region, sc.nom_service, d.nom_district`,
     );
+     return this.serializeRawRows(rows);
   }
 
   async createDistrict(data: { nom_district: string; id_service: string }) {
@@ -138,7 +148,7 @@ export class AdminStructureService {
   // ── Secteurs ──
 
   async getSecteurs() {
-    return this.prisma.$queryRawUnsafe<any[]>(
+    const rows = await this.prisma.$queryRawUnsafe<any[]>(
       `SELECT s.*, d.nom_district, sc.nom_service, r.nom_region,
               (SELECT COUNT(*) FROM utilisateurs u WHERE u.id_secteur = s.id_secteur) as nb_utilisateurs
        FROM secteurs s
@@ -147,6 +157,7 @@ export class AdminStructureService {
        LEFT JOIN regions r ON sc.id_region = r.id_region
        ORDER BY r.nom_region, sc.nom_service, d.nom_district, s.nom_secteur`,
     );
+     return this.serializeRawRows(rows);
   }
 
   async createSecteur(data: { nom_secteur: string; id_district: string; id_service?: string }) {
