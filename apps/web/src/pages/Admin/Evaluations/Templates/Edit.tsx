@@ -460,7 +460,7 @@ const TemplateEditPage: React.FC = () => {
               <Button
                 type="submit"
                 className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white"
-                disabled={!isFormValid() || updateMutation.isPending}
+                disabled={updateMutation.isPending}
               >
                 <Save className="h-4 w-4 mr-2" />
                 {updateMutation.isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
