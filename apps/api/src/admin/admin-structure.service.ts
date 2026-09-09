@@ -135,12 +135,6 @@ export class AdminStructureService {
     if (Number(users[0]?.count ?? 0) > 0) {
       throw new BadRequestException('Impossible de supprimer: des utilisateurs sont rattachés à ce district');
     }
-    const secteurs = await this.prisma.$queryRawUnsafe<{ count: bigint }[]>(
-      `SELECT COUNT(*) as count FROM secteurs WHERE id_district = ?`, id,
-    );
-    if (Number(secteurs[0]?.count ?? 0) > 0) {
-      throw new BadRequestException('Impossible de supprimer: des secteurs dépendent de ce district');
-    }
     await this.prisma.$executeRawUnsafe(`DELETE FROM districts WHERE id_district = ?`, id);
     return { success: true };
   }

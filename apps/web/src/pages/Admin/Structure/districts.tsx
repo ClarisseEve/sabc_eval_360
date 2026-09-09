@@ -78,7 +78,7 @@ export default function DistrictsIndex() {
   const handleDelete = async (id: string, nom: string) => {
     const ok = await confirm({
       title: `Supprimer le district ${nom} ?`,
-      description: 'Cette action est irréversible.',
+      description: 'Cette action est irréversible. Les secteurs liés seront détachés du district.',
       confirmLabel: 'Supprimer',
       variant: 'destructive',
     });
@@ -175,7 +175,7 @@ export default function DistrictsIndex() {
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={Number(district.nb_utilisateurs ?? 0) > 0 || Number(district.nb_secteurs ?? 0) > 0}
+                        disabled={Number(district.nb_utilisateurs ?? 0) > 0}
                         onClick={() => handleDelete(district.id_district, district.nom_district)}
                       >
                         Supprimer
