@@ -43,27 +43,29 @@ export default function CriteresEditor({ value, onChange, categories, errors }: 
     setCriteres(value || []);
   }, [value]);
 
-  useEffect(() => {
-    onChange(criteres);
-  }, [criteres, onChange]);
-
   const totalPonderation = criteres.reduce((sum, critere) => sum + (Number(critere.poids) || 0), 0);
 
   const addCritere = () => {
-    setCriteres((prev) => [
-      ...prev,
-      createEmptyCriterion(categories[0] || 'Compétences', prev.length + 1),
-    ]);
+    const nextCriteres = [
+      ...criteres,
+      createEmptyCriterion(categories[0] || 'Compétences', criteres.length + 1),
+    ];
+    setCriteres(nextCriteres);
+    onChange(nextCriteres);
   };
 
   const removeCritere = (index: number) => {
-    setCriteres((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+    const nextCriteres = criteres.filter((_, currentIndex) => currentIndex !== index);
+    setCriteres(nextCriteres);
+    onChange(nextCriteres);
   };
 
   const updateCritere = (index: number, patch: Partial<RuleCriterion>) => {
-    setCriteres((prev) => prev.map((critere, currentIndex) => (
+    const nextCriteres = criteres.map((critere, currentIndex) => (
       currentIndex === index ? { ...critere, ...patch } : critere
-    )));
+    ));
+    setCriteres(nextCriteres);
+    onChange(nextCriteres);
   };
 
   return (
