@@ -971,6 +971,104 @@ export class AnalyticsService {
     };
   }
 
+  async getEvaluationGaps(matricule?: string) {
+    const params = matricule ? [matricule] : [];
+    const rows = await this.pg.query<any>(
+      `SELECT
+         e.evalue_matricule AS matricule,
+         e.type_evaluation,
+         n->>'critere_id' AS critere_id,
+         ROUND(AVG((n->>'note')::numeric), 2) AS score,
+         COALESCE(MAX((critere->>'niveau_requis')::numeric), 3) AS niveau_requis,
+         COUNT(*)::int AS nb_evaluations
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       CROSS JOIN LATERAL jsonb_array_elements(e.notations_json) AS n
+       LEFT JOIN LATERAL jsonb_array_elements(
+         CASE
+           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'object'
+             THEN COALESCE(r.criteres_evaluation_json->'criteres', '[]'::jsonb)
+           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'array'
+             THEN r.criteres_evaluation_json
+           ELSE '[]'::jsonb
+         END
+       ) AS critere ON critere->>'id' = n->>'critere_id'
+       WHERE e.statut = 'valide'
+         AND e.notations_json IS NOT NULL
+         AND n->>'note' IS NOT NULL
+         AND n->>'critere_id' IS NOT NULL
+         AND ${ruleVisibilitySql('admin')}
+         ${matricule ? 'AND e.evalue_matricule = $1' : ''}
+       GROUP BY e.evalue_matricule, e.type_evaluation, n->>'critere_id'`,
+      params,
+    );
+
+    const profiles = new Map<string, any>();
+    for (const row of rows) {
+      const score = Number(row.score);
+      const required = Number(row.niveau_requis ?? 3);
+      const profile = profiles.get(row.matricule) ?? {
+        matricule: row.matricule,
+        types: {},
+        competences: new Map<string, any>(),
+      };
+      profile.types[row.type_evaluation] = profile.types[row.type_evaluation] ?? {
+        score: 0,
+        count: 0,
+        competences: 0,
+      };
+      profile.types[row.type_evaluation].score += score * Number(row.nb_evaluations ?? 1);
+      profile.types[row.type_evaluation].count += Number(row.nb_evaluations ?? 1);
+      profile.types[row.type_evaluation].competences += 1;
+
+      const competence = profile.competences.get(row.critere_id) ?? {
+        critere_id: row.critere_id,
+        niveau_requis: required,
+        par_type: {},
+      };
+      competence.niveau_requis = Math.max(competence.niveau_requis, required);
+      competence.par_type[row.type_evaluation] = {
+        score,
+        ecart_niveau: Math.round((score - required) * 100) / 100,
+        nb_evaluations: Number(row.nb_evaluations ?? 0),
+      };
+      profile.competences.set(row.critere_id, competence);
+      profiles.set(row.matricule, profile);
+    }
+
+    return {
+      seuil_divergence: 1.5,
+      profils: [...profiles.values()].map((profile) => {
+        const types = Object.fromEntries(
+          Object.entries(profile.types).map(([type, value]: [string, any]) => [
+            type,
+            { ...value, score: value.count > 0 ? Math.round((value.score / value.count) * 100) / 100 : null },
+          ]),
+        );
+        const typeScores = Object.values(types)
+          .map((value: any) => value.score)
+          .filter((value): value is number => typeof value === 'number');
+        const divergence = typeScores.length > 1 ? Math.max(...typeScores) - Math.min(...typeScores) : 0;
+        const competences = [...profile.competences.values()].map((competence: any) => ({
+          ...competence,
+          gap_types: Object.entries(competence.par_type)
+            .filter(([, value]: [string, any]) => value.ecart_niveau < 0)
+            .map(([type, value]) => ({ type, ...(value as any) })),
+        }));
+        const deficits = competences.reduce((count, competence) => count + competence.gap_types.length, 0);
+        return {
+          matricule: profile.matricule,
+          types,
+          competences,
+          divergence: Math.round(divergence * 100) / 100,
+          anomalie: divergence >= 1.5 || deficits > 0,
+          deficits,
+        };
+      }),
+      generated_at: new Date().toISOString(),
+    };
+  }
+
   // ─── Recommandations personnalisées ─────────────────────────────────────
   /**
    * `knownUser` évite un aller-retour MySQL quand l'appelant a déjà chargé

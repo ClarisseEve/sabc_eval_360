@@ -116,6 +116,13 @@ export class AnalyticsController {
     return this.service.detecterAnomalies(matricule, idRegion);
   }
 
+  @Get('admin/evaluation-gaps')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  evaluationGaps(@Query('matricule') matricule?: string) {
+    return this.service.getEvaluationGaps(matricule);
+  }
+
   @Get('anomalies/history')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')

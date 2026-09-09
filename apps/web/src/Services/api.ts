@@ -431,6 +431,8 @@ export const analyticsApi = {
     api.get<EvolutionApiResponse>(`/analytics/evolution/${matricule}`),
   anomalies: (params?: { matricule?: string; id_region?: string }) =>
     api.get('/analytics/anomalies', { params }),
+  evaluationGaps: (matricule?: string) =>
+    api.get('/analytics/admin/evaluation-gaps', { params: matricule ? { matricule } : undefined }),
   anomaliesHistory: (params?: { severite?: string; type?: string; resolue?: string; limit?: number }) =>
     api.get('/analytics/anomalies/history', { params }),
   acknowledgeAnomalie: (id: string) =>

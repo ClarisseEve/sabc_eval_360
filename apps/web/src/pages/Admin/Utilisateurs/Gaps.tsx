@@ -1,118 +1,127 @@
 import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronDown, ChevronRight, GraduationCap, ShieldAlert } from 'lucide-react';
+import { analyticsApi } from '@/Services/api';
+import { useAdminUsers } from '@/Hooks/queries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Input } from '@/Components/UI/Input';
+import { Badge } from '@/Components/UI/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/Components/UI/Pagination';
 import { PageHeader } from '@/Components/UI/Page';
 import { EmptyState } from '@/Components/UI/EmptyState';
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/Components/UI/Pagination';
-import { CheckCircle2 } from 'lucide-react';
-import { useAdminUsers } from '@/Hooks/queries';
-import { paginateList } from '@/utils/adminUi';
 import { AdminUsersLayout } from './shared';
+import { paginateList } from '@/utils/adminUi';
 
-function detectGaps(user: any) {
-  const gaps: string[] = [];
-  if (!user.manager_matricule && user.role !== 'DR' && user.role !== 'ADMIN') gaps.push('Manager absent');
-  if (!user.telephone) gaps.push('Téléphone manquant');
-  if (!user.email) gaps.push('Email manquant');
-  if (!user.id_region) gaps.push('Région absente');
-  if (!user.id_branche) gaps.push('Branche absente');
-  if (!user.est_actif) gaps.push('Compte inactif');
-  return gaps;
+const TYPE_LABELS: Record<string, string> = {
+  auto: 'Auto-évaluation',
+  pairs: 'Évaluation pair',
+  descendante: 'Évaluation manager',
+  ascendante: 'Évaluation ascendante',
+  '360': 'Évaluation 360°',
+};
+
+function formatScore(score: number | null | undefined) {
+  return score == null ? '—' : `${Number(score).toFixed(2)}/5`;
 }
 
 export default function UserGaps() {
-  const { data } = useAdminUsers({ limit: 1000 });
+  const { data: usersData } = useAdminUsers({ limit: 1000 });
+  const { data: gapData, isLoading } = useQuery({
+    queryKey: ['admin', 'evaluation-gaps'],
+    queryFn: () => analyticsApi.evaluationGaps().then((response) => response.data),
+  });
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const users = data?.data ?? (Array.isArray(data) ? data : []);
+  const [selectedMatricule, setSelectedMatricule] = useState<string | null>(null);
+  const pageSize = 15;
 
-  const rows = useMemo(() => {
-    return users
-      .map((user: any) => ({ user, gaps: detectGaps(user) }))
-      .filter(({ user, gaps }: { user: any; gaps: string[] }) => {
-        if (gaps.length === 0) return false;
-        const term = search.trim().toLowerCase();
-        if (!term) return true;
-        return [user.matricule, user.nom, user.prenom, user.role, ...gaps]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(term));
-      });
-  }, [users, search]);
+  const users: any[] = usersData?.data ?? (Array.isArray(usersData) ? usersData : []);
+  const usersByMatricule = useMemo(
+    () => new Map<string, any>(users.map((user: any) => [String(user.matricule), user])),
+    [users],
+  );
+  const profiles = Array.isArray(gapData?.profils) ? gapData.profils : [];
+  const filteredProfiles = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return profiles;
+    return profiles.filter((profile: any) => {
+      const user = usersByMatricule.get(String(profile.matricule));
+      return [profile.matricule, user?.nom, user?.prenom, user?.role]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term));
+    });
+  }, [profiles, search, usersByMatricule]);
+  const paginatedProfiles = useMemo(
+    () => paginateList(filteredProfiles, { page, pageSize }),
+    [filteredProfiles, page],
+  );
+  const anomalyCount = profiles.filter((profile: any) => profile.anomalie).length;
+  const deficitCount = profiles.reduce((total: number, profile: any) => total + Number(profile.deficits ?? 0), 0);
+  const selectedProfile = profiles.find((profile: any) => profile.matricule === selectedMatricule);
+  const selectedUser = selectedProfile ? usersByMatricule.get(String(selectedProfile.matricule)) : null;
 
-  const pageSize = 8;
-  const paginatedRows = useMemo(() => paginateList(rows, { page, pageSize }), [rows, page]);
-
-  React.useEffect(() => {
-    setPage(1);
-  }, [search]);
+  React.useEffect(() => setPage(1), [search]);
 
   return (
-    <AdminUsersLayout title="Analyse des gaps utilisateurs">
+    <AdminUsersLayout title="Gaps d’évaluation par profil">
       <PageHeader
-        title="Analyse des gaps utilisateurs"
-        description="Détection simple des incohérences de données exploitées par l’application."
-        breadcrumbs={[{ label: 'Administration' }, { label: 'Utilisateurs', to: '/admin/utilisateurs' }, { label: 'Gaps' }]}
+        title="Gaps d’évaluation par profil"
+        description="Comparez l’auto-évaluation, les pairs et le manager pour repérer les écarts de perception et les besoins de développement."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Utilisateurs', to: '/admin/utilisateurs' }, { label: 'Gaps d’évaluation' }]}
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Utilisateurs audités</div><div className="text-2xl font-bold">{users.length}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Avec gaps</div><div className="text-2xl font-bold">{rows.length}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Total gaps</div><div className="text-2xl font-bold">{rows.reduce((sum: number, row: { user: any; gaps: string[] }) => sum + row.gaps.length, 0)}</div></CardContent></Card>
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Profils analysés</div><div className="text-2xl font-bold">{profiles.length}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Profils en anomalie</div><div className="text-2xl font-bold text-sabc-error">{anomalyCount}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Déficits de compétence</div><div className="text-2xl font-bold text-sabc-warning">{deficitCount}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Seuil de divergence</div><div className="text-2xl font-bold">{gapData?.seuil_divergence ?? 1.5} pts</div></CardContent></Card>
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Résultats</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Comparaison des profils</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un utilisateur ou un gap" />
-          {rows.length === 0 ? (
-            search.trim() ? (
-              <EmptyState title="Aucun résultat" description="Aucun gap ne correspond à votre recherche." />
-            ) : (
-              <EmptyState icon={CheckCircle2} title="Aucun gap détecté" description="Toutes les données utilisateurs exploitées sont complètes." />
-            )
-          ) : (
+          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher par matricule, nom, rôle..." />
+          {isLoading ? <div className="p-8 text-center text-sabc-gray-500">Analyse des évaluations…</div> : null}
+          {!isLoading && filteredProfiles.length === 0 ? <EmptyState title="Aucun gap d’évaluation" description="Aucune évaluation valide par compétence n’est disponible pour l’administration." /> : null}
+          {!isLoading && filteredProfiles.length > 0 ? (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Matricule</TableHead>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Rôle</TableHead>
-                    <TableHead>Gaps</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedRows.items.map(({ user, gaps }: { user: any; gaps: string[] }) => (
-                    <TableRow key={user.matricule}>
-                      <TableCell>{user.matricule}</TableCell>
-                      <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
-                      <TableCell>{user.role}</TableCell>
-                      <TableCell>{gaps.join(', ')}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              {rows.length > pageSize && (
-                <Pagination className="pt-2">
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious onClick={() => setPage((current) => Math.max(1, current - 1))} aria-disabled={page === 1} className={page === 1 ? 'pointer-events-none opacity-50' : ''} />
-                    </PaginationItem>
-                    {Array.from({ length: paginatedRows.pageCount }, (_, index) => index + 1).map((pageNumber) => (
-                      <PaginationItem key={pageNumber}>
-                        <PaginationLink isActive={page === pageNumber} onClick={() => setPage(pageNumber)}>{pageNumber}</PaginationLink>
-                      </PaginationItem>
-                    ))}
-                    <PaginationItem>
-                      <PaginationNext onClick={() => setPage((current) => Math.min(paginatedRows.pageCount, current + 1))} aria-disabled={page === paginatedRows.pageCount} className={page === paginatedRows.pageCount ? 'pointer-events-none opacity-50' : ''} />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              )}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Profil</TableHead><TableHead>Rôle</TableHead><TableHead>Auto</TableHead><TableHead>Pairs</TableHead><TableHead>Manager</TableHead><TableHead>Écart max.</TableHead><TableHead>Besoin</TableHead><TableHead className="text-right">Détail</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {paginatedProfiles.items.map((profile: any) => {
+                      const user = usersByMatricule.get(String(profile.matricule));
+                      const expanded = selectedMatricule === profile.matricule;
+                      return (
+                        <React.Fragment key={profile.matricule}>
+                          <TableRow className={profile.anomalie ? 'bg-amber-50/40' : undefined}>
+                            <TableCell><div className="font-medium">{[user?.prenom, user?.nom].filter(Boolean).join(' ') || profile.matricule}</div><div className="text-xs text-sabc-gray-500">{profile.matricule}</div></TableCell>
+                            <TableCell>{user?.role ?? '—'}</TableCell>
+                            <TableCell>{formatScore(profile.types?.auto?.score)}</TableCell>
+                            <TableCell>{formatScore(profile.types?.pairs?.score)}</TableCell>
+                            <TableCell>{formatScore(profile.types?.descendante?.score)}</TableCell>
+                            <TableCell><span className={Number(profile.divergence) >= 1.5 ? 'font-semibold text-sabc-error' : 'text-sabc-gray-700'}>{Number(profile.divergence).toFixed(2)} pts</span></TableCell>
+                            <TableCell>{profile.deficits > 0 ? <Badge variant="destructive">{profile.deficits} déficit(s)</Badge> : <Badge variant="success">Concordant</Badge>}</TableCell>
+                            <TableCell className="text-right"><button type="button" className="inline-flex items-center gap-1 text-sm font-medium text-sabc-red-primary" onClick={() => setSelectedMatricule(expanded ? null : profile.matricule)}>{expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}Voir</button></TableCell>
+                          </TableRow>
+                          {expanded ? (
+                            <TableRow><TableCell colSpan={8} className="bg-sabc-gray-50/70 p-4">
+                              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-sabc-gray-800"><ShieldAlert className="h-4 w-4 text-sabc-red-primary" />Détail par compétence pour {selectedUser ? `${selectedUser.prenom} ${selectedUser.nom}` : profile.matricule}</div>
+                              <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Compétence</TableHead><TableHead>Niveau requis</TableHead><TableHead>Types en déficit</TableHead><TableHead>Action recommandée</TableHead></TableRow></TableHeader><TableBody>
+                                {profile.competences.map((competence: any) => <TableRow key={competence.critere_id}><TableCell className="font-medium">{competence.critere_id}</TableCell><TableCell>{formatScore(competence.niveau_requis)}</TableCell><TableCell>{competence.gap_types.length > 0 ? competence.gap_types.map((gap: any) => `${TYPE_LABELS[gap.type] ?? gap.type} (${formatScore(gap.score)})`).join(', ') : 'Aucun'}</TableCell><TableCell>{competence.gap_types.length > 0 ? <span className="inline-flex items-center gap-1 text-sabc-warning"><GraduationCap className="h-4 w-4" />Formation ou réévaluation ciblée</span> : 'Suivi normal'}</TableCell></TableRow>)}
+                              </TableBody></Table></div>
+                            </TableCell></TableRow>
+                          ) : null}
+                        </React.Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              {filteredProfiles.length > pageSize ? <Pagination className="pt-2"><PaginationContent><PaginationItem><PaginationPrevious onClick={() => setPage((current) => Math.max(1, current - 1))} aria-disabled={page === 1} className={page === 1 ? 'pointer-events-none opacity-50' : ''} /></PaginationItem>{Array.from({ length: paginatedProfiles.pageCount }, (_, index) => index + 1).map((pageNumber) => <PaginationItem key={pageNumber}><PaginationLink isActive={page === pageNumber} onClick={() => setPage(pageNumber)}>{pageNumber}</PaginationLink></PaginationItem>)}<PaginationItem><PaginationNext onClick={() => setPage((current) => Math.min(paginatedProfiles.pageCount, current + 1))} aria-disabled={page === paginatedProfiles.pageCount} className={page === paginatedProfiles.pageCount ? 'pointer-events-none opacity-50' : ''} /></PaginationItem></PaginationContent></Pagination> : null}
             </>
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </AdminUsersLayout>
