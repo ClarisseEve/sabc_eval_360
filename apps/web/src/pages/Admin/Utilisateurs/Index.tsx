@@ -118,7 +118,7 @@ function UsersContent() {
         [debounceTimer],
     );
 
-    const params = { page, limit: 50, ...(searchDebounced ? { search: searchDebounced } : {}) };
+    const params = { page, limit: 15, ...(searchDebounced ? { search: searchDebounced } : {}) };
     const { data: response } = useAdminUsers(params);
     const { data: roles = [], isPending: rolesPending } = useQuery({
         queryKey: ['admin', 'roles'],
@@ -130,7 +130,7 @@ function UsersContent() {
     });
 
     const users = response?.data ?? (Array.isArray(response) ? response : []);
-    const meta = response?.meta ?? { total: users.length, page: 1, limit: 50, totalPages: 1 };
+    const meta = response?.meta ?? { total: users.length, page: 1, limit: 15, totalPages: 1 };
     const hasRoles = Array.isArray(roles) && roles.length > 0;
     const hasRegions = Array.isArray(regions) && regions.length > 0;
     const referencesPending = rolesPending || regionsPending;
