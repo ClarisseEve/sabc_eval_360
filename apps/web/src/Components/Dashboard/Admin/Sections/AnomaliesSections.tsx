@@ -373,78 +373,108 @@ export function AnomaliesTableSection({
             </p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Priorité</TableHead>
-                <TableHead>Signal</TableHead>
-                <TableHead>Collaborateur</TableHead>
-                <TableHead>Indicateur</TableHead>
-                <TableHead>Action recommandée</TableHead>
-                <TableHead>Statut</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row, index) => {
-                const config = SEVERITY_CONFIG[row.severite] || SEVERITY_CONFIG.info;
-                const IconComp = config.icon;
-                const rowKey = `${row.type}-${row.matricule ?? 'global'}-${index}`;
-                const isAcknowledging = acknowledgeLoading !== null && row.id === acknowledgeLoading;
-                return (
-                  <TableRow
-                    key={rowKey}
-                    className={cn(
-                      row.resolue && 'opacity-60',
-                      !row.resolue && row.severite === 'critical' && 'bg-red-50/40',
-                      !row.resolue && row.severite === 'warning' && 'bg-amber-50/30',
-                    )}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: `${config.color}18` }}>
-                          <IconComp className="h-4 w-4" style={{ color: config.color }} />
-                        </span>
-                        <div>
-                          <Badge variant={config.badgeVariant}>{row.severite}</Badge>
-                          <div className="mt-1 text-xs text-sabc-gray-500">
-                            {row.severite === 'critical' ? 'Action < 24h' : row.severite === 'warning' ? 'Revue 48h' : 'Surveillance'}
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Priorité</TableHead>
+                  <TableHead>Signal</TableHead>
+                  <TableHead>Collaborateur</TableHead>
+                  <TableHead>Indicateur</TableHead>
+                  <TableHead>Action recommandée</TableHead>
+                  <TableHead>Statut</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedRows.items.map((row, index) => {
+                  const config = SEVERITY_CONFIG[row.severite] || SEVERITY_CONFIG.info;
+                  const IconComp = config.icon;
+                  const rowKey = `${row.type}-${row.matricule ?? 'global'}-${index}`;
+                  const isAcknowledging = acknowledgeLoading !== null && row.id === acknowledgeLoading;
+                  return (
+                    <TableRow
+                      key={rowKey}
+                      className={cn(
+                        row.resolue && 'opacity-60',
+                        !row.resolue && row.severite === 'critical' && 'bg-red-50/40',
+                        !row.resolue && row.severite === 'warning' && 'bg-amber-50/30',
+                      )}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: `${config.color}18` }}>
+                            <IconComp className="h-4 w-4" style={{ color: config.color }} />
+                          </span>
+                          <div>
+                            <Badge variant={config.badgeVariant}>{row.severite}</Badge>
+                            <div className="mt-1 text-xs text-sabc-gray-500">
+                              {row.severite === 'critical' ? 'Action < 24h' : row.severite === 'warning' ? 'Revue 48h' : 'Surveillance'}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="min-w-[220px]">
-                      <div className="font-medium text-sabc-gray-900">{formatTypeLabel(row.type)}</div>
-                      <div className="mt-1 text-xs leading-5 text-sabc-gray-500">{row.description}</div>
-                    </TableCell>
-                    <TableCell>{row.matricule || 'Analyse globale'}</TableCell>
-                    <TableCell className="font-medium text-sabc-gray-700">{buildSignalMetric(row)}</TableCell>
-                    <TableCell className="max-w-md text-sabc-gray-600">{buildActionLabel(row)}</TableCell>
-                    <TableCell>
-                      {row.resolue === true ? (
-                        <Badge variant="secondary" className="gap-1 bg-sabc-gray-100 text-sabc-gray-500">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Résolu
-                        </Badge>
-                      ) : row.id ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={isAcknowledging}
-                          onClick={() => onAcknowledge(row.id!)}
-                          className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          {isAcknowledging ? 'En cours…' : 'Marquer résolu'}
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-sabc-gray-400">—</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                      <TableCell className="min-w-[220px]">
+                        <div className="font-medium text-sabc-gray-900">{formatTypeLabel(row.type)}</div>
+                        <div className="mt-1 text-xs leading-5 text-sabc-gray-500">{row.description}</div>
+                      </TableCell>
+                      <TableCell>{row.matricule || 'Analyse globale'}</TableCell>
+                      <TableCell className="font-medium text-sabc-gray-700">{buildSignalMetric(row)}</TableCell>
+                      <TableCell className="max-w-md text-sabc-gray-600">{buildActionLabel(row)}</TableCell>
+                      <TableCell>
+                        {row.resolue === true ? (
+                          <Badge variant="secondary" className="gap-1 bg-sabc-gray-100 text-sabc-gray-500">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Résolu
+                          </Badge>
+                        ) : row.id ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isAcknowledging}
+                            onClick={() => onAcknowledge(row.id!)}
+                            className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {isAcknowledging ? 'En cours…' : 'Marquer résolu'}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-sabc-gray-400">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+
+            {rows.length > pageSize && (
+              <div className="border-t border-sabc-gray-100 px-4 py-3">
+                <Pagination className="justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => setPage((current) => Math.max(1, current - 1))}
+                        aria-disabled={page === 1}
+                        className={page === 1 ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: paginatedRows.pageCount }, (_, index) => index + 1).map((pageNumber) => (
+                      <PaginationItem key={pageNumber}>
+                        <PaginationLink isActive={page === pageNumber} onClick={() => setPage(pageNumber)}>{pageNumber}</PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => setPage((current) => Math.min(paginatedRows.pageCount, current + 1))}
+                        aria-disabled={page === paginatedRows.pageCount}
+                        className={page === paginatedRows.pageCount ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
