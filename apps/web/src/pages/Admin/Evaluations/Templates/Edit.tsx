@@ -183,7 +183,7 @@ const TemplateEditPage: React.FC = () => {
     return (
       formData.titre.trim() !== '' &&
       formData.categorie !== '' &&
-      totalCompetences >= 5 && // Règle métier: minimum 5 compétences
+      totalCompetences > 0 &&
       sections.every(section => section.titre.trim() !== '' && section.competences.length > 0) &&
       sections.every(section => 
         section.competences.every(comp => comp.libelle.trim() !== '')
@@ -225,7 +225,7 @@ const TemplateEditPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid()) {
-      warning('Veuillez remplir tous les champs obligatoires et ajouter au moins 5 compétences au total.');
+      warning('Veuillez remplir les champs obligatoires et conserver au moins une compétence dans le template.');
       return;
     }
     updateMutation.mutate();
