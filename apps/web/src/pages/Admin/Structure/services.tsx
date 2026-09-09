@@ -30,6 +30,7 @@ export default function ServicesIndex() {
   const [nomService, setNomService] = useState('');
   const [idRegion, setIdRegion] = useState('');
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const regions = Array.isArray(data?.regions) ? data.regions : [];
   const services = Array.isArray(data?.services) ? data.services : [];
@@ -43,10 +44,26 @@ export default function ServicesIndex() {
     setOpen(false);
     setNomService('');
     setIdRegion('');
+    setEditingId(null);
+  };
+
+  const openEdit = (service: any) => {
+    setEditingId(service.id_service);
+    setNomService(service.nom_service ?? '');
+    setIdRegion(service.id_region ?? '');
+    setOpen(true);
   };
 
   const createMutation = useMutation({
     mutationFn: async () => adminApi.structure.createService({ nom_service: nomService, id_region: idRegion }),
+    onSuccess: async () => {
+      closeModal();
+      await refresh();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async () => adminApi.structure.updateService(editingId!, { nom_service: nomService, id_region: idRegion }),
     onSuccess: async () => {
       closeModal();
       await refresh();
@@ -74,9 +91,10 @@ export default function ServicesIndex() {
     }
   };
 
+  const activeMutation = editingId ? updateMutation : createMutation;
   const errorMessage =
-    (createMutation.error as any)?.response?.data?.message ||
-    (createMutation.error ? 'Une erreur est survenue.' : null);
+    (activeMutation.error as any)?.response?.data?.message ||
+    (activeMutation.error ? 'Une erreur est survenue.' : null);
 
   return (
     <AdminStructureLayout title="Services commerciaux">
@@ -127,8 +145,9 @@ export default function ServicesIndex() {
             <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Service</TableHead>
-                <TableHead>Région</TableHead>
+                <TableHead>Code</TableHead>
+                <TableHead>Nom du service</TableHead>
+                <TableHead>Région de rattachement</TableHead>
                 <TableHead>Utilisateurs</TableHead>
                 <TableHead>Districts</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -138,21 +157,26 @@ export default function ServicesIndex() {
               {services.map((service: any, index: number) => (
                 <TableRow key={`${service.id_service}-${index}`}>
                   <TableCell>
-                    <div className="font-medium">{service.nom_service}</div>
-                    <div className="text-xs text-sabc-gray-500">{service.id_service}</div>
+                    {service.id_service}
                   </TableCell>
+                  <TableCell className="font-medium">{service.nom_service}</TableCell>
                   <TableCell>{service.nom_region}</TableCell>
                   <TableCell>{service.nb_utilisateurs ?? service.utilisateurs_count ?? 0}</TableCell>
                   <TableCell>{service.nb_districts ?? service.districts_count ?? 0}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={Number(service.nb_utilisateurs ?? 0) > 0 || Number(service.nb_districts ?? 0) > 0}
-                      onClick={() => handleDelete(service.id_service, service.nom_service)}
-                    >
-                      Supprimer
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openEdit(service)}>
+                        Modifier
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={Number(service.nb_utilisateurs ?? 0) > 0 || Number(service.nb_districts ?? 0) > 0}
+                        onClick={() => handleDelete(service.id_service, service.nom_service)}
+                      >
+                        Supprimer
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -166,8 +190,8 @@ export default function ServicesIndex() {
       <Dialog open={open} onOpenChange={(value) => (value ? setOpen(true) : closeModal())}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Créer un service</DialogTitle>
-            <DialogDescription>Renseigner les informations du nouveau service commercial.</DialogDescription>
+            <DialogTitle>{editingId ? 'Modifier un service' : 'Créer un service'}</DialogTitle>
+            <DialogDescription>Renseigner les informations du service commercial.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -198,9 +222,9 @@ export default function ServicesIndex() {
             <Button
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               disabled={!nomService || !idRegion || createMutation.isPending}
-              onClick={() => createMutation.mutate()}
+              onClick={() => (editingId ? updateMutation : createMutation).mutate()}
             >
-              {createMutation.isPending ? 'Création...' : 'Créer'}
+              {activeMutation.isPending ? (editingId ? 'Mise à jour...' : 'Création...') : editingId ? 'Enregistrer' : 'Créer'}
             </Button>
           </DialogFooter>
         </DialogContent>

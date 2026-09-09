@@ -31,6 +31,7 @@ export default function SecteursIndex() {
   const [idService, setIdService] = useState('');
   const [idDistrict, setIdDistrict] = useState('');
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const services = Array.isArray(data?.services) ? data.services : [];
   const districts = Array.isArray(data?.districts) ? data.districts : [];
@@ -51,11 +52,33 @@ export default function SecteursIndex() {
     setNomSecteur('');
     setIdService('');
     setIdDistrict('');
+    setEditingId(null);
+  };
+
+  const openEdit = (secteur: any) => {
+    setEditingId(secteur.id_secteur);
+    setNomSecteur(secteur.nom_secteur ?? '');
+    setIdService(secteur.id_service ?? '');
+    setIdDistrict(secteur.id_district ?? '');
+    setOpen(true);
   };
 
   const createMutation = useMutation({
     mutationFn: async () =>
       adminApi.structure.createSecteur({
+        nom_secteur: nomSecteur,
+        id_service: idService,
+        id_district: idDistrict || undefined,
+      }),
+    onSuccess: async () => {
+      closeModal();
+      await refresh();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async () =>
+      adminApi.structure.updateSecteur(editingId!, {
         nom_secteur: nomSecteur,
         id_service: idService,
         id_district: idDistrict || undefined,
@@ -87,9 +110,10 @@ export default function SecteursIndex() {
     }
   };
 
+  const activeMutation = editingId ? updateMutation : createMutation;
   const errorMessage =
-    (createMutation.error as any)?.response?.data?.message ||
-    (createMutation.error ? 'Une erreur est survenue.' : null);
+    (activeMutation.error as any)?.response?.data?.message ||
+    (activeMutation.error ? 'Une erreur est survenue.' : null);
 
   return (
     <AdminStructureLayout title="Secteurs">
@@ -140,10 +164,11 @@ export default function SecteursIndex() {
             <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Secteur</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>District</TableHead>
-                <TableHead>Région</TableHead>
+                <TableHead>Code</TableHead>
+                <TableHead>Nom du secteur</TableHead>
+                <TableHead>Service de rattachement</TableHead>
+                <TableHead>District de rattachement</TableHead>
+                <TableHead>Région de rattachement</TableHead>
                 <TableHead>Utilisateurs</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -152,22 +177,27 @@ export default function SecteursIndex() {
               {secteurs.map((secteur: any) => (
                 <TableRow key={secteur.id_secteur}>
                   <TableCell>
-                    <div className="font-medium">{secteur.nom_secteur}</div>
-                    <div className="text-xs text-sabc-gray-500">{secteur.id_secteur}</div>
+                    {secteur.id_secteur}
                   </TableCell>
+                  <TableCell className="font-medium">{secteur.nom_secteur}</TableCell>
                   <TableCell>{secteur.nom_service}</TableCell>
                   <TableCell>{secteur.nom_district || 'Direct service'}</TableCell>
                   <TableCell>{secteur.nom_region}</TableCell>
                   <TableCell>{secteur.nb_utilisateurs ?? secteur.utilisateurs_count ?? 0}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={Number(secteur.nb_utilisateurs ?? 0) > 0}
-                      onClick={() => handleDelete(secteur.id_secteur, secteur.nom_secteur)}
-                    >
-                      Supprimer
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openEdit(secteur)}>
+                        Modifier
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={Number(secteur.nb_utilisateurs ?? 0) > 0}
+                        onClick={() => handleDelete(secteur.id_secteur, secteur.nom_secteur)}
+                      >
+                        Supprimer
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -181,8 +211,8 @@ export default function SecteursIndex() {
       <Dialog open={open} onOpenChange={(value) => (value ? setOpen(true) : closeModal())}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Créer un secteur</DialogTitle>
-            <DialogDescription>Renseigner les informations du nouveau secteur.</DialogDescription>
+            <DialogTitle>{editingId ? 'Modifier un secteur' : 'Créer un secteur'}</DialogTitle>
+            <DialogDescription>Renseigner les informations du secteur.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -227,9 +257,9 @@ export default function SecteursIndex() {
             <Button
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               disabled={!nomSecteur || !idService || createMutation.isPending}
-              onClick={() => createMutation.mutate()}
+              onClick={() => (editingId ? updateMutation : createMutation).mutate()}
             >
-              {createMutation.isPending ? 'Création...' : 'Créer'}
+              {activeMutation.isPending ? (editingId ? 'Mise à jour...' : 'Création...') : editingId ? 'Enregistrer' : 'Créer'}
             </Button>
           </DialogFooter>
         </DialogContent>

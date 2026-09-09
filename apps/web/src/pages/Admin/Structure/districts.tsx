@@ -30,6 +30,7 @@ export default function DistrictsIndex() {
   const [nomDistrict, setNomDistrict] = useState('');
   const [idService, setIdService] = useState('');
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const services = Array.isArray(data?.services) ? data.services : [];
   const districts = Array.isArray(data?.districts) ? data.districts : [];
@@ -43,10 +44,26 @@ export default function DistrictsIndex() {
     setOpen(false);
     setNomDistrict('');
     setIdService('');
+    setEditingId(null);
+  };
+
+  const openEdit = (district: any) => {
+    setEditingId(district.id_district);
+    setNomDistrict(district.nom_district ?? '');
+    setIdService(district.id_service ?? '');
+    setOpen(true);
   };
 
   const createMutation = useMutation({
     mutationFn: async () => adminApi.structure.createDistrict({ nom_district: nomDistrict, id_service: idService }),
+    onSuccess: async () => {
+      closeModal();
+      await refresh();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async () => adminApi.structure.updateDistrict(editingId!, { nom_district: nomDistrict, id_service: idService }),
     onSuccess: async () => {
       closeModal();
       await refresh();
@@ -76,9 +93,10 @@ export default function DistrictsIndex() {
 
   const sortedServices = useMemo(() => services, [services]);
 
+  const activeMutation = editingId ? updateMutation : createMutation;
   const errorMessage =
-    (createMutation.error as any)?.response?.data?.message ||
-    (createMutation.error ? 'Une erreur est survenue.' : null);
+    (activeMutation.error as any)?.response?.data?.message ||
+    (activeMutation.error ? 'Une erreur est survenue.' : null);
 
   return (
     <AdminStructureLayout title="Districts">
@@ -129,9 +147,10 @@ export default function DistrictsIndex() {
             <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>District</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Région</TableHead>
+                <TableHead>Code</TableHead>
+                <TableHead>Nom du district</TableHead>
+                <TableHead>Service de rattachement</TableHead>
+                <TableHead>Région de rattachement</TableHead>
                 <TableHead>Utilisateurs</TableHead>
                 <TableHead>Secteurs</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -141,22 +160,27 @@ export default function DistrictsIndex() {
               {districts.map((district: any) => (
                 <TableRow key={district.id_district}>
                   <TableCell>
-                    <div className="font-medium">{district.nom_district}</div>
-                    <div className="text-xs text-sabc-gray-500">{district.id_district}</div>
+                    {district.id_district}
                   </TableCell>
+                  <TableCell className="font-medium">{district.nom_district}</TableCell>
                   <TableCell>{district.nom_service}</TableCell>
                   <TableCell>{district.nom_region}</TableCell>
                   <TableCell>{district.nb_utilisateurs ?? district.utilisateurs_count ?? 0}</TableCell>
                   <TableCell>{district.nb_secteurs ?? district.secteurs_count ?? 0}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={Number(district.nb_utilisateurs ?? 0) > 0 || Number(district.nb_secteurs ?? 0) > 0}
-                      onClick={() => handleDelete(district.id_district, district.nom_district)}
-                    >
-                      Supprimer
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openEdit(district)}>
+                        Modifier
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={Number(district.nb_utilisateurs ?? 0) > 0 || Number(district.nb_secteurs ?? 0) > 0}
+                        onClick={() => handleDelete(district.id_district, district.nom_district)}
+                      >
+                        Supprimer
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -170,8 +194,8 @@ export default function DistrictsIndex() {
       <Dialog open={open} onOpenChange={(value) => (value ? setOpen(true) : closeModal())}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Créer un district</DialogTitle>
-            <DialogDescription>Renseigner les informations du nouveau district.</DialogDescription>
+            <DialogTitle>{editingId ? 'Modifier un district' : 'Créer un district'}</DialogTitle>
+            <DialogDescription>Renseigner les informations du district.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -202,9 +226,9 @@ export default function DistrictsIndex() {
             <Button
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               disabled={!nomDistrict || !idService || createMutation.isPending}
-              onClick={() => createMutation.mutate()}
+              onClick={() => (editingId ? updateMutation : createMutation).mutate()}
             >
-              {createMutation.isPending ? 'Création...' : 'Créer'}
+              {activeMutation.isPending ? (editingId ? 'Mise à jour...' : 'Création...') : editingId ? 'Enregistrer' : 'Créer'}
             </Button>
           </DialogFooter>
         </DialogContent>
