@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Download, ChevronDown } from 'lucide-react';
 import { useToast } from '@/Contexts/ToastContext';
@@ -10,13 +9,17 @@ interface Props {
 }
 
 function getExportSvg(chartContainer: HTMLDivElement): SVGSVGElement | null {
-  const svg = chartContainer.querySelector('svg');
-  if (!svg) return null;
+  const sourceSvg = chartContainer.querySelector('svg');
+  if (!sourceSvg) return null;
 
-  const clone = svg.cloneNode(true) as SVGSVGElement;
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  clone.setAttribute('width', String(chartContainer.clientWidth || 800));
-  clone.setAttribute('height', String(chartContainer.clientHeight || 300));
+  const width = chartContainer.clientWidth || 1200;
+  const height = chartContainer.clientHeight || 500;
+
+  const root = sourceSvg.cloneNode(true) as SVGSVGElement;
+  root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  root.setAttribute('width', String(width));
+  root.setAttribute('height', String(height));
+  root.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
   const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
   style.textContent = `
@@ -24,10 +27,17 @@ function getExportSvg(chartContainer: HTMLDivElement): SVGSVGElement | null {
     .recharts-text { font-family: Arial, sans-serif; fill: #4b5563; }
     .recharts-legend-item text { font-size: 12px; fill: #334155; }
     .recharts-default-tooltip { font-family: Arial, sans-serif; }
+    text { font-family: Arial, sans-serif; }
   `;
-  clone.insertBefore(style, clone.firstChild);
+  root.insertBefore(style, root.firstChild);
 
-  return clone;
+  const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  background.setAttribute('width', String(width));
+  background.setAttribute('height', String(height));
+  background.setAttribute('fill', '#ffffff');
+  root.insertBefore(background, root.firstChild);
+
+  return root;
 }
 
 function triggerDownload(blob: Blob, filename: string) {
@@ -35,8 +45,43 @@ function triggerDownload(blob: Blob, filename: string) {
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function svgToCanvas(svg: SVGSVGElement, scale = 2): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const serializer = new XMLSerializer();
+    const svgUrl = URL.createObjectURL(
+      new Blob([serializer.serializeToString(svg)], { type: 'image/svg+xml;charset=utf-8' }),
+    );
+    const image = new Image();
+    image.onload = () => {
+      const width = Number(svg.getAttribute('width')) || 1200;
+      const height = Number(svg.getAttribute('height')) || 500;
+      const canvas = document.createElement('canvas');
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        URL.revokeObjectURL(svgUrl);
+        reject(new Error('Impossible de préparer le canevas PNG.'));
+        return;
+      }
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(svgUrl);
+      resolve(canvas);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(svgUrl);
+      reject(new Error('Impossible de convertir le graphe en PNG.'));
+    };
+    image.src = svgUrl;
+  });
 }
 
 export function ChartExportButton({ chartRef, filename = 'sabc-chart' }: Props) {
@@ -60,35 +105,15 @@ export function ChartExportButton({ chartRef, filename = 'sabc-chart' }: Props) 
     if (!chartRef.current) return;
     try {
       const svg = getExportSvg(chartRef.current);
-      if (svg) {
-        const serializer = new XMLSerializer();
-        const source = serializer.serializeToString(svg);
-        const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const image = new Image();
-        image.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = chartRef.current!.clientWidth * 2 || 1200;
-          canvas.height = chartRef.current!.clientHeight * 2 || 800;
-          const ctx = canvas.getContext('2d');
-          ctx?.fillStyle = '#ffffff';
-          ctx?.fillRect(0, 0, canvas.width, canvas.height);
-          ctx?.drawImage(image, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob((pngBlob) => {
-            if (pngBlob) triggerDownload(pngBlob, `${baseName}.png`);
-            setOpen(false);
-          }, 'image/png');
-          URL.revokeObjectURL(url);
-        };
-        image.src = url;
-        return;
-      }
-
-      const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff', scale: 2 });
-      canvas.toBlob((pngBlob) => {
+      if (!svg) throw new Error('Aucun SVG trouvé dans ce graphe.');
+      const canvas = await svgToCanvas(svg);
+      canvas.toBlob((pngBlob: Blob | null) => {
         if (pngBlob) triggerDownload(pngBlob, `${baseName}.png`);
         setOpen(false);
       }, 'image/png');
+    } catch (exportError) {
+      error(exportError instanceof Error ? exportError.message : 'Export PNG impossible.');
+      setOpen(false);
     } finally {
       if (!open) setOpen(false);
     }
@@ -112,49 +137,21 @@ export function ChartExportButton({ chartRef, filename = 'sabc-chart' }: Props) 
     if (!chartRef.current) return;
     try {
       const svg = getExportSvg(chartRef.current);
-      if (!svg) {
-        const canvas = await html2canvas(chartRef.current, { backgroundColor: '#ffffff', scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const pageW = pdf.internal.pageSize.getWidth();
-        const pageH = pdf.internal.pageSize.getHeight();
-        const imgW = pageW - 20;
-        const imgH = (canvas.height / canvas.width) * imgW;
-        const y = imgH < pageH - 20 ? (pageH - imgH) / 2 : 10;
-        pdf.addImage(imgData, 'PNG', 10, y, imgW, Math.min(imgH, pageH - 20));
-        pdf.save(`${baseName}.pdf`);
-        setOpen(false);
-        return;
-      }
-
-      const serializer = new XMLSerializer();
-      const svgStr = serializer.serializeToString(svg);
-      const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const image = new Image();
-      image.onload = () => {
-        const canvas = document.createElement('canvas');
-        const width = chartRef.current?.clientWidth || 1200;
-        const height = chartRef.current?.clientHeight || 600;
-        canvas.width = width * 2;
-        canvas.height = height * 2;
-        const ctx = canvas.getContext('2d');
-        ctx?.fillStyle = '#ffffff';
-        ctx?.fillRect(0, 0, canvas.width, canvas.height);
-        ctx?.drawImage(image, 0, 0, canvas.width, canvas.height);
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const pageW = pdf.internal.pageSize.getWidth();
-        const pageH = pdf.internal.pageSize.getHeight();
-        const imgW = pageW - 20;
-        const imgH = (canvas.height / canvas.width) * imgW;
-        const y = imgH < pageH - 20 ? (pageH - imgH) / 2 : 10;
-        pdf.addImage(imgData, 'PNG', 10, y, imgW, Math.min(imgH, pageH - 20));
-        pdf.save(`${baseName}.pdf`);
-        setOpen(false);
-        URL.revokeObjectURL(url);
-      };
-      image.src = url;
+      if (!svg) throw new Error('Aucun SVG trouvé dans ce graphe.');
+      const canvas = await svgToCanvas(svg);
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = pageW - 20;
+      const imgH = (canvas.height / canvas.width) * imgW;
+      const y = imgH < pageH - 20 ? (pageH - imgH) / 2 : 10;
+      pdf.addImage(imgData, 'PNG', 10, y, imgW, Math.min(imgH, pageH - 20));
+      pdf.save(`${baseName}.pdf`);
+      setOpen(false);
+    } catch (exportError) {
+      error(exportError instanceof Error ? exportError.message : 'Export PDF impossible.');
+      setOpen(false);
     } finally {
       if (!open) setOpen(false);
     }
