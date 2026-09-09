@@ -4,7 +4,7 @@ import { Button } from '@/Components/UI/Button';
 import { Input } from '@/Components/UI/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import AppLayout from '@/Components/Layout/app/AppLayout';
-import { User, Mail, Save, Info, Building2, Bell } from 'lucide-react';
+import { User, Mail, Save, Info, Building2, Bell, Camera } from 'lucide-react';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { formatPersonName } from '@/utils/helpers';
 
@@ -14,6 +14,7 @@ export default function Profile() {
   const [formData, setFormData] = useState({
     nom: user?.nom || '',
     prenom: user?.prenom || '',
+    photo_url: user?.avatar || '',
     email: user?.email || '',
     telephone: user?.telephone || '',
     date_naissance: user?.date_naissance
@@ -127,6 +128,18 @@ export default function Profile() {
             <form onSubmit={submit} className="space-y-6">
 
               {/* Nom / Prénom */}
+              <div>
+                <label htmlFor="photo_url" className="mb-2 flex items-center gap-2 text-sm font-medium text-sabc-gray-800">
+                  <Camera className="h-4 w-4" />
+                  Photo de profil
+                </label>
+                <div className="flex items-center gap-4">
+                  {formData.photo_url ? <img src={formData.photo_url} alt="Aperçu du profil" className="h-14 w-14 rounded-full object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full bg-sabc-red-primary/10 text-sabc-red-primary"><User className="h-6 w-6" /></div>}
+                  <Input id="photo_url" type="url" value={formData.photo_url} onChange={setField('photo_url')} placeholder="https://.../photo.jpg" />
+                </div>
+                <p className="mt-1 text-xs text-sabc-gray-500">Ajoutez l’URL d’une photo accessible pour l’afficher dans votre profil.</p>
+              </div>
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label htmlFor="nom" className="mb-2 block text-sm font-medium text-sabc-gray-800">

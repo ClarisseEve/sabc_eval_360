@@ -83,6 +83,7 @@ export class AuthController {
     const data: Record<string, unknown> = {};
     if (body.nom !== undefined) data.nom = body.nom;
     if (body.prenom !== undefined) data.prenom = body.prenom;
+    if (body.photo_url !== undefined) data.photo_url = body.photo_url;
     if (body.email !== undefined) {
       const existing = await this.prisma.utilisateur.findFirst({
         where: { email: body.email, matricule: { not: req.user.matricule } },

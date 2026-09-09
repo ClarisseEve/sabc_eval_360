@@ -47,6 +47,11 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
+  photo_url?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(20)
   telephone?: string;
 

@@ -26,6 +26,7 @@ import {
   useEvaluationLayoutUser,
 } from './shared';
 import { ActiveRulesCard, formatDateLabel, formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
+import { getScoreTone } from '@/utils/adminUi';
 
 const STATUS_VARIANTS: Record<string, { label: string; variant: 'primary' | 'secondary' | 'destructive'; helper: string }> = {
   brouillon: {

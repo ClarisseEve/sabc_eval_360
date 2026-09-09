@@ -504,6 +504,7 @@ export const profileApi = {
   update: (data: {
     nom?: string;
     prenom?: string;
+    photo_url?: string;
     email?: string;
     telephone?: string;
     date_naissance?: string;

@@ -103,7 +103,10 @@ export class AnalyticsController {
   @Get('axes-amelioration/:matricule')
   async axesAmelioration(@Param('matricule') matricule: string, @Request() req: any) {
     await this.assertCanViewMatricule(req, matricule);
-    return this.service.getAxesAmelioration(matricule);
+    const audience = req.user?.is_admin || String(req.user?.role ?? '').toUpperCase() === 'ADMIN'
+      ? 'admin'
+      : 'evaluated';
+    return this.service.getAxesAmelioration(matricule, audience);
   }
 
   @Get('anomalies')
@@ -248,7 +251,10 @@ export class AnalyticsController {
   @Get('recommandations/:matricule')
   async recommandations(@Param('matricule') matricule: string, @Request() req: any) {
     await this.assertCanViewMatricule(req, matricule);
-    return this.service.getRecommandations(matricule);
+    const audience = req.user?.is_admin || String(req.user?.role ?? '').toUpperCase() === 'ADMIN'
+      ? 'admin'
+      : 'evaluated';
+    return this.service.getRecommandations(matricule, audience);
   }
 
   @Get('scores')
@@ -265,7 +271,10 @@ export class AnalyticsController {
   @Get('scores/:matricule')
   async scoresUtilisateur(@Param('matricule') matricule: string, @Request() req: any) {
     await this.assertCanViewMatricule(req, matricule);
-    return this.service.getScoresUtilisateur(matricule);
+    const audience = req.user?.is_admin || String(req.user?.role ?? '').toUpperCase() === 'ADMIN'
+      ? 'admin'
+      : 'evaluated';
+    return this.service.getScoresUtilisateur(matricule, audience);
   }
 
   /** Comparaison par critère: sujet vs moyenne de sa région vs top performers. */
