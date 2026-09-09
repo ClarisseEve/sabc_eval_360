@@ -182,8 +182,7 @@ const TemplateEditPage: React.FC = () => {
   const isFormValid = () => {
     return (
       formData.titre.trim() !== '' &&
-      formData.categorie !== '' &&
-      totalCompetences > 0 &&
+      sections.length > 0 &&
       sections.every(section => section.titre.trim() !== '' && section.competences.length > 0) &&
       sections.every(section => 
         section.competences.every(comp => comp.libelle.trim() !== '')
@@ -195,7 +194,7 @@ const TemplateEditPage: React.FC = () => {
   const buildDto = () => ({
     titre: formData.titre,
     description: formData.description || undefined,
-    categorie: formData.categorie,
+    ...(formData.categorie ? { categorie: formData.categorie } : {}),
     version: formData.version,
     est_actif: formData.est_actif,
     sections: sections.map((section, sectionIndex) => ({
@@ -225,7 +224,7 @@ const TemplateEditPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid()) {
-      warning('Veuillez remplir les champs obligatoires et conserver au moins une compétence dans le template.');
+      warning('Veuillez renseigner le titre, le nom de chaque section et le libellé de chaque compétence.');
       return;
     }
     updateMutation.mutate();
@@ -261,7 +260,7 @@ const TemplateEditPage: React.FC = () => {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="titre">Titre du template</Label>
+                    <Label htmlFor="titre">Titre du template <span className="text-red-600">*</span></Label>
                     <Input
                       id="titre"
                       name="titre"
@@ -272,7 +271,7 @@ const TemplateEditPage: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="categorie">Catégorie</Label>
+                    <Label htmlFor="categorie">Catégorie <span className="text-red-600">*</span></Label>
                     <Select 
                       onValueChange={(value) => handleSelectChange('categorie', value)}
                       value={formData.categorie}
@@ -362,11 +361,12 @@ const TemplateEditPage: React.FC = () => {
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <div>
                       <CardTitle>
+                        <Label className="mb-1 block text-sm font-medium">Nom de la section <span className="text-red-600">*</span></Label>
                         <Input
                           value={section.titre}
                           onChange={(e) => updateSection(section.id, 'titre', e.target.value)}
                           className="font-bold text-lg"
-                          placeholder="Titre de la section"
+                          placeholder="Titre de la section *"
                         />
                       </CardTitle>
                       <CardDescription>
@@ -404,7 +404,7 @@ const TemplateEditPage: React.FC = () => {
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label htmlFor={`comp-${competence.id}-libelle`}>Libellé de la compétence</Label>
+                              <Label htmlFor={`comp-${competence.id}-libelle`}>Libellé de la compétence <span className="text-red-600">*</span></Label>
                               <Input
                                 id={`comp-${competence.id}-libelle`}
                                 value={competence.libelle}
