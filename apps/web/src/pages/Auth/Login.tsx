@@ -8,7 +8,7 @@ import { Label } from '@/Components/UI/Label/Label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/Components/UI/Card/Card';
 import { Eye, EyeOff } from 'lucide-react';
 
-const IS_DEV = import.meta.env.DEV;
+const SHOW_DEMO_ACCOUNTS = import.meta.env.VITE_SHOW_DEMO_ACCOUNTS !== 'false';
 
 type TestAccount = {
   label: string;
@@ -24,10 +24,9 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   const [identifier, setIdentifier] = useState('');
-  // Aucun mot de passe en dur: le pré-remplissage de confort en développement
-  // passe par VITE_DEMO_PASSWORD, défini localement et jamais committé.
+  // Le mot de passe de démonstration vient de VITE_DEMO_PASSWORD quand il est défini.
   const [password, setPassword] = useState(
-    IS_DEV ? (import.meta.env.VITE_DEMO_PASSWORD ?? '12345') : '',
+    SHOW_DEMO_ACCOUNTS ? (import.meta.env.VITE_DEMO_PASSWORD ?? '12345') : '',
   );
   const [showPassword, setShowPassword] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -116,7 +115,7 @@ const Login: React.FC = () => {
         </CardHeader>
         
         <CardContent className="p-6">
-          {IS_DEV && (
+          {SHOW_DEMO_ACCOUNTS && (
             <div className="mb-6">
               <p className="text-sm text-sabc-gray-800 mb-2 font-medium">Comptes de démonstration (dev) :</p>
               <div className="border border-sabc-gray-200 rounded-md p-2 bg-white">

@@ -9,7 +9,10 @@ import { ErrorBoundary } from '@/Components/ErrorBoundary';
 import { DashboardSkeleton } from '@/Components/Dashboard/DashboardSkeleton';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { analyticsApi, periodesApi } from '@/Services/api';
-import { Calendar } from 'lucide-react';
+import { Calendar, FileSpreadsheet, FileText } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { DataExport } from '@/Components/UI/Export/DataExport';
+import { useToast } from '@/Contexts/ToastContext';
 
 const DashboardTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/DashboardTab'));
 const RegionsTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/RegionsTab'));
@@ -40,7 +43,9 @@ function resolveTab(rawValue: string | null): AdminTabValue {
 
 export default function AdminAnalytics() {
   const { user } = useAuthContext();
+  const { error } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [exporting, setExporting] = React.useState(false);
   const activeTab = resolveTab(searchParams.get('tab'));
   const selectedPeriodeId = searchParams.get('periode') ?? '';
 
@@ -92,6 +97,26 @@ export default function AdminAnalytics() {
       }
     : undefined;
 
+  const downloadExport = async (format: string) => {
+    if (format !== 'csv' && format !== 'excel') return;
+    setExporting(true);
+    try {
+      const response = await analyticsApi.exportEvaluations(format === 'excel' ? 'xlsx' : 'csv', dateRange);
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `evaluations-consolidees.${format === 'excel' ? 'xlsx' : 'csv'}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (exportError: any) {
+      error(exportError?.message || "L'extraction des évaluations a échoué.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <AppLayout user={layoutUser} pageTitle="Analytics 360°" notifications={[]}>
       <Head title="Analytics 360° - SABC Eval360" />
@@ -104,25 +129,44 @@ export default function AdminAnalytics() {
               Exploration approfondie des performances, régions, rôles, anomalies et tendances.
             </p>
           </div>
-          {periodes.length > 0 && (
-            <div className="flex items-center gap-2 rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
-              <Calendar size={15} className="shrink-0 text-sabc-gray-400" />
-              <select
-                value={selectedPeriodeId}
-                onChange={(e) => handlePeriodeChange(e.target.value)}
-                className="border-none bg-transparent text-sm text-sabc-gray-900 outline-none"
-              >
-                <option value="">Toutes les périodes</option>
-                {periodes.map((p: any) => (
-                  <option key={p.id_periode} value={p.id_periode}>
-                    {p.nom_periode}
-                    {p.est_ouverte ? ' (active)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {periodes.length > 0 && (
+              <div className="flex items-center gap-2 rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
+                <Calendar size={15} className="shrink-0 text-sabc-gray-400" />
+                <select
+                  value={selectedPeriodeId}
+                  onChange={(e) => handlePeriodeChange(e.target.value)}
+                  className="border-none bg-transparent text-sm text-sabc-gray-900 outline-none"
+                >
+                  <option value="">Toutes les périodes</option>
+                  {periodes.map((p: any) => (
+                    <option key={p.id_periode} value={p.id_periode}>
+                      {p.nom_periode}
+                      {p.est_ouverte ? ' (active)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <DataExport onExport={(format) => { void downloadExport(format); }} isLoading={exporting} formats={[
+              { id: 'excel', label: 'Excel (.xlsx)', extension: '.xlsx', icon: <FileSpreadsheet className="h-4 w-4" />, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+              { id: 'csv', label: 'CSV (.csv)', extension: '.csv', icon: <FileText className="h-4 w-4" />, mimeType: 'text/csv' },
+            ]} />
+          </div>
         </div>
+
+        <Card className="mb-6 border-sabc-red-primary/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Extraction des données d’évaluation</CardTitle>
+            <CardDescription>
+              Une ligne par compétence et par évaluation, avec les informations de l’évalué, de l’évaluateur, le score et son niveau d’acquisition.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm text-sabc-gray-600 md:flex-row md:items-center md:justify-between">
+            <span>{selectedPeriode ? `Périmètre sélectionné : ${selectedPeriode.nom_periode}` : 'Périmètre sélectionné : toutes les périodes'}</span>
+            <span className="text-xs text-sabc-gray-500">Le fichier est généré côté serveur pour supporter les extractions volumineuses.</span>
+          </CardContent>
+        </Card>
 
         <Tabs value={activeTab} variant="card" onValueChange={handleTabChange}>
           <TabsList className="mb-4 flex w-full flex-nowrap overflow-x-auto scrollbar-hide justify-start gap-2 pb-1">

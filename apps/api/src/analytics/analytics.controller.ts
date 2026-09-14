@@ -1,4 +1,5 @@
-import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, Res, UseGuards, Request } from '@nestjs/common';
+import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AnalyticsService } from './analytics.service';
 import { BatchMatriculesDto } from './dto/batch-matricules.dto';
@@ -194,6 +195,24 @@ export class AnalyticsController {
   @Roles('ADMIN')
   adminOverview(@Query() filters: DateRangeQueryDto) {
     return this.service.getAdminOverview(filters);
+  }
+
+  @Get('admin/export-evaluations')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async exportEvaluations(
+    @Query('format') format: string,
+    @Query() filters: DateRangeQueryDto,
+    @Res() response: Response,
+  ) {
+    const exportFormat = format === 'xlsx' ? 'xlsx' : 'csv';
+    const file = await this.service.exportEvaluations(exportFormat, filters);
+    response.set({
+      'Content-Type': file.contentType,
+      'Content-Disposition': `attachment; filename="${file.filename}"`,
+      'Content-Length': String(file.buffer.length),
+    });
+    response.end(file.buffer);
   }
 
   @Get('admin/roles')

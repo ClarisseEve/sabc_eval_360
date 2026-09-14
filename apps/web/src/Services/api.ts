@@ -407,6 +407,8 @@ export const analyticsApi = {
   performances: () => api.get('/analytics/performances'),
   adminOverview: (params?: { start_date?: string; end_date?: string }) =>
     api.get('/analytics/admin/overview', { params }),
+  exportEvaluations: (format: 'csv' | 'xlsx', params?: { start_date?: string; end_date?: string }) =>
+    requestBlob('/analytics/admin/export-evaluations', { params: { format, ...params }, timeout: 120_000 }),
   adminRoles: (params?: { start_date?: string; end_date?: string }) =>
     api.get('/analytics/admin/roles', { params }),
   adminRegionsOverview: (params?: { start_date?: string; end_date?: string }) =>

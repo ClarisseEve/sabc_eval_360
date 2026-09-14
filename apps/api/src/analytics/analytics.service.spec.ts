@@ -60,6 +60,55 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('exportEvaluations', () => {
+    it('produit un CSV tabulaire avec les colonnes métier et les niveaux de compétence', async () => {
+      mockPg.query.mockResolvedValue([
+        {
+          date_evaluation: '2026-09-14',
+          evalue_nom: 'Dupont, Jean',
+          evalue_matricule: 'U001',
+          poste: 'TMO',
+          branche: 'B01',
+          region: 'Littoral',
+          evaluateur_nom: 'Admin, SABC',
+          type_evaluation: 'auto',
+          competence: 'Communication; relation client',
+          score: '4',
+        },
+        { date_evaluation: '2026-09-13', evalue_nom: 'A', evalue_matricule: 'U002', poste: 'CDS', branche: 'B01', region: 'Centre', evaluateur_nom: 'B', type_evaluation: 'pairs', competence: 'Leadership', score: '3' },
+        { date_evaluation: '2026-09-12', evalue_nom: 'C', evalue_matricule: 'U003', poste: 'DR', branche: 'B02', region: 'Nord', evaluateur_nom: 'D', type_evaluation: 'descendante', competence: 'Pilotage', score: '2' },
+      ]);
+
+      const result = await service.exportEvaluations('csv', { start_date: '2026-01-01', end_date: '2026-12-31' });
+      const csv = result.buffer.toString('utf8').replace(/^\uFEFF/, '');
+
+      expect(result.filename).toMatch(/\.csv$/);
+      expect(csv.split('\r\n')[0]).toBe(
+        "Date d'évaluation;Noms et prénoms de l'évalué;Matricule de l'évalué;Poste de l'évalué;Branche;Région de l'évalué;Nom de l'évaluateur;Type d'évaluation;Compétence;Note ou score de la compétence;Description",
+      );
+      expect(csv).toContain('Auto-évaluation');
+      expect(csv).toContain('Acquis');
+      expect(csv).toContain("En cours d'acquisition");
+      expect(csv).toContain('Non acquis');
+      expect(csv).toContain('"Communication; relation client"');
+      expect(mockPg.query).toHaveBeenCalledWith(expect.stringContaining('jsonb_array_elements'), ['2026-01-01', '2026-12-31']);
+    });
+
+    it('conserve un lot dense dans le fichier Excel', async () => {
+      mockPg.query.mockResolvedValue(Array.from({ length: 1000 }, (_, index) => ({
+        date_evaluation: '2026-09-14', evalue_nom: `Agent ${index}`, evalue_matricule: `U${index}`, poste: 'TMO',
+        branche: 'B01', region: 'Littoral', evaluateur_nom: 'Admin', type_evaluation: 'manager', competence: 'Compétence', score: '4',
+      })));
+
+      const result = await service.exportEvaluations('xlsx');
+
+      expect(result.filename).toMatch(/\.xlsx$/);
+      expect(result.contentType).toContain('spreadsheetml');
+      expect(result.buffer.subarray(0, 2).toString()).toBe('PK');
+      expect(mockPg.query).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('getRegionAnalytics', () => {
     it('should query by region', async () => {
       mockPg.query.mockResolvedValue([{ total_evaluations: '15', validees: '10', score_moyen: 3.8 }]);

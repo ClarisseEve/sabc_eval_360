@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import ExcelJS from 'exceljs';
 import { DatabasePgService } from '../database/database-pg.service';
 import { CacheService } from '../common/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -244,6 +245,129 @@ export class AnalyticsService {
        GROUP BY e.statut`,
       [startDate, endDate],
     );
+  }
+
+  async exportEvaluations(
+    format: 'csv' | 'xlsx',
+    filters: { start_date?: string; end_date?: string } = {},
+  ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
+    const rows = await this.pg.query<{
+      date_evaluation: string | Date | null;
+      evalue_nom: string;
+      evalue_matricule: string;
+      poste: string;
+      branche: string;
+      region: string;
+      evaluateur_nom: string;
+      type_evaluation: string;
+      competence: string;
+      score: number | string | null;
+    }>(
+      `SELECT
+         ${EVALUATION_EFFECTIVE_DATE_E_SQL} AS date_evaluation,
+         CONCAT_WS(' ', evalue.prenom, evalue.nom) AS evalue_nom,
+         e.evalue_matricule,
+         COALESCE(evalue.role, '') AS poste,
+         COALESCE(evalue.id_branche, '') AS branche,
+         COALESCE(evalue.region_nom, '') AS region,
+         CONCAT_WS(' ', evaluateur.prenom, evaluateur.nom) AS evaluateur_nom,
+         e.type_evaluation,
+         COALESCE(note->>'nom', note->>'critere', note->>'categorie', critere->>'nom', critere->>'libelle', note->>'critere_id', 'Compétence') AS competence,
+         NULLIF(note->>'note', '')::numeric AS score
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       LEFT JOIN utilisateurs_ref evalue ON evalue.matricule = e.evalue_matricule
+       LEFT JOIN utilisateurs_ref evaluateur ON evaluateur.matricule = e.evaluateur_matricule
+       CROSS JOIN LATERAL jsonb_array_elements(COALESCE(e.notations_json, '[]'::jsonb)) AS note
+       LEFT JOIN LATERAL jsonb_array_elements(
+         CASE
+           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'object'
+             THEN COALESCE(r.criteres_evaluation_json->'criteres', '[]'::jsonb)
+           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'array'
+             THEN r.criteres_evaluation_json
+           ELSE '[]'::jsonb
+         END
+       ) AS critere ON COALESCE(note->>'critere_id', note->>'id_critere', note->>'id') = critere->>'id'
+       WHERE ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN COALESCE($1::date, '-infinity'::date) AND COALESCE($2::date, 'infinity'::date)
+         AND ${ruleVisibilitySql('admin')}
+         AND note->>'note' IS NOT NULL
+       ORDER BY ${EVALUATION_EFFECTIVE_DATE_E_SQL} DESC, e.evalue_matricule, competence`,
+      [filters.start_date ?? null, filters.end_date ?? null],
+    );
+
+    const headers = [
+      "Date d'évaluation", "Noms et prénoms de l'évalué", "Matricule de l'évalué", "Poste de l'évalué",
+      'Branche', "Région de l'évalué", "Nom de l'évaluateur", "Type d'évaluation", 'Compétence',
+      'Note ou score de la compétence', 'Description',
+    ];
+    const data = rows.map((row) => {
+      const score = row.score == null ? null : Number(row.score);
+      return [
+        row.date_evaluation ? new Date(row.date_evaluation).toISOString().slice(0, 10) : '',
+        row.evalue_nom || row.evalue_matricule,
+        row.evalue_matricule,
+        row.poste,
+        row.branche,
+        row.region,
+        row.evaluateur_nom,
+        this.formatEvaluationTypeForExport(row.type_evaluation),
+        row.competence,
+        score == null || Number.isNaN(score) ? '' : score,
+        this.describeScore(score),
+      ];
+    });
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `evaluations-consolidees-${date}`;
+
+    if (format === 'csv') {
+      const csv = [headers, ...data]
+        .map((line) => line.map((value) => this.escapeCsvCell(value)).join(';'))
+        .join('\r\n');
+      return {
+        buffer: Buffer.from(`\uFEFF${csv}`, 'utf8'),
+        filename: `${filename}.csv`,
+        contentType: 'text/csv; charset=utf-8',
+      };
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'SABC Eval360';
+    const worksheet = workbook.addWorksheet('Evaluations');
+    worksheet.columns = headers.map((header) => ({ header, key: header, width: Math.max(18, Math.min(header.length + 4, 32)) }));
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC62828' } };
+    data.forEach((line) => worksheet.addRow(line));
+    worksheet.autoFilter = { from: 'A1', to: `K${Math.max(1, data.length + 1)}` };
+    worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    return {
+      buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
+      filename: `${filename}.xlsx`,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+  }
+
+  private escapeCsvCell(value: unknown): string {
+    const text = value == null ? '' : String(value);
+    return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  }
+
+  private describeScore(score: number | null): string {
+    if (score == null || Number.isNaN(score)) return '';
+    if (score >= 4) return 'Acquis';
+    if (score >= 3) return "En cours d'acquisition";
+    return 'Non acquis';
+  }
+
+  private formatEvaluationTypeForExport(type: string): string {
+    const labels: Record<string, string> = {
+      auto: 'Auto-évaluation',
+      pairs: 'Évaluation pair',
+      manager: 'Évaluation manager',
+      subordonnes: 'Évaluation descendante',
+      descendante: 'Évaluation descendante',
+    };
+    return labels[type] ?? type;
   }
 
   async getPerformances(filters: { start_date?: string; end_date?: string } = {}) {
