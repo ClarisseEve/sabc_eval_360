@@ -253,6 +253,7 @@ export class AnalyticsService {
   ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
     const rows = await this.pg.query<{
       date_evaluation: string | Date | null;
+      statut: string;
       evalue_nom: string;
       evalue_matricule: string;
       poste: string;
@@ -265,6 +266,7 @@ export class AnalyticsService {
     }>(
       `SELECT
          ${EVALUATION_EFFECTIVE_DATE_E_SQL} AS date_evaluation,
+         e.statut,
          CONCAT_WS(' ', evalue.prenom, evalue.nom) AS evalue_nom,
          e.evalue_matricule,
          COALESCE(evalue.role, '') AS poste,
@@ -296,7 +298,7 @@ export class AnalyticsService {
     );
 
     const headers = [
-      "Date d'évaluation", "Noms et prénoms de l'évalué", "Matricule de l'évalué", "Poste de l'évalué",
+      "Date d'évaluation", "Statut de l'évaluation", "Noms et prénoms de l'évalué", "Matricule de l'évalué", "Poste de l'évalué",
       'Branche', "Région de l'évalué", "Nom de l'évaluateur", "Type d'évaluation", 'Compétence',
       'Note ou score de la compétence', 'Description',
     ];
@@ -304,6 +306,7 @@ export class AnalyticsService {
       const score = row.score == null ? null : Number(row.score);
       return [
         row.date_evaluation ? new Date(row.date_evaluation).toISOString().slice(0, 10) : '',
+        this.formatEvaluationStatusForExport(row.statut),
         row.evalue_nom || row.evalue_matricule,
         row.evalue_matricule,
         row.poste,
@@ -337,7 +340,7 @@ export class AnalyticsService {
     worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC62828' } };
     data.forEach((line) => worksheet.addRow(line));
-    worksheet.autoFilter = { from: 'A1', to: `K${Math.max(1, data.length + 1)}` };
+    worksheet.autoFilter = { from: 'A1', to: `L${Math.max(1, data.length + 1)}` };
     worksheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     return {
@@ -368,6 +371,16 @@ export class AnalyticsService {
       descendante: 'Évaluation descendante',
     };
     return labels[type] ?? type;
+  }
+
+  private formatEvaluationStatusForExport(status: string): string {
+    const labels: Record<string, string> = {
+      valide: 'Validée',
+      rejete: 'Rejetée',
+      brouillon: 'Brouillon',
+      soumis: 'Soumise',
+    };
+    return labels[status] ?? status;
   }
 
   async getPerformances(filters: { start_date?: string; end_date?: string } = {}) {

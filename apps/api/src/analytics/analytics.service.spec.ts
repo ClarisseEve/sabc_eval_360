@@ -65,6 +65,7 @@ describe('AnalyticsService', () => {
       mockPg.query.mockResolvedValue([
         {
           date_evaluation: '2026-09-14',
+          statut: 'valide',
           evalue_nom: 'Dupont, Jean',
           evalue_matricule: 'U001',
           poste: 'TMO',
@@ -75,8 +76,8 @@ describe('AnalyticsService', () => {
           competence: 'Communication; relation client',
           score: '4',
         },
-        { date_evaluation: '2026-09-13', evalue_nom: 'A', evalue_matricule: 'U002', poste: 'CDS', branche: 'B01', region: 'Centre', evaluateur_nom: 'B', type_evaluation: 'pairs', competence: 'Leadership', score: '3' },
-        { date_evaluation: '2026-09-12', evalue_nom: 'C', evalue_matricule: 'U003', poste: 'DR', branche: 'B02', region: 'Nord', evaluateur_nom: 'D', type_evaluation: 'descendante', competence: 'Pilotage', score: '2' },
+        { date_evaluation: '2026-09-13', statut: 'soumis', evalue_nom: 'A', evalue_matricule: 'U002', poste: 'CDS', branche: 'B01', region: 'Centre', evaluateur_nom: 'B', type_evaluation: 'pairs', competence: 'Leadership', score: '3' },
+        { date_evaluation: '2026-09-12', statut: 'rejete', evalue_nom: 'C', evalue_matricule: 'U003', poste: 'DR', branche: 'B02', region: 'Nord', evaluateur_nom: 'D', type_evaluation: 'descendante', competence: 'Pilotage', score: '2' },
       ]);
 
       const result = await service.exportEvaluations('csv', { start_date: '2026-01-01', end_date: '2026-12-31' });
@@ -84,8 +85,11 @@ describe('AnalyticsService', () => {
 
       expect(result.filename).toMatch(/\.csv$/);
       expect(csv.split('\r\n')[0]).toBe(
-        "Date d'évaluation;Noms et prénoms de l'évalué;Matricule de l'évalué;Poste de l'évalué;Branche;Région de l'évalué;Nom de l'évaluateur;Type d'évaluation;Compétence;Note ou score de la compétence;Description",
+        "Date d'évaluation;Statut de l'évaluation;Noms et prénoms de l'évalué;Matricule de l'évalué;Poste de l'évalué;Branche;Région de l'évalué;Nom de l'évaluateur;Type d'évaluation;Compétence;Note ou score de la compétence;Description",
       );
+      expect(csv).toContain('Validée');
+      expect(csv).toContain('Soumise');
+      expect(csv).toContain('Rejetée');
       expect(csv).toContain('Auto-évaluation');
       expect(csv).toContain('Acquis');
       expect(csv).toContain("En cours d'acquisition");
@@ -97,6 +101,7 @@ describe('AnalyticsService', () => {
     it('conserve un lot dense dans le fichier Excel', async () => {
       mockPg.query.mockResolvedValue(Array.from({ length: 1000 }, (_, index) => ({
         date_evaluation: '2026-09-14', evalue_nom: `Agent ${index}`, evalue_matricule: `U${index}`, poste: 'TMO',
+        statut: 'brouillon',
         branche: 'B01', region: 'Littoral', evaluateur_nom: 'Admin', type_evaluation: 'manager', competence: 'Compétence', score: '4',
       })));
 
