@@ -29,11 +29,11 @@ describe('ReglesService', () => {
       expect(result.erreurs).toHaveLength(0);
     });
 
-    it('should reject fewer than 5 criteres', () => {
+    it('should accept a single critere', () => {
       const criteres = [validCritere({ ponderation: 100 })];
       const result = service.validateCriteres(criteres);
-      expect(result.valide).toBe(false);
-      expect(result.erreurs.some(e => e.includes('Minimum 5'))).toBe(true);
+      expect(result.valide).toBe(true);
+      expect(result.erreurs).toHaveLength(0);
     });
 
     it('should reject ponderation != 100', () => {
@@ -67,7 +67,7 @@ describe('ReglesService', () => {
   describe('getConstraints', () => {
     it('should return constraints', () => {
       const c = service.getConstraints();
-      expect(c.min_criteres).toBe(5);
+      expect(c.min_criteres).toBe(1);
       expect(c.total_ponderation).toBe(100);
       expect(c.echelle_min).toBe(1);
       expect(c.echelle_max).toBe(5);

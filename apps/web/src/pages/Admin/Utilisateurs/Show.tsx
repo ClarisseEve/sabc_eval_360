@@ -69,10 +69,16 @@ export default function ShowUser() {
   const subs = Array.isArray(subordinates) ? subordinates : [];
   const profileGap = Array.isArray(gapData?.profils) ? gapData.profils[0] : null;
   const typeScore = (type: string) => profileGap?.types?.[type]?.score ?? scoreData?.par_type?.find((entry: any) => entry.type === type)?.moyenne ?? null;
+  const typeEvaluatorCount = (type: string) => Number(profileGap?.types?.[type]?.nb_evaluateurs ?? scoreData?.par_type?.find((entry: any) => entry.type === type)?.nb_evaluations ?? 0);
   const axes = Array.isArray(axesData?.axes_amelioration) ? axesData.axes_amelioration : [];
   const recommendations = Array.isArray(recommendationsData?.recommandations)
     ? recommendationsData.recommandations
     : Array.isArray(recommendationsData) ? recommendationsData : [];
+  const criticalCompetences = Array.isArray(profileGap?.competences)
+    ? profileGap.competences.filter((competence: any) => Array.isArray(competence.gap_types) && competence.gap_types.length > 0)
+    : [];
+  const totalEvaluateurs = ['auto', 'pairs', 'descendante'].reduce((sum, type) => sum + typeEvaluatorCount(type), 0);
+  const maxGap = Number(profileGap?.divergence ?? 0);
 
   return (
     <AdminUsersLayout title={`Utilisateur ${matricule}`}>
@@ -102,16 +108,32 @@ export default function ShowUser() {
           {scoresLoading || gapsLoading ? (
             <div className="p-6 text-center text-sm text-sabc-gray-500">Chargement des résultats d’évaluation…</div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-4"><div className="text-xs text-sabc-gray-500">Score global</div><div className="mt-1 text-2xl font-bold">{scoreData?.score_global != null ? `${scoreData.score_global}/5` : '—'}</div></div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+              <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-4">
+                <div className="text-xs text-sabc-gray-500">Score global</div>
+                <div className="mt-1 text-2xl font-bold">{scoreData?.score_global != null ? `${Number(scoreData.score_global).toFixed(2)}/20` : '—'}</div>
+              </div>
               {[
                 ['auto', 'Auto-évaluation'],
-                ['pairs', 'Évaluation pairs'],
+                ['pairs', 'Évaluations pairs'],
                 ['descendante', 'Évaluation manager'],
               ].map(([type, label]) => (
-                <div key={type} className="rounded-lg border border-sabc-gray-200 bg-white p-4"><div className="text-xs text-sabc-gray-500">{label}</div><div className="mt-1 text-2xl font-bold">{typeScore(type) != null ? `${Number(typeScore(type)).toFixed(2)}/5` : '—'}</div><div className="mt-1 text-xs text-sabc-gray-500">{profileGap?.types?.[type]?.nb_evaluateurs ?? 0} évaluateur(s)</div></div>
+                <div key={type} className="rounded-lg border border-sabc-gray-200 bg-white p-4">
+                  <div className="text-xs text-sabc-gray-500">{label}</div>
+                  <div className="mt-1 text-2xl font-bold">{typeScore(type) != null ? `${Number(typeScore(type)).toFixed(2)}/5` : '—'}</div>
+                  <div className="mt-1 text-xs text-sabc-gray-500">{typeEvaluatorCount(type)} évaluateur(s)</div>
+                </div>
               ))}
-              <div className="rounded-lg border border-sabc-gray-200 bg-white p-4"><div className="text-xs text-sabc-gray-500">Écart maximal</div><div className={`mt-1 text-2xl font-bold ${Number(profileGap?.divergence ?? 0) >= 1.5 ? 'text-sabc-error' : 'text-sabc-success'}`}>{profileGap ? `${Number(profileGap.divergence).toFixed(2)} pts` : '—'}</div><div className="mt-1 text-xs text-sabc-gray-500">Seuil : 1,5 pt</div></div>
+              <div className="rounded-lg border border-sabc-gray-200 bg-white p-4">
+                <div className="text-xs text-sabc-gray-500">Écart maximal</div>
+                <div className={`mt-1 text-2xl font-bold ${maxGap >= 1.5 ? 'text-sabc-error' : 'text-sabc-success'}`}>{profileGap ? `${maxGap.toFixed(2)} pts` : '—'}</div>
+                <div className="mt-1 text-xs text-sabc-gray-500">Seuil : 1,5 pt</div>
+              </div>
+              <div className="rounded-lg border border-sabc-gray-200 bg-white p-4">
+                <div className="text-xs text-sabc-gray-500">Nombre d’évaluateurs</div>
+                <div className="mt-1 text-2xl font-bold">{totalEvaluateurs || '—'}</div>
+                <div className="mt-1 text-xs text-sabc-gray-500">Auto + pairs + manager</div>
+              </div>
             </div>
           )}
         </CardContent>
@@ -119,11 +141,18 @@ export default function ShowUser() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Compétences à améliorer</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Compétences sous le niveau requis</CardTitle></CardHeader>
           <CardContent>
-            {!profileGap?.competences?.length ? <p className="text-sm text-sabc-gray-500">Aucun détail de compétence disponible.</p> : (
-              <div className="space-y-3">{profileGap.competences.filter((competence: any) => competence.gap_types?.length > 0).map((competence: any) => (
-                <div key={competence.critere_id} className="rounded-lg border border-amber-200 bg-amber-50/50 p-3"><div className="flex items-center justify-between gap-3"><span className="font-medium text-sabc-gray-900">{competence.critere_id}</span><Badge variant="warning">Revoir</Badge></div><div className="mt-1 text-xs text-sabc-gray-600">Niveau requis : {Number(competence.niveau_requis).toFixed(2)}/5</div><div className="mt-2 text-xs text-sabc-gray-700">{competence.gap_types.map((gap: any) => `${gap.type} : ${Number(gap.score).toFixed(2)}/5`).join(' · ')}</div></div>
+            {criticalCompetences.length === 0 ? <p className="text-sm text-sabc-gray-500">Aucune compétence sous le niveau requis détectée.</p> : (
+              <div className="space-y-3">{criticalCompetences.map((competence: any) => (
+                <div key={competence.critere_id} className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-sabc-gray-900">{competence.critere_id}</span>
+                    <Badge variant="warning">À renforcer</Badge>
+                  </div>
+                  <div className="mt-1 text-xs text-sabc-gray-600">Niveau requis : {Number(competence.niveau_requis).toFixed(2)}/5</div>
+                  <div className="mt-2 text-xs text-sabc-gray-700">{competence.gap_types.map((gap: any) => `${gap.type} : ${Number(gap.score).toFixed(2)}/5`).join(' · ')}</div>
+                </div>
               ))}</div>
             )}
           </CardContent>
@@ -131,8 +160,17 @@ export default function ShowUser() {
         <Card>
           <CardHeader><CardTitle>Axes d’amélioration et recommandations</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            {axes.slice(0, 5).map((axis: any) => <div key={axis.critere} className="rounded-lg border border-sabc-gray-200 p-3"><div className="font-medium">{axis.critere}</div><div className="text-sm text-sabc-gray-600">Score actuel : {axis.score_actuel ?? axis.moyenne}/5 · {axis.suggestion ?? 'Formation ciblée recommandée'}</div></div>)}
-            {recommendations.slice(0, 5).map((recommendation: any, index: number) => <div key={recommendation.id ?? index} className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-3 text-sm">{recommendation.titre ?? recommendation.description ?? recommendation.suggestion ?? 'Recommandation de développement'}</div>)}
+            {axes.slice(0, 5).map((axis: any) => (
+              <div key={axis.critere ?? `${axis.score_actuel ?? axis.moyenne ?? 'axe'}-${Math.random()}`} className="rounded-lg border border-sabc-gray-200 p-3">
+                <div className="font-medium">{axis.critere}</div>
+                <div className="text-sm text-sabc-gray-600">Score actuel : {axis.score_actuel ?? axis.moyenne ?? '—'}/5 · {axis.suggestion ?? 'Formation ciblée recommandée'}</div>
+              </div>
+            ))}
+            {recommendations.slice(0, 5).map((recommendation: any, index: number) => (
+              <div key={recommendation.id ?? `${recommendation.titre ?? 'reco'}-${index}`} className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-3 text-sm">
+                {recommendation.titre ?? recommendation.description ?? recommendation.suggestion ?? 'Recommandation de développement'}
+              </div>
+            ))}
             {axes.length === 0 && recommendations.length === 0 ? <p className="text-sm text-sabc-gray-500">Aucune recommandation disponible.</p> : null}
           </CardContent>
         </Card>

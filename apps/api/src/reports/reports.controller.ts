@@ -98,23 +98,32 @@ export class ReportsController {
     });
   }
 
-  @Get(':id/export/xlsx')
-  async exportXLSX(
+  @Get(':id/export/docx')
+  async exportDOCX(
     @Param('id') id: string,
     @Request() req: any,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
-    const buffer = await this.exportService.exportXLSX(id);
+    const buffer = await this.exportService.exportDOCX(id);
     await this.exportService.logExport({
       rapport_id: id,
-      format: 'xlsx',
+      format: 'docx',
       createur_matricule: req.user.matricule,
-      fichier_nom: `rapport-${id}.xlsx`,
+      fichier_nom: `rapport-${id}.docx`,
     });
-    res.setHeader('Content-Disposition', `attachment; filename="rapport-${id}.xlsx"`);
+    res.setHeader('Content-Disposition', `attachment; filename="rapport-${id}.docx"`);
     return new StreamableFile(buffer, {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     });
+  }
+
+  @Get(':id/export/xlsx')
+  async exportLegacyXLSX(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return this.exportDOCX(id, req, res);
   }
 
   @Get(':id/exports/history')

@@ -15,6 +15,7 @@ export interface Competence {
   description: string;
   niveau_requis: number;
   ordre: number;
+  poids: number;
 }
 
 export interface Section {
@@ -43,8 +44,39 @@ const SectionsCompetencesEditor: React.FC<SectionsCompetencesEditorProps> = ({
   const [newCompetence, setNewCompetence] = useState({
     libelle: '',
     description: '',
-    niveau_requis: 3
+    niveau_requis: 3,
+    poids: 0,
   });
+
+  const updateCompetenceWeight = (sectionIndex: number, competenceIndex: number, value: number) => {
+    const nextSections = sections.map((section) => ({
+      ...section,
+      competences: section.competences.map((competence) => ({ ...competence })),
+    }));
+    const target = nextSections[sectionIndex].competences[competenceIndex];
+    const targetWeight = Math.min(99.99, Math.max(0.01, Number.isFinite(value) ? value : 0.01));
+    const others = nextSections[sectionIndex].competences.filter((_, index) => index !== competenceIndex);
+    const remaining = 100 - targetWeight;
+    const otherTotal = others.reduce((sum, competence) => sum + Math.max(0, competence.poids || 0), 0);
+    let assigned = 0;
+    nextSections[sectionIndex].competences.forEach((competence, index) => {
+      if (index === competenceIndex) {
+        competence.poids = targetWeight;
+        return;
+      }
+      const poids = Math.round((otherTotal > 0 ? remaining * (Math.max(0, competence.poids || 0) / otherTotal) : remaining / others.length) * 100) / 100;
+      competence.poids = poids;
+      assigned += poids;
+    });
+    if (others.length > 0) {
+      const correction = Math.round((remaining - assigned) * 100) / 100;
+      const lastOther = [...nextSections[sectionIndex].competences]
+        .reverse()
+        .find((_, index) => nextSections[sectionIndex].competences.length - 1 - index !== competenceIndex);
+      if (lastOther) lastOther.poids = Math.round((lastOther.poids + correction) * 100) / 100;
+    }
+    onChange(nextSections);
+  };
   
   // Ajouter une section
   const ajouterSection = () => {
@@ -91,6 +123,7 @@ const SectionsCompetencesEditor: React.FC<SectionsCompetencesEditorProps> = ({
       description: newCompetence.description,
       niveau_requis: newCompetence.niveau_requis,
       ordre: newSections[currentSection].competences.length + 1
+      , poids: newCompetence.poids
     });
     
     onChange(newSections);
@@ -98,6 +131,7 @@ const SectionsCompetencesEditor: React.FC<SectionsCompetencesEditorProps> = ({
       libelle: '',
       description: '',
       niveau_requis: 3
+      , poids: 0
     });
   };
   
@@ -285,9 +319,20 @@ const SectionsCompetencesEditor: React.FC<SectionsCompetencesEditorProps> = ({
                         </div>
                         
                         <div className="flex items-center space-x-2">
-                          <Badge className="bg-sabc-gray-800">
-                            Niveau {competence.niveau_requis}
-                          </Badge>
+                          <Badge className="bg-sabc-gray-800">Niveau {competence.niveau_requis}</Badge>
+                          <div className="flex items-center gap-1">
+                            <Label htmlFor={`poids-${sectionIndex}-${competenceIndex}`} className="text-xs">Poids (%)</Label>
+                            <Input
+                              id={`poids-${sectionIndex}-${competenceIndex}`}
+                              type="number"
+                              min="0.01"
+                              max="100"
+                              step="0.01"
+                              className="w-20"
+                              value={competence.poids ?? 0}
+                              onChange={(event) => updateCompetenceWeight(sectionIndex, competenceIndex, Number(event.target.value))}
+                            />
+                          </div>
                           
                           {sections.length > 1 && (
                             <Select
@@ -366,6 +411,17 @@ const SectionsCompetencesEditor: React.FC<SectionsCompetencesEditorProps> = ({
                             <SelectItem value="5">Niveau 5</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div>
+                        <Input
+                          type="number"
+                          min="0.01"
+                          max="100"
+                          step="0.01"
+                          value={newCompetence.poids}
+                          onChange={(e) => setNewCompetence({ ...newCompetence, poids: Number(e.target.value) })}
+                          placeholder="Poids (%)"
+                        />
                       </div>
                     </div>
                     <div className="mt-2">

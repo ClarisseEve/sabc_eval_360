@@ -26,6 +26,14 @@ export function useCreateReport() {
   });
 }
 
+export function useUpdateReport(rapportId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (updates: { titre?: string; sous_titre?: string; statut?: string }) => reportsApi.update(rapportId, updates),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['report', rapportId] }),
+  });
+}
+
 export function useAddSection(rapportId: string) {
   const qc = useQueryClient();
   return useMutation({

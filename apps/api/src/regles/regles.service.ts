@@ -21,7 +21,7 @@ const CATEGORIES_VALIDES = [
   'Résolution de problèmes',
 ];
 
-const MIN_CRITERES = 5;
+const MIN_CRITERES = 1;
 const TOTAL_PONDERATION = 100;
 const ECHELLE_MIN = 1;
 const ECHELLE_MAX = 5;

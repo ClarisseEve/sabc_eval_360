@@ -7,6 +7,11 @@ export class UpdateRapportDto {
   titre?: string;
 
   @IsOptional()
+  @IsString()
+  @Length(0, 300)
+  sous_titre?: string;
+
+  @IsOptional()
   @IsIn(['brouillon', 'finalise'])
   statut?: string;
 }

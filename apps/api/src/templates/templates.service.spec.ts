@@ -102,7 +102,7 @@ describe('TemplatesService', () => {
       const dto = {
         titre: 'Template Test',
         categorie: 'CSC',
-        sections: [{ titre: 'S1', competences: [{ libelle: 'C1' }] }],
+        sections: [{ titre: 'S1', competences: [{ libelle: 'C1', poids: 100 }] }],
       };
 
       const result = await service.createTemplate(dto as any);
@@ -121,7 +121,7 @@ describe('TemplatesService', () => {
       await service.createTemplate({
         titre: 'Active',
         categorie: 'CSC',
-        sections: [{ titre: 'S1', competences: [{ libelle: 'C1' }] }],
+        sections: [{ titre: 'S1', competences: [{ libelle: 'C1', poids: 100 }] }],
         est_actif: true,
       } as any);
 
@@ -136,7 +136,7 @@ describe('TemplatesService', () => {
       await service.createTemplate({
         titre: 'Draft',
         categorie: 'CSC',
-        sections: [{ titre: 'S1', competences: [{ libelle: 'C1' }] }],
+        sections: [{ titre: 'S1', competences: [{ libelle: 'C1', poids: 100 }] }],
         est_actif: false,
       } as any);
 
@@ -165,7 +165,7 @@ describe('TemplatesService', () => {
     });
 
     it('merges sections into existing meta_json', async () => {
-      const newSections = [{ titre: 'S2', competences: [{ libelle: 'C2' }, { libelle: 'C3' }] }];
+      const newSections = [{ titre: 'S2', competences: [{ libelle: 'C2', poids: 50 }, { libelle: 'C3', poids: 50 }] }];
 
       // updateTemplate calls getTemplateById twice for sections path:
       // once for existence check, once to get current meta_json for merge

@@ -80,18 +80,20 @@ export class AdminStructureService {
 
   async deleteService(id: string) {
     const users = await this.prisma.$queryRawUnsafe<{ count: bigint }[]>(
-      `SELECT COUNT(*) as count FROM utilisateurs WHERE id_service = ?`, id,
+      `SELECT COUNT(*) as count
+         FROM utilisateurs u
+         LEFT JOIN districts d ON u.id_district = d.id_district
+        WHERE u.id_service = ? OR d.id_service = ?`, id, id,
     );
     if (Number(users[0]?.count ?? 0) > 0) {
       throw new BadRequestException('Impossible de supprimer: des utilisateurs sont rattachés à ce service');
     }
-    const districts = await this.prisma.$queryRawUnsafe<{ count: bigint }[]>(
-      `SELECT COUNT(*) as count FROM districts WHERE id_service = ?`, id,
-    );
-    if (Number(districts[0]?.count ?? 0) > 0) {
-      throw new BadRequestException('Impossible de supprimer: des districts dépendent de ce service');
-    }
-    await this.prisma.$executeRawUnsafe(`DELETE FROM services_commerciaux WHERE id_service = ?`, id);
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRawUnsafe(`DELETE FROM secteurs WHERE id_service = ?`, id);
+      await transaction.$executeRawUnsafe(`DELETE FROM districts WHERE id_service = ?`, id);
+      await transaction.$executeRawUnsafe(`DELETE FROM services_commerciaux WHERE id_service = ?`, id);
+    });
     return { success: true };
   }
 

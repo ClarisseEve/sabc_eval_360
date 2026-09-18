@@ -9,6 +9,7 @@ jest.mock('pptxgenjs', () => {
     addSlide: jest.fn().mockReturnValue({
       addText: jest.fn(),
       addShape: jest.fn(),
+      addImage: jest.fn(),
     }),
     write: jest.fn().mockResolvedValue(Buffer.from('PPTX_MOCK_CONTENT')),
   }));
@@ -52,6 +53,46 @@ describe('ExportService', () => {
     const buffer = await service.exportXLSX('uuid-1');
     expect(Buffer.isBuffer(buffer)).toBe(true);
     expect(buffer.length).toBeGreaterThan(0);
+  });
+
+  it('exportDOCX — retourne un Buffer non-vide', async () => {
+    mockPg.queryOne.mockResolvedValue(mockRapport);
+    const buffer = await service.exportDOCX('uuid-1');
+    expect(Buffer.isBuffer(buffer)).toBe(true);
+    expect(buffer.length).toBeGreaterThan(0);
+  });
+
+  it('getChartData — métier retourne un radar avec une série par métier', async () => {
+    const prisma = {
+      utilisateur: {
+        findMany: jest.fn().mockResolvedValue([
+          { matricule: 'M001', role_nom: 'Commercial', role: 'COMM', region_nom: 'Centre', id_district: 'D1' },
+          { matricule: 'M002', role_nom: 'Manager', role: 'MGR', region_nom: 'Centre', id_district: 'D1' },
+        ]),
+      },
+    };
+    service = new ExportService(mockPg as any, prisma as any);
+    mockPg.query.mockResolvedValue([
+      { matricule: 'M001', label: 'Pilotage', value: 2.4 },
+      { matricule: 'M002', label: 'Pilotage', value: 3.1 },
+      { matricule: 'M001', label: 'Reporting', value: 2.8 },
+      { matricule: 'M002', label: 'Reporting', value: 3.2 },
+    ]);
+
+    const chart = await (service as any).getChartData('competences_faibles_metier');
+
+    expect(chart.type).toBe('radar');
+    expect(chart.data).toHaveLength(2);
+    expect(chart.data.map((series: any) => series.name)).toEqual(['Commercial (1 non acquis)', 'Manager (1 non acquis)']);
+  });
+
+  it('getChartData — classement utilise des barres horizontales', async () => {
+    mockPg.query.mockResolvedValue([{ label: 'Pilotage', value: 2.8 }]);
+
+    const chart = await (service as any).getChartData('classement_competences_metier');
+
+    expect(chart.type).toBe('bar');
+    expect(chart.chartOptions.barDir).toBe('bar');
   });
 
   it('exportXLSX — crée onglet Rapport si sections vides', async () => {

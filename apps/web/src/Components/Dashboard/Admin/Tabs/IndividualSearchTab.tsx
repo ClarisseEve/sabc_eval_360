@@ -62,7 +62,7 @@ export default function IndividualSearchTab() {
             metrics={[
               {
                 label: 'Score global',
-                value: scores?.score_global != null ? `${scores.score_global}/5` : '—',
+                value: scores?.score_global != null ? `${scores.score_global}/20` : '—',
               },
               {
                 label: 'Score pondéré',

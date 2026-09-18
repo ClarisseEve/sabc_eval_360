@@ -44,6 +44,7 @@ const TemplateCreatePage: React.FC = () => {
       libelle: string;
       description: string;
       obligatoire: boolean;
+      poids: number;
     }>;
   }>>([{
     id: '1',
@@ -54,10 +55,48 @@ const TemplateCreatePage: React.FC = () => {
         id: '1-1',
         libelle: 'Compétence 1',
         description: '',
-        obligatoire: true
+        obligatoire: true,
+        poids: 0,
       }
     ]
   }]);
+
+  const rebalanceWeights = (currentSections: typeof sections, competenceId: string, requestedWeight: number) => {
+    const competences = currentSections.flatMap((section) => section.competences);
+    const targetWeight = Math.min(99.99, Math.max(0.01, Number.isFinite(requestedWeight) ? requestedWeight : 0.01));
+    const others = competences.filter((competence) => competence.id !== competenceId);
+    if (others.length === 0) {
+      return currentSections.map((section) => ({
+        ...section,
+        competences: section.competences.map((competence) => ({ ...competence, poids: 100 })),
+      }));
+    }
+
+    const remaining = 100 - targetWeight;
+    const otherTotal = others.reduce((sum, competence) => sum + Math.max(0, Number(competence.poids) || 0), 0);
+    let assigned = 0;
+    const rebalanced = currentSections.map((section) => ({
+      ...section,
+      competences: section.competences.map((competence) => {
+        if (competence.id === competenceId) return { ...competence, poids: targetWeight };
+        const rawWeight = otherTotal > 0
+          ? remaining * (Math.max(0, Number(competence.poids) || 0) / otherTotal)
+          : remaining / others.length;
+        const poids = Math.round(rawWeight * 100) / 100;
+        assigned += poids;
+        return { ...competence, poids };
+      }),
+    }));
+    const correction = Math.round((remaining - assigned) * 100) / 100;
+    if (correction === 0) return rebalanced;
+    const lastOtherId = others[others.length - 1].id;
+    return rebalanced.map((section) => ({
+      ...section,
+      competences: section.competences.map((competence) => competence.id === lastOtherId
+        ? { ...competence, poids: Math.round((competence.poids + correction) * 100) / 100 }
+        : competence),
+    }));
+  };
   
   // Gérer les changements dans le formulaire principal
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -86,7 +125,8 @@ const TemplateCreatePage: React.FC = () => {
         id: `${newId}-1`,
         libelle: 'Nouvelle compétence',
         description: '',
-        obligatoire: true
+          obligatoire: true,
+          poids: 0,
       }]
     }]);
   };
@@ -117,7 +157,8 @@ const TemplateCreatePage: React.FC = () => {
             id: newCompId,
             libelle: 'Nouvelle compétence',
             description: '',
-            obligatoire: true
+            obligatoire: true,
+            poids: 0,
           }]
         };
       }
@@ -140,6 +181,10 @@ const TemplateCreatePage: React.FC = () => {
   
   // Mettre à jour une compétence
   const updateCompetence = (sectionId: string, competenceId: string, field: string, value: any) => {
+    if (field === 'poids') {
+      setSections((prev) => rebalanceWeights(prev, competenceId, Number(value)));
+      return;
+    }
     setSections(prev => prev.map(section => {
       if (section.id === sectionId) {
         return {
@@ -158,6 +203,10 @@ const TemplateCreatePage: React.FC = () => {
   
   // Calculer le nombre total de compétences
   const totalCompetences = sections.reduce((total, section) => total + section.competences.length, 0);
+  const totalPoids = sections.reduce(
+    (total, section) => total + section.competences.reduce((sum, competence) => sum + Number(competence.poids || 0), 0),
+    0,
+  );
   
   // Vérifier si le formulaire est valide
   const isFormValid = () => {
@@ -168,7 +217,9 @@ const TemplateCreatePage: React.FC = () => {
       sections.every(section => section.titre.trim() !== '' && section.competences.length > 0) &&
       sections.every(section => 
         section.competences.every(comp => comp.libelle.trim() !== '')
-      )
+      ) &&
+      sections.every(section => section.competences.every(comp => Number(comp.poids) > 0)) &&
+      Math.abs(totalPoids - 100) <= 0.01
     );
   };
   
@@ -187,6 +238,7 @@ const TemplateCreatePage: React.FC = () => {
         libelle: competence.libelle,
         description: competence.description || undefined,
         ordre: compIndex + 1,
+        poids: Number(competence.poids),
       })),
     })),
   });
@@ -302,6 +354,9 @@ const TemplateCreatePage: React.FC = () => {
                   <span className={`text-sm ${totalCompetences < 5 ? 'text-sabc-error' : 'text-sabc-success'}`}>
                     {totalCompetences} compétence{totalCompetences > 1 ? 's' : ''} au total
                   </span>
+                  <span className={`text-sm ${Math.abs(totalPoids - 100) <= 0.01 ? 'text-sabc-success' : 'text-sabc-error'}`}>
+                    Poids : {totalPoids.toFixed(2)} % / 100 %
+                  </span>
                   <Button 
                     type="button" 
                     onClick={addSection}
@@ -318,6 +373,11 @@ const TemplateCreatePage: React.FC = () => {
                   <p className="text-sm text-sabc-gray-800">
                     <span className="font-medium">Attention:</span> Selon les règles métier SABC, un template doit contenir au minimum 5 compétences.
                   </p>
+                </div>
+              )}
+              {Math.abs(totalPoids - 100) > 0.01 && (
+                <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-md">
+                  <p className="text-sm text-sabc-gray-800">La somme des poids doit être exactement égale à 100 %.</p>
                 </div>
               )}
               
@@ -386,6 +446,20 @@ const TemplateCreatePage: React.FC = () => {
                                 }
                               />
                               <Label htmlFor={`comp-${competence.id}-obligatoire`}>Compétence obligatoire</Label>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`comp-${competence.id}-poids`}>Importance de la compétence (%)</Label>
+                              <Input
+                                id={`comp-${competence.id}-poids`}
+                                type="number"
+                                min="0.01"
+                                max="100"
+                                step="0.01"
+                                value={competence.poids}
+                                onChange={(e) => updateCompetence(section.id, competence.id, 'poids', Number(e.target.value))}
+                                required
+                              />
+                              <p className="text-xs text-sabc-gray-500">Les autres poids s’ajustent automatiquement pour totaliser 100 %.</p>
                             </div>
                             <div className="space-y-2 md:col-span-2">
                               <Label htmlFor={`comp-${competence.id}-description`}>Description</Label>

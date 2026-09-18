@@ -537,6 +537,9 @@ export class EvaluationsService {
     await this.syncUserRefs([validateur]);
 
     const commentaire = commentaireValidation?.trim() || null;
+    if (estValidee && !commentaire) {
+      throw new BadRequestException('Un commentaire général est obligatoire pour valider une évaluation.');
+    }
     const nouveauStatut = estValidee ? 'valide' : 'rejete';
 
     await this.pg.execute(
@@ -1037,7 +1040,7 @@ export class EvaluationsService {
         poids += p;
       }
     }
-    return poids > 0 ? Math.round((somme / poids) * 100) / 100 : null;
+    return poids > 0 ? Math.round((somme / poids) * 4 * 100) / 100 : null;
   }
 
   private async enrichEvaluations(evaluations: Evaluation[]): Promise<EnrichedEvaluation[]> {

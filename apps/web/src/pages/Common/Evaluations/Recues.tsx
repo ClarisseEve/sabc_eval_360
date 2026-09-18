@@ -296,7 +296,7 @@ const EvaluationsRecues: React.FC = () => {
                   <div className="flex items-center gap-3">
                     {evaluation.statut === 'valide' && evaluation.note_globale != null && (
                       <Badge variant="info">
-                        {Number(evaluation.note_globale).toFixed(1)} / 5
+                        {Number(evaluation.note_globale).toFixed(1)} / 20
                       </Badge>
                     )}
                     <Link href={`/evaluations/${evaluation.id_evaluation}`}>

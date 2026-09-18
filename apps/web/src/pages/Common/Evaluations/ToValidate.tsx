@@ -174,7 +174,7 @@ export default function ToValidate() {
                           if (note == null || !Number.isFinite(note)) return null;
                           return (
                             <div className={`text-lg font-bold ${noteColor(note)}`}>
-                              {note.toFixed(1)}<span className="text-xs font-normal text-gray-400">/5</span>
+                              {note.toFixed(1)}<span className="text-xs font-normal text-gray-400">/20</span>
                             </div>
                           );
                         })()}

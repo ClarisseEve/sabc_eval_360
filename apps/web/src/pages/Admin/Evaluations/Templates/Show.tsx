@@ -144,6 +144,7 @@ export default function TemplateShowPage() {
                     {(section.competences ?? []).map((competence: any, compIndex: number) => (
                       <li key={compIndex} className="rounded-md bg-sabc-gray-50 px-3 py-2">
                         <span className="text-sm font-medium text-sabc-gray-800">{competence.libelle}</span>
+                        <span className="ml-2 text-xs text-sabc-gray-500">Poids : {competence.poids ?? '—'} %</span>
                         {competence.description ? (
                           <span className="block text-xs text-sabc-gray-500">{competence.description}</span>
                         ) : null}

@@ -178,11 +178,11 @@ export function createEmptyRuleBuilderInput(): RuleBuilderInput {
     role_evalue: '',
     type_evaluation: '',
     est_active: true,
-    criteres: Array.from({ length: 5 }, (_, index) => ({
+    criteres: Array.from({ length: 3 }, (_, index) => ({
       id: `critere-${index + 1}`,
       libelle: '',
       description: '',
-      poids: index === 4 ? 20 : 20,
+      poids: [34, 33, 33][index],
       section_label: DEFAULT_SECTION_LABEL,
       section_order: 1,
       niveau_requis: 3,

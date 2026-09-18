@@ -358,7 +358,7 @@ const Header: React.FC<HeaderProps> = ({
                   Mon profil
                 </Link>
                 <Link
-                  href="/settings/password"
+                  href="/settings"
                   role="menuitem"
                   onClick={() => setShowUserMenu(false)}
                   className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-sabc-gray-700 transition-colors hover:bg-sabc-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 dark:text-sabc-gray-200 dark:hover:bg-sabc-gray-800"

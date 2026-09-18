@@ -27,6 +27,7 @@ export interface RapportSection {
 export interface RapportRow {
   id_rapport: string;
   titre: string;
+  sous_titre?: string | null;
   createur_matricule: string;
   sections_json: RapportSection[];
   statut: string;

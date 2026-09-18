@@ -131,7 +131,7 @@ export default function RoleIndividualDashboardPage({
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{evaluation.statut}</Badge>
                     {evaluation.note_globale != null ? (
-                      <Badge variant="info">{evaluation.note_globale}/5</Badge>
+                      <Badge variant="info">{evaluation.note_globale}/20</Badge>
                     ) : null}
                     <Button variant="outline" size="sm" onClick={() => navigateTo(`/common/evaluations/${evaluation.id_evaluation}`)}>
                       Consulter

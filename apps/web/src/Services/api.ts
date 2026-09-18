@@ -482,7 +482,7 @@ export const reportsApi = {
     api.post('/reports', { titre }),
   get: (id: string) =>
     api.get(`/reports/${id}`),
-  update: (id: string, data: { titre?: string; statut?: string }) =>
+  update: (id: string, data: { titre?: string; sous_titre?: string; statut?: string }) =>
     api.patch(`/reports/${id}`, data),
   delete: (id: string) =>
     api.delete(`/reports/${id}`),
@@ -496,8 +496,8 @@ export const reportsApi = {
     api.patch(`/reports/${id}/reorder`, { orderedIds }),
   exportPPTX: (id: string) =>
     requestBlob(`/reports/${id}/export/pptx`),
-  exportXLSX: (id: string) =>
-    requestBlob(`/reports/${id}/export/xlsx`),
+  exportDOCX: (id: string) =>
+    requestBlob(`/reports/${id}/export/docx`),
   exportHistory: (id: string) =>
     api.get(`/reports/${id}/exports/history`),
 };

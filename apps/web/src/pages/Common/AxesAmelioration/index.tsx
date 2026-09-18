@@ -991,7 +991,7 @@ function AdminAxesPage() {
               },
               {
                 label: 'Score global',
-                value: scoresQuery.data?.score_global != null ? `${scoresQuery.data.score_global}/5` : '—',
+                value: scoresQuery.data?.score_global != null ? `${scoresQuery.data.score_global}/20` : '—',
               },
               {
                 label: 'Progression',

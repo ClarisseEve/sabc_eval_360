@@ -313,6 +313,7 @@ export class ValidationNotationService {
     if (totalWeight === 0) {
       return null;
     }
-    return Math.round((weightedSum / totalWeight) * 100) / 100;
+    // Notes are entered on 5, while the business score is reported on 20.
+    return Math.round((weightedSum / totalWeight) * 4 * 100) / 100;
   }
 }

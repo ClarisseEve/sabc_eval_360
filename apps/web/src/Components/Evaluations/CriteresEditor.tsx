@@ -84,8 +84,8 @@ export default function CriteresEditor({ value, onChange, categories, errors }: 
               style={{ width: `${Math.min(totalPonderation, 100)}%` }}
             />
           </div>
-          {criteres.length < 5 ? (
-            <p className="text-sm text-sabc-error">Minimum 5 critères requis (actuellement: {criteres.length})</p>
+          {criteres.length < 1 ? (
+            <p className="text-sm text-sabc-error">Ajoutez au moins un critère pour pouvoir enregistrer la règle.</p>
           ) : null}
         </CardContent>
       </Card>
@@ -99,7 +99,7 @@ export default function CriteresEditor({ value, onChange, categories, errors }: 
               onClick={() => removeCritere(index)}
               variant="destructive"
               size="sm"
-              disabled={criteres.length <= 5}
+              disabled={criteres.length <= 1}
             >
               <Trash2 size={16} />
             </Button>

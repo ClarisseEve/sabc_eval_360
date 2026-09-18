@@ -171,7 +171,7 @@ export default function ServicesIndex() {
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={Number(service.nb_utilisateurs ?? 0) > 0 || Number(service.nb_districts ?? 0) > 0}
+                        disabled={Number(service.nb_utilisateurs ?? 0) > 0}
                         onClick={() => handleDelete(service.id_service, service.nom_service)}
                       >
                         Supprimer

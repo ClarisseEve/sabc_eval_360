@@ -122,6 +122,7 @@ const TeamEvaluations = lazy(() => import('./pages/Common/Team/Evaluations'));
 const AxesAmeliorationPage = lazy(() => import('./pages/Common/AxesAmelioration/index'));
 
 // Settings
+const SettingsIndex = lazy(() => import('./pages/Settings'));
 const SettingsProfile = lazy(() => import('./pages/Settings/profile'));
 const SettingsPassword = lazy(() => import('./pages/Settings/password'));
 const SettingsAppearance = lazy(() => import('./pages/Settings/appearance'));
@@ -314,6 +315,7 @@ function App() {
                       <Route path="/common/settings" element={<G><CommonSettings /></G>} />
 
                       {/* ── Settings ── */}
+                      <Route path="/settings" element={<G><SettingsIndex /></G>} />
                       <Route path="/settings/profile" element={<G><SettingsProfile /></G>} />
                       <Route path="/settings/password" element={<G><SettingsPassword /></G>} />
                       <Route path="/settings/appearance" element={<G><SettingsAppearance /></G>} />

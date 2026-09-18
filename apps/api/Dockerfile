@@ -7,7 +7,7 @@ RUN npm install -g pnpm@10.14.0
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
-RUN pnpm exec prisma generate --binary-targets=debian-openssl-3.0.x && pnpm run build
+RUN pnpm exec prisma generate && pnpm run build
 
 FROM node:20-bookworm-slim
 WORKDIR /app

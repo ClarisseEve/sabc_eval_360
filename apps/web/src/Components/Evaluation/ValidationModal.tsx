@@ -84,6 +84,10 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
       setError('Le motif de rejet doit contenir au moins 20 caractères.');
       return;
     }
+    if (action === 'valide' && commentaire.trim().length === 0) {
+      setError('Un commentaire général est obligatoire pour valider une évaluation.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -145,7 +149,7 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <span className="text-sm font-medium text-gray-700">Note globale</span>
               <span className={`text-2xl font-bold px-3 py-1 rounded-lg ${overallScoreColor(overallScore)}`}>
-                {overallScore.toFixed(2)}<span className="text-sm font-normal">/5</span>
+                {overallScore.toFixed(2)}<span className="text-sm font-normal">/20</span>
               </span>
             </div>
           )}
@@ -236,7 +240,7 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
           <div>
             <label htmlFor="validation-comment" className="text-sm font-medium text-gray-700">
               Commentaire
-              {action === 'rejete' && <span className="text-red-500 ml-1">*</span>}
+              <span className="text-red-500 ml-1">*</span>
             </label>
             <textarea
               id="validation-comment"
@@ -249,7 +253,7 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
               placeholder={
                 action === 'rejete'
                   ? 'Expliquez la raison du renvoi (20 caractères minimum)...'
-                  : 'Commentaire facultatif...'
+                  : 'Expliquez votre décision de validation...'
               }
               value={commentaire}
               onChange={(e) => setCommentaire(e.target.value)}

@@ -13,6 +13,17 @@ export class TemplatesService {
     private prisma: PrismaService,
   ) {}
 
+  private validateWeights(sections: Array<{ competences?: Array<{ poids?: number }> }>) {
+    const weights = sections.flatMap((section) => section.competences ?? []).map((competence) => Number(competence.poids));
+    if (weights.length === 0 || weights.some((weight) => !Number.isFinite(weight) || weight <= 0)) {
+      throw new BadRequestException('Chaque compétence doit avoir un poids supérieur à 0.');
+    }
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    if (Math.abs(total - 100) > 0.01) {
+      throw new BadRequestException(`La somme des poids doit être égale à 100 %. Total actuel : ${total} %.`);
+    }
+  }
+
   private normalizeTemplate(row: any) {
     const payload = row?.meta_json
       ? typeof row.meta_json === 'string'
@@ -64,6 +75,7 @@ export class TemplatesService {
   }
 
   async createTemplate(dto: CreateTemplateDto) {
+    this.validateWeights(dto.sections);
     const id = randomUUID();
     const metaJson = JSON.stringify({
       categorie: dto.categorie,
@@ -106,6 +118,7 @@ export class TemplatesService {
       params.push(Number(dto.version) || 1);
     }
     if (dto.sections !== undefined) {
+      this.validateWeights(dto.sections);
       const current = await this.getTemplateById(id);
       sets.push(`meta_json = $${index++}::json`);
       params.push(

@@ -351,8 +351,8 @@ export function validateRuleEnvelope(envelope: RuleEnvelope): string[] {
   const errors: string[] = [];
   const totalWeight = envelope.criteres.reduce((sum, criterion) => sum + criterion.poids, 0);
 
-  if (envelope.criteres.length < 5) {
-    errors.push(`Minimum 5 critères requis (actuellement: ${envelope.criteres.length})`);
+  if (envelope.criteres.length < 1) {
+    errors.push(`Minimum 1 critère requis (actuellement: ${envelope.criteres.length})`);
   }
 
   if (totalWeight !== 100) {

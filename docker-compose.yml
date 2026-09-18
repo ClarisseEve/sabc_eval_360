@@ -46,6 +46,8 @@ services:
       ALLOW_DEMO_SEED: ${ALLOW_DEMO_SEED:-true}
     ports:
       - "${API_PORT:-3000}:3000"
+    volumes:
+      - ./apps/web/public/images/logos/sabc-logo.png:/app/assets/sabc-logo.png:ro
     depends_on:
       mysql:
         condition: service_healthy

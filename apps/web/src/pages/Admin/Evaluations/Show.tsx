@@ -152,7 +152,7 @@ export default function AdminEvaluationShowPage() {
               <div className="rounded-xl bg-sabc-red-light/60 p-4 text-center">
                 <div className="text-xs uppercase tracking-wide text-sabc-red-primary/80">Note globale</div>
                 <div className="mt-2 text-4xl font-bold text-sabc-red-primary">
-                  {overallScore != null ? overallScore.toFixed(2) : '—'}
+                  {overallScore != null ? overallScore.toFixed(2) : '—'}<span className="text-base font-normal">/20</span>
                 </div>
               </div>
 

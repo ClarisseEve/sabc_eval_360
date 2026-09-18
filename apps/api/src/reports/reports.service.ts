@@ -46,11 +46,12 @@ export class ReportsService {
     return { ...row, sections_json: row.sections_json ?? [] };
   }
 
-  async updateRapport(idRapport: string, updates: { titre?: string; statut?: string }): Promise<RapportRow> {
+  async updateRapport(idRapport: string, updates: { titre?: string; sous_titre?: string; statut?: string }): Promise<RapportRow> {
     const fields: string[] = ['updated_at = NOW()'];
     const params: unknown[] = [];
     let idx = 1;
     if (updates.titre !== undefined)  { fields.push(`titre = $${idx++}`);  params.push(updates.titre); }
+    if (updates.sous_titre !== undefined) { fields.push(`sous_titre = $${idx++}`); params.push(updates.sous_titre); }
     if (updates.statut !== undefined) { fields.push(`statut = $${idx++}`); params.push(updates.statut); }
     params.push(idRapport);
     const row = await this.pg.queryOne<RapportRow>(

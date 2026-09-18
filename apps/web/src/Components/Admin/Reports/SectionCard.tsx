@@ -1,14 +1,14 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { BarChart3, GripVertical, PieChart, Plus, Trash2, TrendingUp, X } from 'lucide-react';
+import { BarChart3, GripVertical, PieChart, Plus, Radar, Trash2, TrendingUp, X } from 'lucide-react';
 
 const SECTION_LABELS: Record<string, string> = {
-  executive_summary: 'Executive Summary',
-  kpis: 'KPIs Globaux',
-  tendances: 'Tendances Performance',
-  recommandations: 'Recommandations',
-  texte_libre: 'Texte Libre',
+  executive_summary: 'Synthèse exécutive',
+  kpis: 'KPIs globaux',
+  tendances: 'Tendances performance',
+  recommandations: 'Recommandations & actions',
+  texte_libre: 'Texte libre',
 };
 
 interface Section {
@@ -43,10 +43,15 @@ export function SectionCard({ section, onUpdate, onDelete }: Props) {
   };
   const charts = section.contenu?.graphes ?? [];
   const chartOptions = [
-    { source: 'kpis', type: 'bar', titre: 'Indicateurs clés', icon: BarChart3 },
-    { source: 'types_evaluation', type: 'pie', titre: 'Répartition des évaluations', icon: PieChart },
-    { source: 'evolution_performance', type: 'line', titre: 'Évolution du score moyen', icon: TrendingUp },
-    { source: 'matrice_competences', type: 'bar', titre: 'Matrice des compétences', icon: BarChart3 },
+    { source: 'competences_faibles_metier', type: 'radar', titre: 'Compétences faibles par métier', description: 'Radar : compétences faibles et niveau moyen par métier', icon: Radar },
+    { source: 'competences_faibles_region', type: 'bar', titre: 'Compétences faibles par région', description: 'Progression par périmètre géographique', icon: BarChart3 },
+    { source: 'competences_faibles_district', type: 'bar', titre: 'Compétences faibles par district', description: 'Écarts localisés par district', icon: BarChart3 },
+    { source: 'classement_competences_metier', type: 'bar', titre: 'Classement compétences / métier', description: 'Les plus acquises vers les moins acquises', icon: TrendingUp },
+    { source: 'top_performers', type: 'bar', titre: 'Top 10 meilleurs performers', description: 'Meilleurs scores globaux par métier, region et branche', icon: BarChart3 },
+    { source: 'alertes_faiblesses', type: 'pie', titre: 'Alerte compétences faiblement acquises', description: 'Proportion de collaborateurs concernés', icon: PieChart },
+    { source: 'types_evaluation', type: 'pie', titre: 'Répartition des évaluations', description: 'Validées, rejetées, soumises et brouillons', icon: PieChart },
+    { source: 'evolution_performance', type: 'line', titre: 'Évolution du score moyen', description: 'Tendance de la performance sur le temps', icon: TrendingUp },
+    { source: 'matrice_competences', type: 'bar', titre: 'Matrice des compétences', description: 'Axes, moyennes et niveaux d’alertes', icon: BarChart3 },
   ];
   const addChart = (option: typeof chartOptions[number]) => {
     const graphes = [...charts, { id: `${option.source}-${Date.now()}`, type: option.type, titre: option.titre, donnees_source: option.source }];
@@ -117,7 +122,7 @@ export function SectionCard({ section, onUpdate, onDelete }: Props) {
             ))}
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
+        <div className="space-y-2">
           {chartOptions.filter((option) => !charts.some((chart) => chart.donnees_source === option.source)).map((option) => {
             const Icon = option.icon;
             return (
@@ -125,11 +130,18 @@ export function SectionCard({ section, onUpdate, onDelete }: Props) {
                 key={option.source}
                 type="button"
                 onClick={() => addChart(option)}
-                className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:border-sabc-red-primary hover:text-sabc-red-primary"
+                className="flex w-full items-start gap-2 rounded-lg border border-gray-200 bg-sabc-gray-50 px-2.5 py-2 text-left text-xs text-gray-600 transition hover:border-sabc-red-primary hover:bg-red-50 hover:text-sabc-red-primary"
               >
-                <Plus size={13} aria-hidden="true" />
-                <Icon size={13} aria-hidden="true" />
-                {option.titre}
+                <span className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-md bg-white text-sabc-red-primary">
+                  <Plus size={13} aria-hidden="true" />
+                </span>
+                <span className="flex-1">
+                  <span className="flex items-center gap-1 font-semibold text-sabc-gray-800">
+                    <Icon size={13} aria-hidden="true" />
+                    {option.titre}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-gray-500">{option.description}</span>
+                </span>
               </button>
             );
           })}

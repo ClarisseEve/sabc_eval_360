@@ -6,22 +6,21 @@ import { PageHeader } from '@/Components/UI/Page/PageHeader';
 import { Skeleton } from '@/Components/UI/Skeleton';
 import { Input } from '@/Components/UI/Input/Input';
 import { useToast } from '@/Contexts/ToastContext';
-import { useAddSection, useRemoveSection, useReorderSections, useReport, useUpdateSection } from '@/Hooks/queries/useReports';
+import { useAddSection, useRemoveSection, useReorderSections, useReport, useUpdateReport, useUpdateSection } from '@/Hooks/queries/useReports';
 import { reportsApi } from '@/Services/api';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Eye, FileText, PieChart, Plus, Table2, TrendingUp } from 'lucide-react';
+import { ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Eye, FileText, PieChart, Plus, Radar, Table2, TrendingUp } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AdminReportsLayout } from './shared';
 
 const SECTION_TYPES = [
-    { value: 'executive_summary', label: 'Executive Summary' },
-    { value: 'kpis', label: 'KPIs Globaux' },
-    { value: 'tendances', label: 'Tendances Performance' },
-    { value: 'recommandations', label: 'Recommandations' },
-    { value: 'texte_libre', label: 'Texte Libre' },
+    { value: 'executive_summary', label: 'Synthèse exécutive', description: 'Vue d’ensemble, priorités et signal faibles.' },
+    { value: 'kpis', label: 'KPIs globaux', description: 'Score moyen, couverture, validité et volume des évaluations.' },
+    { value: 'texte_libre', label: 'Texte libre', description: 'Commentaire spécifique pour la slide de synthèse.' },
+    { value: 'recommandations', label: 'Recommandations & actions', description: 'Actions prioritaires et plans de développement identifiés.' },
 ];
 
 const CHART_LABELS: Record<string, { label: string; icon: typeof BarChart3 }> = {
@@ -29,6 +28,13 @@ const CHART_LABELS: Record<string, { label: string; icon: typeof BarChart3 }> = 
     types_evaluation: { label: 'Répartition des évaluations', icon: PieChart },
     evolution_performance: { label: 'Évolution du score moyen', icon: TrendingUp },
     matrice_competences: { label: 'Matrice des compétences', icon: BarChart3 },
+    competences_faibles_metier: { label: 'Compétences faibles par métier', icon: BarChart3 },
+    competences_faibles_region: { label: 'Compétences faibles par région', icon: BarChart3 },
+    competences_faibles_district: { label: 'Compétences faibles par district', icon: BarChart3 },
+    classement_competences_metier: { label: 'Classement compétences / métier', icon: TrendingUp },
+    top_performers: { label: 'Top 10 meilleurs performers', icon: BarChart3 },
+    alertes_faiblesses: { label: 'Alerte compétences faiblement acquises', icon: PieChart },
+    radar: { label: 'Radar des compétences par métier', icon: Radar },
 };
 
 function fileNameBase(value: string) {
@@ -46,13 +52,16 @@ export default function Builder() {
     const navigate = useNavigate();
     const { data: rapport, isLoading } = useReport(id!);
     const addSection = useAddSection(id!);
+    const updateReport = useUpdateReport(id!);
     const updateSection = useUpdateSection(id!);
     const removeSection = useRemoveSection(id!);
     const reorderSections = useReorderSections(id!);
     const [showTypeSelector, setShowTypeSelector] = useState(false);
-    const [exporting, setExporting] = useState<'pptx' | 'xlsx' | null>(null);
-    const [previewFormat, setPreviewFormat] = useState<'pptx' | 'xlsx'>('pptx');
+    const [newSectionType, setNewSectionType] = useState<string>('executive_summary');
+    const [exporting, setExporting] = useState<'pptx' | 'docx' | null>(null);
+    const [previewFormat, setPreviewFormat] = useState<'pptx' | 'docx'>('pptx');
     const [fileBaseName, setFileBaseName] = useState('');
+    const [subtitleDraft, setSubtitleDraft] = useState('');
     const [previewSlide, setPreviewSlide] = useState(0);
     const { success, error } = useToast();
 
@@ -65,6 +74,10 @@ export default function Builder() {
     useEffect(() => {
         setPreviewSlide((current) => Math.min(current, totalSlides - 1));
     }, [totalSlides]);
+
+    useEffect(() => {
+        setSubtitleDraft((rapport as any)?.sous_titre ?? '');
+    }, [(rapport as any)?.sous_titre]);
 
     const handleDragEnd = useCallback(
         (event: DragEndEvent) => {
@@ -82,6 +95,7 @@ export default function Builder() {
         const label = SECTION_TYPES.find((t) => t.value === type)?.label ?? type;
         addSection.mutate({ type, titre: label });
         setShowTypeSelector(false);
+        setNewSectionType(type);
     };
 
     const downloadBlob = (blob: Blob, filename: string) => {
@@ -109,17 +123,17 @@ export default function Builder() {
         }
     };
 
-    const handleExportXLSX = async () => {
-        setExporting('xlsx');
+    const handleExportDOCX = async () => {
+        setExporting('docx');
         try {
-            const res = await reportsApi.exportXLSX(id!);
+            const res = await reportsApi.exportDOCX(id!);
             downloadBlob(
-                new Blob([(res as any).data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-                `${fileNameBase(fileBaseName || reportTitle)}.xlsx`,
+                new Blob([(res as any).data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
+                `${fileNameBase(fileBaseName || reportTitle)}.docx`,
             );
-            success('Export Excel généré.');
+            success('Export Word généré.');
         } catch (e: any) {
-            error(e?.response?.data?.message || e?.message || "L'export Excel a échoué. Réessayez.");
+            error(e?.response?.data?.message || e?.message || "L'export Word a échoué. Réessayez.");
         } finally {
             setExporting(null);
         }
@@ -159,6 +173,7 @@ export default function Builder() {
     }
 
     const reportTitle = (rapport as any).titre || 'Rapport sans titre';
+    const reportSubtitle = subtitleDraft;
     const activeSection = previewSlide > 0 && previewSlide <= previewSections.length
         ? previewSections[previewSlide - 1]
         : null;
@@ -180,26 +195,27 @@ export default function Builder() {
                                 <Eye size={18} className="text-sabc-red-primary" aria-hidden="true" />
                                 <h2 id="report-preview-title" className="text-lg font-semibold text-sabc-gray-900">Prévisualisation</h2>
                             </div>
-                            <p className="mt-1 text-sm text-sabc-gray-600">Vérifiez la mise en page avant de télécharger le document.</p>
+                            <p className="mt-1 text-sm text-sabc-gray-600">Vérifiez les sous-titres, axes annotés et graphiques de chaque analyse avant export.</p>
                         </div>
                         <div className="flex rounded-lg border border-sabc-gray-200 bg-white p-1" role="tablist" aria-label="Format de prévisualisation">
                             <button type="button" role="tab" aria-selected={previewFormat === 'pptx'} onClick={() => setPreviewFormat('pptx')} className={`rounded-md px-3 py-1.5 text-sm ${previewFormat === 'pptx' ? 'bg-sabc-red-primary text-white' : 'text-sabc-gray-600'}`}>PowerPoint</button>
-                            <button type="button" role="tab" aria-selected={previewFormat === 'xlsx'} onClick={() => setPreviewFormat('xlsx')} className={`rounded-md px-3 py-1.5 text-sm ${previewFormat === 'xlsx' ? 'bg-sabc-red-primary text-white' : 'text-sabc-gray-600'}`}>Excel</button>
+                            <button type="button" role="tab" aria-selected={previewFormat === 'docx'} onClick={() => setPreviewFormat('docx')} className={`rounded-md px-3 py-1.5 text-sm ${previewFormat === 'docx' ? 'bg-sabc-red-primary text-white' : 'text-sabc-gray-600'}`}>Word</button>
                         </div>
                     </div>
 
                     <div className="rounded-xl border border-sabc-gray-200 bg-sabc-gray-100 p-4 dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
                         <div className="mb-3 flex items-center justify-between text-xs text-sabc-gray-500">
-                            <span>{previewFormat === 'pptx' ? 'Aperçu des diapositives PowerPoint' : 'Aperçu des feuilles Excel'}</span>
+                            <span>{previewFormat === 'pptx' ? 'Aperçu des diapositives PowerPoint' : 'Aperçu du document Word'}</span>
                             <span>Slide {previewSlide + 1} / {totalSlides}</span>
                         </div>
-                        <div className="rounded-lg border border-sabc-gray-200 bg-white p-5 shadow-sm dark:border-sabc-gray-700 dark:bg-sabc-gray-950">
+                        <div className="rounded-lg border border-sabc-gray-200 bg-white p-5 shadow-sm dark:border-sabc-gray-700 dark:bg-white">
                             {previewSlide === 0 ? (
                                 <>
                                     <div className="mb-8 h-2 rounded bg-sabc-red-primary" />
                                     <div className="flex min-h-[430px] flex-col items-center justify-center text-center">
+                                        <img src="/images/logos/sabc-logo.png" alt="Logo SABC" className="mb-5 h-20 w-auto object-contain" />
                                         <div className="text-2xl font-bold text-sabc-gray-900 dark:text-white">{reportTitle}</div>
-                                        <div className="mt-3 text-sm text-sabc-gray-500">SABC — Évaluation 360°</div>
+                                        <div className="mt-3 text-sm text-sabc-gray-500">{reportSubtitle || 'Sous-titre à renseigner'}</div>
                                         <div className="mt-16 text-[10px] uppercase tracking-wide text-sabc-gray-400">Page de couverture</div>
                                     </div>
                                 </>
@@ -238,15 +254,18 @@ export default function Builder() {
                         </div>
                     </div>
 
-                    <div className="flex flex-col gap-3 rounded-lg border border-sabc-gray-200 bg-white p-4 dark:border-sabc-gray-700 dark:bg-sabc-gray-950">
+                    <div className="flex flex-col gap-3 rounded-lg border border-sabc-gray-200 bg-white p-4 dark:border-sabc-gray-700 dark:bg-white">
                         <div className="flex-1">
                             <label htmlFor="report-file-name" className="mb-1 block text-sm font-medium text-sabc-gray-700 dark:text-sabc-gray-200">Nom du fichier</label>
                             <Input id="report-file-name" value={fileBaseName || fileNameBase(reportTitle)} onChange={(event) => setFileBaseName(event.target.value)} placeholder={fileNameBase(reportTitle)} aria-describedby="report-file-name-help" />
-                            <p id="report-file-name-help" className="mt-1 text-xs text-sabc-gray-500">Le nom sera utilisé pour les téléchargements .pptx et .xlsx.</p>
+                            <label htmlFor="report-subtitle" className="mb-1 mt-3 block text-sm font-medium text-sabc-gray-700 dark:text-sabc-gray-200">Sous-titre de la couverture</label>
+                            <Input id="report-subtitle" value={subtitleDraft} onChange={(event) => setSubtitleDraft(event.target.value)} onBlur={() => updateReport.mutate({ sous_titre: subtitleDraft.trim() })} placeholder="Saisissez le sous-titre de votre présentation" aria-describedby="report-subtitle-help" />
+                            <p id="report-subtitle-help" className="mt-1 text-xs text-sabc-gray-500">Ce texte apparaîtra sur la première page du PowerPoint.</p>
+                            <p id="report-file-name-help" className="mt-1 text-xs text-sabc-gray-500">Le nom sera utilisé pour les téléchargements .pptx et .docx.</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             <Button type="button" variant="warning" onClick={handleExportPPTX} loading={exporting === 'pptx'} disabled={exporting !== null}><FileText size={16} aria-hidden="true" />Télécharger PowerPoint</Button>
-                            <Button type="button" variant="success" onClick={handleExportXLSX} loading={exporting === 'xlsx'} disabled={exporting !== null}><FileText size={16} aria-hidden="true" />Télécharger Excel</Button>
+                            <Button type="button" variant="success" onClick={handleExportDOCX} loading={exporting === 'docx'} disabled={exporting !== null}><FileText size={16} aria-hidden="true" />Télécharger Word</Button>
                         </div>
                     </div>
                 </section>
@@ -267,24 +286,29 @@ export default function Builder() {
 
                     {showTypeSelector ? (
                     <div className="border-sabc-gray-200 rounded-lg border bg-white p-4">
-                        <p className="text-sabc-gray-700 mb-3 text-sm font-medium">Choisir un type de section :</p>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <p className="text-sabc-gray-700 mb-3 text-sm font-medium">Choisir la grande section du rapport :</p>
+                        <label htmlFor="report-section-type" className="mb-1 block text-xs font-medium uppercase tracking-wide text-sabc-gray-500">Section</label>
+                        <select
+                            id="report-section-type"
+                            value={newSectionType}
+                            onChange={(event) => setNewSectionType(event.target.value)}
+                            className="w-full rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 px-3 py-2 text-sm text-sabc-gray-800 outline-none focus:border-sabc-red-primary"
+                        >
                             {SECTION_TYPES.map((type) => (
-                                <Button
-                                    key={type.value}
-                                    type="button"
-                                    variant="outline"
-                                    className="justify-start"
-                                    disabled={addSection.isPending}
-                                    onClick={() => handleAddSection(type.value)}
-                                >
-                                    {type.label}
-                                </Button>
+                                <option key={type.value} value={type.value}>{type.label}</option>
                             ))}
+                        </select>
+                        <p className="mt-2 text-xs text-sabc-gray-600">
+                            {SECTION_TYPES.find((type) => type.value === newSectionType)?.description}
+                        </p>
+                        <div className="mt-4 flex gap-2">
+                            <Button type="button" onClick={() => handleAddSection(newSectionType)} disabled={addSection.isPending}>
+                                Ajouter la section
+                            </Button>
+                            <Button type="button" variant="ghost" onClick={() => setShowTypeSelector(false)}>
+                                Annuler
+                            </Button>
                         </div>
-                        <Button type="button" variant="ghost" className="mt-3" onClick={() => setShowTypeSelector(false)}>
-                            Annuler
-                        </Button>
                     </div>
                     ) : (
                     <Button
