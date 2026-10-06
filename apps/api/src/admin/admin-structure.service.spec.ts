@@ -30,10 +30,16 @@ describe('AdminStructureService — mise à jour de la structure', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
-      serviceCommercial: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+      serviceCommercial: {
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
       utilisateur: { groupBy: jest.fn(), updateMany: jest.fn() },
-      district: { findUnique: jest.fn(), update: jest.fn() },
-      secteur: { findUnique: jest.fn(), update: jest.fn() },
+      district: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
+      secteur: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
       $transaction: jest.fn((callback: (client: typeof transaction) => unknown) => callback(transaction)),
     };
     pg = { execute: jest.fn().mockResolvedValue(1) };
@@ -108,6 +114,78 @@ describe('AdminStructureService — mise à jour de la structure', () => {
       expect(transaction.utilisateur.updateMany).toHaveBeenCalledWith({
         where: { id_region: 'RG001' },
         data: { id_region: 'LT', region_nom: 'Littoral', type_region: 'taniere' },
+      });
+    });
+  });
+
+  describe('createService', () => {
+    it('génère le prochain code séquentiel de la région', async () => {
+      prisma.region.findUnique.mockResolvedValue({ id_region: 'LT' });
+      prisma.serviceCommercial.findMany.mockResolvedValue([
+        { id_service: 'LTSC01' },
+        { id_service: 'SVC8K1XQ0' },
+      ]);
+
+      await service.createService({ nom_service: 'Service suivant', id_region: 'LT' });
+
+      expect(prisma.serviceCommercial.create).toHaveBeenCalledWith({
+        data: { id_service: 'LTSC03', nom_service: 'Service suivant', id_region: 'LT' },
+      });
+    });
+  });
+
+  describe('createDistrict', () => {
+    it('incrémente le numéro des districts du service', async () => {
+      prisma.serviceCommercial.findUnique.mockResolvedValue({ id_service: 'LTSC01', id_region: 'LT' });
+      prisma.serviceCommercial.findMany.mockResolvedValue([{ id_service: 'LTSC01' }]);
+      prisma.district.findMany.mockResolvedValue([{ id_district: 'LTSC01D1' }]);
+
+      await service.createDistrict({ nom_district: 'District suivant', id_service: 'LTSC01' });
+
+      expect(prisma.district.create).toHaveBeenCalledWith({
+        data: { id_district: 'LTSC01D2', nom_district: 'District suivant', id_service: 'LTSC01' },
+      });
+    });
+
+    it('utilise le code régional attendu pour un ancien service aléatoire', async () => {
+      prisma.serviceCommercial.findUnique.mockResolvedValue({ id_service: 'SVC8K1XQ0', id_region: 'LT' });
+      prisma.serviceCommercial.findMany.mockResolvedValue([{ id_service: 'SVC8K1XQ0' }]);
+      prisma.district.findMany.mockResolvedValue([]);
+
+      await service.createDistrict({ nom_district: 'Premier district', id_service: 'SVC8K1XQ0' });
+
+      expect(prisma.district.create).toHaveBeenCalledWith({
+        data: {
+          id_district: 'LTSC01D1',
+          nom_district: 'Premier district',
+          id_service: 'SVC8K1XQ0',
+        },
+      });
+    });
+  });
+
+  describe('createSecteur', () => {
+    it('incrémente les secteurs à l’échelle de leur région', async () => {
+      prisma.district.findUnique.mockResolvedValue({ id_district: 'LTSC01D1', id_service: 'LTSC01' });
+      prisma.serviceCommercial.findUnique.mockResolvedValue({ id_service: 'LTSC01', id_region: 'LT' });
+      prisma.serviceCommercial.findMany.mockResolvedValue([
+        { id_service: 'LTSC01' },
+        { id_service: 'LTSC02' },
+      ]);
+      prisma.secteur.findMany.mockResolvedValue([
+        { id_secteur: 'LTST01' },
+        { id_secteur: 'LTST03' },
+      ]);
+
+      await service.createSecteur({ nom_secteur: 'Secteur suivant', id_district: 'LTSC01D1' });
+
+      expect(prisma.secteur.create).toHaveBeenCalledWith({
+        data: {
+          id_secteur: 'LTST04',
+          nom_secteur: 'Secteur suivant',
+          id_district: 'LTSC01D1',
+          id_service: 'LTSC01',
+        },
       });
     });
   });

@@ -24,13 +24,39 @@ export class AdminStructureService {
     );
   }
 
-  /**
-   * Generates a short unique id (<= 10 chars) for the varchar(10) primary keys
-   * used by the org-structure tables (no DB auto-increment / default exists).
-   */
-  private generateId(prefix: string): string {
-    const suffix = Math.random().toString(36).slice(2, 2 + (10 - prefix.length)).toUpperCase();
-    return `${prefix}${suffix}`.slice(0, 10);
+  private nextSequentialId(prefix: string, existingIds: string[], padding: number): string {
+    const pattern = new RegExp(`^${prefix}(\\d+)$`);
+    const existingNumbers = existingIds
+      .map((id) => id.match(pattern)?.[1])
+      .filter((value): value is string => value !== undefined)
+      .map(Number);
+    const legacyCount = existingIds.length - existingNumbers.length;
+    const nextNumber = Math.max(0, ...existingNumbers) + legacyCount + 1;
+    const id = `${prefix}${String(nextNumber).padStart(padding, '0')}`;
+
+    if (id.length > 10) {
+      throw new BadRequestException(`La séquence de codes ${prefix} a atteint sa limite`);
+    }
+
+    return id;
+  }
+
+  private getLegacyServiceCode(regionId: string, serviceIds: string[], serviceId: string): string {
+    const prefix = `${regionId}SC`;
+    const pattern = new RegExp(`^${prefix}(\\d+)$`);
+    const existingNumbers = serviceIds
+      .map((id) => id.match(pattern)?.[1])
+      .filter((value): value is string => value !== undefined)
+      .map(Number);
+    const legacyIds = serviceIds.filter((id) => !pattern.test(id));
+    const legacyIndex = legacyIds.indexOf(serviceId);
+
+    if (legacyIndex < 0) {
+      throw new NotFoundException('Service introuvable');
+    }
+
+    const sequence = Math.max(0, ...existingNumbers) + legacyIndex + 1;
+    return `${prefix}${String(sequence).padStart(2, '0')}`;
   }
 
   // ── Regions ──
@@ -159,9 +185,18 @@ export class AdminStructureService {
   async createService(data: { nom_service: string; id_region: string }) {
     const region = await this.prisma.region.findUnique({ where: { id_region: data.id_region } });
     if (!region) throw new BadRequestException('Région introuvable');
+    const services = await this.prisma.serviceCommercial.findMany({
+      where: { id_region: data.id_region },
+      select: { id_service: true },
+    });
+    const id_service = this.nextSequentialId(
+      `${region.id_region}SC`,
+      services.map((service) => service.id_service),
+      2,
+    );
     return this.prisma.serviceCommercial.create({
       data: {
-        id_service: this.generateId('SVC'),
+        id_service,
         nom_service: data.nom_service,
         id_region: data.id_region,
       },
@@ -211,9 +246,30 @@ export class AdminStructureService {
   async createDistrict(data: { nom_district: string; id_service: string }) {
     const service = await this.prisma.serviceCommercial.findUnique({ where: { id_service: data.id_service } });
     if (!service) throw new BadRequestException('Service introuvable');
+    const services = await this.prisma.serviceCommercial.findMany({
+      where: { id_region: service.id_region },
+      orderBy: [{ created_at: 'asc' }, { id_service: 'asc' }],
+      select: { id_service: true },
+    });
+    const serviceCodePattern = new RegExp(`^${service.id_region}SC\\d+$`);
+    const serviceCode = serviceCodePattern.test(service.id_service)
+      ? service.id_service
+      : this.getLegacyServiceCode(
+          service.id_region,
+          services.map((entry) => entry.id_service),
+          service.id_service,
+        );
+    const districts = await this.prisma.district.findMany({
+      where: { id_service: data.id_service },
+      select: { id_district: true },
+    });
     return this.prisma.district.create({
       data: {
-        id_district: this.generateId('DIS'),
+        id_district: this.nextSequentialId(
+          `${serviceCode}D`,
+          districts.map((district) => district.id_district),
+          0,
+        ),
         nom_district: data.nom_district,
         id_service: data.id_service,
       },
@@ -257,9 +313,23 @@ export class AdminStructureService {
     if (!district) throw new BadRequestException('District introuvable');
     // secteurs.id_service is NOT NULL — derive it from the parent district when omitted
     const id_service = data.id_service ?? district.id_service;
+    const service = await this.prisma.serviceCommercial.findUnique({ where: { id_service } });
+    if (!service) throw new BadRequestException('Service introuvable');
+    const services = await this.prisma.serviceCommercial.findMany({
+      where: { id_region: service.id_region },
+      select: { id_service: true },
+    });
+    const secteurs = await this.prisma.secteur.findMany({
+      where: { id_service: { in: services.map((entry) => entry.id_service) } },
+      select: { id_secteur: true },
+    });
     return this.prisma.secteur.create({
       data: {
-        id_secteur: this.generateId('SEC'),
+        id_secteur: this.nextSequentialId(
+          `${service.id_region}ST`,
+          secteurs.map((secteur) => secteur.id_secteur),
+          2,
+        ),
         nom_secteur: data.nom_secteur,
         id_district: data.id_district,
         id_service,
