@@ -1111,30 +1111,62 @@ export class AnalyticsService {
   async getEvaluationGaps(matricule?: string) {
     const params = matricule ? [matricule] : [];
     const scoreRows = await this.pg.query<any>(
-      `SELECT
-         e.evalue_matricule AS matricule,
-         e.type_evaluation,
-         ROUND(AVG(e.note_globale), 2) AS score,
-         COUNT(*)::int AS nb_evaluations,
-         COUNT(DISTINCT e.evaluateur_matricule)::int AS nb_evaluateurs
-       FROM evaluations e
-       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
-       WHERE e.statut = 'valide'
-         AND e.note_globale IS NOT NULL
-         AND ${ruleVisibilitySql('admin')}
-         ${matricule ? 'AND e.evalue_matricule = $1' : ''}
-       GROUP BY e.evalue_matricule, e.type_evaluation`,
+      `WITH historical_counts AS (
+         SELECT e.evalue_matricule, e.type_evaluation,
+                COUNT(*)::int AS nb_evaluations,
+                COUNT(DISTINCT e.evaluateur_matricule)::int AS nb_evaluateurs
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
+           AND ${ruleVisibilitySql('admin')}
+           ${matricule ? 'AND e.evalue_matricule = $1' : ''}
+         GROUP BY e.evalue_matricule, e.type_evaluation
+       ), latest AS (
+         SELECT e.evalue_matricule, e.type_evaluation, e.note_globale,
+                ROW_NUMBER() OVER (
+                  PARTITION BY e.evalue_matricule, e.type_evaluation
+                  ORDER BY COALESCE(e.date_soumission, e.updated_at, e.created_at) DESC,
+                           e.created_at DESC, e.id_evaluation DESC
+                ) AS recency_rank
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
+           AND ${ruleVisibilitySql('admin')}
+           ${matricule ? 'AND e.evalue_matricule = $1' : ''}
+       )
+       SELECT latest.evalue_matricule AS matricule, latest.type_evaluation,
+              ROUND(latest.note_globale, 2) AS score,
+              counts.nb_evaluations, counts.nb_evaluateurs
+       FROM latest
+       JOIN historical_counts counts
+         ON counts.evalue_matricule = latest.evalue_matricule
+        AND counts.type_evaluation = latest.type_evaluation
+       WHERE latest.recency_rank = 1`,
       params,
     );
     const rows = await this.pg.query<any>(
-      `SELECT
+      `WITH latest AS (
+       SELECT e.id_evaluation, e.evalue_matricule, e.type_evaluation, e.id_regle, e.notations_json,
+              ROW_NUMBER() OVER (
+                PARTITION BY e.evalue_matricule, e.type_evaluation
+                ORDER BY COALESCE(e.date_soumission, e.updated_at, e.created_at) DESC,
+                         e.created_at DESC, e.id_evaluation DESC
+              ) AS recency_rank
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.statut = 'valide'
+         AND e.notations_json IS NOT NULL
+         AND ${ruleVisibilitySql('admin')}
+         ${matricule ? 'AND e.evalue_matricule = $1' : ''}
+      )
+      SELECT
          e.evalue_matricule AS matricule,
          e.type_evaluation,
          n->>'critere_id' AS critere_id,
-         ROUND(AVG((n->>'note')::numeric), 2) AS score,
-         COALESCE(AVG((critere->>'niveau_requis')::numeric), 3) AS niveau_requis,
+         ROUND(MAX((n->>'note')::numeric), 2) AS score,
+         COALESCE(MAX((critere->>'niveau_requis')::numeric), 3) AS niveau_requis,
          COUNT(*)::int AS nb_notes
-       FROM evaluations e
+       FROM latest e
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
        CROSS JOIN LATERAL jsonb_array_elements(e.notations_json) AS n
        LEFT JOIN LATERAL jsonb_array_elements(
@@ -1146,13 +1178,12 @@ export class AnalyticsService {
            ELSE '[]'::jsonb
          END
        ) AS critere ON critere->>'id' = n->>'critere_id'
-       WHERE e.statut = 'valide'
-         AND e.notations_json IS NOT NULL
+       WHERE e.recency_rank = 1
          AND n->>'note' IS NOT NULL
          AND n->>'critere_id' IS NOT NULL
          AND ${ruleVisibilitySql('admin')}
          ${matricule ? 'AND e.evalue_matricule = $1' : ''}
-       GROUP BY e.evalue_matricule, e.type_evaluation, n->>'critere_id'`,
+      GROUP BY e.evalue_matricule, e.type_evaluation, n->>'critere_id'`,
       params,
     );
 
@@ -1709,33 +1740,45 @@ export class AnalyticsService {
     const visibilitySql =
       audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL;
     const recent = await this.pg.queryOne<any>(
-      `SELECT AVG(e.note_globale) as score_recent
+      `SELECT e.note_globale as score_recent
        FROM evaluations e
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
        WHERE e.evalue_matricule = $1 AND e.statut = 'valide' AND e.note_globale IS NOT NULL
          AND ${visibilitySql}
-         AND ${EVALUATION_EFFECTIVE_TS_E_SQL} >= NOW() - INTERVAL '6 months'`,
+         AND ${EVALUATION_EFFECTIVE_TS_E_SQL} >= NOW() - INTERVAL '6 months'
+       ORDER BY ${EVALUATION_EFFECTIVE_TS_E_SQL} DESC, e.created_at DESC, e.id_evaluation DESC
+       LIMIT 1`,
       [matricule],
     );
 
     const ancien = await this.pg.queryOne<any>(
-      `SELECT AVG(e.note_globale) as score_ancien
+      `SELECT e.note_globale as score_ancien
        FROM evaluations e
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
        WHERE e.evalue_matricule = $1 AND e.statut = 'valide' AND e.note_globale IS NOT NULL
          AND ${visibilitySql}
          AND ${EVALUATION_EFFECTIVE_TS_E_SQL} < NOW() - INTERVAL '6 months'
-         AND ${EVALUATION_EFFECTIVE_TS_E_SQL} >= NOW() - INTERVAL '12 months'`,
+         AND ${EVALUATION_EFFECTIVE_TS_E_SQL} >= NOW() - INTERVAL '12 months'
+       ORDER BY ${EVALUATION_EFFECTIVE_TS_E_SQL} DESC, e.created_at DESC, e.id_evaluation DESC
+       LIMIT 1`,
       [matricule],
     );
 
     const parType = await this.pg.query<any>(
-      `SELECT e.type_evaluation, AVG(e.note_globale) as moyenne, COUNT(*) as nb
-       FROM evaluations e
-       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
-       WHERE e.evalue_matricule = $1 AND e.statut = 'valide' AND e.note_globale IS NOT NULL
-         AND ${visibilitySql}
-       GROUP BY e.type_evaluation`,
+      `WITH ranked AS (
+         SELECT e.type_evaluation, e.note_globale,
+                COUNT(*) OVER (PARTITION BY e.type_evaluation) AS nb,
+                ROW_NUMBER() OVER (
+                  PARTITION BY e.type_evaluation
+                  ORDER BY ${EVALUATION_EFFECTIVE_TS_E_SQL} DESC, e.created_at DESC, e.id_evaluation DESC
+                ) AS recency_rank
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.evalue_matricule = $1 AND e.statut = 'valide' AND e.note_globale IS NOT NULL
+           AND ${visibilitySql}
+       )
+       SELECT type_evaluation, note_globale AS moyenne, nb
+       FROM ranked WHERE recency_rank = 1`,
       [matricule],
     );
 

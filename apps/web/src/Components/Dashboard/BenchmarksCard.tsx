@@ -3,6 +3,7 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -59,7 +60,7 @@ export function BenchmarksCard({
           <>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                <BarChart data={rows} margin={{ top: 22, right: 16, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                   <XAxis
                     dataKey="critere"
@@ -78,9 +79,15 @@ export function BenchmarksCard({
                     }
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="sujet" name={sujetLabel} fill={COULEUR_SUJET} radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="region" name="Moyenne région" fill={COULEUR_REGION} radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="top" name="Top performers" fill={COULEUR_TOP} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="sujet" name={sujetLabel} fill={COULEUR_SUJET} radius={[3, 3, 0, 0]}>
+                    <LabelList dataKey="sujet" position="top" formatter={(value: number | null) => value == null ? '' : value.toFixed(1)} fill={COULEUR_SUJET} fontSize={9} />
+                  </Bar>
+                  <Bar dataKey="region" name="Moyenne région" fill={COULEUR_REGION} radius={[3, 3, 0, 0]}>
+                    <LabelList dataKey="region" position="top" formatter={(value: number | null) => value == null ? '' : value.toFixed(1)} fill={COULEUR_REGION} fontSize={9} />
+                  </Bar>
+                  <Bar dataKey="top" name="Top performers" fill={COULEUR_TOP} radius={[3, 3, 0, 0]}>
+                    <LabelList dataKey="top" position="top" formatter={(value: number | null) => value == null ? '' : value.toFixed(1)} fill="#8A5A00" fontSize={9} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isPublishedRuleReady } from './rules';
+import { filterApplicableRules, isPublishedRuleReady } from './rules';
 
 describe("pré-requis d'une règle avant création d'un brouillon", () => {
   const validRule = {
@@ -20,5 +20,21 @@ describe("pré-requis d'une règle avant création d'un brouillon", () => {
 
   it('refuse un détail de règle qui ne correspond pas à la sélection', () => {
     expect(isPublishedRuleReady(validRule, 'REG-2')).toBe(false);
+  });
+});
+
+describe('filterApplicableRules', () => {
+  it.each([
+    ['Directeur regional', 'DR', 'Trade Marketing Operator', 'TMO'],
+    ['Trade Marketing Operator', 'TMO', 'Directeur regional', 'DR'],
+  ])('reconnaît les libellés de rôles %s / %s comme les codes %s / %s', (evaluator, evaluatorCode, evaluatee, evaluateeCode) => {
+    const rules = filterApplicableRules(
+      [{ est_active: true, role_evaluateur: evaluatorCode, role_evalue: evaluateeCode, type_evaluation: 'descendante' }],
+      evaluator,
+      evaluatee,
+      'descendante',
+    );
+
+    expect(rules).toHaveLength(1);
   });
 });

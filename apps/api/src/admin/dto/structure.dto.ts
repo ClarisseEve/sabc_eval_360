@@ -17,6 +17,11 @@ export class CreateRegionDto {
 export class UpdateRegionDto {
   @IsOptional()
   @IsString()
+  @MaxLength(5)
+  id_region?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(100)
   nom_region?: string;
 

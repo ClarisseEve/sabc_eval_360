@@ -131,16 +131,10 @@ const BRANCHES: BrancheSeed[] = [
 ];
 
 const REGIONS: RegionSeed[] = [
-  { id: 'RG001', nom: 'Littoral', estTaniere: true },
-  { id: 'RG002', nom: 'Centre', estTaniere: true },
-  { id: 'RG003', nom: 'Ouest', estTaniere: false },
-  { id: 'RG004', nom: 'Nord-Ouest', estTaniere: false },
-  { id: 'RG005', nom: 'Sud-Ouest', estTaniere: true },
-  { id: 'RG006', nom: 'Nord', estTaniere: false },
-  { id: 'RG007', nom: 'Extreme-Nord', estTaniere: false },
-  { id: 'RG008', nom: 'Est', estTaniere: false },
-  { id: 'RG009', nom: 'Sud', estTaniere: true },
-  { id: 'RG010', nom: 'Adamaoua', estTaniere: false },
+  { id: 'LT', nom: 'Littoral', estTaniere: true },
+  { id: 'CE', nom: 'Centre', estTaniere: true },
+  { id: 'OU', nom: 'Ouest', estTaniere: false },
+  { id: 'NO', nom: 'Nord', estTaniere: false },
 ];
 
 const ROLES: RoleSeed[] = [
@@ -323,7 +317,7 @@ function generateUsers(): UserSeed[] {
     email: 'admin@sabc.local',
     role: 'ADMIN',
     roleId: 'R0000',
-    regionId: 'RG001',
+    regionId: 'LT',
     brancheId: 'BR001',
     managerMatricule: null,
     niveau: 0,
@@ -358,7 +352,7 @@ function generateUsers(): UserSeed[] {
         let overrideMatricule = matricule;
 
         // Keep demo accounts working for Littoral first instances
-        if (region.id === 'RG001' && i === 0) {
+        if (region.id === 'LT' && i === 0) {
           if (entry.role === 'DR') {
             overrideMatricule = 'D1010';
             email = 'dr.littoral@sabc.local';
@@ -698,6 +692,7 @@ const ROLE_DOMAIN: Record<string, 'commercial' | 'marketing' | 'sponsoring' | 't
 
 const RULE_SPECS: RuleSeed[] = [
   { nom: 'DR vers CDS', description: 'Evaluation descendante des CDS', roleEvaluateur: 'DR', roleEvalue: 'CDS', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
+  { nom: 'DR vers CDV', description: 'Evaluation descendante des CDV', roleEvaluateur: 'DR', roleEvalue: 'CDV', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
   { nom: 'DR vers RTM', description: 'Evaluation descendante des RTM', roleEvaluateur: 'DR', roleEvalue: 'RTM', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('marketing') },
   { nom: 'DR vers SS', description: 'Evaluation descendante des SS', roleEvaluateur: 'DR', roleEvalue: 'SS', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('sponsoring') },
   { nom: 'DR vers CDTT', description: 'Evaluation descendante des CDTT', roleEvaluateur: 'DR', roleEvalue: 'CDTT', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('trade') },
@@ -771,13 +766,47 @@ async function ensureBranche(branche: BrancheSeed) {
 }
 
 async function ensureRegion(region: RegionSeed) {
-  const existing = await prisma.region.findFirst({
-    where: {
-      OR: [{ id_region: region.id }, { nom_region: region.nom }],
-    },
-  });
+  const existingById = await prisma.region.findUnique({ where: { id_region: region.id } });
+  const existingByName = await prisma.region.findUnique({ where: { nom_region: region.nom } });
+
+  if (existingById && existingByName && existingById.id_region !== existingByName.id_region) {
+    throw new Error(`Impossible de réconcilier la région ${region.nom}: le code ${region.id} est déjà utilisé.`);
+  }
+
+  const existing = existingByName ?? existingById;
 
   if (existing) {
+    if (existing.id_region !== region.id) {
+      const temporaryName = `__rekey_${region.id}_${randomUUID().slice(0, 8)}`;
+      return prisma.$transaction(async (transaction) => {
+        await transaction.region.update({
+          where: { id_region: existing.id_region },
+          data: { nom_region: temporaryName },
+        });
+        const updatedRegion = await transaction.region.create({
+          data: {
+            id_region: region.id,
+            nom_region: region.nom,
+            est_taniere: region.estTaniere,
+          },
+        });
+        await transaction.serviceCommercial.updateMany({
+          where: { id_region: existing.id_region },
+          data: { id_region: region.id },
+        });
+        await transaction.utilisateur.updateMany({
+          where: { id_region: existing.id_region },
+          data: {
+            id_region: region.id,
+            region_nom: region.nom,
+            type_region: region.estTaniere ? 'taniere' : 'non-taniere',
+          },
+        });
+        await transaction.region.delete({ where: { id_region: existing.id_region } });
+        return updatedRegion;
+      });
+    }
+
     return prisma.region.update({
       where: { id_region: existing.id_region },
       data: { nom_region: region.nom, est_taniere: region.estTaniere },
@@ -1155,23 +1184,16 @@ async function upsertEvaluation(seed: EvaluationSeed) {
        evaluateur_matricule, evalue_matricule, id_periode, id_regle, date_creation, date_soumission,
        date_validation, validateur_matricule, statut, notations_json, commentaire_global,
        commentaire_validation, note_globale, type_evaluation, periode_code, created_at, updated_at
-     ) VALUES (
-       $1, $2, $3, $4, $5::date, $6::timestamp, $7::timestamp, $8, $9, $10::json,
-       $11, $12, $13, $14, $15, $16::timestamp, $17::timestamp
      )
-     ON CONFLICT (evaluateur_matricule, evalue_matricule, id_periode, type_evaluation) DO UPDATE SET
-       id_regle = EXCLUDED.id_regle,
-       date_creation = EXCLUDED.date_creation,
-       date_soumission = EXCLUDED.date_soumission,
-       date_validation = EXCLUDED.date_validation,
-       validateur_matricule = EXCLUDED.validateur_matricule,
-       statut = EXCLUDED.statut,
-       notations_json = EXCLUDED.notations_json,
-       commentaire_global = EXCLUDED.commentaire_global,
-       commentaire_validation = EXCLUDED.commentaire_validation,
-       note_globale = EXCLUDED.note_globale,
-       periode_code = EXCLUDED.periode_code,
-       updated_at = EXCLUDED.updated_at`,
+     SELECT $1, $2, $3, $4, $5::date, $6::timestamp, $7::timestamp, $8, $9, $10::json,
+            $11, $12, $13, $14, $15, $16::timestamp, $17::timestamp
+     WHERE NOT EXISTS (
+       SELECT 1 FROM evaluations
+       WHERE evaluateur_matricule = $1
+         AND evalue_matricule = $2
+         AND id_periode = $3
+         AND type_evaluation = $14
+     )`,
     [
       seed.evaluateur,
       seed.evalue,
@@ -1333,6 +1355,7 @@ async function seedEvaluations(ruleIdByKey: Map<string, string>) {
       // DR evaluates CDS, RTM, SS, CDTT (descendante)
       const directReports: { role: string; ruleKey: string; criteriaFn: () => CriterionSeed[] }[] = [
         { role: 'CDS', ruleKey: 'DR:CDS:descendante', criteriaFn: () => commercial },
+        { role: 'CDV', ruleKey: 'DR:CDV:descendante', criteriaFn: () => commercial },
         { role: 'RTM', ruleKey: 'DR:RTM:descendante', criteriaFn: () => marketing },
         { role: 'SS', ruleKey: 'DR:SS:descendante', criteriaFn: () => sponsoring },
         { role: 'CDTT', ruleKey: 'DR:CDTT:descendante', criteriaFn: () => trade },
@@ -1606,10 +1629,10 @@ async function seedRemplacements() {
     { titulaire: 'TMO', remplacant: 'TMO', regionIdx: 1, motif: 'Formation externe' },
     { titulaire: 'CSC', remplacant: 'CSC', regionIdx: 2, motif: 'Mission temporaire' },
     { titulaire: 'SRMO', remplacant: 'SRMO', regionIdx: 3, motif: 'Conge maladie' },
-    { titulaire: 'AS', remplacant: 'AS', regionIdx: 4, motif: 'Remplacement programmatique' },
-    { titulaire: 'TMO', remplacant: 'TMO', regionIdx: 5, motif: 'Conge parental' },
-    { titulaire: 'CDV', remplacant: 'CDV', regionIdx: 6, motif: 'Deplacement siege' },
-    { titulaire: 'AS', remplacant: 'AS', regionIdx: 7, motif: 'Formation interne' },
+    { titulaire: 'AS', remplacant: 'AS', regionIdx: 0, motif: 'Remplacement programmatique' },
+    { titulaire: 'TMO', remplacant: 'TMO', regionIdx: 1, motif: 'Conge parental' },
+    { titulaire: 'CDV', remplacant: 'CDV', regionIdx: 2, motif: 'Deplacement siege' },
+    { titulaire: 'AS', remplacant: 'AS', regionIdx: 3, motif: 'Formation interne' },
   ];
 
   for (const repl of replacements) {

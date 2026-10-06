@@ -42,7 +42,7 @@ function AggregatedScore({ entry }: { entry?: { score?: number | null; nb_evalua
   return (
     <span title={`${entry.nb_evaluations ?? 0} évaluation(s), ${entry.nb_evaluateurs ?? 0} évaluateur(s)`}>
       {formatScore(entry.score)}
-      <span className="ml-1 text-xs text-sabc-gray-500">({entry.nb_evaluateurs ?? 0})</span>
+      <span className="ml-1 text-xs text-sabc-gray-500">×{entry.nb_evaluations ?? 0}</span>
     </span>
   );
 }

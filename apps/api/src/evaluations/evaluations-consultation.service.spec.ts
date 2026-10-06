@@ -115,6 +115,20 @@ describe('EvaluationsConsultationService', () => {
       }
     });
 
+    it('numbers attempts per evaluator, target, period, and evaluation type', async () => {
+      mockPg.queryOne.mockResolvedValue({ total: '2' });
+      mockPg.query.mockResolvedValue([
+        makeEvaluation({ total_tentatives: 2, numero_tentative: 2 }),
+      ]);
+
+      const result = await service.getRecues('MAT001');
+      const dataSql: string = mockPg.query.mock.calls[0][0];
+
+      expect(dataSql).toContain('COUNT(*) OVER');
+      expect(dataSql).toContain('PARTITION BY e.evaluateur_matricule, e.evalue_matricule, e.id_periode, e.type_evaluation');
+      expect(result.data[0]).toEqual(expect.objectContaining({ total_tentatives: 2, numero_tentative: 2 }));
+    });
+
     it("retire en défense l'évaluation lorsque visibility_policy.evaluated=false", async () => {
       mockPg.queryOne.mockResolvedValue({ total: '0' });
       mockPg.query.mockResolvedValue([

@@ -25,6 +25,8 @@ interface EvaluationRecue {
   type_evaluation: string;
   statut: 'soumis' | 'valide';
   note_globale: number | null;
+  numero_tentative?: number;
+  total_tentatives?: number;
   evaluateur: {
     prenom?: string;
     nom?: string;
@@ -291,12 +293,17 @@ const EvaluationsRecues: React.FC = () => {
                       Évalué par : {evaluatorName(evaluation)}
                     </div>
                     <div className="text-sm text-sabc-gray-500">{periodLabel(evaluation)}</div>
+                    {Number(evaluation.total_tentatives) > 1 && (
+                      <div className="text-xs text-sabc-gray-500">
+                        Tentative {evaluation.numero_tentative} sur {evaluation.total_tentatives} de cet évaluateur dans cette période
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-3">
                     {evaluation.statut === 'valide' && evaluation.note_globale != null && (
                       <Badge variant="info">
-                        {Number(evaluation.note_globale).toFixed(1)} / 20
+                        {Number(evaluation.note_globale).toFixed(1)} / 5
                       </Badge>
                     )}
                     <Link href={`/evaluations/${evaluation.id_evaluation}`}>

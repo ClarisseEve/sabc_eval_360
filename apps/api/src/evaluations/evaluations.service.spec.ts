@@ -701,7 +701,6 @@ describe('EvaluationsService', () => {
           statut: 'ouverte',
           est_ouverte: true,
         })
-        .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(created);
 
       const result = await service.create('M1', 'M2', 'periode-uuid');
@@ -725,6 +724,25 @@ describe('EvaluationsService', () => {
       expect(periodCheckSql).toContain('est_ouverte = true');
       expect(periodCheckSql).toContain('est_cloturee = false');
       expect(periodCheckSql).toContain("AT TIME ZONE 'Africa/Douala'");
+    });
+
+    it('creates a new evaluation instead of reusing an earlier attempt', async () => {
+      const newAttempt = { id_evaluation: 'E2', id_periode: 'periode-uuid' };
+      mockPg.queryOne
+        .mockResolvedValueOnce({
+          id_periode: 'periode-uuid',
+          code_periode: 'P1',
+          statut: 'ouverte',
+          est_ouverte: true,
+        })
+        .mockResolvedValueOnce(newAttempt);
+
+      const result = await service.create('M1', 'M2', 'periode-uuid');
+
+      expect(result).toEqual(newAttempt);
+      expect(mockPg.queryOne).toHaveBeenCalledTimes(2);
+      expect(mockPg.queryOne.mock.calls[1][0]).toContain('INSERT INTO evaluations');
+      expect(mockPg.queryOne.mock.calls[1][0]).not.toContain('SELECT * FROM evaluations');
     });
 
     it('bloque la création si la période ne satisfait plus tous les invariants actifs', async () => {

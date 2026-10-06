@@ -1,9 +1,20 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { DatabasePgService } from '../database/database-pg.service';
+
+const REGION_CODES: Record<string, string> = {
+  Littoral: 'LT',
+  Centre: 'CE',
+  Nord: 'NO',
+  Ouest: 'OU',
+};
 
 @Injectable()
 export class AdminStructureService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private pg: DatabasePgService,
+  ) {}
 
   private serializeRawRows<T extends Record<string, any>>(rows: T[]): T[] {
     return rows.map((row) =>
@@ -25,17 +36,102 @@ export class AdminStructureService {
   // ── Regions ──
 
   async getRegions() {
-    return this.prisma.region.findMany({ orderBy: { nom_region: 'asc' } });
+    const [regions, usersByRegion] = await Promise.all([
+      this.prisma.region.findMany({ orderBy: { nom_region: 'asc' } }),
+      this.prisma.utilisateur.groupBy({
+        by: ['id_region'],
+        _count: { _all: true },
+      }),
+    ]);
+    const userCountByRegion = new Map(
+      usersByRegion
+        .filter((entry) => entry.id_region)
+        .map((entry) => [entry.id_region, entry._count._all]),
+    );
+
+    return regions.map((region) => ({
+      ...region,
+      _count: { utilisateurs: userCountByRegion.get(region.id_region) ?? 0 },
+    }));
   }
 
   async createRegion(data: { id_region: string; nom_region: string; est_taniere?: boolean }) {
-    return this.prisma.region.create({ data });
+    const expectedId = REGION_CODES[data.nom_region];
+    if (!expectedId) {
+      throw new BadRequestException('Seules les régions Littoral, Centre, Nord et Ouest sont autorisées');
+    }
+    if (data.id_region !== expectedId) {
+      throw new BadRequestException(`Le code de la région ${data.nom_region} doit être ${expectedId}`);
+    }
+    return this.prisma.region.create({ data: { ...data, id_region: expectedId } });
   }
 
-  async updateRegion(id: string, data: { nom_region?: string; est_taniere?: boolean }) {
+  async updateRegion(id: string, data: { id_region?: string; nom_region?: string; est_taniere?: boolean }) {
     const region = await this.prisma.region.findUnique({ where: { id_region: id } });
     if (!region) throw new NotFoundException('Région introuvable');
-    return this.prisma.region.update({ where: { id_region: id }, data });
+
+    const nomRegion = data.nom_region ?? region.nom_region;
+    const idRegion = data.id_region ?? REGION_CODES[nomRegion] ?? id;
+    const expectedId = REGION_CODES[nomRegion];
+    if (data.id_region && !expectedId) {
+      throw new BadRequestException('Le code ne peut être modifié que pour l’une des quatre régions officielles');
+    }
+    if (expectedId && idRegion !== expectedId) {
+      throw new BadRequestException(`Le code de la région ${nomRegion} doit être ${expectedId}`);
+    }
+
+    const estTaniere = data.est_taniere ?? region.est_taniere;
+    if (idRegion === id) {
+      return this.prisma.region.update({
+        where: { id_region: id },
+        data: { nom_region: nomRegion, est_taniere: estTaniere },
+      });
+    }
+
+    const existingCode = await this.prisma.region.findUnique({ where: { id_region: idRegion } });
+    if (existingCode) throw new BadRequestException(`Le code ${idRegion} est déjà utilisé`);
+    const existingName = await this.prisma.region.findUnique({ where: { nom_region: nomRegion } });
+    if (existingName && existingName.id_region !== id) {
+      throw new BadRequestException(`La région ${nomRegion} existe déjà`);
+    }
+
+    const typeRegion = estTaniere ? 'taniere' : 'non-taniere';
+    await this.pg.execute(
+      `UPDATE utilisateurs_ref
+         SET id_region = $1, region_nom = $2, type_region = $3, updated_at = NOW()
+       WHERE id_region = $4`,
+      [idRegion, nomRegion, typeRegion, id],
+    );
+
+    try {
+      return await this.prisma.$transaction(async (transaction) => {
+        await transaction.region.update({
+          where: { id_region: id },
+          data: { nom_region: `__rekey_${idRegion}` },
+        });
+        const updatedRegion = await transaction.region.create({
+          data: { id_region: idRegion, nom_region: nomRegion, est_taniere: estTaniere },
+        });
+        await transaction.serviceCommercial.updateMany({
+          where: { id_region: id },
+          data: { id_region: idRegion },
+        });
+        await transaction.utilisateur.updateMany({
+          where: { id_region: id },
+          data: { id_region: idRegion, region_nom: nomRegion, type_region: typeRegion },
+        });
+        await transaction.region.delete({ where: { id_region: id } });
+        return updatedRegion;
+      });
+    } catch (error) {
+      await this.pg.execute(
+        `UPDATE utilisateurs_ref
+           SET id_region = $1, region_nom = $2, type_region = $3, updated_at = NOW()
+         WHERE id_region = $4`,
+        [id, region.nom_region, region.est_taniere ? 'taniere' : 'non-taniere', idRegion],
+      );
+      throw error;
+    }
   }
 
   async deleteRegion(id: string) {

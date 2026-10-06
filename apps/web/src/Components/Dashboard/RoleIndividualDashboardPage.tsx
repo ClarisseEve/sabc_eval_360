@@ -71,7 +71,7 @@ export default function RoleIndividualDashboardPage({
       periodName={data.dashboard?.periode_active?.nom ?? null}
       degradedSources={data.degradedSources}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-dashboard-export-section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Évaluations à faire"
           value={data.pendingEvaluations.length}
@@ -102,7 +102,7 @@ export default function RoleIndividualDashboardPage({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+      <div data-dashboard-export-section className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>Mes évaluations reçues</CardTitle>
@@ -131,7 +131,7 @@ export default function RoleIndividualDashboardPage({
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{evaluation.statut}</Badge>
                     {evaluation.note_globale != null ? (
-                      <Badge variant="info">{evaluation.note_globale}/20</Badge>
+                      <Badge variant="info">{evaluation.note_globale}/5</Badge>
                     ) : null}
                     <Button variant="outline" size="sm" onClick={() => navigateTo(`/common/evaluations/${evaluation.id_evaluation}`)}>
                       Consulter
@@ -174,22 +174,26 @@ export default function RoleIndividualDashboardPage({
       </div>
 
       {data.canSeeSelfScore && (
+        <div data-dashboard-export-section>
         <EvolutionCard
           data={evolutionQuery.data}
           isLoading={evolutionQuery.isLoading}
         />
+        </div>
       )}
 
       {data.canSeeSelfScore && (
+        <div data-dashboard-export-section>
         <BenchmarksCard
           criteres={benchmarksQuery.data?.criteres ?? []}
           isLoading={benchmarksQuery.isLoading}
           sujetLabel="Vous"
           description="Votre position par critère face à la moyenne de votre région et aux meilleurs profils."
         />
+        </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div data-dashboard-export-section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <ScoresByTypeCard
           title="Scores par type"
           description="Répartition validée des notes reçues"
@@ -226,7 +230,7 @@ export default function RoleIndividualDashboardPage({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div data-dashboard-export-section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Recommandations</CardTitle>
@@ -258,6 +262,7 @@ export default function RoleIndividualDashboardPage({
         />
       </div>
 
+      <div data-dashboard-export-section>
       <QuickActionsCard
         actions={[
           { label: 'Mes axes', href: '/axes-amelioration' },
@@ -266,6 +271,7 @@ export default function RoleIndividualDashboardPage({
           { label: 'Mon profil', href: '/common/settings' },
         ]}
       />
+      </div>
     </DashboardPageFrame>
   );
 }

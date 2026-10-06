@@ -160,16 +160,7 @@ export class EvaluationsService {
     );
     if (!periodeActive) return false;
 
-    const existing = await this.pg.queryOne(
-      `SELECT 1 FROM evaluations
-       WHERE evaluateur_matricule = $1 AND evalue_matricule = $2 AND id_periode = $3
-       ${idRegle ? 'AND id_regle = $4' : ''}`,
-      idRegle
-        ? [evaluateurMatricule, evalueMatricule, periodeActive.id_periode, idRegle]
-        : [evaluateurMatricule, evalueMatricule, periodeActive.id_periode],
-    );
-
-    return !existing;
+    return true;
   }
 
   async create(evaluateurMatricule: string, evalueMatricule: string, idPeriode: string, idRegle?: string): Promise<Evaluation> {
@@ -195,12 +186,6 @@ export class EvaluationsService {
     if (!periode) {
       throw new BadRequestException('Période non active');
     }
-
-    const existing = await this.pg.queryOne(
-      `SELECT * FROM evaluations WHERE evaluateur_matricule = $1 AND evalue_matricule = $2 AND id_periode = $3`,
-      [evaluateurMatricule, evalueMatricule, idPeriode],
-    );
-    if (existing) return existing;
 
     const typeEvalCalcule = this.determinerType(evaluateur, evalue);
     let typeEval = typeEvalCalcule;

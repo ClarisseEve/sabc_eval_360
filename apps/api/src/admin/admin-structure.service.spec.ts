@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { AdminStructureService } from './admin-structure.service';
 
 /**
@@ -9,14 +9,107 @@ import { AdminStructureService } from './admin-structure.service';
 describe('AdminStructureService — mise à jour de la structure', () => {
   let service: AdminStructureService;
   let prisma: any;
+  let pg: any;
+  let transaction: any;
 
   beforeEach(() => {
+    transaction = {
+      region: {
+        update: jest.fn(),
+        create: jest.fn(),
+        delete: jest.fn(),
+      },
+      serviceCommercial: { updateMany: jest.fn() },
+      utilisateur: { groupBy: jest.fn(), updateMany: jest.fn() },
+    };
     prisma = {
-      serviceCommercial: { findUnique: jest.fn(), update: jest.fn() },
+      region: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      serviceCommercial: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+      utilisateur: { groupBy: jest.fn(), updateMany: jest.fn() },
       district: { findUnique: jest.fn(), update: jest.fn() },
       secteur: { findUnique: jest.fn(), update: jest.fn() },
+      $transaction: jest.fn((callback: (client: typeof transaction) => unknown) => callback(transaction)),
     };
-    service = new AdminStructureService(prisma);
+    pg = { execute: jest.fn().mockResolvedValue(1) };
+    service = new AdminStructureService(prisma, pg);
+  });
+
+  describe('regions', () => {
+    it('retourne le nombre réel d’utilisateurs rattachés à chaque région', async () => {
+      prisma.region.findMany.mockResolvedValue([
+        { id_region: 'RG004', nom_region: 'Nord-Ouest' },
+        { id_region: 'LT', nom_region: 'Littoral' },
+      ]);
+      prisma.utilisateur.groupBy.mockResolvedValue([
+        { id_region: 'RG004', _count: { _all: 12 } },
+        { id_region: 'LT', _count: { _all: 19 } },
+      ]);
+
+      const regions = await service.getRegions();
+
+      expect(regions.map((region: any) => [region.id_region, region._count.utilisateurs])).toEqual([
+        ['RG004', 12],
+        ['LT', 19],
+      ]);
+    });
+
+    it.each([
+      ['Littoral', 'LT'],
+      ['Centre', 'CE'],
+      ['Nord', 'NO'],
+      ['Ouest', 'OU'],
+    ])('crée %s avec son code officiel %s', async (nom_region, id_region) => {
+      await service.createRegion({ id_region, nom_region });
+
+      expect(prisma.region.create).toHaveBeenCalledWith({
+        data: { id_region, nom_region },
+      });
+    });
+
+    it('refuse un code qui ne correspond pas au nom officiel', async () => {
+      await expect(
+        service.createRegion({ id_region: 'RG001', nom_region: 'Littoral' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.region.create).not.toHaveBeenCalled();
+    });
+
+    it('transfère services et utilisateurs quand le code change', async () => {
+      prisma.region.findUnique
+        .mockResolvedValueOnce({ id_region: 'RG001', nom_region: 'Littoral', est_taniere: true })
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      transaction.region.create.mockResolvedValue({ id_region: 'LT', nom_region: 'Littoral' });
+
+      await service.updateRegion('RG001', { id_region: 'LT', nom_region: 'Littoral' });
+
+      expect(pg.execute).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE utilisateurs_ref'),
+        ['LT', 'Littoral', 'taniere', 'RG001'],
+      );
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(transaction.region.update).toHaveBeenCalledWith({
+        where: { id_region: 'RG001' },
+        data: { nom_region: expect.stringMatching(/^__rekey_LT/) },
+      });
+      expect(transaction.region.create).toHaveBeenCalledWith({
+        data: { id_region: 'LT', nom_region: 'Littoral', est_taniere: true },
+      });
+      expect(transaction.region.delete).toHaveBeenCalledWith({ where: { id_region: 'RG001' } });
+      expect(transaction.serviceCommercial.updateMany).toHaveBeenCalledWith({
+        where: { id_region: 'RG001' },
+        data: { id_region: 'LT' },
+      });
+      expect(transaction.utilisateur.updateMany).toHaveBeenCalledWith({
+        where: { id_region: 'RG001' },
+        data: { id_region: 'LT', region_nom: 'Littoral', type_region: 'taniere' },
+      });
+    });
   });
 
   describe('updateService', () => {

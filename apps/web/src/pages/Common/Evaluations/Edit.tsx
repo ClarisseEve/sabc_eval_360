@@ -222,7 +222,7 @@ const EditEvaluation: React.FC = () => {
                 {isOnline
                   ? isSyncing
                     ? 'Synchronisation en cours…'
-                    : `${pendingCount} brouillon(s) non synchronisé(s).`
+                    : `${pendingCount} brouillons locaux sur cet appareil restent à synchroniser. Cela ne signifie pas que cette évaluation est terminée.`
                   : 'Vous êtes hors ligne. Les modifications sont sauvegardées localement et envoyées à la reconnexion.'}
               </span>
               {isOnline && pendingCount > 0 && !isSyncing ? (

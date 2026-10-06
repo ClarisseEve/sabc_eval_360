@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  LabelList,
   ResponsiveContainer,
 } from 'recharts';
 import { Users, Clock, CheckCircle, AlertTriangle, TrendingUp } from 'lucide-react';
@@ -16,6 +17,7 @@ import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button';
 import { EvaluationPageLayout } from '@/pages/Common/Evaluations/shared';
 import api from '@/Services/api';
+import { DashboardExportMenu } from '@/Components/Dashboard/DashboardExportMenu';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -142,6 +144,7 @@ function KpiCard({ icon: Icon, label, value, iconClass = 'text-sabc-red-primary'
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 const ManagerDashboard: React.FC = () => {
+  const dashboardRef = React.useRef<HTMLDivElement>(null);
   const [selectedPeriode, setSelectedPeriode] = useState('');
   const [validationsPage, setValidationsPage] = useState(1);
 
@@ -162,7 +165,10 @@ const ManagerDashboard: React.FC = () => {
 
   return (
     <EvaluationPageLayout pageTitle="Dashboard Manager">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <div ref={dashboardRef} className="mx-auto flex max-w-6xl flex-col gap-6">
+        <div className="flex justify-end">
+          <DashboardExportMenu targetRef={dashboardRef} filename="tableau-de-bord-manager" />
+        </div>
 
         {/* ── Section 1 — Filtre période ── */}
         <Card>
@@ -210,7 +216,7 @@ const ManagerDashboard: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div data-dashboard-export-section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <KpiCard
                 icon={Users}
                 label="Total évaluations attendues"
@@ -250,7 +256,7 @@ const ManagerDashboard: React.FC = () => {
             </div>
 
             {/* ── Section 3 — Tableau subordonnés ── */}
-            <Card>
+            <Card data-dashboard-export-section>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-sabc-red-primary" />
@@ -300,7 +306,7 @@ const ManagerDashboard: React.FC = () => {
             </Card>
 
             {/* ── Section 4 — LineChart Recharts ── */}
-            <Card>
+            <Card data-dashboard-export-section>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-sabc-red-primary" />
@@ -322,7 +328,9 @@ const ManagerDashboard: React.FC = () => {
                       name="Complétées"
                       strokeWidth={2}
                       dot={{ r: 4 }}
-                    />
+                    >
+                      <LabelList dataKey="completes" position="top" fill="#166534" fontSize={9} />
+                    </Line>
                     <Line
                       type="monotone"
                       dataKey="en_attente"
@@ -330,7 +338,9 @@ const ManagerDashboard: React.FC = () => {
                       name="En attente"
                       strokeWidth={2}
                       dot={{ r: 4 }}
-                    />
+                    >
+                      <LabelList dataKey="en_attente" position="top" fill="#9A3412" fontSize={9} />
+                    </Line>
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -339,7 +349,7 @@ const ManagerDashboard: React.FC = () => {
         )}
 
         {/* ── Section 5 — Validations en attente ── */}
-        <Card>
+        <Card data-dashboard-export-section>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-orange-500" />

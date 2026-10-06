@@ -3,6 +3,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -97,12 +98,14 @@ export function ScoresByTypeCard({
         ) : variant === 'chart' ? (
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={entries} layout="vertical" margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+              <BarChart data={entries} layout="vertical" margin={{ top: 10, right: 42, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" horizontal={false} />
                 <XAxis type="number" domain={[0, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                 <YAxis dataKey="type" type="category" width={110} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} tickFormatter={(value) => formatEvaluationType(value)} />
                 <Tooltip formatter={(value: number) => [`${value}/5`, 'Score moyen']} labelFormatter={(value) => formatEvaluationType(value)} />
-                <Bar dataKey="moyenne" fill="#C62828" radius={[0, 10, 10, 0]} />
+                <Bar dataKey="moyenne" fill="#C62828" radius={[0, 10, 10, 0]}>
+                  <LabelList dataKey="moyenne" position="right" formatter={(value: number) => `${value.toFixed(1)}/5`} fill="#7F1D1D" fontSize={10} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

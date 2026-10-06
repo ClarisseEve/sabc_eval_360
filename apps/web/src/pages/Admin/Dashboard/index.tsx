@@ -9,6 +9,7 @@ import { ErrorBoundary } from '@/Components/ErrorBoundary';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { analyticsApi, periodesApi, reglesApi } from '@/Services/api';
 import { useAdminOverviewTabData } from '@/Hooks/queries/useAdminDashboardTabs';
+import { DashboardExportMenu } from '@/Components/Dashboard/DashboardExportMenu';
 import { AdminOverviewMetricsSection } from '@/Components/Dashboard/Admin/Sections/OverviewSections';
 import {
   AlertTriangle,
@@ -56,6 +57,7 @@ const QUICK_LINKS = [
 
 export default function AdminDashboard() {
   const { user } = useAuthContext();
+  const dashboardRef = React.useRef<HTMLDivElement>(null);
 
   const { data: anomalyTotal = 0 } = useQuery({
     queryKey: ['admin', 'dashboard', 'anomalies', 'badge'],
@@ -92,8 +94,11 @@ export default function AdminDashboard() {
     <AppLayout user={layoutUser} pageTitle="Tableau de bord" notifications={[]}>
       <Head title="Tableau de bord - SABC Eval360" />
 
-      <div className="container mx-auto space-y-6 px-4 py-6">
-        <WelcomeMessage userName={layoutUser.name} />
+      <div ref={dashboardRef} className="container mx-auto space-y-6 px-4 py-6">
+        <div className="flex items-start justify-between gap-4">
+          <WelcomeMessage userName={layoutUser.name} />
+          <DashboardExportMenu targetRef={dashboardRef} filename="tableau-de-bord-admin" />
+        </div>
 
         {/* Checklist de configuration */}
         {!isSetupComplete && (
@@ -136,7 +141,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Indicateurs clés en un coup d'œil */}
-        <section>
+        <section data-dashboard-export-section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-semibold text-sabc-gray-900 dark:text-white">Indicateurs clés</h2>
             <Link to="/admin/analytics?tab=overview" className="text-sm font-medium text-sabc-red-primary hover:underline">
@@ -151,7 +156,7 @@ export default function AdminDashboard() {
         </section>
 
         {/* Alertes & état des campagnes */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div data-dashboard-export-section className="grid gap-4 md:grid-cols-2">
           <Link to="/admin/analytics?tab=anomalies" className="block">
             <Card className="transition-shadow hover:shadow-md">
               <CardContent className="flex items-center gap-4 p-5">
@@ -186,7 +191,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Accès rapides */}
-        <section>
+        <section data-dashboard-export-section>
           <h2 className="mb-3 text-base font-semibold text-sabc-gray-900 dark:text-white">Accès rapides</h2>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
             {QUICK_LINKS.map(({ label, caption, href, icon: Icon }) => (

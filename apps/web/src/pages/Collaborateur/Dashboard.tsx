@@ -7,6 +7,7 @@ import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button';
 import { EvaluationPageLayout } from '@/pages/Common/Evaluations/shared';
 import api from '@/Services/api';
+import { DashboardExportMenu } from '@/Components/Dashboard/DashboardExportMenu';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -111,6 +112,7 @@ function StatutBadgeRecue({ statut }: { statut: EvaluationRecue['statut'] }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const CollaborateurDashboard: React.FC = () => {
+  const dashboardRef = React.useRef<HTMLDivElement>(null);
   const { data, isLoading } = useQuery<CollaborateurDashboardData>({
     queryKey: ['dashboard', 'collaborateur'],
     queryFn: fetchCollaborateurDashboard,
@@ -119,11 +121,14 @@ const CollaborateurDashboard: React.FC = () => {
 
   return (
     <EvaluationPageLayout pageTitle="Mon Tableau de Bord">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <div ref={dashboardRef} className="mx-auto flex max-w-6xl flex-col gap-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-semibold text-sabc-gray-900">Mon Tableau de Bord</h1>
-          <p className="mt-1 text-sm text-sabc-gray-500">Suivez vos évaluations et votre score global.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-sabc-gray-900">Mon Tableau de Bord</h1>
+            <p className="mt-1 text-sm text-sabc-gray-500">Suivez vos évaluations et votre score global.</p>
+          </div>
+          <DashboardExportMenu targetRef={dashboardRef} filename="mon-tableau-de-bord" />
         </div>
 
         {/* Loading state */}
@@ -132,7 +137,7 @@ const CollaborateurDashboard: React.FC = () => {
         ) : data ? (
           <>
             {/* ── Section 1 & 2 & 3 — KPI Cards ── */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div data-dashboard-export-section className="grid gap-4 md:grid-cols-3">
               {/* Score Global */}
               <Card>
                 <CardContent className="flex flex-col gap-3 p-6">
@@ -187,7 +192,7 @@ const CollaborateurDashboard: React.FC = () => {
             </div>
 
             {/* ── Section 4 — Évaluations à compléter ── */}
-            <Card>
+            <Card data-dashboard-export-section>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <ClipboardList className="h-5 w-5 text-sabc-red-primary" />
@@ -237,7 +242,7 @@ const CollaborateurDashboard: React.FC = () => {
             </Card>
 
             {/* ── Section 5 — Évaluations reçues ── */}
-            <Card>
+            <Card data-dashboard-export-section>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Inbox className="h-5 w-5 text-sabc-red-primary" />
@@ -285,7 +290,7 @@ const CollaborateurDashboard: React.FC = () => {
             </Card>
 
             {/* Quick actions */}
-            <div className="flex gap-3">
+            <div data-dashboard-export-section className="flex gap-3">
               <Link to="/evaluations/pending">
                 <Button size="sm" className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark">
                   <CheckCircle className="mr-2 h-4 w-4" />

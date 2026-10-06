@@ -95,6 +95,6 @@ describe('ValidationNotationService - intégrité de soumission', () => {
       criteres,
     );
 
-    expect(result).toBe(16);
+    expect(result).toBe(4);
   });
 });

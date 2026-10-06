@@ -6,6 +6,7 @@ import type {
   RuleSection,
   RuleVisibilityPolicy,
 } from '@/types/rules';
+import { resolveKnownRole } from '../config/rbac';
 
 const DEFAULT_SECTION_LABEL = 'Compétences';
 
@@ -259,15 +260,19 @@ export function filterApplicableRules(
   evaluateeRole: string | null | undefined,
   typeEvaluation: string | null | undefined,
 ) {
-  const evaluator = (evaluatorRole ?? '').toUpperCase();
-  const evaluatee = (evaluateeRole ?? '').toUpperCase();
+  const normalizeRoleIdentifier = (role: string | null | undefined) => {
+    const value = (role ?? '').trim();
+    return resolveKnownRole(value) ?? value.toUpperCase();
+  };
+  const evaluator = normalizeRoleIdentifier(evaluatorRole);
+  const evaluatee = normalizeRoleIdentifier(evaluateeRole);
   const type = (typeEvaluation ?? '').toLowerCase();
 
   return rules
     .map((rule) => normalizePublishedRule(rule))
     .filter((rule) => {
-      const matchesEvaluator = !rule.role_evaluateur || String(rule.role_evaluateur).toUpperCase() === evaluator;
-      const matchesEvaluatee = !rule.role_evalue || String(rule.role_evalue).toUpperCase() === evaluatee;
+      const matchesEvaluator = !rule.role_evaluateur || normalizeRoleIdentifier(rule.role_evaluateur) === evaluator;
+      const matchesEvaluatee = !rule.role_evalue || normalizeRoleIdentifier(rule.role_evalue) === evaluatee;
       const matchesType = !rule.type_evaluation || String(rule.type_evaluation).toLowerCase() === type;
       return rule.est_active && matchesEvaluator && matchesEvaluatee && matchesType;
     });

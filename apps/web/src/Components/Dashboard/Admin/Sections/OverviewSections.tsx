@@ -8,6 +8,7 @@ import {
   Cell,
   ComposedChart,
   Legend,
+  LabelList,
   Line,
   Pie,
   PieChart,
@@ -202,7 +203,7 @@ export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[]
 
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={trendData} margin={{ top: 10, right: 8, left: -10, bottom: 0 }}>
+                <ComposedChart data={trendData} margin={{ top: 22, right: 8, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="adminTrendArea" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#E53E3E" stopOpacity={0.24} />
@@ -216,9 +217,13 @@ export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[]
                   <Tooltip content={<ChartTooltip />} />
                   <Legend />
                   <ReferenceLine yAxisId="left" y={3.5} stroke="#94A3B8" strokeDasharray="4 4" />
-                  <Bar yAxisId="right" dataKey="count" fill="#CBD5E1" name="Volume" radius={[10, 10, 0, 0]} barSize={20} />
+                  <Bar yAxisId="right" dataKey="count" fill="#CBD5E1" name="Volume" radius={[10, 10, 0, 0]} barSize={20}>
+                    <LabelList dataKey="count" position="top" fill="#64748B" fontSize={10} />
+                  </Bar>
                   <Area yAxisId="left" type="monotone" dataKey="score" fill="url(#adminTrendArea)" stroke="transparent" name="Tendance" />
-                  <Line yAxisId="left" type="monotone" dataKey="score" stroke="#E53E3E" strokeWidth={3} dot={{ r: 4, fill: '#E53E3E' }} activeDot={{ r: 6 }} name="Score moyen" />
+                  <Line yAxisId="left" type="monotone" dataKey="score" stroke="#E53E3E" strokeWidth={3} dot={{ r: 4, fill: '#E53E3E' }} activeDot={{ r: 6 }} name="Score moyen">
+                    <LabelList dataKey="score" position="top" formatter={(value: number) => value.toFixed(2)} fill="#C62828" fontSize={10} />
+                  </Line>
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -359,14 +364,18 @@ export function RegionalActivitySection({ regionData }: { regionData: RegionActi
         ) : (
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={regionData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              <BarChart data={regionData} margin={{ top: 22, right: 20, left: 0, bottom: 0 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                 <XAxis dataKey="region" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                 <YAxis tickLine={false} axisLine={false} width={36} />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend />
-                <Bar dataKey="utilisateurs" fill="#3182CE" name="Utilisateurs" radius={[6, 6, 0, 0]} barSize={14} />
-                <Bar dataKey="evaluations" fill="#E53E3E" name="Évaluations" radius={[6, 6, 0, 0]} barSize={14} />
+                <Bar dataKey="utilisateurs" fill="#3182CE" name="Utilisateurs" radius={[6, 6, 0, 0]} barSize={14}>
+                  <LabelList dataKey="utilisateurs" position="top" fill="#1E40AF" fontSize={10} />
+                </Bar>
+                <Bar dataKey="evaluations" fill="#E53E3E" name="Évaluations" radius={[6, 6, 0, 0]} barSize={14}>
+                  <LabelList dataKey="evaluations" position="top" fill="#C62828" fontSize={10} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

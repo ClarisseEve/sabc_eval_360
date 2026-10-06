@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Head } from '@/lib/inertia-shim';
+import { DashboardExportMenu } from '@/Components/Dashboard/DashboardExportMenu';
 import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Badge } from '@/Components/UI/Badge/Badge';
@@ -165,21 +166,26 @@ export function DashboardPageFrame({
   degradedSources = [],
   children,
 }: DashboardPageFrameProps) {
+  const dashboardRef = React.useRef<HTMLDivElement>(null);
+
   return (
     <AppLayout user={layoutUser} notifications={[]} pageTitle={title}>
       <Head title={`${title} - SABC Eval360`} />
 
-      <div className="container mx-auto space-y-6 px-4 py-6">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+      <div ref={dashboardRef} className="container mx-auto space-y-6 px-4 py-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-xl font-semibold text-sabc-gray-900 dark:text-white">{title}</h1>
             <p className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{subtitle}</p>
           </div>
-          {periodName ? (
-            <Badge variant="info" className="w-fit">
-              Période active: {periodName}
-            </Badge>
-          ) : null}
+          <div className="flex items-center gap-2 self-start md:self-auto">
+            {periodName ? (
+              <Badge variant="info" className="w-fit">
+                Période active: {periodName}
+              </Badge>
+            ) : null}
+            <DashboardExportMenu targetRef={dashboardRef} filename={title} />
+          </div>
         </div>
 
         {degradedSources.length > 0 && (

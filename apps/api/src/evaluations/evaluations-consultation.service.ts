@@ -100,7 +100,15 @@ export class EvaluationsConsultationService {
         countParams,
       ),
       this.pg.query<any>(
-        `SELECT e.*, r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
+        `SELECT e.*,
+                COUNT(*) OVER (
+                  PARTITION BY e.evaluateur_matricule, e.evalue_matricule, e.id_periode, e.type_evaluation
+                )::int AS total_tentatives,
+                ROW_NUMBER() OVER (
+                  PARTITION BY e.evaluateur_matricule, e.evalue_matricule, e.id_periode, e.type_evaluation
+                  ORDER BY COALESCE(e.date_soumission, e.updated_at, e.created_at), e.created_at, e.id_evaluation
+                )::int AS numero_tentative,
+                r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
          FROM evaluations e
          LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
          ${whereClause}

@@ -23,6 +23,12 @@ import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
 
 const initialForm = { id_region: '', nom_region: '', est_taniere: 'false' };
+const OFFICIAL_REGIONS = [
+  { id_region: 'LT', nom_region: 'Littoral' },
+  { id_region: 'CE', nom_region: 'Centre' },
+  { id_region: 'NO', nom_region: 'Nord' },
+  { id_region: 'OU', nom_region: 'Ouest' },
+];
 
 export default function RegionsIndex() {
   const { data } = useAdminStructure();
@@ -34,6 +40,9 @@ export default function RegionsIndex() {
   const { success, error } = useToast();
 
   const regions = Array.isArray(data?.regions) ? data.regions : [];
+  const availableRegions = OFFICIAL_REGIONS.filter((option) =>
+    !regions.some((region: any) => region.nom_region === option.nom_region && region.id_region !== editingId),
+  );
 
   const handleDelete = async (id: string, nom: string) => {
     const ok = await confirm({
@@ -70,7 +79,7 @@ export default function RegionsIndex() {
   const openEdit = (region: any) => {
     setEditingId(region.id_region);
     setForm({
-      id_region: region.id_region,
+      id_region: OFFICIAL_REGIONS.find((option) => option.nom_region === region.nom_region)?.id_region ?? region.id_region,
       nom_region: region.nom_region,
       est_taniere: String(!!region.est_taniere),
     });
@@ -78,12 +87,11 @@ export default function RegionsIndex() {
   };
 
   const createMutation = useMutation({
-    mutationFn: async () =>
-      adminApi.structure.createRegion({
-        id_region: form.id_region,
-        nom_region: form.nom_region,
-        est_taniere: form.est_taniere === 'true',
-      }),
+    mutationFn: async () => adminApi.structure.createRegion({
+      id_region: form.id_region,
+      nom_region: form.nom_region,
+      est_taniere: form.est_taniere === 'true',
+    }),
     onSuccess: async () => {
       closeModal();
       await refresh();
@@ -93,6 +101,7 @@ export default function RegionsIndex() {
   const updateMutation = useMutation({
     mutationFn: async () =>
       adminApi.structure.updateRegion(editingId!, {
+        id_region: form.id_region,
         nom_region: form.nom_region,
         est_taniere: form.est_taniere === 'true',
       }),
@@ -167,7 +176,7 @@ export default function RegionsIndex() {
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={(region._count?.utilisateurs ?? 0) > 0}
+                        disabled={deleteMutation.isPending}
                         onClick={() => handleDelete(region.id_region, region.nom_region)}
                       >
                         Supprimer
@@ -192,25 +201,39 @@ export default function RegionsIndex() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {!editingId && (
-              <div>
-                <Label htmlFor="id_region">Code région</Label>
-                <Input
-                  id="id_region"
-                  value={form.id_region}
-                  onChange={(e) => setForm((prev) => ({ ...prev, id_region: e.target.value }))}
-                  placeholder="LTL"
-                />
-              </div>
-            )}
             <div>
-              <Label htmlFor="nom_region">Nom</Label>
-              <Input
-                id="nom_region"
+              <Label>Nom de la région</Label>
+              <Select
                 value={form.nom_region}
-                onChange={(e) => setForm((prev) => ({ ...prev, nom_region: e.target.value }))}
-                placeholder="Littoral"
-              />
+                onValueChange={(nom_region) => {
+                  const option = OFFICIAL_REGIONS.find((region) => region.nom_region === nom_region);
+                  setForm((prev) => ({
+                    ...prev,
+                    nom_region,
+                    id_region: option?.id_region ?? '',
+                  }));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une région" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(editingId
+                    ? OFFICIAL_REGIONS.filter((option) =>
+                        !regions.some((region: any) => region.nom_region === option.nom_region && region.id_region !== editingId),
+                      )
+                    : availableRegions
+                  ).map((option) => (
+                    <SelectItem key={option.id_region} value={option.nom_region}>
+                      {option.nom_region}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="id_region">Code attribué automatiquement</Label>
+              <Input id="id_region" value={form.id_region} readOnly />
             </div>
             <div>
               <Label>Type</Label>
@@ -232,7 +255,7 @@ export default function RegionsIndex() {
             <Button
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               onClick={() => (editingId ? updateMutation.mutate() : createMutation.mutate())}
-              disabled={!form.nom_region || (!editingId && !form.id_region) || activeMutation.isPending}
+              disabled={!form.nom_region || !form.id_region || activeMutation.isPending}
             >
               {activeMutation.isPending
                 ? 'Enregistrement...'

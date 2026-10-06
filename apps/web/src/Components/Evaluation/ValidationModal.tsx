@@ -149,7 +149,7 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <span className="text-sm font-medium text-gray-700">Note globale</span>
               <span className={`text-2xl font-bold px-3 py-1 rounded-lg ${overallScoreColor(overallScore)}`}>
-                {overallScore.toFixed(2)}<span className="text-sm font-normal">/20</span>
+                {overallScore.toFixed(2)}<span className="text-sm font-normal">/5</span>
               </span>
             </div>
           )}

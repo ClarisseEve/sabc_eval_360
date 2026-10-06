@@ -1,6 +1,7 @@
 import {
   CartesianGrid,
   Legend,
+  LabelList,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -80,7 +81,15 @@ export function EvolutionCard({
                       dot={{ r: 3 }}
                       // Une période non mesurée ne doit pas casser la courbe.
                       connectNulls
-                    />
+                    >
+                      <LabelList
+                        dataKey={critere}
+                        position="top"
+                        formatter={(value: number | null) => value == null ? '' : value.toFixed(1)}
+                        fill={COULEURS[index % COULEURS.length]}
+                        fontSize={9}
+                      />
+                    </Line>
                   ))}
                 </LineChart>
               </ResponsiveContainer>

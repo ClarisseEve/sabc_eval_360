@@ -227,14 +227,14 @@ const ShowEvaluation: React.FC = () => {
                     >
                       {overallScore != null ? overallScore.toFixed(2) : '—'}
                     </div>
-                    <div className="mt-0.5 text-sm font-medium text-sabc-gray-400">/20</div>
+                    <div className="mt-0.5 text-sm font-medium text-sabc-gray-400">/5</div>
                     {overallScore != null && (
                       <div className="mt-3 h-2 w-20 overflow-hidden rounded-full bg-sabc-gray-200 dark:bg-sabc-gray-700">
                         <div
                           className={`h-full rounded-full transition-all ${
                             getScoreTone(overallScore) === 'success' ? 'bg-sabc-success' : 'bg-sabc-red-primary'
                           }`}
-                          style={{ width: `${Math.min((overallScore / 20) * 100, 100)}%` }}
+                          style={{ width: `${Math.min((overallScore / 5) * 100, 100)}%` }}
                         />
                       </div>
                     )}

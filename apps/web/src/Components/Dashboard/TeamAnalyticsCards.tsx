@@ -89,9 +89,10 @@ export function TeamAxisFrequencyChartCard({
         {axes.length === 0 ? (
           <EmptyState message={emptyMessage} />
         ) : (
-          <div className={heightClassName}>
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsRadarChart data={radarData} margin={{ top: 8, right: 30, left: 30, bottom: 8 }}>
+          <>
+            <div className={heightClassName}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsRadarChart data={radarData} margin={{ top: 8, right: 30, left: 30, bottom: 8 }}>
                 <PolarGrid stroke="var(--sabc-gray-200)" />
                 <PolarAngleAxis
                   dataKey="axe"
@@ -121,9 +122,18 @@ export function TeamAxisFrequencyChartCard({
                   }}
                   formatter={(value: number) => [value, tooltipLabel]}
                 />
-              </RechartsRadarChart>
-            </ResponsiveContainer>
-          </div>
+                </RechartsRadarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-sabc-gray-600 dark:text-sabc-gray-300">
+              {radarData.map((entry) => (
+                <div key={entry.axe} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{entry.axe}</span>
+                  <span className="font-semibold">{entry.value}</span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

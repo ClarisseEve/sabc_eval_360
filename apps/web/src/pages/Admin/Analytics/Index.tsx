@@ -7,11 +7,11 @@ import AppLayout from '@/Components/Layout/app/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/UI/Tabs/Tabs';
 import { ErrorBoundary } from '@/Components/ErrorBoundary';
 import { DashboardSkeleton } from '@/Components/Dashboard/DashboardSkeleton';
+import { DashboardExportMenu } from '@/Components/Dashboard/DashboardExportMenu';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { analyticsApi, periodesApi } from '@/Services/api';
-import { Calendar, FileSpreadsheet, FileText } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
-import { DataExport } from '@/Components/UI/Export/DataExport';
 import { useToast } from '@/Contexts/ToastContext';
 
 const DashboardTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/DashboardTab'));
@@ -44,6 +44,7 @@ function resolveTab(rawValue: string | null): AdminTabValue {
 export default function AdminAnalytics() {
   const { user } = useAuthContext();
   const { error } = useToast();
+  const dashboardRef = React.useRef<HTMLDivElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [exporting, setExporting] = React.useState(false);
   const activeTab = resolveTab(searchParams.get('tab'));
@@ -148,10 +149,13 @@ export default function AdminAnalytics() {
                 </select>
               </div>
             )}
-            <DataExport onExport={(format) => { void downloadExport(format); }} isLoading={exporting} formats={[
-              { id: 'excel', label: 'Excel (.xlsx)', extension: '.xlsx', icon: <FileSpreadsheet className="h-4 w-4" />, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-              { id: 'csv', label: 'CSV (.csv)', extension: '.csv', icon: <FileText className="h-4 w-4" />, mimeType: 'text/csv' },
-            ]} />
+            <DashboardExportMenu
+              targetRef={dashboardRef}
+              filename="analytics-360-dashboard"
+              captureSelector="[role='tabpanel']"
+              onRawExport={(format) => { void downloadExport(format); }}
+              isRawExporting={exporting}
+            />
           </div>
         </div>
 
@@ -168,7 +172,7 @@ export default function AdminAnalytics() {
           </CardContent>
         </Card>
 
-        <Tabs value={activeTab} variant="card" onValueChange={handleTabChange}>
+        <Tabs ref={dashboardRef} value={activeTab} variant="card" onValueChange={handleTabChange}>
           <TabsList className="mb-4 flex w-full flex-nowrap overflow-x-auto scrollbar-hide justify-start gap-2 pb-1">
             {ADMIN_TABS.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value} className="gap-2">

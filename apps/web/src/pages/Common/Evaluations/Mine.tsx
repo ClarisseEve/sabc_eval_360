@@ -259,7 +259,7 @@ const Mine: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="info">
-                      {evaluation.note_globale != null ? `${Number(evaluation.note_globale).toFixed(1)}/20` : '—'}
+                      {evaluation.note_globale != null ? `${Number(evaluation.note_globale).toFixed(1)}/5` : '—'}
                     </Badge>
                     <Button variant="outline" size="sm" onClick={() => { window.location.href = `/evaluations/${evaluation.id_evaluation}`; }}>
                       Voir

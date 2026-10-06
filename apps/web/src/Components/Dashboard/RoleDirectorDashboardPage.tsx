@@ -3,6 +3,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -64,7 +65,7 @@ export default function RoleDirectorDashboardPage({
       periodName={data.dashboard?.periode_active?.nom ?? null}
       degradedSources={data.degradedSources}
     >
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div data-dashboard-export-section className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <MetricCard
           label="Évaluations données"
           value={data.givenEvaluations.length}
@@ -91,7 +92,7 @@ export default function RoleDirectorDashboardPage({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div data-dashboard-export-section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Performance par rôle</CardTitle>
@@ -103,14 +104,18 @@ export default function RoleDirectorDashboardPage({
             ) : (
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.roleBreakdown} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                  <BarChart data={data.roleBreakdown} margin={{ top: 22, right: 20, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" vertical={false} />
                     <XAxis dataKey="role" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                     <YAxis yAxisId="left" domain={[0, 5]} tickLine={false} axisLine={false} width={30} />
                     <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} width={35} />
                     <Tooltip />
-                    <Bar yAxisId="left" dataKey="scoreMoyen" fill="#C62828" name="Score moyen" radius={[6, 6, 0, 0]} />
-                    <Bar yAxisId="right" dataKey="couverture" fill="#1D4ED8" name="Couverture %" radius={[6, 6, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="scoreMoyen" fill="#C62828" name="Score moyen" radius={[6, 6, 0, 0]}>
+                      <LabelList dataKey="scoreMoyen" position="top" formatter={(value: number) => value.toFixed(1)} fill="#7F1D1D" fontSize={9} />
+                    </Bar>
+                    <Bar yAxisId="right" dataKey="couverture" fill="#1D4ED8" name="Couverture %" radius={[6, 6, 0, 0]}>
+                      <LabelList dataKey="couverture" position="top" formatter={(value: number) => `${Math.round(value)}%`} fill="#1E40AF" fontSize={9} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -129,12 +134,14 @@ export default function RoleDirectorDashboardPage({
             ) : (
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.levelBreakdown} layout="vertical" margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                  <BarChart data={data.levelBreakdown} layout="vertical" margin={{ top: 10, right: 50, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" horizontal={false} />
                     <XAxis type="number" domain={[0, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                     <YAxis dataKey="niveau" type="category" width={120} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                     <Tooltip formatter={(value: number) => [`${value}/5`, 'Score moyen']} />
-                    <Bar dataKey="scoreMoyen" fill="#C62828" radius={[0, 10, 10, 0]} />
+                    <Bar dataKey="scoreMoyen" fill="#C62828" radius={[0, 10, 10, 0]}>
+                      <LabelList dataKey="scoreMoyen" position="right" formatter={(value: number) => `${value.toFixed(1)}/5`} fill="#7F1D1D" fontSize={10} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -143,7 +150,7 @@ export default function RoleDirectorDashboardPage({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+      <div data-dashboard-export-section className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <HierarchyChainCard
           title="Chaîne hiérarchique"
           description="Positionnement de votre rôle dans la structure"
@@ -225,6 +232,7 @@ export default function RoleDirectorDashboardPage({
         </div>
       )}
 
+      <div data-dashboard-export-section>
       <TeamMemberAnalyticsTableCard
         title={perimeterTitle}
         description={
@@ -238,8 +246,9 @@ export default function RoleDirectorDashboardPage({
         showTotalEvaluations
         renderIdentityMeta={(member) => member.email ?? ''}
       />
+      </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div data-dashboard-export-section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Validations à arbitrer</CardTitle>
@@ -283,6 +292,7 @@ export default function RoleDirectorDashboardPage({
         />
       </div>
 
+      <div data-dashboard-export-section>
       <QuickActionsCard
         actions={[
           ...(data.toValidateEvaluations.length > 0
@@ -299,6 +309,7 @@ export default function RoleDirectorDashboardPage({
             : []),
         ]}
       />
+      </div>
     </DashboardPageFrame>
   );
 }

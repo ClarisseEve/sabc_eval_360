@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -102,7 +103,7 @@ export default function RoleManagerDashboardPage({
       periodName={data.dashboard?.periode_active?.nom ?? null}
       degradedSources={data.degradedSources}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-dashboard-export-section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Actions à traiter"
           value={data.pendingEvaluations.length + data.toValidateEvaluations.length}
@@ -133,7 +134,7 @@ export default function RoleManagerDashboardPage({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div data-dashboard-export-section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Score moyen par type</CardTitle>
@@ -145,7 +146,7 @@ export default function RoleManagerDashboardPage({
             ) : (
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.teamTypeAverages} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                  <BarChart data={data.teamTypeAverages} margin={{ top: 22, right: 20, left: -10, bottom: 0 }}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
                     <XAxis dataKey="type" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                     <YAxis domain={[0, 5]} tickLine={false} axisLine={false} width={30} />
@@ -160,7 +161,9 @@ export default function RoleManagerDashboardPage({
                         );
                       }}
                     />
-                    <Bar dataKey="moyenne" fill="#C62828" radius={[6, 6, 0, 0]} barSize={20} />
+                    <Bar dataKey="moyenne" fill="#C62828" radius={[6, 6, 0, 0]} barSize={20}>
+                      <LabelList dataKey="moyenne" position="top" formatter={(value: number) => value.toFixed(1)} fill="#7F1D1D" fontSize={10} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -176,6 +179,7 @@ export default function RoleManagerDashboardPage({
         />
       </div>
 
+      <div data-dashboard-export-section>
       <TeamHeatmapCard
         data={heatmapQuery.data}
         isLoading={heatmapQuery.isLoading}
@@ -183,7 +187,9 @@ export default function RoleManagerDashboardPage({
           data.teamMembers.find((member) => member.matricule === matricule)?.nomComplet ?? matricule
         }
       />
+      </div>
 
+      <div data-dashboard-export-section>
       <TeamMemberAnalyticsTableCard
         title={teamTitle}
         description="Suivi consolidé des subordonnés directs"
@@ -193,8 +199,9 @@ export default function RoleManagerDashboardPage({
         renderIdentityMeta={(member) => member.email ?? ''}
         renderRoleMeta={(member) => `Niveau ${member.niveauHierarchique ?? '—'}`}
       />
+      </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div data-dashboard-export-section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Alertes équipe</CardTitle>
@@ -260,6 +267,7 @@ export default function RoleManagerDashboardPage({
         />
       </div>
 
+      <div data-dashboard-export-section>
       <QuickActionsCard
         actions={[
           ...(data.toValidateEvaluations.length > 0
@@ -276,6 +284,7 @@ export default function RoleManagerDashboardPage({
             : []),
         ]}
       />
+      </div>
     </DashboardPageFrame>
   );
 }

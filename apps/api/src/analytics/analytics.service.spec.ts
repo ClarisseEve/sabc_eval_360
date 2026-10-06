@@ -60,6 +60,31 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('getEvaluationGaps', () => {
+    it('compares the latest validated score per evaluation type and retains attempt counts', async () => {
+      mockPg.query
+        .mockResolvedValueOnce([
+          { matricule: 'U001', type_evaluation: 'auto', score: '4.50', nb_evaluations: 2, nb_evaluateurs: 1 },
+          { matricule: 'U001', type_evaluation: 'descendante', score: '3.00', nb_evaluations: 3, nb_evaluateurs: 1 },
+        ])
+        .mockResolvedValueOnce([
+          { matricule: 'U001', type_evaluation: 'auto', critere_id: 'leadership', score: '4.50', niveau_requis: '3', nb_notes: 1 },
+          { matricule: 'U001', type_evaluation: 'descendante', critere_id: 'leadership', score: '3.00', niveau_requis: '3', nb_notes: 1 },
+        ]);
+
+      const result = await service.getEvaluationGaps('U001');
+
+      expect(result.profils[0].types.auto).toEqual(expect.objectContaining({ score: 4.5, nb_evaluations: 2 }));
+      expect(result.profils[0].types.descendante).toEqual(expect.objectContaining({ score: 3, nb_evaluations: 3 }));
+      for (const [sql] of mockPg.query.mock.calls) {
+        expect(sql).toContain('ROW_NUMBER() OVER');
+        expect(sql).toContain('PARTITION BY e.evalue_matricule, e.type_evaluation');
+        expect(sql).toContain('recency_rank = 1');
+        expect(sql).toContain('COALESCE(e.date_soumission, e.updated_at, e.created_at) DESC');
+      }
+    });
+  });
+
   describe('exportEvaluations', () => {
     it('produit un CSV tabulaire avec les colonnes métier et les niveaux de compétence', async () => {
       mockPg.query.mockResolvedValue([
