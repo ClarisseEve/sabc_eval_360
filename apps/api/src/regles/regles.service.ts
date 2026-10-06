@@ -198,6 +198,7 @@ export class ReglesService {
       niveau_requis: 3,
       improvement_axis_code: null,
       recommendation_tags: [],
+      recommendation_text: null,
       commentaire_requis_si_note_lt: null,
     } as any)) });
 
@@ -267,6 +268,7 @@ export class ReglesService {
         niveau_requis: 3,
         improvement_axis_code: null,
         recommendation_tags: [],
+        recommendation_text: null,
         commentaire_requis_si_note_lt: null,
       } as any)) });
       const errors = validateRuleEnvelope(envelope);

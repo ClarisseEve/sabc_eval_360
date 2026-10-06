@@ -12,6 +12,7 @@ import { useAdminUser } from '@/Hooks/queries';
 import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { AdminUsersLayout } from './shared';
+import { scoreOnTwenty } from './evaluation-score';
 
 export default function ShowUser() {
   const { matricule = '' } = useParams();
@@ -79,6 +80,8 @@ export default function ShowUser() {
     : [];
   const totalEvaluations = ['auto', 'pairs', 'descendante'].reduce((sum, type) => sum + typeEvaluationCount(type), 0);
   const maxGap = Number(profileGap?.divergence ?? 0);
+  const profileScoreOnTwenty = scoreOnTwenty(stats.score_moyen);
+  const overallScoreOnTwenty = scoreOnTwenty(scoreData?.score_global);
 
   return (
     <AdminUsersLayout title={`Utilisateur ${matricule}`}>
@@ -98,7 +101,7 @@ export default function ShowUser() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Rôle</div><div className="text-xl font-bold">{user?.role}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Statut</div><div className="text-xl font-bold">{user?.statut}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Score moyen</div><div className="text-xl font-bold">{stats.score_moyen ?? 'N/A'}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Score moyen</div><div className="text-xl font-bold">{profileScoreOnTwenty != null ? `${profileScoreOnTwenty.toFixed(2)}/20` : 'N/A'}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Subordonnés</div><div className="text-xl font-bold">{stats.subordonnes ?? 0}</div></CardContent></Card>
       </div>
 
@@ -111,7 +114,8 @@ export default function ShowUser() {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
               <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-4">
                 <div className="text-xs text-sabc-gray-500">Score global</div>
-                <div className="mt-1 text-2xl font-bold">{scoreData?.score_global != null ? `${Number(scoreData.score_global).toFixed(2)}/5` : '—'}</div>
+                <div className="mt-1 text-2xl font-bold">{overallScoreOnTwenty != null ? `${overallScoreOnTwenty.toFixed(2)}/20` : '—'}</div>
+                <div className="mt-1 text-xs text-sabc-gray-500">Source : {scoreData?.score_global != null ? `${Number(scoreData.score_global).toFixed(2)}/5` : 'non évalué'}</div>
               </div>
               {[
                 ['auto', 'Auto-évaluation'],
@@ -120,7 +124,8 @@ export default function ShowUser() {
               ].map(([type, label]) => (
                 <div key={type} className="rounded-lg border border-sabc-gray-200 bg-white p-4">
                   <div className="text-xs text-sabc-gray-500">{label}</div>
-                  <div className="mt-1 text-2xl font-bold">{typeScore(type) != null ? `${Number(typeScore(type)).toFixed(2)}/5` : '—'}</div>
+                  <div className="mt-1 text-2xl font-bold">{scoreOnTwenty(typeScore(type)) != null ? `${scoreOnTwenty(typeScore(type))!.toFixed(2)}/20` : '—'}</div>
+                  <div className="mt-1 text-xs text-sabc-gray-500">Source : {typeScore(type) != null ? `${Number(typeScore(type)).toFixed(2)}/5` : 'non évalué'}</div>
                   <div className="mt-1 text-xs text-sabc-gray-500">{typeEvaluationCount(type)} évaluation(s)</div>
                 </div>
               ))}
@@ -160,10 +165,25 @@ export default function ShowUser() {
         <Card>
           <CardHeader><CardTitle>Axes d’amélioration et recommandations</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            {axes.slice(0, 5).map((axis: any) => (
-              <div key={axis.critere ?? `${axis.score_actuel ?? axis.moyenne ?? 'axe'}-${Math.random()}`} className="rounded-lg border border-sabc-gray-200 p-3">
-                <div className="font-medium">{axis.critere}</div>
-                <div className="text-sm text-sabc-gray-600">Score actuel : {axis.score_actuel ?? axis.moyenne ?? '—'}/5 · {axis.suggestion ?? 'Formation ciblée recommandée'}</div>
+            {axes.slice(0, 5).map((axis: any, index: number) => (
+              <div key={`${axis.critere ?? 'axe'}-${index}`} className="rounded-lg border border-sabc-gray-200 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-medium">{axis.critere}</div>
+                  <Badge variant={axis.priorite === 'haute' ? 'warning' : 'secondary'}>
+                    {axis.priorite === 'haute' ? 'Priorité haute' : 'À renforcer'}
+                  </Badge>
+                </div>
+                <div className="mt-1 text-sm text-sabc-gray-600">
+                  Score : {axis.score_actuel ?? axis.moyenne ?? '—'}/5 · niveau requis : {axis.niveau_requis ?? '—'}/5 · écart : {axis.ecart ?? '—'} pt(s)
+                </div>
+                <p className="mt-2 text-sm">{axis.suggestion}</p>
+                {axis.objectif_smart ? <p className="mt-1 text-xs text-sabc-gray-500">{axis.objectif_smart}</p> : null}
+                {Array.isArray(axis.commentaires_evaluateurs) && axis.commentaires_evaluateurs.length > 0 ? (
+                  <div className="mt-2 border-t border-sabc-gray-200 pt-2 text-xs text-sabc-gray-600">
+                    <span className="font-medium">Commentaires des évaluateurs : </span>
+                    {axis.commentaires_evaluateurs.join(' · ')}
+                  </div>
+                ) : null}
               </div>
             ))}
             {recommendations.slice(0, 5).map((recommendation: any, index: number) => (

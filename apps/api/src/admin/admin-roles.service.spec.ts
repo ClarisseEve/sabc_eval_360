@@ -40,6 +40,7 @@ describe('AdminRolesService', () => {
 
   beforeEach(() => {
     mockPrisma = {
+      branche: { findUnique: jest.fn().mockResolvedValue({ id_branche: 'BR01' }) },
       role: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
@@ -264,6 +265,17 @@ describe('AdminRolesService', () => {
           id_entite: 'TST2',
         }),
       );
+    });
+
+    it('rejects a branch id that does not exist', async () => {
+      mockPrisma.branche.findUnique.mockResolvedValue(null);
+
+      await expect(service.createRole(
+        { id_role: 'TST3', nom_role: 'Test3', id_branche: 'MISSING' },
+        'admin01',
+        '10.0.0.1',
+      )).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.role.create).not.toHaveBeenCalled();
     });
   });
 });

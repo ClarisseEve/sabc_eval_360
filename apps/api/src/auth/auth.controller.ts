@@ -21,7 +21,7 @@ import { UpdatePasswordDto } from './dto/update-password.dto';
 import { AuditLogService } from '../common/services/audit-log.service';
 
 interface CurrentUserRequest {
-  user: { matricule: string };
+  user: { matricule: string; password_change_required?: boolean };
   ip?: string;
 }
 
@@ -119,13 +119,16 @@ export class AuthController {
     });
     if (!user) throw new BadRequestException('Utilisateur introuvable');
 
-    const valid = await bcrypt.compare(body.current_password, user.password);
-    if (!valid) throw new BadRequestException('Mot de passe actuel incorrect');
+    if (!req.user.password_change_required) {
+      if (!body.current_password) throw new BadRequestException('Le mot de passe actuel est requis');
+      const valid = await bcrypt.compare(body.current_password, user.password);
+      if (!valid) throw new BadRequestException('Mot de passe actuel incorrect');
+    }
 
     const hashed = await bcrypt.hash(body.password, 10);
     await this.prisma.utilisateur.update({
       where: { matricule: req.user.matricule },
-      data: { password: hashed },
+      data: { password: hashed, password_change_required: false },
     });
 
     return { message: 'Mot de passe mis à jour avec succès' };

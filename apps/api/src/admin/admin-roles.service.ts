@@ -170,6 +170,13 @@ export class AdminRolesService {
     ip: string,
   ) {
     const finalData = applyBusinessRules(data as Record<string, unknown>);
+    if (finalData.id_branche) {
+      const branch = await this.prisma.branche.findUnique({
+        where: { id_branche: finalData.id_branche as string },
+        select: { id_branche: true },
+      });
+      if (!branch) throw new BadRequestException('Branche introuvable');
+    }
     const role = await this.prisma.role.create({ data: finalData as Prisma.RoleUncheckedCreateInput });
     await this.auditLog.log({
       matricule_utilisateur: adminMatricule,
@@ -203,6 +210,13 @@ export class AdminRolesService {
     if (!role) throw new NotFoundException('Rôle introuvable');
 
     const finalData = applyBusinessRules(data as Record<string, unknown>);
+    if (finalData.id_branche) {
+      const branch = await this.prisma.branche.findUnique({
+        where: { id_branche: finalData.id_branche as string },
+        select: { id_branche: true },
+      });
+      if (!branch) throw new BadRequestException('Branche introuvable');
+    }
     const updated = await this.prisma.role.update({ where: { id_role: id }, data: finalData as Prisma.RoleUncheckedUpdateInput });
     await this.auditLog.log({
       matricule_utilisateur: adminMatricule,

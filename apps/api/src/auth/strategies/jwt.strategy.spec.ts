@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CacheService } from '../../common/cache.service';
 import { UsersService } from '../../users/users.service';
@@ -17,6 +17,7 @@ describe('JwtStrategy', () => {
     jti: 'session-id',
     exp: 1_900_000_000,
   };
+  const request = { method: 'GET', path: '/api/analytics/dashboard' } as any;
 
   let users: { findAuthByMatricule: jest.Mock };
   let cache: { get: jest.Mock };
@@ -32,6 +33,7 @@ describe('JwtStrategy', () => {
         est_actif: true,
         statut: 'Actif',
         password: passwordHash,
+        password_change_required: false,
       }),
     };
     cache = { get: jest.fn().mockResolvedValue(null) };
@@ -44,11 +46,12 @@ describe('JwtStrategy', () => {
   });
 
   it('reloads and returns the current email, role, and admin flag', async () => {
-    await expect(strategy.validate(payload)).resolves.toEqual({
+    await expect(strategy.validate(request, payload)).resolves.toEqual({
       matricule: 'MAT01',
       email: 'current@sabc.cm',
       role: 'MANAGER',
       is_admin: true,
+      password_change_required: false,
       jti: 'session-id',
       exp: 1_900_000_000,
     });
@@ -58,7 +61,7 @@ describe('JwtStrategy', () => {
   it('rejects a blacklisted logout token before querying the user', async () => {
     cache.get.mockResolvedValue(true);
 
-    await expect(strategy.validate(payload)).rejects.toThrow(
+    await expect(strategy.validate(request, payload)).rejects.toThrow(
       'Session révoquée',
     );
 
@@ -95,7 +98,7 @@ describe('JwtStrategy', () => {
   ])('rejects a %s current account', async (_label, currentUser) => {
     users.findAuthByMatricule.mockResolvedValue(currentUser);
 
-    await expect(strategy.validate(payload)).rejects.toThrow(
+    await expect(strategy.validate(request, payload)).rejects.toThrow(
       UnauthorizedException,
     );
   });
@@ -111,17 +114,33 @@ describe('JwtStrategy', () => {
       password: '$2b$10$new-password-hash',
     });
 
-    await expect(strategy.validate(payload)).rejects.toThrow(
+    await expect(strategy.validate(request, payload)).rejects.toThrow(
       'Session invalide',
     );
   });
 
   it('rejects legacy tokens without jti or password fingerprint', async () => {
     await expect(
-      strategy.validate({ ...payload, jti: undefined } as any),
+      strategy.validate(request, { ...payload, jti: undefined } as any),
     ).rejects.toThrow('Session invalide');
     await expect(
-      strategy.validate({ ...payload, password_fingerprint: undefined } as any),
+      strategy.validate(request, { ...payload, password_fingerprint: undefined } as any),
     ).rejects.toThrow('Session invalide');
+  });
+
+  it('blocks normal API routes until the initial password is changed', async () => {
+    users.findAuthByMatricule.mockResolvedValue({
+      matricule: 'MAT01',
+      email: 'current@sabc.cm',
+      role: 'AGENT',
+      id_region: 'LT',
+      est_admin: false,
+      est_actif: true,
+      statut: 'Actif',
+      password: passwordHash,
+      password_change_required: true,
+    });
+
+    await expect(strategy.validate(request, payload)).rejects.toThrow(ForbiddenException);
   });
 });

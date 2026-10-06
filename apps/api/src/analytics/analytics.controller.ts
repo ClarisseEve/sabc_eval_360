@@ -218,8 +218,11 @@ export class AnalyticsController {
   @Get('admin/roles')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  adminRoles(@Query() filters: DateRangeQueryDto) {
-    return this.service.getAdminRoleAnalytics(filters);
+  adminRoles(
+    @Query() filters: DateRangeQueryDto,
+    @Query('type_evaluation') typeEvaluation?: 'auto' | 'pairs' | 'descendante',
+  ) {
+    return this.service.getAdminRoleAnalytics({ ...filters, type_evaluation: typeEvaluation });
   }
 
   @Get('admin/regions')

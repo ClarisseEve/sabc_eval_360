@@ -24,8 +24,10 @@ export interface RuleCriterion {
   section_label: string;
   section_order: number;
   niveau_requis: number;
+  niveaux: Array<{ niveau: number; description: string }>;
   improvement_axis_code: string | null;
   recommendation_tags: string[];
+  recommendation_text: string | null;
   commentaire_requis_si_note_lt: number | null;
   echelle: {
     min: number;
@@ -132,6 +134,14 @@ function normalizeTags(value: unknown): string[] {
   return [];
 }
 
+function normalizeCompetenceLevels(value: unknown): Array<{ niveau: number; description: string }> {
+  const source = Array.isArray(value) ? value : [];
+  return [1, 2, 3, 4, 5].map((niveau) => {
+    const level = source.find((entry: any) => Number(entry?.niveau) === niveau);
+    return { niveau, description: toNonEmptyString(level?.description, '') };
+  });
+}
+
 function normalizeCriterionId(raw: any, index: number, sectionLabel: string) {
   if (raw?.id != null) return String(raw.id);
   const base = String(raw?.libelle ?? raw?.nom ?? `critere-${index + 1}`)
@@ -164,11 +174,13 @@ export function normalizeRuleCriterion(raw: any, index: number): RuleCriterion {
     section_label: sectionLabel,
     section_order: sectionOrder,
     niveau_requis: toNumber(raw?.niveau_requis, 3),
+    niveaux: normalizeCompetenceLevels(raw?.niveaux),
     improvement_axis_code:
       raw?.improvement_axis_code != null && String(raw.improvement_axis_code).trim().length > 0
         ? String(raw.improvement_axis_code).trim()
         : null,
     recommendation_tags: normalizeTags(raw?.recommendation_tags),
+    recommendation_text: toNonEmptyString(raw?.recommendation_text, '') || null,
     commentaire_requis_si_note_lt:
       raw?.commentaire_requis_si_note_lt == null
         ? DEFAULT_COMMENT_THRESHOLD

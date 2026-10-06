@@ -140,6 +140,7 @@ export class AuthService {
       est_actif: user.est_actif,
       est_admin: user.est_admin,
       statut: user.statut,
+      password_change_required: user.password_change_required,
     };
   }
 
@@ -176,6 +177,7 @@ export class AuthService {
         email: currentUser.email,
         role: currentUser.role,
         is_admin: currentUser.est_admin,
+        password_change_required: currentUser.password_change_required,
       },
     };
   }

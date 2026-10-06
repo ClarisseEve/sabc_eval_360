@@ -96,6 +96,8 @@ function UsersContent() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [searchDebounced, setSearchDebounced] = useState('');
+    const [sortBy, setSortBy] = useState<'name' | 'score'>('score');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
     const [createOpen, setCreateOpen] = useState(false);
@@ -118,7 +120,13 @@ function UsersContent() {
         [debounceTimer],
     );
 
-    const params = { page, limit: 15, ...(searchDebounced ? { search: searchDebounced } : {}) };
+    const params = {
+        page,
+        limit: 15,
+        sort_by: sortBy,
+        sort_order: sortOrder,
+        ...(searchDebounced ? { search: searchDebounced } : {}),
+    };
     const { data: response } = useAdminUsers(params);
     const { data: roles = [], isPending: rolesPending } = useQuery({
         queryKey: ['admin', 'roles'],
@@ -235,11 +243,33 @@ function UsersContent() {
                     <CardTitle>Utilisateurs</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <Input
-                        value={search}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        placeholder="Rechercher par matricule, nom, email, rôle..."
-                    />
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),220px,180px] md:items-end">
+                        <Input
+                            value={search}
+                            onChange={(e) => handleSearch(e.target.value)}
+                            placeholder="Rechercher par matricule, nom, email, rôle..."
+                        />
+                        <div className="space-y-1">
+                            <Label htmlFor="users-sort-by">Trier par</Label>
+                            <Select value={sortBy} onValueChange={(value: 'name' | 'score') => { setSortBy(value); setPage(1); }}>
+                                <SelectTrigger id="users-sort-by"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="score">Score moyen</SelectItem>
+                                    <SelectItem value="name">Nom</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="users-sort-order">Ordre</Label>
+                            <Select value={sortOrder} onValueChange={(value: 'asc' | 'desc') => { setSortOrder(value); setPage(1); }}>
+                                <SelectTrigger id="users-sort-order"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="desc">Du plus élevé au plus faible</SelectItem>
+                                    <SelectItem value="asc">Du plus faible au plus élevé</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
 
                     <Table>
                         <TableHeader>
@@ -247,6 +277,7 @@ function UsersContent() {
                                 <TableHead>Matricule</TableHead>
                                 <TableHead>Nom</TableHead>
                                 <TableHead>Rôle</TableHead>
+                                <TableHead>Score moyen /5</TableHead>
                                 <TableHead>Région</TableHead>
                                 <TableHead>Branche</TableHead>
                                 <TableHead>Statut</TableHead>
@@ -256,7 +287,7 @@ function UsersContent() {
                         <TableBody>
                             {users.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-sabc-gray-500 py-8 text-center">
+                                    <TableCell colSpan={8} className="text-sabc-gray-500 py-8 text-center">
                                         {searchDebounced ? 'Aucun résultat pour cette recherche' : 'Aucun utilisateur'}
                                     </TableCell>
                                 </TableRow>
@@ -271,6 +302,7 @@ function UsersContent() {
                                     <TableCell>
                                         <Badge variant="primary">{user.role}</Badge>
                                     </TableCell>
+                                    <TableCell>{user.score_moyen != null ? `${Number(user.score_moyen).toFixed(2)}/5` : '—'}</TableCell>
                                     <TableCell>{user.region?.nom_region || user.id_region}</TableCell>
                                     <TableCell>{user.branche?.nom_branche || user.id_branche}</TableCell>
                                     <TableCell>

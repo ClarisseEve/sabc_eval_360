@@ -21,14 +21,21 @@ export class AdminUsersController {
     @Query('statut') statut?: string,
     @Query('role') role?: string,
     @Query('id_region') id_region?: string,
+    @Query('id_branche') id_branche?: string,
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('sort_by') sort_by?: 'name' | 'score',
+    @Query('sort_order') sort_order?: 'asc' | 'desc',
+    @Query('score_type') score_type?: 'global' | 'auto' | 'pairs' | 'descendante',
   ) {
     return this.usersService.getUsers({
-      statut, role, id_region, search,
+      statut, role, id_region, id_branche, search,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
+      sort_by,
+      sort_order,
+      score_type,
     });
   }
 

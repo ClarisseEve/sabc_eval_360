@@ -32,6 +32,7 @@ describe('AdminStructureService — mise à jour de la structure', () => {
       },
       serviceCommercial: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -121,6 +122,7 @@ describe('AdminStructureService — mise à jour de la structure', () => {
   describe('createService', () => {
     it('génère le prochain code séquentiel de la région', async () => {
       prisma.region.findUnique.mockResolvedValue({ id_region: 'LT' });
+      prisma.serviceCommercial.findFirst.mockResolvedValue(null);
       prisma.serviceCommercial.findMany.mockResolvedValue([
         { id_service: 'LTSC01' },
         { id_service: 'SVC8K1XQ0' },
@@ -130,6 +132,32 @@ describe('AdminStructureService — mise à jour de la structure', () => {
 
       expect(prisma.serviceCommercial.create).toHaveBeenCalledWith({
         data: { id_service: 'LTSC03', nom_service: 'Service suivant', id_region: 'LT' },
+      });
+    });
+
+    it('refuse un nom déjà utilisé dans la même région', async () => {
+      prisma.region.findUnique.mockResolvedValue({ id_region: 'LT' });
+      prisma.serviceCommercial.findFirst.mockResolvedValue({ id_service: 'LTSC01' });
+
+      await expect(
+        service.createService({ nom_service: 'Service existant', id_region: 'LT' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.serviceCommercial.create).not.toHaveBeenCalled();
+    });
+
+    it('autorise le même nom de service dans une autre région', async () => {
+      prisma.region.findUnique.mockResolvedValue({ id_region: 'OU' });
+      prisma.serviceCommercial.findFirst.mockResolvedValue(null);
+      prisma.serviceCommercial.findMany.mockResolvedValue([]);
+
+      await service.createService({ nom_service: 'Service Commercial I', id_region: 'OU' });
+
+      expect(prisma.serviceCommercial.findFirst).toHaveBeenCalledWith({
+        where: { nom_service: 'Service Commercial I', id_region: 'OU' },
+        select: { id_service: true },
+      });
+      expect(prisma.serviceCommercial.create).toHaveBeenCalledWith({
+        data: { id_service: 'OUSC01', nom_service: 'Service Commercial I', id_region: 'OU' },
       });
     });
   });

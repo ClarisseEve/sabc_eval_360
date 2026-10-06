@@ -42,6 +42,7 @@ export interface User {
   est_actif: boolean;
   est_admin: boolean;
   est_indisponible?: boolean;
+  password_change_required?: boolean;
 
   // Compatibilité
   id?: string;

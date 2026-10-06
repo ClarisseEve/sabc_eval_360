@@ -11,6 +11,13 @@ import { Checkbox } from '@/Components/UI/Checkbox/Checkbox';
 import { templatesApi } from '@/Services/api';
 import { useToast } from '@/Contexts/ToastContext';
 import { AdminEvaluationsLayout } from '../shared';
+import { TemplateCompetenceLevels } from './TemplateCompetenceLevels';
+import {
+  areCompetenceLevelsComplete,
+  createEmptyCompetenceLevels,
+  normalizeCompetenceLevels,
+  type CompetenceLevelDescription,
+} from './template-levels';
 
 /**
  * Page d'édition de template d'évaluation pour l'administrateur
@@ -45,6 +52,8 @@ const TemplateEditPage: React.FC = () => {
       description: string;
       obligatoire: boolean;
       poids: number;
+      niveau_requis: number;
+      niveaux: CompetenceLevelDescription[];
     }>;
   }>>([]);
 
@@ -114,6 +123,8 @@ const TemplateEditPage: React.FC = () => {
           description: competence.description ?? '',
           obligatoire: true,
           poids: Number(competence.poids ?? 0),
+          niveau_requis: Number(competence.niveau_requis ?? 3),
+          niveaux: normalizeCompetenceLevels(competence.niveaux),
         })),
       }));
     const loadedCompetences = loadedSections.flatMap((section) => section.competences);
@@ -164,6 +175,8 @@ const TemplateEditPage: React.FC = () => {
         description: '',
         obligatoire: true,
         poids: 0,
+        niveau_requis: 3,
+        niveaux: createEmptyCompetenceLevels(),
       }]
     }]);
   };
@@ -196,6 +209,8 @@ const TemplateEditPage: React.FC = () => {
             description: '',
             obligatoire: true,
             poids: 0,
+            niveau_requis: 3,
+            niveaux: createEmptyCompetenceLevels(),
           }]
         };
       }
@@ -254,6 +269,7 @@ const TemplateEditPage: React.FC = () => {
       sections.every(section => 
         section.competences.every(comp => comp.libelle.trim() !== '')
       ) &&
+      sections.every(section => section.competences.every((comp) => areCompetenceLevelsComplete(comp.niveaux))) &&
       sections.every(section => section.competences.every(comp => Number(comp.poids) > 0)) &&
       Math.abs(totalPoids - 100) <= 0.01
     );
@@ -273,6 +289,8 @@ const TemplateEditPage: React.FC = () => {
       competences: section.competences.map((competence, compIndex) => ({
         libelle: competence.libelle,
         description: competence.description || undefined,
+        niveau_requis: competence.niveau_requis,
+        niveaux: competence.niveaux,
         ordre: compIndex + 1,
         poids: Number(competence.poids),
       })),
@@ -525,6 +543,13 @@ const TemplateEditPage: React.FC = () => {
                                 className="w-full min-h-[80px] p-2 border border-sabc-gray-200 rounded-md"
                               />
                             </div>
+                            <TemplateCompetenceLevels
+                              idPrefix={`comp-${competence.id}`}
+                              niveauRequis={competence.niveau_requis}
+                              niveaux={competence.niveaux}
+                              onNiveauRequisChange={(niveau) => updateCompetence(section.id, competence.id, 'niveau_requis', niveau)}
+                              onNiveauxChange={(niveaux) => updateCompetence(section.id, competence.id, 'niveaux', niveaux)}
+                            />
                           </div>
                         </div>
                       ))}

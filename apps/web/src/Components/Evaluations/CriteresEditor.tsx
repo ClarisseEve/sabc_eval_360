@@ -4,6 +4,7 @@ import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
+import { Textarea } from '@/Components/UI/Textarea/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import type { RuleCriterion } from '@/types/rules';
 
@@ -23,8 +24,10 @@ function createEmptyCriterion(sectionLabel: string, index: number): RuleCriterio
     section_label: sectionLabel,
     section_order: 1,
     niveau_requis: 3,
+    niveaux: [1, 2, 3, 4, 5].map((niveau) => ({ niveau, description: '' })),
     improvement_axis_code: null,
     recommendation_tags: [],
+    recommendation_text: null,
     commentaire_requis_si_note_lt: 3,
     echelle: { min: 1, max: 5 },
   };
@@ -179,6 +182,28 @@ export default function CriteresEditor({ value, onChange, categories, errors }: 
                 />
               </div>
 
+              <div className="md:col-span-2 space-y-3">
+                <p className="text-sm font-medium text-sabc-gray-800">Comportements attendus par niveau</p>
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {critere.niveaux.map((level) => (
+                    <div key={level.niveau}>
+                      <Label htmlFor={`criterion-${index}-level-${level.niveau}`}>Niveau {level.niveau}</Label>
+                      <Textarea
+                        id={`criterion-${index}-level-${level.niveau}`}
+                        value={level.description}
+                        onChange={(event) => updateCritere(index, {
+                          niveaux: critere.niveaux.map((current) => current.niveau === level.niveau
+                            ? { ...current, description: event.target.value }
+                            : current),
+                        })}
+                        placeholder={`Décrire le comportement attendu au niveau ${level.niveau}...`}
+                        className="min-h-[76px]"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <Label htmlFor={`threshold-${index}`}>Commentaire requis si note &lt;</Label>
                 <Input
@@ -213,6 +238,17 @@ export default function CriteresEditor({ value, onChange, categories, errors }: 
                       .filter(Boolean),
                   })}
                   placeholder="formation, mentorat, coaching"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Label htmlFor={`recommendation-${index}`}>Suggestion de développement</Label>
+                <Textarea
+                  id={`recommendation-${index}`}
+                  value={critere.recommendation_text ?? ''}
+                  onChange={(event) => updateCritere(index, { recommendation_text: event.target.value || null })}
+                  placeholder="Décrire une action de développement adaptée à cette compétence et à ce poste."
+                  className="min-h-[80px]"
                 />
               </div>
 

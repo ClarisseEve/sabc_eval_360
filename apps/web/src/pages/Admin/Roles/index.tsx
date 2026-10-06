@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Badge } from '@/Components/UI/Badge';
 import { Button } from '@/Components/UI/Button';
@@ -49,6 +49,10 @@ export default function RolesIndex() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
   const roles = Array.isArray(data) ? data : [];
+  const { data: branches = [], isPending: branchesPending } = useQuery({
+    queryKey: ['admin', 'structure', 'branches'],
+    queryFn: () => adminApi.structure.branches().then((response) => response.data),
+  });
 
   const closeModal = () => {
     setOpen(false);
@@ -254,7 +258,21 @@ export default function RolesIndex() {
             </div>
             <div>
               <Label htmlFor="id_branche">Branche</Label>
-              <Input id="id_branche" value={form.id_branche} onChange={(e) => setForm((p) => ({ ...p, id_branche: e.target.value.toUpperCase() }))} placeholder="COMM / MKT / ..." />
+              <Select value={form.id_branche} onValueChange={(id_branche) => setForm((current) => ({ ...current, id_branche }))}>
+                <SelectTrigger id="id_branche" aria-label="Branche">
+                  <SelectValue placeholder={branchesPending ? 'Chargement des branches…' : 'Sélectionner une branche'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(branches as Array<{ id_branche: string; nom_branche: string }>).map((branch) => (
+                    <SelectItem key={branch.id_branche} value={branch.id_branche}>
+                      {branch.nom_branche}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!branchesPending && branches.length === 0 ? (
+                <p role="status" className="mt-1 text-xs text-amber-700">Aucune branche disponible; créez d’abord une branche.</p>
+              ) : null}
             </div>
             <div>
               <Label>Niveau</Label>
@@ -295,7 +313,7 @@ export default function RolesIndex() {
             <Button variant="outline" onClick={closeModal}>Annuler</Button>
             <Button
               className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-              disabled={!form.id_role || !form.nom_role || !form.id_branche || createMutation.isPending}
+              disabled={!form.id_role || !form.nom_role || !form.id_branche || branchesPending || branches.length === 0 || createMutation.isPending}
               onClick={() => createMutation.mutate()}
             >
               {createMutation.isPending ? 'Création...' : 'Créer'}

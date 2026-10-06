@@ -35,7 +35,7 @@ export default function DashboardTab({ dateRange }: { dateRange?: { start_date?:
       </div>
 
       <div data-dashboard-export-section>
-        <TopRolesSection topRoles={data.topRoles} />
+        <TopRolesSection topRoles={data.topRoles} dateRange={dateRange} />
       </div>
     </div>
   );

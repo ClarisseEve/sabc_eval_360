@@ -85,6 +85,43 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('getAxesAmelioration', () => {
+    it('compares each competence score with its configured required level', async () => {
+      mockPg.query.mockResolvedValue([
+        {
+          critere: 'Négociation',
+          moyenne: '3.50',
+          niveau_requis: '4',
+          recommendation_text: 'Faire une mise en situation client mensuelle.',
+          nb_evaluations: 2,
+          commentaires: ['Préparer les objections clients.'],
+        },
+        {
+          critere: 'Connaissance produit',
+          moyenne: '3.50',
+          niveau_requis: '3',
+          nb_evaluations: 2,
+          commentaires: [],
+        },
+      ]);
+
+      const result = await service.getAxesAmelioration('U001', 'admin');
+
+      expect(result.axes_amelioration).toHaveLength(1);
+      expect(result.axes_amelioration[0]).toMatchObject({
+        critere: 'Négociation',
+        score_actuel: 3.5,
+        niveau_requis: 4,
+        ecart: 0.5,
+        suggestion: 'Faire une mise en situation client mensuelle.',
+        nb_evaluations: 2,
+        commentaires_evaluateurs: ['Préparer les objections clients.'],
+      });
+      expect(result.forces).toEqual([]);
+      expect(String(mockPg.query.mock.calls[0][0])).toContain("criterion.value->>'niveau_requis'");
+    });
+  });
+
   describe('exportEvaluations', () => {
     it('produit un CSV tabulaire avec les colonnes métier et les niveaux de compétence', async () => {
       mockPg.query.mockResolvedValue([

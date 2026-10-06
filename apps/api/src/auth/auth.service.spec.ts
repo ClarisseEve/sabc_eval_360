@@ -27,6 +27,7 @@ describe('AuthService', () => {
     est_actif: true,
     est_admin: false,
     statut: 'Actif',
+    password_change_required: false,
     nom: 'Dupont',
     prenom: 'Jean',
     photo_url: null,
@@ -271,6 +272,7 @@ describe('AuthService', () => {
         est_actif: true,
         est_admin: true,
         statut: 'Actif',
+        password_change_required: false,
         password: hashedPassword,
       });
 
@@ -311,6 +313,7 @@ describe('AuthService', () => {
         est_actif: false,
         est_admin: false,
         statut: 'Inactif',
+        password_change_required: false,
         password: hashedPassword,
       });
 

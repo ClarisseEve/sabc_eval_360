@@ -73,8 +73,15 @@ export function normalizeRuleCriterion(raw: any, index: number): RuleCriterion {
     section_label: sectionLabel,
     section_order: toNumberValue(raw?.section_order ?? raw?.sectionOrder, 1),
     niveau_requis: toNumberValue(raw?.niveau_requis, 3),
+    niveaux: [1, 2, 3, 4, 5].map((niveau) => {
+      const level = Array.isArray(raw?.niveaux)
+        ? raw.niveaux.find((entry: any) => Number(entry?.niveau) === niveau)
+        : null;
+      return { niveau, description: toStringValue(level?.description) };
+    }),
     improvement_axis_code: toStringValue(raw?.improvement_axis_code) || null,
     recommendation_tags: toTags(raw?.recommendation_tags),
+    recommendation_text: toStringValue(raw?.recommendation_text) || null,
     commentaire_requis_si_note_lt:
       raw?.commentaire_requis_si_note_lt == null ? 3 : toNumberValue(raw?.commentaire_requis_si_note_lt, 3),
     echelle: {
@@ -187,8 +194,10 @@ export function createEmptyRuleBuilderInput(): RuleBuilderInput {
       section_label: DEFAULT_SECTION_LABEL,
       section_order: 1,
       niveau_requis: 3,
+      niveaux: [1, 2, 3, 4, 5].map((niveau) => ({ niveau, description: '' })),
       improvement_axis_code: null,
       recommendation_tags: [],
+      recommendation_text: null,
       commentaire_requis_si_note_lt: 3,
       echelle: { min: 1, max: 5 },
     })),

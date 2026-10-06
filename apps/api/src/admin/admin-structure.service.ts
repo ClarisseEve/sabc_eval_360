@@ -185,6 +185,13 @@ export class AdminStructureService {
   async createService(data: { nom_service: string; id_region: string }) {
     const region = await this.prisma.region.findUnique({ where: { id_region: data.id_region } });
     if (!region) throw new BadRequestException('Région introuvable');
+    const existingService = await this.prisma.serviceCommercial.findFirst({
+      where: { nom_service: data.nom_service, id_region: data.id_region },
+      select: { id_service: true },
+    });
+    if (existingService) {
+      throw new BadRequestException('Un service portant ce nom existe déjà dans cette région');
+    }
     const services = await this.prisma.serviceCommercial.findMany({
       where: { id_region: data.id_region },
       select: { id_service: true },

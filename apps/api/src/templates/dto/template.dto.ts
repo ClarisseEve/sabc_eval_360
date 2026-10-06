@@ -1,5 +1,17 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+
+class TemplateLevelDescriptionDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  niveau!: number;
+
+  @IsString()
+  @MaxLength(2000)
+  description!: string;
+}
 
 class TemplateCompetenceDto {
   @IsString()
@@ -9,11 +21,18 @@ class TemplateCompetenceDto {
   @IsString()
   description?: string;
 
-  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(5)
   niveau_requis?: number;
+
+  @IsArray()
+  @ArrayMinSize(5)
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => TemplateLevelDescriptionDto)
+  niveaux!: TemplateLevelDescriptionDto[];
 
   @IsOptional()
   @Type(() => Number)

@@ -8,11 +8,13 @@ import { Lock, Save } from 'lucide-react';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { profileApi } from '@/Services/api';
 import { formatPersonName } from '@/utils/helpers';
+import { useNavigate } from 'react-router-dom';
 
 export default function Password() {
   const passwordInput = useRef<HTMLInputElement>(null);
   const currentPasswordInput = useRef<HTMLInputElement>(null);
-  const { user } = useAuthContext();
+  const { user, logout } = useAuthContext();
+  const navigate = useNavigate();
   const [data, setData] = useState({
     current_password: '',
     password: '',
@@ -34,9 +36,17 @@ export default function Password() {
     setProcessing(true);
     setErrorMessage(null);
     try {
-      await profileApi.changePassword(data);
+      const passwordChangeRequired = Boolean(user?.password_change_required);
+      await profileApi.changePassword(passwordChangeRequired
+        ? { password: data.password, password_confirmation: data.password_confirmation }
+        : data);
       setData({ current_password: '', password: '', password_confirmation: '' });
       setRecentlySuccessful(true);
+      if (passwordChangeRequired) {
+        window.setTimeout(() => {
+          void logout().finally(() => navigate('/login', { replace: true }));
+        }, 1200);
+      }
       window.setTimeout(() => setRecentlySuccessful(false), 2500);
     } catch (error: any) {
       const message =
@@ -78,10 +88,10 @@ export default function Password() {
                   {errorMessage}
                 </div>
               ) : null}
-              <div>
+              {!user?.password_change_required ? <div>
                 <label htmlFor="current_password" className="mb-2 block text-sm font-medium text-sabc-gray-800">Mot de passe actuel</label>
                 <Input id="current_password" ref={currentPasswordInput} type="password" value={data.current_password} onChange={(e) => setData((p) => ({ ...p, current_password: e.target.value }))} />
-              </div>
+              </div> : <p className="text-sm text-sabc-gray-600">Votre administrateur vous a fourni un mot de passe initial. Définissez maintenant votre mot de passe personnel.</p>}
               <div>
                 <label htmlFor="password" className="mb-2 block text-sm font-medium text-sabc-gray-800">Nouveau mot de passe</label>
                 <Input id="password" ref={passwordInput} type="password" value={data.password} onChange={(e) => setData((p) => ({ ...p, password: e.target.value }))} />

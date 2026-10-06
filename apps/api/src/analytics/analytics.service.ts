@@ -495,12 +495,12 @@ export class AnalyticsService {
     };
   }
 
-  async getAdminRoleAnalytics(filters: { start_date?: string; end_date?: string } = {}) {
-    const cacheKey = `analytics:admin:roles:${filters.start_date ?? 'all'}:${filters.end_date ?? 'all'}`;
+  async getAdminRoleAnalytics(filters: { start_date?: string; end_date?: string; type_evaluation?: string } = {}) {
+    const cacheKey = `analytics:admin:roles:${filters.start_date ?? 'all'}:${filters.end_date ?? 'all'}:${filters.type_evaluation ?? 'global'}`;
     return this.cache.getOrCompute(cacheKey, 120, () => this._getAdminRoleAnalytics(filters));
   }
 
-  private async _getAdminRoleAnalytics(filters: { start_date?: string; end_date?: string } = {}) {
+  private async _getAdminRoleAnalytics(filters: { start_date?: string; end_date?: string; type_evaluation?: string } = {}) {
     const [roles, channels] = await Promise.all([
       this.getAdminRolePerformance(filters),
       this.getPerformances(filters),
@@ -645,70 +645,78 @@ export class AnalyticsService {
   ) {
     const visibilitySql =
       audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL;
-    const evaluations = await this.pg.query<any>(
-      `SELECT e.notations_json, e.type_evaluation, e.note_globale
-       FROM evaluations e
+    const criteria = await this.pg.query<any>(
+      `WITH latest AS (
+         SELECT e.id_evaluation, e.id_regle, e.notations_json,
+                ROW_NUMBER() OVER (
+                  ORDER BY ${EVALUATION_EFFECTIVE_TS_E_SQL} DESC, e.created_at DESC, e.id_evaluation DESC
+                ) AS recency_rank
+         FROM evaluations e
+         LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+         WHERE e.evalue_matricule = $1
+           AND e.statut = 'valide'
+           AND e.notations_json IS NOT NULL
+           AND ${visibilitySql}
+           AND ${ruleVisibilityDetailSql('detailed')}
+       )
+       SELECT COALESCE(criterion.value->>'libelle', note.value->>'nom', note.value->>'critere', note.value->>'critere_id') AS critere,
+              ROUND(AVG(NULLIF(note.value->>'note', '')::numeric), 2) AS moyenne,
+              COALESCE(MAX(NULLIF(criterion.value->>'niveau_requis', '')::numeric), 3) AS niveau_requis,
+              MAX(NULLIF(criterion.value->>'recommendation_text', '')) AS recommendation_text,
+              COUNT(NULLIF(note.value->>'note', ''))::int AS nb_evaluations,
+              ARRAY_AGG(DISTINCT note.value->>'commentaire') FILTER (
+                WHERE note.value->>'commentaire' IS NOT NULL
+              ) AS commentaires
+       FROM latest e
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
-       WHERE e.evalue_matricule = $1
-         AND e.statut = 'valide'
-         AND e.notations_json IS NOT NULL
-         AND ${visibilitySql}
-         AND ${ruleVisibilityDetailSql('detailed')}
-       ORDER BY ${EVALUATION_EFFECTIVE_TS_E_SQL} DESC LIMIT 20`,
+       CROSS JOIN LATERAL jsonb_array_elements(e.notations_json) AS note(value)
+       LEFT JOIN LATERAL jsonb_array_elements(
+         CASE
+           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'object'
+             THEN COALESCE(r.criteres_evaluation_json->'criteres', '[]'::jsonb)
+           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'array'
+             THEN r.criteres_evaluation_json
+           ELSE '[]'::jsonb
+         END
+       ) AS criterion(value) ON criterion.value->>'id' = note.value->>'critere_id'
+       WHERE e.recency_rank <= 20 AND note.value->>'note' IS NOT NULL
+       GROUP BY 1`,
       [matricule],
     );
 
-    if (!evaluations.length) return { axes: [], message: 'Aucune évaluation validée trouvée' };
+    if (!criteria.length) return { axes_amelioration: [], forces: [], total_criteres: 0 };
 
-    // Aggregate scores by criteria
-    const criteriaScores: Record<string, { total: number; count: number; comments: string[] }> = {};
-
-    for (const ev of evaluations) {
-      const notes = typeof ev.notations_json === 'string' ? JSON.parse(ev.notations_json) : ev.notations_json ?? [];
-      for (const note of notes) {
-        const key = note.nom ?? note.critere ?? note.categorie ?? `critere_${Object.keys(criteriaScores).length}`;
-        if (!criteriaScores[key]) criteriaScores[key] = { total: 0, count: 0, comments: [] };
-        if (note.note != null) {
-          criteriaScores[key].total += note.note;
-          criteriaScores[key].count++;
-        }
-        if (note.commentaire && note.note < 3) {
-          criteriaScores[key].comments.push(note.commentaire);
-        }
-      }
-    }
-
-    // Identify weak areas (moyenne < 3/5)
-    const axes = Object.entries(criteriaScores)
-      .map(([critere, data]) => ({
-        critere,
-        moyenne: data.count > 0 ? Math.round((data.total / data.count) * 100) / 100 : 0,
-        nb_evaluations: data.count,
-        commentaires: data.comments.slice(0, 3),
-      }))
-      .filter(a => a.moyenne < 3)
-      .sort((a, b) => a.moyenne - b.moyenne);
-
-    // Generate suggestions
-    const suggestions = axes.map(axe => ({
-      critere: axe.critere,
-      score_actuel: axe.moyenne,
-      priorite: axe.moyenne < 2 ? 'haute' : 'moyenne',
-      suggestion: this.genererSuggestion(axe.critere, axe.moyenne),
-      objectif_smart: this.genererObjectifSmart(axe.critere, axe.moyenne),
-      commentaires_evaluateurs: axe.commentaires,
+    const criteriaScores = criteria.map((row) => ({
+      critere: String(row.critere ?? 'Compétence'),
+      moyenne: Number(row.moyenne),
+      niveau_requis: Number(row.niveau_requis ?? 3),
+      recommendation_text: typeof row.recommendation_text === 'string' ? row.recommendation_text : null,
+      nb_evaluations: Number(row.nb_evaluations ?? 0),
+      commentaires: Array.isArray(row.commentaires) ? row.commentaires.filter(Boolean).slice(0, 3) : [],
     }));
 
-    // Strengths (score >= 4)
-    const forces = Object.entries(criteriaScores)
-      .map(([critere, data]) => ({
-        critere,
-        moyenne: data.count > 0 ? Math.round((data.total / data.count) * 100) / 100 : 0,
-      }))
-      .filter(a => a.moyenne >= 4)
-      .sort((a, b) => b.moyenne - a.moyenne);
+    const axes = criteriaScores
+      .filter((criterion) => criterion.moyenne < criterion.niveau_requis)
+      .sort((left, right) => (left.niveau_requis - left.moyenne) - (right.niveau_requis - right.moyenne));
+    const suggestions = axes.map((axe) => {
+      const ecart = Math.round((axe.niveau_requis - axe.moyenne) * 100) / 100;
+      return {
+        critere: axe.critere,
+        score_actuel: axe.moyenne,
+        niveau_requis: axe.niveau_requis,
+        ecart,
+        nb_evaluations: axe.nb_evaluations,
+        priorite: ecart >= 1 || axe.moyenne < 2 ? 'haute' : 'moyenne',
+        suggestion: axe.recommendation_text || this.genererSuggestion(axe.critere, axe.moyenne, axe.niveau_requis),
+        objectif_smart: this.genererObjectifSmart(axe.critere, axe.moyenne, axe.niveau_requis),
+        commentaires_evaluateurs: axe.commentaires,
+      };
+    });
+    const forces = criteriaScores
+      .filter((criterion) => criterion.moyenne >= 4)
+      .sort((left, right) => right.moyenne - left.moyenne);
 
-    return { axes_amelioration: suggestions, forces, total_criteres: Object.keys(criteriaScores).length };
+    return { axes_amelioration: suggestions, forces, total_criteres: criteriaScores.length };
   }
 
   async getImprovementPlans(filters: ImprovementPlanFilters = {}) {
@@ -1859,34 +1867,26 @@ export class AnalyticsService {
 
   // ─── Private helpers ─────────────────────────────────────────────────────
 
-  private genererSuggestion(critere: string, score: number): string {
+  private genererSuggestion(critere: string, score: number, niveauRequis = 3): string {
     const critLower = critere.toLowerCase();
-    if (critLower.includes('leadership') || critLower.includes('management'))
-      return 'Formation en leadership et gestion d\'équipe recommandée. Participer à des ateliers de coaching.';
-    if (critLower.includes('communication'))
-      return 'Développer les compétences en communication orale et écrite. Exercices de prise de parole.';
-    if (critLower.includes('technique') || critLower.includes('compétence'))
-      return 'Programme de mise à niveau technique. Formations certifiantes dans le domaine concerné.';
-    if (critLower.includes('autonomie'))
-      return 'Confier progressivement des tâches avec moins de supervision. Suivi régulier des résultats.';
-    if (critLower.includes('équipe') || critLower.includes('collaboration'))
-      return 'Participer à des projets transversaux. Exercices de team-building.';
-    if (critLower.includes('innovation'))
-      return 'Encourager la proposition d\'idées nouvelles. Participer à des hackathons internes.';
-    if (critLower.includes('résolution') || critLower.includes('problème'))
-      return 'Formations en pensée analytique et résolution de problèmes complexes.';
-    if (critLower.includes('performance') || critLower.includes('résultat'))
-      return 'Définir des objectifs SMART clairs avec suivi hebdomadaire.';
-    return score < 2
-      ? 'Accompagnement prioritaire avec suivi rapproché et plan d\'action à 30 jours.'
-      : 'Formation ciblée et mentorat recommandés pour progresser sur cet axe.';
+    const ecart = Math.max(0, niveauRequis - score);
+    const action = score < 2
+      ? 'Prévoir un accompagnement prioritaire, une mise en situation et un suivi rapproché.'
+      : critLower.includes('leadership') || critLower.includes('management')
+        ? 'Planifier une mise en situation de leadership avec retour d’expérience du manager.'
+        : critLower.includes('communication')
+          ? 'Pratiquer des situations de communication liées au poste et demander un retour ciblé.'
+          : critLower.includes('équipe') || critLower.includes('collaboration')
+            ? 'Confier une activité de collaboration transverse avec un point de suivi.'
+            : 'Définir une action de mise en pratique et un point de suivi avec le manager.';
+
+    return `${action} Écart au niveau requis : ${ecart.toFixed(2)} point(s) sur 5.`;
   }
 
-  private genererObjectifSmart(critere: string, score: number): string {
-    const objectifScore = Math.min(score + 1, 5);
-    return `Atteindre un score de ${objectifScore.toFixed(1)}/5 sur "${critere}" d'ici 3 mois, `
-      + `mesuré par les évaluations du prochain cycle, `
-      + `via un plan d'action incluant formation et suivi mensuel.`;
+  private genererObjectifSmart(critere: string, score: number, niveauRequis = 3): string {
+    const objectifScore = Math.min(5, Math.max(score + 0.5, niveauRequis));
+    return `Atteindre le niveau requis de ${objectifScore.toFixed(1)}/5 sur "${critere}" d'ici 3 mois, `
+      + `mesuré par les évaluations du prochain cycle, avec un point de suivi mensuel.`;
   }
 
   private sixMonthsAgo(): string {
@@ -2044,13 +2044,19 @@ export class AnalyticsService {
     }));
   }
 
-  private async getAdminRolePerformance(filters: { start_date?: string; end_date?: string } = {}) {
+  private async getAdminRolePerformance(filters: { start_date?: string; end_date?: string; type_evaluation?: string } = {}) {
     const dateJoinCondition = filters.start_date && filters.end_date
       ? `AND ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2`
       : '';
     const dateParams = filters.start_date && filters.end_date
       ? [filters.start_date, filters.end_date]
       : [];
+    const typeJoinCondition = filters.type_evaluation
+      ? `AND e.type_evaluation = $${dateParams.length + 1}`
+      : '';
+    const queryParams = filters.type_evaluation
+      ? [...dateParams, filters.type_evaluation]
+      : dateParams;
     const rows = await this.pg.query<any>(
       `SELECT
          COALESCE(NULLIF(TRIM(u.role), ''), 'Rôle non renseigné') as role,
@@ -2067,11 +2073,12 @@ export class AnalyticsService {
          FROM evaluations evaluation
          LEFT JOIN regles_evaluation rule ON rule.id_regle = evaluation.id_regle
          WHERE ${ruleVisibilitySql('admin', 'rule')}
-       ) e ON e.evalue_matricule = u.matricule ${dateJoinCondition}
+       ) e ON e.evalue_matricule = u.matricule ${dateJoinCondition} ${typeJoinCondition}
        WHERE COALESCE(u.est_actif, true) = true
        GROUP BY COALESCE(NULLIF(TRIM(u.role), ''), 'Rôle non renseigné')
+       ${filters.type_evaluation ? "HAVING COUNT(e.id_evaluation) FILTER (WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL) > 0" : ''}
        ORDER BY avg_score DESC NULLS LAST, count DESC`,
-      dateParams,
+      queryParams,
     );
 
     return rows.map((row: any) => ({

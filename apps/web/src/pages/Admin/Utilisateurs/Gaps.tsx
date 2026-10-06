@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, GraduationCap, ShieldAlert, Table2 } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Legend, Radar, RadarChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, LabelList, Legend, Radar, RadarChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { adminApi, analyticsApi } from '@/Services/api';
 import { useAdminUsers } from '@/Hooks/queries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
@@ -14,6 +14,7 @@ import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminUsersLayout } from './shared';
 import { paginateList } from '@/utils/adminUi';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/Components/UI/Dialog';
+import { DashboardExportMenu } from '@/Components/Dashboard/DashboardExportMenu';
 
 const TYPE_LABELS: Record<string, string> = {
   auto: 'Auto-évaluation',
@@ -48,6 +49,7 @@ function AggregatedScore({ entry }: { entry?: { score?: number | null; nb_evalua
 }
 
 export default function UserGaps() {
+  const chartsRef = useRef<HTMLDivElement>(null);
   const { data: usersData } = useAdminUsers({ limit: 1000 });
   const { data: gapData, isLoading } = useQuery({
     queryKey: ['admin', 'evaluation-gaps'],
@@ -149,11 +151,15 @@ export default function UserGaps() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Radar des écarts de perception</CardTitle>
-          <p className="text-sm text-sabc-gray-600">Cliquez sur le graphique pour consulter le tableau détaillé des profils et des compétences.</p>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Radar des écarts de perception</CardTitle>
+            <p className="mt-1 text-sm text-sabc-gray-600">Cliquez sur le graphique pour consulter le tableau détaillé des profils et des compétences.</p>
+          </div>
+          <DashboardExportMenu targetRef={chartsRef} filename="gaps-evaluation" />
         </CardHeader>
         <CardContent>
+          <div ref={chartsRef} className="space-y-4">
           <div className="mb-5 grid gap-3 rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-4 md:grid-cols-3">
             <label className="text-sm font-medium text-sabc-gray-700">
               Métier
@@ -202,7 +208,9 @@ export default function UserGaps() {
                       <XAxis type="number" domain={[0, 5]} tick={{ fill: 'var(--sabc-gray-500)', fontSize: 12 }} />
                       <YAxis type="category" dataKey="axe" width={132} tick={{ fill: 'var(--sabc-gray-700)', fontSize: 12 }} />
                       <ReferenceLine x={evaluationMedian} stroke="var(--sabc-gray-700)" strokeDasharray="5 5" strokeWidth={2} />
-                      <Bar name="Score moyen / 5" dataKey="score" fill="var(--sabc-red-primary)" radius={[0, 4, 4, 0]} barSize={24} activeBar={false} />
+                      <Bar name="Score moyen / 5" dataKey="score" fill="var(--sabc-red-primary)" radius={[0, 4, 4, 0]} barSize={24} activeBar={false}>
+                        <LabelList dataKey="score" position="right" formatter={(value: number) => `${Number(value).toFixed(2)}/5`} fill="var(--sabc-gray-800)" fontSize={12} />
+                      </Bar>
                       <Tooltip cursor={false} formatter={(value: number) => [`${Number(value).toFixed(2)}/5`, 'Score moyen']} />
                       <Legend content={() => (
                         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-2 text-xs text-sabc-gray-600">
@@ -215,9 +223,19 @@ export default function UserGaps() {
                   </ResponsiveContainer>
                 </div>
               </div>
-              <div className="flex items-center justify-center gap-2 pb-3 text-sm font-medium text-sabc-red-primary"><Table2 className="h-4 w-4" />Cliquer pour ouvrir le tableau des données</div>
+              <div className="grid gap-2 border-t border-sabc-gray-200 pt-3 sm:grid-cols-3" aria-label="Valeurs annotées du radar">
+                {radarData.map((entry) => (
+                  <div key={entry.axe} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-sabc-gray-600">{entry.axe}</span>
+                    <span className="font-semibold text-sabc-gray-900">{entry.hasData ? `${entry.score.toFixed(2)}/5` : 'Non évalué'}</span>
+                  </div>
+                ))}
+                <div className="text-xs text-sabc-gray-500 sm:col-span-3">Médiane : {evaluationMedian.toFixed(2)}/5 · Variance moyenne : {evaluationVariance.toFixed(2)}</div>
+              </div>
+              <div data-html2canvas-ignore="true" className="flex items-center justify-center gap-2 pb-3 text-sm font-medium text-sabc-red-primary"><Table2 className="h-4 w-4" />Cliquer pour ouvrir le tableau des données</div>
             </button>
           ) : null}
+          </div>
         </CardContent>
       </Card>
 

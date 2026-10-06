@@ -409,7 +409,7 @@ export const analyticsApi = {
     api.get('/analytics/admin/overview', { params }),
   exportEvaluations: (format: 'csv' | 'xlsx', params?: { start_date?: string; end_date?: string }) =>
     requestBlob('/analytics/admin/export-evaluations', { params: { format, ...params }, timeout: 120_000 }),
-  adminRoles: (params?: { start_date?: string; end_date?: string }) =>
+  adminRoles: (params?: { start_date?: string; end_date?: string; type_evaluation?: 'auto' | 'pairs' | 'descendante' }) =>
     api.get('/analytics/admin/roles', { params }),
   adminRegionsOverview: (params?: { start_date?: string; end_date?: string }) =>
     api.get('/analytics/admin/regions', { params }),
@@ -517,6 +517,6 @@ export const profileApi = {
       theme?: string;
     };
   }) => api.patch('/auth/profile', data),
-  changePassword: (data: { current_password: string; password: string; password_confirmation: string }) =>
+  changePassword: (data: { current_password?: string; password: string; password_confirmation: string }) =>
     api.post('/auth/change-password', data),
 };

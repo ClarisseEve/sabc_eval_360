@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import type { Request } from 'express';
 import { UsersService } from '../../users/users.service';
 import { CacheService } from '../../common/cache.service';
 import {
@@ -38,11 +39,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: jwtSecret,
       ignoreExpiration: false,
+      passReqToCallback: true,
     });
     this.jwtSecret = jwtSecret;
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(request: Request, payload: JwtPayload) {
     if (
       typeof payload?.sub !== 'string' ||
       typeof payload?.jti !== 'string' ||
@@ -67,6 +69,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Compte indisponible');
     }
 
+    if (currentUser.password_change_required) {
+      const allowedRoute =
+        (request.method === 'GET' && request.path.endsWith('/auth/me')) ||
+        (request.method === 'POST' && request.path.endsWith('/auth/change-password')) ||
+        (request.method === 'POST' && request.path.endsWith('/auth/logout'));
+      if (!allowedRoute) {
+        throw new ForbiddenException('Vous devez modifier votre mot de passe avant de continuer.');
+      }
+    }
+
     const expectedFingerprint = createPasswordFingerprint(
       currentUser.password,
       this.jwtSecret,
@@ -86,6 +98,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: currentUser.role,
       id_region: currentUser.id_region,
       is_admin: currentUser.est_admin,
+      password_change_required: currentUser.password_change_required,
       jti: payload.jti,
       exp: payload.exp,
     };

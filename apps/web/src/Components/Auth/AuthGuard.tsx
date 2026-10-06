@@ -30,6 +30,10 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, requiredRoles })
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  if (user.password_change_required && location.pathname !== '/settings/password') {
+    return <Navigate to="/settings/password" replace />;
+  }
+
   if (requiredRoles && requiredRoles.length > 0) {
     const userRole = (user.role_nom || user.role || '').toUpperCase();
     if (!requiredRoles.includes(userRole) && !user.est_admin) {

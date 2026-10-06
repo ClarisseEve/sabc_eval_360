@@ -142,6 +142,45 @@ describe('AdminUsersService', () => {
     ) as jest.Mocked<AuditLogService>;
   });
 
+  describe('getUsers', () => {
+    it('sorts users by score and keeps users without measurements last', async () => {
+      (prisma.utilisateur.findMany as jest.Mock).mockResolvedValue([
+        makeDbUser({ matricule: 'NONE', nom: 'Sans', prenom: 'Note' }),
+        makeDbUser({ matricule: 'LOW', nom: 'A', prenom: 'Score' }),
+        makeDbUser({ matricule: 'HIGH', nom: 'Z', prenom: 'Score' }),
+      ]);
+      (pg.query as jest.Mock).mockResolvedValue([
+        { matricule: 'LOW', score_moyen: '2.50' },
+        { matricule: 'HIGH', score_moyen: '4.50' },
+      ]);
+
+      const result = await service.getUsers({ sort_by: 'score', sort_order: 'desc', limit: 3 });
+
+      expect(result.data.map((user) => [user.matricule, user.score_moyen])).toEqual([
+        ['HIGH', 4.5],
+        ['LOW', 2.5],
+        ['NONE', null],
+      ]);
+      expect(result.data[0]).not.toHaveProperty('password');
+    });
+
+    it('keeps users without measurements last when sorting ascending', async () => {
+      (prisma.utilisateur.findMany as jest.Mock).mockResolvedValue([
+        makeDbUser({ matricule: 'NONE', nom: 'Sans', prenom: 'Note' }),
+        makeDbUser({ matricule: 'HIGH', nom: 'Z', prenom: 'Score' }),
+        makeDbUser({ matricule: 'LOW', nom: 'A', prenom: 'Score' }),
+      ]);
+      (pg.query as jest.Mock).mockResolvedValue([
+        { matricule: 'HIGH', score_moyen: '4.50' },
+        { matricule: 'LOW', score_moyen: '2.50' },
+      ]);
+
+      const result = await service.getUsers({ sort_by: 'score', sort_order: 'asc', limit: 3 });
+
+      expect(result.data.map((user) => user.matricule)).toEqual(['LOW', 'HIGH', 'NONE']);
+    });
+  });
+
   // ─── createUser ────────────────────────────────────────────────────────────
 
   describe('createUser', () => {

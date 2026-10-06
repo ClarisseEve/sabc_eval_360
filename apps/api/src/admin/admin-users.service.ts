@@ -12,6 +12,7 @@ import { HierarchyService } from '../hierarchy/hierarchy.service';
 import { AuditLogService } from '../common/services/audit-log.service';
 import { CreateUserDto } from './dto/user.dto';
 import { UpdateUserDto } from './dto/user.dto';
+import { ruleVisibilitySql } from '../evaluations/evaluation-visibility';
 
 @Injectable()
 export class AdminUsersService {
@@ -23,18 +24,48 @@ export class AdminUsersService {
     private auditLogService: AuditLogService,
   ) {}
 
+  private async getAverageScores(
+    matricules?: string[],
+    scoreType?: 'auto' | 'pairs' | 'descendante',
+  ): Promise<Map<string, number>> {
+    if (matricules && matricules.length === 0) return new Map();
+
+    const params: unknown[] = [];
+    const typeFilter = scoreType ? `AND e.type_evaluation = $${params.push(scoreType)}` : '';
+    const matriculeFilter = matricules
+      ? `AND e.evalue_matricule = ANY($${params.push(matricules)}::text[])`
+      : '';
+    const rows = await this.pg.query<{ matricule: string; score_moyen: string | number }>(
+      `SELECT e.evalue_matricule AS matricule, ROUND(AVG(e.note_globale)::numeric, 2) AS score_moyen
+       FROM evaluations e
+       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
+       WHERE e.statut = 'valide' AND e.note_globale IS NOT NULL
+         AND ${ruleVisibilitySql('admin')}
+        ${typeFilter} ${matriculeFilter}
+       GROUP BY e.evalue_matricule`,
+      params,
+    );
+
+    return new Map(rows.map((row) => [row.matricule, Number(row.score_moyen)]));
+  }
+
   async getUsers(filters?: {
     statut?: string;
     role?: string;
     id_region?: string;
+    id_branche?: string;
     search?: string;
     page?: number;
     limit?: number;
+    sort_by?: 'name' | 'score';
+    sort_order?: 'asc' | 'desc';
+    score_type?: 'global' | 'auto' | 'pairs' | 'descendante';
   }) {
     const where: any = {};
     if (filters?.statut) where.statut = filters.statut;
     if (filters?.role) where.role = filters.role;
     if (filters?.id_region) where.id_region = filters.id_region;
+    if (filters?.id_branche) where.id_branche = filters.id_branche;
     if (filters?.search?.trim()) {
       const search = filters.search.trim();
       where.OR = [
@@ -51,20 +82,53 @@ export class AdminUsersService {
     const limit = Math.min(100, Math.max(1, filters?.limit ?? 50));
     const skip = (page - 1) * limit;
 
-    const [data, total] = await Promise.all([
-      this.prisma.utilisateur.findMany({
-        where,
-        orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
-        skip,
-        take: limit,
-      }),
-      this.prisma.utilisateur.count({ where }),
-    ]);
+    let data: Array<Omit<Utilisateur, 'password' | 'remember_token'> & { score_moyen: number | null }>;
+    let total: number;
+
+    if (filters?.sort_by === 'score') {
+      const users = await this.prisma.utilisateur.findMany({ where });
+      const scores = await this.getAverageScores(
+        undefined,
+        filters.score_type && filters.score_type !== 'global' ? filters.score_type : undefined,
+      );
+      const direction = filters.sort_order === 'asc' ? 1 : -1;
+      const rankedUsers = users.map((user) => {
+        const { password, remember_token, ...safeUser } = user;
+        return { ...safeUser, score_moyen: scores.get(user.matricule) ?? null };
+      });
+
+      rankedUsers.sort((left, right) => {
+        if (left.score_moyen === null && right.score_moyen !== null) return 1;
+        if (left.score_moyen !== null && right.score_moyen === null) return -1;
+        if (left.score_moyen !== null && right.score_moyen !== null) {
+          const scoreDifference = (left.score_moyen - right.score_moyen) * direction;
+          if (scoreDifference !== 0) return scoreDifference;
+        }
+        return left.nom.localeCompare(right.nom) || left.prenom.localeCompare(right.prenom);
+      });
+
+      total = users.length;
+      data = rankedUsers.slice(skip, skip + limit);
+    } else {
+      const [users, userCount] = await Promise.all([
+        this.prisma.utilisateur.findMany({
+          where,
+          orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
+          skip,
+          take: limit,
+        }),
+        this.prisma.utilisateur.count({ where }),
+      ]);
+      const scores = await this.getAverageScores(users.map((user) => user.matricule));
+      total = userCount;
+      data = users.map((user) => {
+        const { password, remember_token, ...safeUser } = user;
+        return { ...safeUser, score_moyen: scores.get(user.matricule) ?? null };
+      });
+    }
 
     return {
-      data: data.map(
-        ({ password, remember_token, ...rest }: Utilisateur) => rest,
-      ),
+      data,
       meta: {
         total,
         page,
@@ -159,6 +223,7 @@ export class AdminUsersService {
       prenom: data.prenom,
       email: data.email,
       password: hashedPassword,
+      password_change_required: true,
       role: role.nom_role,
       role_nom: role.nom_role,
       id_region: region.id_region,

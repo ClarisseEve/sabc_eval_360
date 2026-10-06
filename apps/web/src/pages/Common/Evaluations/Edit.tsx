@@ -431,7 +431,8 @@ const EditEvaluation: React.FC = () => {
                           key={value}
                           type="button"
                           onClick={() => handleScoreChange(index, value)}
-                          aria-label={`Attribuer la note ${value} sur 5 au critère ${index + 1}`}
+                          aria-label={`Attribuer la note ${value} sur 5 au critère ${index + 1}${critere.niveaux.find((level) => level.niveau === value)?.description ? ` : ${critere.niveaux.find((level) => level.niveau === value)?.description}` : ''}`}
+                          title={critere.niveaux.find((level) => level.niveau === value)?.description || `Niveau ${value} sur 5`}
                           aria-pressed={notes[index]?.note === value}
                           className={cn(
                             'h-9 w-9 rounded-full border text-sm font-semibold transition',
@@ -444,6 +445,11 @@ const EditEvaluation: React.FC = () => {
                         </button>
                       ))}
                     </div>
+                    {notes[index]?.note != null && critere.niveaux.find((level) => level.niveau === notes[index]?.note)?.description ? (
+                      <p className="mt-2 rounded-md bg-sabc-gray-50 p-2 text-xs text-sabc-gray-600">
+                        {critere.niveaux.find((level) => level.niveau === notes[index]?.note)?.description}
+                      </p>
+                    ) : null}
                     {(critere.commentaireRequisSiNoteLt ?? 0) > 0 && (
                       <div className="mt-2 flex items-center gap-1.5 text-xs text-sabc-gray-500">
                         <Info className="h-3.5 w-3.5 shrink-0" />

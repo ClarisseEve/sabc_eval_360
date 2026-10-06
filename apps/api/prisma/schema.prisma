@@ -66,6 +66,7 @@ model Utilisateur {
   preferences_json           Json?
   sexe                       String?             @db.VarChar(10)
   password                   String              @db.VarChar(255)
+  password_change_required   Boolean             @default(false)
   role                       String              @db.VarChar(50)
   manager_matricule          String?             @db.VarChar(5)
   niveau_hierarchique        Int                 @default(0)
@@ -111,7 +112,7 @@ model Utilisateur {
 
 model ServiceCommercial {
   id_service   String        @id @db.VarChar(10)
-  nom_service  String        @unique(map: "services_commerciaux_nom_service_unique") @db.VarChar(100)
+  nom_service  String        @db.VarChar(100)
   id_region    String        @db.VarChar(5)
   description  String?       @db.Text
   est_actif    Boolean       @default(true)
@@ -123,7 +124,7 @@ model ServiceCommercial {
   utilisateurs Utilisateur[]
 
   @@index([id_region, est_actif], map: "services_commerciaux_id_region_est_actif_index")
-  @@index([nom_service], map: "services_commerciaux_nom_service_index")
+  @@unique([nom_service, id_region], map: "services_commerciaux_nom_service_id_region_unique")
   @@map("services_commerciaux")
 }
 

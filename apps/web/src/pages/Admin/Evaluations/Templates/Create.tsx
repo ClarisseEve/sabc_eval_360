@@ -12,6 +12,12 @@ import { Textarea } from '@/Components/UI/Textarea/Textarea';
 import { templatesApi } from '@/Services/api';
 import { useToast } from '@/Contexts/ToastContext';
 import { AdminEvaluationsLayout } from '../shared';
+import { TemplateCompetenceLevels } from './TemplateCompetenceLevels';
+import {
+  areCompetenceLevelsComplete,
+  createEmptyCompetenceLevels,
+  type CompetenceLevelDescription,
+} from './template-levels';
 
 /**
  * Page de création de template d'évaluation pour l'administrateur
@@ -45,6 +51,8 @@ const TemplateCreatePage: React.FC = () => {
       description: string;
       obligatoire: boolean;
       poids: number;
+      niveau_requis: number;
+      niveaux: CompetenceLevelDescription[];
     }>;
   }>>([{
     id: '1',
@@ -57,6 +65,8 @@ const TemplateCreatePage: React.FC = () => {
         description: '',
         obligatoire: true,
         poids: 0,
+        niveau_requis: 3,
+        niveaux: createEmptyCompetenceLevels(),
       }
     ]
   }]);
@@ -125,8 +135,10 @@ const TemplateCreatePage: React.FC = () => {
         id: `${newId}-1`,
         libelle: 'Nouvelle compétence',
         description: '',
-          obligatoire: true,
-          poids: 0,
+        obligatoire: true,
+        poids: 0,
+        niveau_requis: 3,
+        niveaux: createEmptyCompetenceLevels(),
       }]
     }]);
   };
@@ -159,6 +171,8 @@ const TemplateCreatePage: React.FC = () => {
             description: '',
             obligatoire: true,
             poids: 0,
+            niveau_requis: 3,
+            niveaux: createEmptyCompetenceLevels(),
           }]
         };
       }
@@ -218,6 +232,7 @@ const TemplateCreatePage: React.FC = () => {
       sections.every(section => 
         section.competences.every(comp => comp.libelle.trim() !== '')
       ) &&
+      sections.every(section => section.competences.every((comp) => areCompetenceLevelsComplete(comp.niveaux))) &&
       sections.every(section => section.competences.every(comp => Number(comp.poids) > 0)) &&
       Math.abs(totalPoids - 100) <= 0.01
     );
@@ -237,6 +252,8 @@ const TemplateCreatePage: React.FC = () => {
       competences: section.competences.map((competence, compIndex) => ({
         libelle: competence.libelle,
         description: competence.description || undefined,
+        niveau_requis: competence.niveau_requis,
+        niveaux: competence.niveaux,
         ordre: compIndex + 1,
         poids: Number(competence.poids),
       })),
@@ -258,7 +275,7 @@ const TemplateCreatePage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid()) {
-      warning('Veuillez remplir tous les champs obligatoires et ajouter au moins 5 compétences au total.');
+      warning('Renseignez chaque compétence, son niveau requis, ses cinq descriptions de niveau et ajoutez au moins 5 compétences.');
       return;
     }
     createMutation.mutate();
@@ -471,6 +488,13 @@ const TemplateCreatePage: React.FC = () => {
                                 className="min-h-[80px]"
                               />
                             </div>
+                            <TemplateCompetenceLevels
+                              idPrefix={`comp-${competence.id}`}
+                              niveauRequis={competence.niveau_requis}
+                              niveaux={competence.niveaux}
+                              onNiveauRequisChange={(niveau) => updateCompetence(section.id, competence.id, 'niveau_requis', niveau)}
+                              onNiveauxChange={(niveaux) => updateCompetence(section.id, competence.id, 'niveaux', niveaux)}
+                            />
                           </div>
                         </div>
                       ))}

@@ -24,8 +24,10 @@ export interface RuleCriterion {
   section_label: string;
   section_order: number;
   niveau_requis: number;
+  niveaux: Array<{ niveau: number; description: string }>;
   improvement_axis_code: string | null;
   recommendation_tags: string[];
+  recommendation_text: string | null;
   commentaire_requis_si_note_lt: number | null;
   echelle: {
     min: number;

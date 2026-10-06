@@ -39,6 +39,7 @@ export class UsersService {
         est_admin: true,
         statut: true,
         password: true,
+        password_change_required: true,
       },
     });
   }
@@ -58,6 +59,7 @@ export class UsersService {
         est_admin: true,
         statut: true,
         password: true,
+        password_change_required: true,
       },
     });
   }
@@ -78,6 +80,7 @@ export class UsersService {
         role_nom: true,
         est_actif: true,
         est_admin: true,
+        password_change_required: true,
         photo_url: true,
         id_region: true,
         region_nom: true,

@@ -58,6 +58,7 @@ export type EvaluationCriterionView = {
   description: string | null;
   section: string;
   poids: number | null;
+  niveaux: Array<{ niveau: number; description: string }>;
   commentaireRequisSiNoteLt: number | null;
   note: number | null;
   commentaire: string;
@@ -87,6 +88,7 @@ export function buildEvaluationCriteria(evaluation: Record<string, any>): Evalua
       description: null,
       section: 'Compétences',
       poids: null,
+      niveaux: [],
       commentaireRequisSiNoteLt: 3,
       note: note.note ?? null,
       commentaire: note.commentaire ?? '',
@@ -102,6 +104,7 @@ export function buildEvaluationCriteria(evaluation: Record<string, any>): Evalua
       description: critere.description ?? null,
       section: critere.section_label ?? 'Compétences',
       poids: critere.poids ?? null,
+      niveaux: critere.niveaux ?? [],
       commentaireRequisSiNoteLt: critere.commentaire_requis_si_note_lt ?? 3,
       note: matched?.note ?? null,
       commentaire: matched?.commentaire ?? '',
