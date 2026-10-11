@@ -113,7 +113,10 @@ export class AdminUsersService {
       const [users, userCount] = await Promise.all([
         this.prisma.utilisateur.findMany({
           where,
-          orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
+          orderBy: [
+            { nom: filters?.sort_order === 'desc' ? 'desc' : 'asc' },
+            { prenom: filters?.sort_order === 'desc' ? 'desc' : 'asc' },
+          ],
           skip,
           take: limit,
         }),

@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAdminUsers } from '@/Hooks/queries';
 import { adminApi } from '@/Services/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buildCreateUserPayload, initialCreateUserForm, isCreateUserFormValid, type CreateUserForm } from './create-user-contract';
 import { AdminUsersLayout } from './shared';
@@ -98,7 +98,6 @@ function UsersContent() {
     const [searchDebounced, setSearchDebounced] = useState('');
     const [sortBy, setSortBy] = useState<'name' | 'score'>('score');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-    const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
     const [createOpen, setCreateOpen] = useState(false);
     const [createForm, setCreateForm] = useState(initialCreateUserForm);
@@ -107,18 +106,13 @@ function UsersContent() {
     const [editForm, setEditForm] = useState<UpdateUserForm>(initialUpdateUserForm);
     const editMatricule = editSource?.matricule ?? null;
 
-    const handleSearch = useCallback(
-        (value: string) => {
-            setSearch(value);
-            if (debounceTimer) clearTimeout(debounceTimer);
-            const timer = setTimeout(() => {
-                setSearchDebounced(value);
-                setPage(1);
-            }, 350);
-            setDebounceTimer(timer);
-        },
-        [debounceTimer],
-    );
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setSearchDebounced(search.trim());
+            setPage(1);
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [search]);
 
     const params = {
         page,
@@ -243,12 +237,16 @@ function UsersContent() {
                     <CardTitle>Utilisateurs</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),220px,180px] md:items-end">
-                        <Input
-                            value={search}
-                            onChange={(e) => handleSearch(e.target.value)}
-                            placeholder="Rechercher par matricule, nom, email, rôle..."
-                        />
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_210px_210px] lg:items-end">
+                        <div className="space-y-1">
+                            <Label htmlFor="users-search">Rechercher</Label>
+                            <Input
+                                id="users-search"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Matricule, nom, e-mail, rôle..."
+                            />
+                        </div>
                         <div className="space-y-1">
                             <Label htmlFor="users-sort-by">Trier par</Label>
                             <Select value={sortBy} onValueChange={(value: 'name' | 'score') => { setSortBy(value); setPage(1); }}>
@@ -264,8 +262,8 @@ function UsersContent() {
                             <Select value={sortOrder} onValueChange={(value: 'asc' | 'desc') => { setSortOrder(value); setPage(1); }}>
                                 <SelectTrigger id="users-sort-order"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="desc">Du plus élevé au plus faible</SelectItem>
-                                    <SelectItem value="asc">Du plus faible au plus élevé</SelectItem>
+                                    <SelectItem value="desc">{sortBy === 'score' ? 'Du plus élevé au plus faible' : 'Z à A'}</SelectItem>
+                                    <SelectItem value="asc">{sortBy === 'score' ? 'Du plus faible au plus élevé' : 'A à Z'}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -302,7 +300,7 @@ function UsersContent() {
                                     <TableCell>
                                         <Badge variant="primary">{user.role}</Badge>
                                     </TableCell>
-                                    <TableCell>{user.score_moyen != null ? `${Number(user.score_moyen).toFixed(2)}/5` : '—'}</TableCell>
+                                    <TableCell>{user.score_moyen != null ? `${Number(user.score_moyen).toFixed(2)}/5` : 'Non évalué'}</TableCell>
                                     <TableCell>{user.region?.nom_region || user.id_region}</TableCell>
                                     <TableCell>{user.branche?.nom_branche || user.id_branche}</TableCell>
                                     <TableCell>

@@ -179,6 +179,19 @@ describe('AdminUsersService', () => {
 
       expect(result.data.map((user) => user.matricule)).toEqual(['LOW', 'HIGH', 'NONE']);
     });
+
+    it('sorts names in the selected direction', async () => {
+      (prisma.utilisateur.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.utilisateur.count as jest.Mock).mockResolvedValue(0);
+
+      await service.getUsers({ sort_by: 'name', sort_order: 'desc' });
+
+      expect(prisma.utilisateur.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ nom: 'desc' }, { prenom: 'desc' }],
+        }),
+      );
+    });
   });
 
   // ─── createUser ────────────────────────────────────────────────────────────

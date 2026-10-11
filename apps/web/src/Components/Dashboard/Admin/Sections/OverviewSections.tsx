@@ -24,11 +24,9 @@ import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { EmptyState } from '@/Components/Dashboard/RoleDashboardShared';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/Components/UI/Dialog/Dialog';
 import { Label } from '@/Components/UI/Label/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
-import { adminApi, analyticsApi } from '@/Services/api';
-import { scoreOnTwenty } from '@/pages/Admin/Utilisateurs/evaluation-score';
+import { analyticsApi } from '@/Services/api';
 
 const STATUS_COLORS = ['#48BB78', '#D69E2E', '#FF9800', '#3182CE'];
 
@@ -398,56 +396,26 @@ export function TopRolesSection({
   topRoles: TopRoleEntry[];
   dateRange?: { start_date?: string; end_date?: string };
 }) {
-  const [rankingMode, setRankingMode] = useState<'roles' | 'personnel'>('roles');
   const [scoreType, setScoreType] = useState<'global' | 'auto' | 'pairs' | 'descendante'>('global');
   const [topCount, setTopCount] = useState('6');
-  const [branchId, setBranchId] = useState('');
-  const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  const { data: branches = [] } = useQuery({
-    queryKey: ['admin', 'structure', 'branches'],
-    queryFn: () => adminApi.structure.branches().then((response) => response.data),
-  });
   const { data: roleAnalytics, isPending: rolesPending } = useQuery({
     queryKey: ['admin', 'dashboard', 'role-ranking', dateRange?.start_date, dateRange?.end_date, scoreType],
     queryFn: () => analyticsApi.adminRoles({
       ...dateRange,
       ...(scoreType === 'global' ? {} : { type_evaluation: scoreType }),
     }).then((response) => response.data),
-    enabled: rankingMode === 'roles',
-  });
-  const { data: usersResponse, isPending: usersPending } = useQuery({
-    queryKey: ['admin', 'dashboard', 'person-ranking', branchId, topCount, scoreType],
-    queryFn: () => adminApi.users.list({
-      page: 1,
-      limit: Number(topCount),
-      id_branche: branchId,
-      sort_by: 'score',
-      sort_order: 'desc',
-      score_type: scoreType,
-    }).then((response) => response.data),
-    enabled: rankingMode === 'personnel' && Boolean(branchId),
-  });
-  const { data: selectedScores, isPending: selectedScoresPending } = useQuery({
-    queryKey: ['analytics', 'scores', selectedUser?.matricule],
-    queryFn: () => analyticsApi.scores(selectedUser.matricule).then((response) => response.data),
-    enabled: Boolean(selectedUser?.matricule),
   });
 
   const roleRows = Array.isArray(roleAnalytics?.roles)
     ? roleAnalytics.roles.slice(0, Number(topCount))
     : scoreType === 'global' ? topRoles.slice(0, Number(topCount)) : [];
-  const userRows = Array.isArray(usersResponse?.data)
-    ? usersResponse.data.filter((person: any) => person.score_moyen != null)
-    : [];
   const scoreTypes = [
     { value: 'global', label: 'Score général' },
     { value: 'auto', label: 'Auto-évaluation' },
     { value: 'pairs', label: 'Évaluation par les pairs' },
     { value: 'descendante', label: 'Évaluation descendante' },
   ] as const;
-  const scoreTypeLabel = scoreTypes.find((option) => option.value === scoreType)?.label ?? 'Score général';
-  const typeScore = (type: string) => selectedScores?.par_type?.find((entry: any) => entry.type === type)?.moyenne ?? null;
 
   return (
     <Card>
@@ -456,20 +424,10 @@ export function TopRolesSection({
           <MapPinned className="h-5 w-5 text-sabc-red-primary" />
           Rôles les plus performants
         </CardTitle>
-        <CardDescription>Classement des rôles ou du personnel selon l’axe sélectionné.</CardDescription>
+        <CardDescription>Classement des rôles selon l’axe d’analyse sélectionné.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-1">
-            <Label htmlFor="ranking-mode">Classement</Label>
-            <Select value={rankingMode} onValueChange={(value: 'roles' | 'personnel') => setRankingMode(value)}>
-              <SelectTrigger id="ranking-mode"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="roles">Rôles</SelectItem>
-                <SelectItem value="personnel">Personnel</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <div className="space-y-1">
             <Label htmlFor="ranking-axis">Axe d’analyse</Label>
             <Select value={scoreType} onValueChange={(value: typeof scoreType) => setScoreType(value)}>
@@ -489,109 +447,34 @@ export function TopRolesSection({
               </SelectContent>
             </Select>
           </div>
-          {rankingMode === 'personnel' ? (
-            <div className="space-y-1">
-              <Label htmlFor="ranking-branch">Branche</Label>
-              <Select value={branchId} onValueChange={setBranchId}>
-                <SelectTrigger id="ranking-branch"><SelectValue placeholder="Sélectionner une branche" /></SelectTrigger>
-                <SelectContent>
-                  {(branches as Array<{ id_branche: string; nom_branche: string }>).map((branch) => (
-                    <SelectItem key={branch.id_branche} value={branch.id_branche}>{branch.nom_branche}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
         </div>
 
-        {rankingMode === 'roles' ? (
-          rolesPending ? <p role="status" className="py-6 text-center text-sm text-sabc-gray-500">Chargement du classement…</p> :
-          roleRows.length === 0 ? <EmptyState message="Aucune performance disponible pour cet axe." /> : (
-            <div className="space-y-2">
-              {roleRows.map((role: TopRoleEntry, index: number) => (
-                <div key={role.role} className="flex flex-col gap-3 rounded-lg border border-sabc-gray-200 p-4 md:flex-row md:items-center md:justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="w-8 text-sm font-semibold text-sabc-gray-500">{index + 1}.</span>
-                    <div>
-                      <div className="font-medium text-sabc-gray-900 dark:text-white">{role.role}</div>
-                      <div className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
-                        {role.count ?? 0} utilisateur(s) · complétion {Math.round(Number(role.completion ?? 0))}%
-                      </div>
+        {rolesPending ? (
+          <p role="status" className="py-6 text-center text-sm text-sabc-gray-500">Chargement du classement…</p>
+        ) : roleRows.length === 0 ? (
+          <EmptyState message="Aucune performance disponible pour cet axe." />
+        ) : (
+          <div className="space-y-2">
+            {roleRows.map((role: TopRoleEntry, index: number) => (
+              <div key={role.role} className="flex flex-col gap-3 rounded-lg border border-sabc-gray-200 p-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="w-8 text-sm font-semibold text-sabc-gray-500">{index + 1}.</span>
+                  <div>
+                    <div className="font-medium text-sabc-gray-900 dark:text-white">{role.role}</div>
+                    <div className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
+                      {role.count ?? 0} utilisateur(s) · complétion {Math.round(Number(role.completion ?? 0))}%
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="info">{Number(role.avgScore ?? 0).toFixed(2)}/5</Badge>
-                    <Link to="/admin/analytics?tab=roles"><Button variant="outline" size="sm">Analyse par rôle</Button></Link>
-                  </div>
                 </div>
-              ))}
-            </div>
-          )
-        ) : !branchId ? (
-          <EmptyState message="Sélectionnez une branche pour afficher son classement." />
-        ) : usersPending ? (
-          <p role="status" className="py-6 text-center text-sm text-sabc-gray-500">Chargement du classement…</p>
-        ) : userRows.length === 0 ? (
-          <EmptyState message="Aucun résultat mesuré pour cette branche et cet axe." />
-        ) : (
-          <div className="divide-y divide-sabc-gray-200">
-            {userRows.map((person: any, index: number) => {
-              const score = scoreOnTwenty(person.score_moyen);
-              return (
-                <button
-                  key={person.matricule}
-                  type="button"
-                  onClick={() => setSelectedUser(person)}
-                  className="flex w-full items-center justify-between gap-4 py-3 text-left hover:bg-sabc-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary"
-                >
-                  <span className="flex min-w-0 items-center gap-3">
-                    <span className="w-8 shrink-0 text-sm font-semibold text-sabc-gray-500">{index + 1}.</span>
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium text-sabc-gray-900">{[person.prenom, person.nom].filter(Boolean).join(' ')}</span>
-                      <span className="block truncate text-xs text-sabc-gray-500">{person.role} · {person.matricule}</span>
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="block font-semibold text-sabc-gray-900">{score != null ? `${score.toFixed(2)}/20` : '—'}</span>
-                    <span className="block text-xs text-sabc-gray-500">Moyenne source /5</span>
-                  </span>
-                </button>
-              );
-            })}
+                <div className="flex items-center gap-3">
+                  <Badge variant="info">{Number(role.avgScore ?? 0).toFixed(2)}/5</Badge>
+                  <Link to="/admin/analytics?tab=roles"><Button variant="outline" size="sm">Analyse par rôle</Button></Link>
+                </div>
+              </div>
+            ))}
           </div>
         )}
-        {rankingMode === 'personnel' && branchId ? (
-          <p className="text-xs text-sabc-gray-500">Axe classé : {scoreTypeLabel}. Les personnes sans note sont exclues.</p>
-        ) : null}
       </CardContent>
-
-      <Dialog open={Boolean(selectedUser)} onOpenChange={(open) => { if (!open) setSelectedUser(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{selectedUser ? [selectedUser.prenom, selectedUser.nom].filter(Boolean).join(' ') : 'Détail du classement'}</DialogTitle>
-            <DialogDescription>{selectedUser ? `${selectedUser.role} · ${selectedUser.matricule}` : ''}</DialogDescription>
-          </DialogHeader>
-          {selectedScoresPending ? <p className="text-sm text-sabc-gray-500">Chargement des évaluations…</p> : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                ['auto', 'Auto-évaluation'],
-                ['pairs', 'Évaluation par les pairs'],
-                ['descendante', 'Évaluation descendante'],
-              ].map(([type, label]) => {
-                const source = typeScore(type);
-                const score = scoreOnTwenty(source);
-                return (
-                  <div key={type} className="rounded-md border border-sabc-gray-200 p-3">
-                    <div className="text-sm text-sabc-gray-500">{label}</div>
-                    <div className="mt-1 font-semibold">{score != null ? `${score.toFixed(2)}/20` : 'Non évalué'}</div>
-                    <div className="text-xs text-sabc-gray-500">Source : {source != null ? `${Number(source).toFixed(2)}/5` : '—'}</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 }
