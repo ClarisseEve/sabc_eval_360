@@ -171,6 +171,15 @@ export class EvaluationsService {
       throw new NotFoundException('Évaluateur ou évalué introuvable');
     }
 
+    const isAdminEvaluator = Boolean(evaluateur.est_admin) ||
+      String(evaluateur.role_nom ?? evaluateur.role ?? '').toUpperCase() === 'ADMIN';
+    if (isAdminEvaluator) {
+      const isActive = (user: any) => user.statut === 'Actif' && user.est_actif && !user.est_indisponible;
+      if (!isActive(evaluateur) || !isActive(evalue)) {
+        throw new ForbiddenException('L’évaluateur et la cible doivent être actifs et disponibles');
+      }
+    }
+
     await this.syncUserRefs([evaluateur, evalue]);
 
     const periode = await this.pg.queryOne<any>(
@@ -220,7 +229,7 @@ export class EvaluationsService {
       const actualEvaluatorRole = String(evaluateur.role_nom ?? evaluateur.role ?? '').toUpperCase();
       const actualTargetRole = String(evalue.role_nom ?? evalue.role ?? '').toUpperCase();
 
-      if (expectedEvaluatorRole && expectedEvaluatorRole !== actualEvaluatorRole) {
+      if (!isAdminEvaluator && expectedEvaluatorRole && expectedEvaluatorRole !== actualEvaluatorRole) {
         throw new BadRequestException("Le rôle évaluateur ne correspond pas à la règle sélectionnée");
       }
 
@@ -231,11 +240,11 @@ export class EvaluationsService {
       const envelope = parseRuleEnvelope(normalizedRule.criteres_evaluation_json);
       const constraints = (normalizedRule.criteres_evaluation_json as any)?.constraints ?? {};
 
-      if (constraints.meme_region_obligatoire && evaluateur.id_region !== evalue.id_region) {
+      if (!isAdminEvaluator && constraints.meme_region_obligatoire && evaluateur.id_region !== evalue.id_region) {
         throw new BadRequestException('Cette règle impose une évaluation dans la même région');
       }
 
-      if (constraints.meme_branche_obligatoire && evaluateur.id_branche !== evalue.id_branche) {
+      if (!isAdminEvaluator && constraints.meme_branche_obligatoire && evaluateur.id_branche !== evalue.id_branche) {
         throw new BadRequestException('Cette règle impose une évaluation dans la même branche');
       }
 
@@ -251,7 +260,7 @@ export class EvaluationsService {
     }
 
     const eligibilityType = this.toEligibilityType(typeEval);
-    if (eligibilityType) {
+    if (eligibilityType && !isAdminEvaluator) {
       const eligibility = await this.eligibility.canEvaluate(
         evaluateurMatricule,
         evalueMatricule,
@@ -789,6 +798,22 @@ export class EvaluationsService {
     // Get users the current user can evaluate: subordinates + peers in same region
     const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
     if (!user) return [];
+
+    const isAdmin = Boolean(user.est_admin) ||
+      String(user.role_nom ?? user.role ?? '').toUpperCase() === 'ADMIN';
+    if (isAdmin) {
+      const collaborateurs = await this.prisma.utilisateur.findMany({
+        where: {
+          matricule: { not: matricule },
+          statut: 'Actif',
+          est_actif: true,
+          est_indisponible: false,
+        },
+        select: { matricule: true, nom: true, prenom: true, role: true, role_nom: true },
+      });
+
+      return { auto: null, collaborateurs, subordonnes: [], pairs: [] };
+    }
 
     const [subordinates, peers] = await Promise.all([
       this.prisma.utilisateur.findMany({

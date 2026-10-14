@@ -300,7 +300,13 @@ function UsersContent() {
                                     <TableCell>
                                         <Badge variant="primary">{user.role}</Badge>
                                     </TableCell>
-                                    <TableCell>{user.score_moyen != null ? `${Number(user.score_moyen).toFixed(2)}/5` : 'Non évalué'}</TableCell>
+                                    <TableCell>
+                                        {user.score_moyen != null ? (
+                                            <span className={Number(user.score_moyen) < 3 ? 'font-medium text-sabc-error' : Number(user.score_moyen) > 3 ? 'font-medium text-sabc-success' : ''}>
+                                                {`${Number(user.score_moyen).toFixed(2)}/5`}
+                                            </span>
+                                        ) : 'Non évalué'}
+                                    </TableCell>
                                     <TableCell>{user.region?.nom_region || user.id_region}</TableCell>
                                     <TableCell>{user.branche?.nom_branche || user.id_branche}</TableCell>
                                     <TableCell>

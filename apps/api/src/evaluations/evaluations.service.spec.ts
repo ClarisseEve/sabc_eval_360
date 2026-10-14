@@ -96,6 +96,36 @@ describe('EvaluationsService', () => {
     );
   });
 
+  describe('getEligibles', () => {
+    it('returns active and available colleagues for an admin, excluding the admin', async () => {
+      const admin = {
+        matricule: 'ADM1',
+        role: 'ADMIN',
+        role_nom: 'ADMIN',
+        est_admin: true,
+        statut: 'Actif',
+        est_actif: true,
+        est_indisponible: false,
+      };
+      const colleagues = [{ matricule: 'M2', nom: 'Cible', prenom: 'Cam', role: 'CDS', role_nom: 'CDS' }];
+      mockPrisma.utilisateur.findUnique.mockResolvedValue(admin);
+      mockPrisma.utilisateur.findMany.mockResolvedValueOnce(colleagues);
+
+      const result = await service.getEligibles('ADM1');
+
+      expect(result).toEqual({ auto: null, collaborateurs: colleagues, subordonnes: [], pairs: [] });
+      expect(mockPrisma.utilisateur.findMany).toHaveBeenCalledWith({
+        where: {
+          matricule: { not: 'ADM1' },
+          statut: 'Actif',
+          est_actif: true,
+          est_indisponible: false,
+        },
+        select: { matricule: true, nom: true, prenom: true, role: true, role_nom: true },
+      });
+    });
+  });
+
   describe('findById', () => {
     it('should return evaluation when found', async () => {
       const eval_ = { id_evaluation: 'uuid-1', statut: 'brouillon', evaluateur_matricule: 'M1', evalue_matricule: 'M2' };
@@ -724,6 +754,44 @@ describe('EvaluationsService', () => {
       expect(periodCheckSql).toContain('est_ouverte = true');
       expect(periodCheckSql).toContain('est_cloturee = false');
       expect(periodCheckSql).toContain("AT TIME ZONE 'Africa/Douala'");
+    });
+
+    it('autorise ADMIN à évaluer un utilisateur avec la règle de son rôle sans contrôle hiérarchique', async () => {
+      const admin = { ...evaluateur, matricule: 'ADM1', role: 'ADMIN', role_nom: 'ADMIN', est_admin: true };
+      const distantTarget = { ...evalue, id_region: 'R2', id_branche: 'B2' };
+      const created = { id_evaluation: 'E-ADMIN', id_periode: 'periode-uuid' };
+      mockPrisma.utilisateur.findUnique.mockImplementation(({ where }: any) =>
+        Promise.resolve(where.matricule === 'ADM1' ? admin : distantTarget),
+      );
+      mockPg.queryOne
+        .mockResolvedValueOnce({
+          id_periode: 'periode-uuid',
+          code_periode: 'P1',
+          statut: 'ouverte',
+          est_ouverte: true,
+        })
+        .mockResolvedValueOnce({
+          id_regle: 'R1',
+          nom_regle: 'Règle CSC',
+          criteres_evaluation_json: {
+            criteres: [{ id: 'C1', libelle: 'Critère', poids: 100 }],
+            constraints: { meme_region_obligatoire: true, meme_branche_obligatoire: true },
+          },
+          est_active: true,
+          role_evaluateur: 'CDS',
+          role_evalue: 'CSC',
+          type_evaluation: 'descendante',
+        })
+        .mockResolvedValueOnce(created);
+
+      const result = await service.create('ADM1', 'M2', 'periode-uuid', 'R1');
+
+      expect(result).toEqual(created);
+      expect(mockEligibility.canEvaluate).not.toHaveBeenCalled();
+      const insertCall = mockPg.queryOne.mock.calls.find((call: any[]) =>
+        String(call[0]).includes('INSERT INTO evaluations'),
+      );
+      expect(insertCall?.[1][4]).toBe('descendante');
     });
 
     it('creates a new evaluation instead of reusing an earlier attempt', async () => {

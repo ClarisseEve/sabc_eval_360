@@ -18,11 +18,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Progress } from '@/Components/UI/Progress/Progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table/Table';
 import { analyticsApi, reglesApi } from '@/Services/api';
-import { useEligibles, usePeriodes } from '@/Hooks/queries/useEvaluationsQuery';
+import { useEvaluationTargets, usePeriodes } from '@/Hooks/queries/useEvaluationsQuery';
 import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminEvaluationsLayout, PeriodeStatusBadge } from './shared';
 import { useAuthContext } from '@/Contexts/AuthContext';
-import { filterApplicableRules } from '@/utils/rules';
+import { filterAdminApplicableRules, filterApplicableRules } from '@/utils/rules';
 
 function formatDate(value?: string | null) {
   if (!value) return 'N/A';
@@ -117,8 +117,9 @@ function getChannelPresentation(value: unknown) {
 
 export default function EvaluationManagementPage() {
   const { user } = useAuthContext();
+  const isAdmin = Boolean(user?.est_admin) || String(user?.role ?? '').toUpperCase() === 'ADMIN';
   const { data: periodesData } = usePeriodes();
-  const { data: eligiblesData } = useEligibles();
+  const { data: eligiblesData } = useEvaluationTargets(isAdmin);
   const { data: reglesData } = useSuspenseQuery({
     queryKey: ['regles', 'actives'],
     queryFn: () => reglesApi.list().then((r) => r.data),
@@ -141,18 +142,25 @@ export default function EvaluationManagementPage() {
   const channels = Array.isArray(performances) ? performances : [];
   const activeRules = Array.isArray(reglesData) ? reglesData : [];
   const activePeriodes = periodes.filter((periode: any) => periode.est_ouverte || String(periode.statut).toLowerCase() === 'ouverte');
-  const eligibleRuleTargets = [
-    ...(eligiblesData?.auto ? [{ role: eligiblesData.auto.role_nom || eligiblesData.auto.role, type: 'auto' }] : []),
-    ...(Array.isArray(eligiblesData?.subordonnes)
-      ? eligiblesData.subordonnes.map((target: any) => ({ role: target.role_nom || target.role, type: 'descendante' }))
-      : []),
-    ...(Array.isArray(eligiblesData?.pairs)
-      ? eligiblesData.pairs.map((target: any) => ({ role: target.role_nom || target.role, type: 'pairs' }))
-      : []),
-  ];
+  const eligibleRuleTargets = isAdmin
+    ? (Array.isArray(eligiblesData) ? eligiblesData : []).map((target: any) => ({
+        role: target.role_nom || target.role,
+        type: '360',
+      }))
+    : [
+        ...(eligiblesData?.auto ? [{ role: eligiblesData.auto.role_nom || eligiblesData.auto.role, type: 'auto' }] : []),
+        ...(Array.isArray(eligiblesData?.subordonnes)
+          ? eligiblesData.subordonnes.map((target: any) => ({ role: target.role_nom || target.role, type: 'descendante' }))
+          : []),
+        ...(Array.isArray(eligiblesData?.pairs)
+          ? eligiblesData.pairs.map((target: any) => ({ role: target.role_nom || target.role, type: 'pairs' }))
+          : []),
+      ];
   const hasEligibleTargets = eligibleRuleTargets.length > 0;
   const hasApplicableRule = eligibleRuleTargets.some((target) =>
-    filterApplicableRules(activeRules, user?.role_nom || user?.role, target.role, target.type).length > 0,
+    isAdmin
+      ? filterAdminApplicableRules(activeRules, target.role).length > 0
+      : filterApplicableRules(activeRules, user?.role_nom || user?.role, target.role, target.type).length > 0,
   );
   const canCreateEvaluation = activePeriodes.length > 0 && hasEligibleTargets && hasApplicableRule;
   const statusTotal = statuses.reduce((sum: number, row: any) => sum + Number(row.count ?? 0), 0);
@@ -210,7 +218,7 @@ export default function EvaluationManagementPage() {
                 {activeRules.length === 0 ? 'Configurer les règles' : 'Ajouter une règle applicable'}
               </Link>
             ) : null}
-            {!hasEligibleTargets ? (
+            {!isAdmin && !hasEligibleTargets ? (
               <Link to="/admin/utilisateurs/gaps" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
                 Corriger la hiérarchie
               </Link>

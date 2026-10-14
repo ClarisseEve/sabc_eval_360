@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/Components/UI/Badge';
 import { Button } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/Components/UI/Pagination';
 import { PageHeader } from '@/Components/UI/Page';
 import { EmptyState } from '@/Components/UI/EmptyState';
 import { adminApi } from '@/Services/api';
@@ -12,6 +13,7 @@ import { useAdminRole } from '@/Hooks/queries';
 import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { AdminRolesLayout } from './shared';
+import { paginateList } from '@/utils/adminUi';
 
 export default function ShowRole() {
   const { id = '' } = useParams();
@@ -46,6 +48,14 @@ export default function ShowRole() {
 
   const role = data;
   const users = Array.isArray(role?.utilisateurs) ? role.utilisateurs : [];
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const paginatedUsers = useMemo(() => paginateList(users, { page, pageSize }), [users, page]);
+  const activePage = Math.min(page, paginatedUsers.pageCount);
+
+  useEffect(() => {
+    setPage(1);
+  }, [id]);
 
   return (
     <AdminRolesLayout title={`Rôle ${role?.nom_role || id}`}>
@@ -96,7 +106,7 @@ export default function ShowRole() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user: any) => (
+                  {paginatedUsers.items.map((user: any) => (
                     <TableRow key={user.matricule}>
                       <TableCell>{user.matricule}</TableCell>
                       <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
@@ -105,6 +115,38 @@ export default function ShowRole() {
                   ))}
                 </TableBody>
               </Table>
+            )}
+            {users.length > pageSize && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-sabc-gray-500">
+                  Affichage de {(activePage - 1) * pageSize + 1} à {Math.min(activePage * pageSize, users.length)} sur {users.length} utilisateurs
+                </p>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => setPage((current) => Math.max(1, current - 1))}
+                        aria-disabled={activePage === 1}
+                        className={activePage === 1 ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: paginatedUsers.pageCount }, (_, index) => index + 1).map((pageNumber) => (
+                      <PaginationItem key={pageNumber}>
+                        <PaginationLink isActive={activePage === pageNumber} onClick={() => setPage(pageNumber)}>
+                          {pageNumber}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => setPage((current) => Math.min(paginatedUsers.pageCount, current + 1))}
+                        aria-disabled={activePage === paginatedUsers.pageCount}
+                        className={activePage === paginatedUsers.pageCount ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
             )}
           </CardContent>
         </Card>

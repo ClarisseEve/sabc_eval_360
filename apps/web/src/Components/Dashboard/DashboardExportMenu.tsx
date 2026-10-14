@@ -194,6 +194,7 @@ export function DashboardExportMenu({
         onclone: (clonedDocument: Document) => {
           clonedDocument.querySelectorAll('[data-html2canvas-ignore="true"]').forEach((element: Element) => element.remove());
           const clonedTarget = clonedDocument.querySelector(`[data-dashboard-capture-id="${captureId}"]`);
+          makeColorsHtml2CanvasCompatible(clonedDocument.documentElement, clonedDocument);
           if (clonedTarget) makeColorsHtml2CanvasCompatible(clonedTarget, clonedDocument);
         },
       });

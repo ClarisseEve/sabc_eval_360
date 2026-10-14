@@ -25,3 +25,16 @@ Validation de cette sous-tâche : 6 suites ciblées / 53 tests verts, typecheck 
 build API verts, configuration Compose scale valide. Le run API complet compte
 400 tests verts et un échec hors périmètre dans `regles.service.spec.ts` (test
 historique incompatible avec l'immuabilité désormais imposée aux règles actives).
+
+## Évaluation du personnel par l'administrateur
+
+- [x] Exposer les collaborateurs actifs dans le formulaire ADMIN.
+- [x] Filtrer les règles par rôle évalué pour l'ADMIN.
+- [x] Autoriser la création ADMIN sans contourner les contrôles de cible et de période.
+- [x] Ajouter des tests ciblés frontend et backend.
+- [x] Exécuter typecheck, builds et tests ciblés.
+- [ ] Déployer et committer uniquement les fichiers de cette fonctionnalité, sur demande.
+
+### Revue
+
+Les collaborateurs ADMIN sont limités aux comptes actifs et disponibles, hors compte ADMIN lui-même. La création vérifie toujours la période ouverte et la règle active/cible. Typecheck complet, build frontend/API, test ciblé frontend (6) et test API (46) réussis.

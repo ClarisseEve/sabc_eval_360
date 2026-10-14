@@ -1070,7 +1070,15 @@ async function upsertTemplate(template: {
   evaluatedRole: string;
   criteria: CriterionSeed[];
 }) {
-  const sections = buildRuleEnvelope(template.criteria).sections;
+  const envelope = buildRuleEnvelope(template.criteria);
+  const criteriaById = new Map(envelope.criteres.map((criterion) => [criterion.id, criterion]));
+  const sections = envelope.sections.map((section) => ({
+    ...section,
+    competences: section.competences.map((competence: any) => ({
+      ...competence,
+      poids: criteriaById.get(competence.id)?.poids ?? 0,
+    })),
+  }));
   await pg.query(
     `INSERT INTO templates
      (id_template, nom, description, evaluated_role, version, statut, meta_json, created_at, updated_at)
@@ -1090,6 +1098,7 @@ async function upsertTemplate(template: {
       JSON.stringify({
         categorie: template.evaluatedRole,
         sections,
+        criteres: envelope.criteres,
       }),
     ],
   );

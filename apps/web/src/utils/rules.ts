@@ -286,3 +286,97 @@ export function filterApplicableRules(
       return rule.est_active && matchesEvaluator && matchesEvaluatee && matchesType;
     });
 }
+
+export function filterAdminApplicableRules(
+  rules: any[],
+  evaluateeRole: string | null | undefined,
+) {
+  const value = (evaluateeRole ?? '').trim();
+  if (!value) return [];
+  const evaluatee = resolveKnownRole(value) ?? value.toUpperCase();
+
+  return rules
+    .map((rule) => normalizePublishedRule(rule))
+    .filter((rule) => {
+      const targetRole = (rule.role_evalue ?? '').trim();
+      const matchesEvaluatee = !targetRole || (resolveKnownRole(targetRole) ?? targetRole.toUpperCase()) === evaluatee;
+      return rule.est_active && matchesEvaluatee && String(rule.type_evaluation ?? '').toLowerCase() !== 'auto';
+    });
+}
+
+interface TemplateCompetenceEntry {
+  section: any;
+  sectionIndex: number;
+  competence: any;
+  competenceIndex: number;
+  weight: number;
+  fallback: any;
+}
+
+function getTemplateCompetences(template: any): TemplateCompetenceEntry[] {
+  const sections = Array.isArray(template?.sections) ? template.sections : [];
+  const criteria = Array.isArray(template?.meta_json?.criteres)
+    ? template.meta_json.criteres
+    : Array.isArray(template?.criteres)
+      ? template.criteres
+      : [];
+
+  return sections.flatMap((section: any, sectionIndex: number) => {
+    const competences = Array.isArray(section?.competences) ? section.competences : [];
+    return competences.map((competence: any, competenceIndex: number) => {
+      const fallback = criteria.find((criterion: any) =>
+        (competence.id && criterion.id === competence.id) ||
+        (competence.libelle && criterion.libelle === competence.libelle),
+      );
+      return {
+        section,
+        sectionIndex,
+        competence,
+        competenceIndex,
+        weight: Number(competence.poids ?? fallback?.poids),
+        fallback,
+      };
+    });
+  });
+}
+
+export function templateHasValidWeights(template: any) {
+  const competences = getTemplateCompetences(template);
+  if (competences.length === 0 || competences.some(({ weight }) => !Number.isFinite(weight) || weight <= 0)) {
+    return false;
+  }
+  const total = competences.reduce((sum, { weight }) => sum + weight, 0);
+  return Math.abs(total - 100) <= 0.01;
+}
+
+export function templateToRuleCriteria(template: any): RuleCriterion[] {
+  const competences = getTemplateCompetences(template);
+  const keepTemplateWeights = templateHasValidWeights(template);
+  const equalWeight = Math.floor((100 / competences.length) * 100) / 100;
+
+  return competences.map(({ section, sectionIndex, competence, competenceIndex, weight, fallback }, index) => ({
+    id: String(competence.id ?? fallback?.id ?? `${sectionIndex + 1}-${competenceIndex + 1}`),
+    libelle: String(competence.libelle ?? fallback?.libelle ?? ''),
+    description: String(competence.description ?? fallback?.description ?? ''),
+    poids: keepTemplateWeights
+      ? weight
+      : index === competences.length - 1
+        ? Number((100 - equalWeight * (competences.length - 1)).toFixed(2))
+        : equalWeight,
+    section_label: String(section.titre ?? 'Compétences'),
+    section_order: Number(section.ordre) || sectionIndex + 1,
+    niveau_requis: Number(competence.niveau_requis ?? fallback?.niveau_requis) || 3,
+    niveaux: [1, 2, 3, 4, 5].map((niveau) => {
+      const levels = competence.niveaux ?? fallback?.niveaux;
+      const level = Array.isArray(levels)
+        ? levels.find((entry: any) => Number(entry?.niveau) === niveau)
+        : null;
+      return { niveau, description: String(level?.description ?? '') };
+    }),
+    improvement_axis_code: fallback?.improvement_axis_code ?? null,
+    recommendation_tags: fallback?.recommendation_tags ?? [],
+    recommendation_text: fallback?.recommendation_text ?? null,
+    commentaire_requis_si_note_lt: fallback?.commentaire_requis_si_note_lt ?? 3,
+    echelle: { min: 1, max: 5 },
+  }));
+}

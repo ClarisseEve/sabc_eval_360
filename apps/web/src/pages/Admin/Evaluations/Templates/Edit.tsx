@@ -51,51 +51,11 @@ const TemplateEditPage: React.FC = () => {
       libelle: string;
       description: string;
       obligatoire: boolean;
-      poids: number;
+      poids: string;
       niveau_requis: number;
       niveaux: CompetenceLevelDescription[];
     }>;
   }>>([]);
-
-  const rebalanceWeights = (currentSections: typeof sections, sectionId: string, competenceId: string, requestedWeight: number) => {
-    const competences = currentSections.flatMap((section) => section.competences);
-    const targetWeight = Math.min(99.99, Math.max(0.01, Number.isFinite(requestedWeight) ? requestedWeight : 0.01));
-    const others = competences.filter((competence) => competence.id !== competenceId);
-    if (others.length === 0) {
-      return currentSections.map((section) => ({
-        ...section,
-        competences: section.competences.map((competence) => ({ ...competence, poids: 100 })),
-      }));
-    }
-
-    const remaining = 100 - targetWeight;
-    const otherTotal = others.reduce((sum, competence) => sum + Math.max(0, Number(competence.poids) || 0), 0);
-    let assigned = 0;
-    const rebalanced = currentSections.map((section) => ({
-      ...section,
-      competences: section.competences.map((competence) => {
-        if (competence.id === competenceId) return { ...competence, poids: targetWeight };
-        const rawWeight = otherTotal > 0
-          ? remaining * (Math.max(0, Number(competence.poids) || 0) / otherTotal)
-          : remaining / others.length;
-        const poids = Math.round(rawWeight * 100) / 100;
-        assigned += poids;
-        return { ...competence, poids };
-      }),
-    }));
-
-    const correction = Math.round((remaining - assigned) * 100) / 100;
-    if (correction !== 0) {
-      const lastOtherId = others[others.length - 1].id;
-      return rebalanced.map((section) => ({
-        ...section,
-        competences: section.competences.map((competence) => competence.id === lastOtherId
-          ? { ...competence, poids: Math.round((competence.poids + correction) * 100) / 100 }
-          : competence),
-      }));
-    }
-    return rebalanced;
-  };
 
   // Chargement du template réel
   const { data: template, isLoading } = useQuery({
@@ -122,28 +82,12 @@ const TemplateEditPage: React.FC = () => {
           libelle: competence.libelle ?? '',
           description: competence.description ?? '',
           obligatoire: true,
-          poids: Number(competence.poids ?? 0),
+          poids: String(competence.poids ?? 0),
           niveau_requis: Number(competence.niveau_requis ?? 3),
           niveaux: normalizeCompetenceLevels(competence.niveaux),
         })),
       }));
-    const loadedCompetences = loadedSections.flatMap((section) => section.competences);
-    const loadedTotal = loadedCompetences.reduce((sum, competence) => sum + competence.poids, 0);
-    if (loadedTotal <= 0 && loadedCompetences.length > 0) {
-      const equalWeight = Math.round((100 / loadedCompetences.length) * 100) / 100;
-      let assigned = 0;
-      setSections(loadedSections.map((section) => ({
-        ...section,
-        competences: section.competences.map((competence, index) => {
-          const isLast = index === section.competences.length - 1 && section === loadedSections[loadedSections.length - 1];
-          const poids = isLast ? Math.round((100 - assigned) * 100) / 100 : equalWeight;
-          assigned += poids;
-          return { ...competence, poids };
-        }),
-      })));
-    } else {
-      setSections(loadedSections);
-    }
+    setSections(loadedSections);
   }, [template]);
 
   // Gérer les changements dans le formulaire principal
@@ -174,7 +118,7 @@ const TemplateEditPage: React.FC = () => {
         libelle: 'Nouvelle compétence',
         description: '',
         obligatoire: true,
-        poids: 0,
+        poids: '0',
         niveau_requis: 3,
         niveaux: createEmptyCompetenceLevels(),
       }]
@@ -208,7 +152,7 @@ const TemplateEditPage: React.FC = () => {
             libelle: 'Nouvelle compétence',
             description: '',
             obligatoire: true,
-            poids: 0,
+            poids: '0',
             niveau_requis: 3,
             niveaux: createEmptyCompetenceLevels(),
           }]
@@ -233,10 +177,6 @@ const TemplateEditPage: React.FC = () => {
   
   // Mettre à jour une compétence
   const updateCompetence = (sectionId: string, competenceId: string, field: string, value: any) => {
-    if (field === 'poids') {
-      setSections((prev) => rebalanceWeights(prev, sectionId, competenceId, Number(value)));
-      return;
-    }
     setSections(prev => prev.map(section => {
       if (section.id === sectionId) {
         return {
@@ -254,9 +194,13 @@ const TemplateEditPage: React.FC = () => {
   };
   
   // Calculer le nombre total de compétences
+  const parseWeight = (value: string) => {
+    const weight = Number(value.replace(',', '.'));
+    return Number.isFinite(weight) ? weight : 0;
+  };
   const totalCompetences = sections.reduce((total, section) => total + section.competences.length, 0);
   const totalPoids = sections.reduce(
-    (total, section) => total + section.competences.reduce((sum, competence) => sum + Number(competence.poids || 0), 0),
+    (total, section) => total + section.competences.reduce((sum, competence) => sum + parseWeight(competence.poids), 0),
     0,
   );
   
@@ -270,7 +214,7 @@ const TemplateEditPage: React.FC = () => {
         section.competences.every(comp => comp.libelle.trim() !== '')
       ) &&
       sections.every(section => section.competences.every((comp) => areCompetenceLevelsComplete(comp.niveaux))) &&
-      sections.every(section => section.competences.every(comp => Number(comp.poids) > 0)) &&
+      sections.every(section => section.competences.every(comp => parseWeight(comp.poids) > 0)) &&
       Math.abs(totalPoids - 100) <= 0.01
     );
   };
@@ -292,7 +236,7 @@ const TemplateEditPage: React.FC = () => {
         niveau_requis: competence.niveau_requis,
         niveaux: competence.niveaux,
         ordre: compIndex + 1,
-        poids: Number(competence.poids),
+        poids: parseWeight(competence.poids),
       })),
     })),
   });
@@ -520,18 +464,16 @@ const TemplateEditPage: React.FC = () => {
                               <Label htmlFor={`comp-${competence.id}-obligatoire`}>Compétence obligatoire</Label>
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor={`comp-${competence.id}-poids`}>Importance de la compétence (%)</Label>
+                              <Label htmlFor={`comp-${competence.id}-poids`}>Poids de la compétence (%)</Label>
                               <Input
                                 id={`comp-${competence.id}-poids`}
-                                type="number"
-                                min="0.01"
-                                max="100"
-                                step="0.01"
+                                type="text"
+                                inputMode="decimal"
                                 value={competence.poids}
-                                onChange={(e) => updateCompetence(section.id, competence.id, 'poids', Number(e.target.value))}
+                                onChange={(e) => updateCompetence(section.id, competence.id, 'poids', e.target.value)}
                                 required
                               />
-                              <p className="text-xs text-sabc-gray-500">Les autres poids s’ajustent automatiquement pour totaliser 100 %.</p>
+                              <p className="text-xs text-sabc-gray-500">Définissez ce pourcentage manuellement. Les autres poids ne changent pas automatiquement ; le total doit faire 100 %.</p>
                             </div>
                             <div className="space-y-2 md:col-span-2">
                               <Label htmlFor={`comp-${competence.id}-description`}>Description</Label>

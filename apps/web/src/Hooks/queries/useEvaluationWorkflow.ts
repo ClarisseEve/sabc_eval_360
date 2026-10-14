@@ -7,6 +7,7 @@ const TARGET_LABELS: Record<string, string> = {
   auto: 'Auto-évaluation',
   pairs: 'Pairs',
   subordonnes: 'Subordonnés',
+  collaborateurs: 'Collaborateurs',
   ascendante: 'Ascendante',
 };
 

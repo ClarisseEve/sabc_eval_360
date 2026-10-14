@@ -52,13 +52,13 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Mes évaluations',
         href: '/evaluations/mine',
         icon: <ChevronRight className="h-4 w-4" />,
-        roles: ALL_OPERATIONAL,
+        roles: ALL_WITH_ADMIN,
       },
       {
         title: 'À compléter',
         href: '/evaluations/pending',
         icon: <ChevronRight className="h-4 w-4" />,
-        roles: ALL_OPERATIONAL,
+        roles: ALL_WITH_ADMIN,
         badge: 'notifications',
       },
       {
@@ -73,7 +73,7 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Historique',
         href: '/evaluations/historique',
         icon: <ChevronRight className="h-4 w-4" />,
-        roles: ALL_OPERATIONAL,
+        roles: ALL_WITH_ADMIN,
       },
       {
         title: 'Gestion globale',

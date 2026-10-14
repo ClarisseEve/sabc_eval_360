@@ -19,7 +19,7 @@ import {
   PlayCircle,
   Users2,
 } from 'lucide-react';
-import { filterApplicableRules } from '@/utils/rules';
+import { filterAdminApplicableRules, filterApplicableRules } from '@/utils/rules';
 import { useAuthContext } from '@/Contexts/AuthContext';
 
 type Target = Record<string, any>;
@@ -59,14 +59,17 @@ const Mine: React.FC = () => {
 
   const isAdmin = (user?.role_nom || user?.role || '').toUpperCase() === 'ADMIN';
 
-  const handleEvaluate = (target: Target) => {
-    const targetType = target.workflowType ?? null;
-    const rules = filterApplicableRules(
+  const getApplicableRules = (target: Target) => isAdmin
+    ? filterAdminApplicableRules(data.rules, target.role_nom || target.role)
+    : filterApplicableRules(
       data.rules,
       user?.role_nom || user?.role,
       target.role_nom || target.role,
-      targetType,
+      target.workflowType ?? null,
     );
+
+  const handleEvaluate = (target: Target) => {
+    const rules = getApplicableRules(target);
     setSelectedTarget(target.matricule);
     setSelectedTemplate(rules[0]?.id_regle ?? null);
     setModalOpen(true);
@@ -129,7 +132,7 @@ const Mine: React.FC = () => {
           <MetricTile
             label="Cibles éligibles"
             value={data.summary.eligibleTargets}
-            caption="Auto, pairs et subordonnés selon la hiérarchie"
+            caption={isAdmin ? 'Collaborateurs actifs et disponibles' : 'Auto, pairs et subordonnés selon la hiérarchie'}
             icon={Users2}
           />
           <MetricTile
@@ -149,8 +152,12 @@ const Mine: React.FC = () => {
         <div className="grid gap-6">
           <ActiveRulesCard
             rules={data.rules}
-            description="Les règles compatibles sont filtrées selon votre rôle et les cibles disponibles."
-            emptyMessage="Aucune règle active publiée pour votre rôle."
+            description={isAdmin
+              ? 'Les règles compatibles sont filtrées selon le rôle de chaque collaborateur.'
+              : 'Les règles compatibles sont filtrées selon votre rôle et les cibles disponibles.'}
+            emptyMessage={isAdmin
+              ? 'Aucune règle active publiée pour les rôles des collaborateurs.'
+              : 'Aucune règle active publiée pour votre rôle.'}
           />
         </div>
 
@@ -166,7 +173,9 @@ const Mine: React.FC = () => {
               <Alert>
                 <AlertTitle>Aucune cible disponible</AlertTitle>
                 <AlertDescription className="flex flex-col gap-2">
-                  <span>Votre hiérarchie ne compte aucun subordonné ou pair éligible pour l’instant.</span>
+                  <span>{isAdmin
+                    ? 'Aucun collaborateur actif et disponible ne peut être évalué pour l’instant.'
+                    : 'Votre hiérarchie ne compte aucun subordonné ou pair éligible pour l’instant.'}</span>
                   {isAdmin && (
                     <a
                       href="/admin/utilisateurs"
@@ -193,13 +202,7 @@ const Mine: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           {(() => {
-                            const targetType = target.workflowType ?? null;
-                            const rules = filterApplicableRules(
-                              data.rules,
-                              user?.role_nom || user?.role,
-                              target.role_nom || target.role,
-                              targetType,
-                            );
+                            const rules = getApplicableRules(target);
                             const canStart = Boolean(data.activePeriod) && rules.length > 0;
                             return (
                               <>

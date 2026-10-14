@@ -8,9 +8,9 @@ import { EmptyState } from '@/Components/UI/EmptyState';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
 import { reglesApi, evaluationsApi } from '@/Services/api';
 import { useAuthContext } from '@/Contexts/AuthContext';
-import { useEligibles, usePeriodesActives } from '@/Hooks/queries/useEvaluationsQuery';
+import { useEvaluationTargets, usePeriodesActives } from '@/Hooks/queries/useEvaluationsQuery';
 import { AdminEvaluationsLayout } from './shared';
-import { filterApplicableRules } from '@/utils/rules';
+import { filterAdminApplicableRules, filterApplicableRules } from '@/utils/rules';
 
 type EligibleOption = {
   matricule: string;
@@ -21,6 +21,15 @@ type EligibleOption = {
 
 function normalizeEligibles(data: any): EligibleOption[] {
   if (!data) return [];
+
+  if (Array.isArray(data)) {
+    return data.map((item) => ({
+      matricule: item.matricule,
+      label: [item.prenom, item.nom].filter(Boolean).join(' ').trim() || item.matricule,
+      bucket: 'Personnel',
+      role: item.role_nom || item.role,
+    }));
+  }
 
   const push = (items: any[], bucket: string) => items.map((item) => ({
     matricule: item.matricule,
@@ -46,12 +55,13 @@ function normalizeEligibles(data: any): EligibleOption[] {
 export default function EvaluationFormPage() {
   const { user } = useAuthContext();
   const navigate = useNavigate();
+  const isAdmin = Boolean(user?.est_admin) || String(user?.role ?? '').toUpperCase() === 'ADMIN';
   const [selectedPeriode, setSelectedPeriode] = React.useState('');
   const [selectedTarget, setSelectedTarget] = React.useState('');
   const [selectedRegle, setSelectedRegle] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
 
-  const { data: eligiblesData } = useEligibles();
+  const { data: eligiblesData } = useEvaluationTargets(isAdmin);
   const { data: periodesData } = usePeriodesActives();
   const { data: reglesData } = useSuspenseQuery({
     queryKey: ['regles', 'actives'],
@@ -80,7 +90,9 @@ export default function EvaluationFormPage() {
   }, [regles, selectedRegle]);
 
   const selectedEligible = eligibles.find((item) => item.matricule === selectedTarget);
-  const evaluationType = selectedEligible?.bucket === 'Auto-évaluation'
+  const evaluationType = isAdmin
+    ? '360'
+    : selectedEligible?.bucket === 'Auto-évaluation'
     ? 'auto'
     : selectedEligible?.bucket === 'Pairs'
       ? 'pairs'
@@ -88,8 +100,10 @@ export default function EvaluationFormPage() {
         ? 'descendante'
         : null;
   const applicableRules = React.useMemo(
-    () => filterApplicableRules(regles, user?.role_nom || user?.role, selectedEligible?.role, evaluationType),
-    [regles, user?.role_nom, user?.role, selectedEligible?.role, evaluationType],
+    () => isAdmin
+      ? filterAdminApplicableRules(regles, selectedEligible?.role)
+      : filterApplicableRules(regles, user?.role_nom || user?.role, selectedEligible?.role, evaluationType),
+    [isAdmin, regles, user?.role_nom, user?.role, selectedEligible?.role, evaluationType],
   );
   const selectedRule = applicableRules.find((item) => item.id_regle === selectedRegle);
   const selectedPeriodeData = periodes.find((item: any) => item.id_periode === selectedPeriode);

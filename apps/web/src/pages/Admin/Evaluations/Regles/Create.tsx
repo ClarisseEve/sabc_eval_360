@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { adminApi, reglesApi } from '@/Services/api';
+import { adminApi } from '@/Services/api';
 import { AdminEvaluationsLayout } from '../shared';
 import { RuleForm } from './RuleForm';
 import { builderInputToPayload, createEmptyRuleBuilderInput } from '@/utils/rules';
@@ -30,19 +30,12 @@ export default function CreateRulePage() {
     queryFn: () => adminApi.roles.list().then((response) => response.data),
   });
 
-  const { data: constraintsData } = useSuspenseQuery({
-    queryKey: ['regles', 'constraints'],
-    queryFn: () => reglesApi.constraints().then((response) => response.data),
-  });
-
-  const roles = Array.isArray(rolesData) ? rolesData.map((role: any) => role.nom_role) : [];
-  const categories = Array.isArray(constraintsData?.categories_valides)
-    ? constraintsData.categories_valides
-    : ['Compétences', 'Leadership', 'Performance', 'Exécution'];
+  const roles = Array.isArray(rolesData) ? rolesData : [];
   const types = ['auto', 'pairs', 'descendante', 'ascendante', '360'];
 
   const createMutation = useMutation({
-    mutationFn: () => adminApi.roles.createRegle(builderInputToPayload(formData)),
+    mutationFn: (criteria: RuleBuilderInput['criteres']) =>
+      adminApi.roles.createRegle(builderInputToPayload({ ...formData, criteres: criteria })),
     onSuccess: () => navigate('/admin/evaluations/regles'),
     onError: (error: any) => {
       const message = error?.response?.data?.message;
@@ -60,18 +53,16 @@ export default function CreateRulePage() {
 
       <RuleForm
         title="Créer une règle d’évaluation"
-        subtitle="Définissez le contexte, la visibilité et les critères évalués."
+        subtitle="Définissez la relation d’évaluation; les compétences proviennent du template associé."
         data={formData}
         onChange={(patch) => setFormData((current) => ({ ...current, ...patch }))}
-        onSubmit={(event) => {
-          event.preventDefault();
+        onSubmit={(_event, criteria) => {
           setErrorMessage(null);
-          createMutation.mutate();
+          createMutation.mutate(criteria);
         }}
         onCancel={() => navigate('/admin/evaluations/regles')}
         processing={createMutation.isPending}
         roles={roles}
-        categories={categories}
         types={types}
         submitLabel="Créer la règle"
       />

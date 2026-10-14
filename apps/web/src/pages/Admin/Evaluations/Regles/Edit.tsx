@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { adminApi, reglesApi } from '@/Services/api';
+import { adminApi } from '@/Services/api';
 import { AdminEvaluationsLayout } from '../shared';
 import { RuleForm } from './RuleForm';
 import { builderInputToPayload, createEmptyRuleBuilderInput, ruleToBuilderInput } from '@/utils/rules';
@@ -23,25 +23,18 @@ export default function EditRulePage() {
     queryFn: () => adminApi.roles.list().then((response) => response.data),
   });
 
-  const { data: constraintsData } = useSuspenseQuery({
-    queryKey: ['regles', 'constraints'],
-    queryFn: () => reglesApi.constraints().then((response) => response.data),
-  });
-
   React.useEffect(() => {
     if (ruleData) {
       setFormData(ruleToBuilderInput(ruleData));
     }
   }, [ruleData]);
 
-  const roles = Array.isArray(rolesData) ? rolesData.map((role: any) => role.nom_role) : [];
-  const categories = Array.isArray(constraintsData?.categories_valides)
-    ? constraintsData.categories_valides
-    : ['Compétences', 'Leadership', 'Performance', 'Exécution'];
+  const roles = Array.isArray(rolesData) ? rolesData : [];
   const types = ['auto', 'pairs', 'descendante', 'ascendante', '360'];
 
   const updateMutation = useMutation({
-    mutationFn: () => adminApi.roles.updateRegle(id, builderInputToPayload(formData)),
+    mutationFn: (criteria: RuleBuilderInput['criteres']) =>
+      adminApi.roles.updateRegle(id, builderInputToPayload({ ...formData, criteres: criteria })),
     onSuccess: () => navigate('/admin/evaluations/regles'),
     onError: (error: any) => {
       const message = error?.response?.data?.message;
@@ -59,18 +52,16 @@ export default function EditRulePage() {
 
       <RuleForm
         title="Modifier une règle d’évaluation"
-        subtitle={formData.nom_regle || 'Ajustez le contexte, la visibilité et les critères évalués.'}
+        subtitle={formData.nom_regle || 'Ajustez la relation d’évaluation et consultez le template associé.'}
         data={formData}
         onChange={(patch) => setFormData((current) => ({ ...current, ...patch }))}
-        onSubmit={(event) => {
-          event.preventDefault();
+        onSubmit={(_event, criteria) => {
           setErrorMessage(null);
-          updateMutation.mutate();
+          updateMutation.mutate(criteria);
         }}
         onCancel={() => navigate('/admin/evaluations/regles')}
         processing={updateMutation.isPending}
         roles={roles}
-        categories={categories}
         types={types}
         submitLabel="Mettre à jour la règle"
       />
