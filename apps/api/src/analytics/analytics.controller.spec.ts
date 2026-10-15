@@ -33,12 +33,12 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
 
   it('autorise un utilisateur à consulter ses propres scores', async () => {
     await controller.scoresUtilisateur('M001', reqFor(MANAGER));
-    expect(mockService.getScoresUtilisateur).toHaveBeenCalledWith('M001');
+    expect(mockService.getScoresUtilisateur).toHaveBeenCalledWith('M001', 'evaluated');
   });
 
   it('autorise un manager à consulter les scores d\'un subordonné', async () => {
     await controller.scoresUtilisateur('M002', reqFor(MANAGER));
-    expect(mockService.getScoresUtilisateur).toHaveBeenCalledWith('M002');
+    expect(mockService.getScoresUtilisateur).toHaveBeenCalledWith('M002', 'evaluated');
   });
 
   it('refuse un utilisateur consultant les scores d\'un tiers non subordonné (IDOR)', async () => {
@@ -90,7 +90,7 @@ describe('AnalyticsController — contrôle d\'accès objet (anti-IDOR)', () => 
 
   it('autorise un admin à consulter n\'importe quel matricule sans appel hiérarchie', async () => {
     await controller.scoresUtilisateur('X999', reqFor(ADMIN));
-    expect(mockService.getScoresUtilisateur).toHaveBeenCalledWith('X999');
+    expect(mockService.getScoresUtilisateur).toHaveBeenCalledWith('X999', 'admin');
     expect(mockHierarchy.getTousSubordonnes).not.toHaveBeenCalled();
   });
 
