@@ -28,13 +28,12 @@ historique incompatible avec l'immuabilité désormais imposée aux règles acti
 
 ## Évaluation du personnel par l'administrateur
 
-- [x] Exposer les collaborateurs actifs dans le formulaire ADMIN.
-- [x] Filtrer les règles par rôle évalué pour l'ADMIN.
-- [x] Autoriser la création ADMIN sans contourner les contrôles de cible et de période.
-- [x] Ajouter des tests ciblés frontend et backend.
-- [x] Exécuter typecheck, builds et tests ciblés.
-- [ ] Déployer et committer uniquement les fichiers de cette fonctionnalité, sur demande.
+- [ ] Exposer les collaborateurs actifs dans le formulaire ADMIN.
+- [ ] Filtrer les règles par rôle évalué pour l'ADMIN.
+- [ ] Autoriser la création ADMIN sans contourner les contrôles de cible et de période.
+- [ ] Ajouter des tests ciblés frontend et backend.
+- [ ] Exécuter les vérifications, redéployer le frontend/API si nécessaire et committer uniquement les fichiers de cette fonctionnalité.
 
 ### Revue
 
-Les collaborateurs ADMIN sont limités aux comptes actifs et disponibles, hors compte ADMIN lui-même. La création vérifie toujours la période ouverte et la règle active/cible. Typecheck complet, build frontend/API, test ciblé frontend (6) et test API (46) réussis.
+À compléter après validation.

@@ -96,36 +96,6 @@ describe('EvaluationsService', () => {
     );
   });
 
-  describe('getEligibles', () => {
-    it('returns active and available colleagues for an admin, excluding the admin', async () => {
-      const admin = {
-        matricule: 'ADM1',
-        role: 'ADMIN',
-        role_nom: 'ADMIN',
-        est_admin: true,
-        statut: 'Actif',
-        est_actif: true,
-        est_indisponible: false,
-      };
-      const colleagues = [{ matricule: 'M2', nom: 'Cible', prenom: 'Cam', role: 'CDS', role_nom: 'CDS' }];
-      mockPrisma.utilisateur.findUnique.mockResolvedValue(admin);
-      mockPrisma.utilisateur.findMany.mockResolvedValueOnce(colleagues);
-
-      const result = await service.getEligibles('ADM1');
-
-      expect(result).toEqual({ auto: null, collaborateurs: colleagues, subordonnes: [], pairs: [] });
-      expect(mockPrisma.utilisateur.findMany).toHaveBeenCalledWith({
-        where: {
-          matricule: { not: 'ADM1' },
-          statut: 'Actif',
-          est_actif: true,
-          est_indisponible: false,
-        },
-        select: { matricule: true, nom: true, prenom: true, role: true, role_nom: true },
-      });
-    });
-  });
-
   describe('findById', () => {
     it('should return evaluation when found', async () => {
       const eval_ = { id_evaluation: 'uuid-1', statut: 'brouillon', evaluateur_matricule: 'M1', evalue_matricule: 'M2' };

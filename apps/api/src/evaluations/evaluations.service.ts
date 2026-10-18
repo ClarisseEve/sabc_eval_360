@@ -799,22 +799,6 @@ export class EvaluationsService {
     const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
     if (!user) return [];
 
-    const isAdmin = Boolean(user.est_admin) ||
-      String(user.role_nom ?? user.role ?? '').toUpperCase() === 'ADMIN';
-    if (isAdmin) {
-      const collaborateurs = await this.prisma.utilisateur.findMany({
-        where: {
-          matricule: { not: matricule },
-          statut: 'Actif',
-          est_actif: true,
-          est_indisponible: false,
-        },
-        select: { matricule: true, nom: true, prenom: true, role: true, role_nom: true },
-      });
-
-      return { auto: null, collaborateurs, subordonnes: [], pairs: [] };
-    }
-
     const [subordinates, peers] = await Promise.all([
       this.prisma.utilisateur.findMany({
         where: { manager_matricule: matricule, statut: 'Actif' },
