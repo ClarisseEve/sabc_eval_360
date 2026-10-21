@@ -54,6 +54,53 @@ const toTags = (value: unknown): string[] => {
   return [];
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+function getTemplateCriteria(template: unknown) {
+  if (!isRecord(template) || !Array.isArray(template.sections)) return [];
+
+  return template.sections.flatMap((section, sectionIndex) => {
+    if (!isRecord(section) || !Array.isArray(section.competences)) return [];
+
+    return section.competences
+      .filter(isRecord)
+      .map((competence) => ({ section, sectionIndex, competence }));
+  });
+}
+
+export function templateHasValidWeights(template: unknown): boolean {
+  const criteria = getTemplateCriteria(template);
+  const weights = criteria.map(({ competence }) => Number(competence.poids));
+
+  return (
+    weights.length > 0 &&
+    weights.every((weight) => Number.isFinite(weight) && weight > 0) &&
+    Math.abs(weights.reduce((total, weight) => total + weight, 0) - 100) <= 0.01
+  );
+}
+
+export function templateToRuleCriteria(template: unknown): RuleCriterion[] {
+  const criteria = getTemplateCriteria(template);
+  const hasValidWeights = templateHasValidWeights(template);
+  const baseWeight = criteria.length > 0 ? Math.floor(100 / criteria.length) : 0;
+  const remainder = criteria.length > 0 ? 100 - baseWeight * criteria.length : 0;
+
+  return criteria.map(({ section, sectionIndex, competence }, index) =>
+    normalizeRuleCriterion(
+      {
+        ...competence,
+        id: competence.id ?? `template-critere-${index + 1}`,
+        poids: hasValidWeights ? competence.poids : baseWeight + (index < remainder ? 1 : 0),
+        section_label: toStringValue(section.titre, DEFAULT_SECTION_LABEL),
+        section_order: toNumberValue(section.ordre, sectionIndex + 1),
+        niveau_requis: competence.niveau_requis,
+      },
+      index,
+    ),
+  );
+}
+
 const safeParseJson = (value: unknown): any => {
   if (typeof value !== 'string') return value;
   try {

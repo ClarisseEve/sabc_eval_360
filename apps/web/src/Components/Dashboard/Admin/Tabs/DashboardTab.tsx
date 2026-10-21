@@ -9,8 +9,14 @@ import {
   TopRolesSection,
 } from '@/Components/Dashboard/Admin/Sections/OverviewSections';
 
-export default function DashboardTab({ dateRange }: { dateRange?: { start_date?: string; end_date?: string } }) {
-  const { data } = useAdminOverviewTabData(dateRange);
+export default function DashboardTab({
+  dateRange,
+  periodeId,
+}: {
+  dateRange?: { start_date?: string; end_date?: string };
+  periodeId?: string;
+}) {
+  const { data } = useAdminOverviewTabData(dateRange, periodeId);
 
   return (
     <div className="space-y-6">

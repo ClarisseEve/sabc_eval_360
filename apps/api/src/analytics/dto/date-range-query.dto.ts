@@ -1,4 +1,4 @@
-import { IsDateString, IsOptional } from 'class-validator';
+import { IsDateString, IsOptional, IsUUID } from 'class-validator';
 
 export class DateRangeQueryDto {
   @IsOptional()
@@ -8,4 +8,8 @@ export class DateRangeQueryDto {
   @IsOptional()
   @IsDateString({ strict: true })
   end_date?: string;
+
+  @IsOptional()
+  @IsUUID()
+  id_periode?: string;
 }

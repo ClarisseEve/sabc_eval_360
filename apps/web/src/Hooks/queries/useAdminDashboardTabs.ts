@@ -13,11 +13,27 @@ export function getAdminDisplayName(user: any) {
   return formatPersonName(user);
 }
 
-export function useAdminOverviewTabData(dateRange?: { start_date?: string; end_date?: string }) {
+export function useAdminOverviewTabData(
+  dateRange?: { start_date?: string; end_date?: string },
+  periodeId?: string,
+) {
   return useSuspenseQuery({
-    queryKey: ['admin', 'dashboard', 'tab', 'overview', dateRange?.start_date ?? 'all', dateRange?.end_date ?? 'all'],
+    queryKey: [
+      'admin',
+      'dashboard',
+      'tab',
+      'overview',
+      dateRange?.start_date ?? 'all',
+      dateRange?.end_date ?? 'all',
+      periodeId ?? 'all',
+    ],
     queryFn: async () => {
-      const analytics = (await analyticsApi.adminOverview(dateRange)).data;
+      const analytics = (
+        await analyticsApi.adminOverview({
+          ...dateRange,
+          ...(periodeId ? { id_periode: periodeId } : {}),
+        })
+      ).data;
 
       return {
         totalEvaluations: Number(analytics?.kpis?.total_evaluations ?? 0),
