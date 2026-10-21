@@ -276,6 +276,25 @@ export const evaluationsApi = {
   rappels: (idPeriode: string) => api.post(`/evaluations/rappels/${idPeriode}`),
 };
 
+export type RatingSheetCategoryType = 'auto' | 'pairs' | 'descendante' | 'admin';
+export type RatingSheetConfiguration = {
+  methode_calcul: 'moyenne' | 'ponderee';
+  categories: Array<{ type: RatingSheetCategoryType; poids: number }>;
+};
+
+export const ratingSheetsApi = {
+  periods: () => api.get<any[]>('/rating-sheets/admin/periods'),
+  overview: (idPeriode: string) => api.get<any>(`/rating-sheets/admin/${idPeriode}`),
+  saveConfiguration: (idPeriode: string, role: string, data: RatingSheetConfiguration) =>
+    api.put(`/rating-sheets/admin/${idPeriode}/config/${encodeURIComponent(role)}`, data),
+  publish: (idPeriode: string, role: string, matricules?: string[]) =>
+    api.post<any>(`/rating-sheets/admin/${idPeriode}/${encodeURIComponent(role)}/publish`, {
+      ...(matricules?.length ? { matricules } : {}),
+    }),
+  mine: () => api.get<any[]>('/rating-sheets/mine'),
+  pdf: (idFiche: string) => requestBlob(`/rating-sheets/${idFiche}/pdf`),
+};
+
 export const periodesApi = {
   list: () => api.get('/periodes'),
   get: (id: string) => api.get(`/periodes/${id}`),

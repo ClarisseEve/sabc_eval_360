@@ -23,6 +23,7 @@ import { HealthModule } from './health/health.module';
 import { CommonModule } from './common/common.module';
 import { EvaluationPermissionModule } from './evaluation-permission/evaluation-permission.module';
 import { ReportsModule } from './reports/reports.module';
+import { RatingSheetsModule } from './rating-sheets/rating-sheets.module';
 import { validateEnvironment } from './config/validate-env';
 import { APP_THROTTLER_OPTIONS } from './config/throttler-options';
 
@@ -54,6 +55,7 @@ import { APP_THROTTLER_OPTIONS } from './config/throttler-options';
     HealthModule,
     EvaluationPermissionModule,
     ReportsModule,
+    RatingSheetsModule,
   ],
   exports: [CacheService],
   providers: [

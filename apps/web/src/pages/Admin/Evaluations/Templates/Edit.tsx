@@ -13,11 +13,11 @@ import { useToast } from '@/Contexts/ToastContext';
 import { AdminEvaluationsLayout } from '../shared';
 import { TemplateCompetenceLevels } from './TemplateCompetenceLevels';
 import {
-  areCompetenceLevelsComplete,
   createEmptyCompetenceLevels,
   normalizeCompetenceLevels,
   type CompetenceLevelDescription,
 } from './template-levels';
+import { getTemplateEditValidationError } from './template-edit-validation';
 
 /**
  * Page d'édition de template d'évaluation pour l'administrateur
@@ -204,21 +204,6 @@ const TemplateEditPage: React.FC = () => {
     0,
   );
   
-  // Vérifier si le formulaire est valide
-  const isFormValid = () => {
-    return (
-      formData.titre.trim() !== '' &&
-      sections.length > 0 &&
-      sections.every(section => section.titre.trim() !== '' && section.competences.length > 0) &&
-      sections.every(section => 
-        section.competences.every(comp => comp.libelle.trim() !== '')
-      ) &&
-      sections.every(section => section.competences.every((comp) => areCompetenceLevelsComplete(comp.niveaux))) &&
-      sections.every(section => section.competences.every(comp => parseWeight(comp.poids) > 0)) &&
-      Math.abs(totalPoids - 100) <= 0.01
-    );
-  };
-  
   // Construit le payload attendu par l'API (modèle sections -> compétences)
   const buildDto = () => ({
     titre: formData.titre,
@@ -255,8 +240,9 @@ const TemplateEditPage: React.FC = () => {
   // Gérer la soumission du formulaire
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid()) {
-      warning('Veuillez renseigner le titre, le nom de chaque section et le libellé de chaque compétence.');
+    const validationError = getTemplateEditValidationError(formData.titre, sections);
+    if (validationError) {
+      warning(validationError);
       return;
     }
     updateMutation.mutate();

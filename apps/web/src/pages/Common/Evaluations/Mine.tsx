@@ -21,8 +21,10 @@ import {
 } from 'lucide-react';
 import { filterAdminApplicableRules, filterApplicableRules } from '@/utils/rules';
 import { useAuthContext } from '@/Contexts/AuthContext';
+import { paginateEligibleGroups } from './eligible-targets-data';
 
 type Target = Record<string, any>;
+const ELIGIBLE_TARGETS_PAGE_SIZE = 10;
 
 function MetricTile({
   label,
@@ -56,6 +58,12 @@ const Mine: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [eligibleTargetsPage, setEligibleTargetsPage] = useState(1);
+  const eligibleTargetsPagination = paginateEligibleGroups(
+    data.eligibleGroups,
+    eligibleTargetsPage,
+    ELIGIBLE_TARGETS_PAGE_SIZE,
+  );
 
   const isAdmin = (user?.role_nom || user?.role || '').toUpperCase() === 'ADMIN';
 
@@ -187,7 +195,7 @@ const Mine: React.FC = () => {
                 </AlertDescription>
               </Alert>
             ) : (
-              data.eligibleGroups.map((group) => (
+              eligibleTargetsPagination.groups.map((group) => (
                 <div key={group.key} className="space-y-3">
                   <div className="text-sm font-semibold text-sabc-gray-900">
                     {group.label}
@@ -229,6 +237,39 @@ const Mine: React.FC = () => {
                   ))}
                 </div>
               ))
+            )}
+            {eligibleTargetsPagination.total > ELIGIBLE_TARGETS_PAGE_SIZE && (
+              <nav
+                aria-label="Pagination des cibles éligibles"
+                className="flex flex-col gap-3 border-t border-sabc-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <p className="text-sm text-sabc-gray-500" aria-live="polite">
+                  Affichage de {eligibleTargetsPagination.start} à {eligibleTargetsPagination.end} sur {eligibleTargetsPagination.total} collaborateurs
+                </p>
+                <div className="flex items-center justify-between gap-3 sm:justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={eligibleTargetsPagination.page <= 1}
+                    onClick={() => setEligibleTargetsPage(Math.max(1, eligibleTargetsPagination.page - 1))}
+                  >
+                    Précédent
+                  </Button>
+                  <span className="text-sm text-sabc-gray-600">
+                    Page {eligibleTargetsPagination.page} sur {eligibleTargetsPagination.totalPages}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={eligibleTargetsPagination.page >= eligibleTargetsPagination.totalPages}
+                    onClick={() => setEligibleTargetsPage(Math.min(eligibleTargetsPagination.totalPages, eligibleTargetsPagination.page + 1))}
+                  >
+                    Suivant
+                  </Button>
+                </div>
+              </nav>
             )}
           </CardContent>
         </Card>

@@ -76,6 +76,12 @@ export const NAV_ITEMS: NavItem[] = [
         roles: ALL_WITH_ADMIN,
       },
       {
+        title: 'Mes fiches de notation',
+        href: '/evaluations/fiches',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ALL_WITH_ADMIN,
+      },
+      {
         title: 'Gestion globale',
         href: '/admin/evaluations/management',
         icon: <ChevronRight className="h-4 w-4" />,
@@ -84,6 +90,12 @@ export const NAV_ITEMS: NavItem[] = [
       {
         title: 'Périodes',
         href: '/admin/evaluations/periodes',
+        icon: <ChevronRight className="h-4 w-4" />,
+        roles: ['ADMIN'],
+      },
+      {
+        title: 'Fiches de notation',
+        href: '/admin/evaluations/fiches',
         icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN'],
       },

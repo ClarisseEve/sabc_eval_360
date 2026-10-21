@@ -48,6 +48,7 @@ const AdminEvaluationsManagement = lazy(() => import('./pages/Admin/Evaluations/
 const AdminEvaluationsHistory = lazy(() => import('./pages/Admin/Evaluations/History'));
 const AdminEvaluationsShow = lazy(() => import('./pages/Admin/Evaluations/Show'));
 const AdminEvaluationsForm = lazy(() => import('./pages/Admin/Evaluations/Form'));
+const AdminRatingSheets = lazy(() => import('./pages/Admin/Evaluations/RatingSheets'));
 
 // Admin: Évaluations — Règles
 const AdminReglesIndex = lazy(() => import('./pages/Admin/Evaluations/Regles/Index'));
@@ -105,6 +106,7 @@ const CommonEvaluationsToValidate = lazy(() => import('./pages/Common/Evaluation
 const CommonEvaluationsRecues = lazy(() => import('./pages/Common/Evaluations/Recues'));
 const CommonEvaluationsDonnees = lazy(() => import('./pages/Common/Evaluations/Donnees'));
 const CommonEvaluationsHistorique = lazy(() => import('./pages/Common/Evaluations/Historique'));
+const CommonRatingSheets = lazy(() => import('./pages/Common/Evaluations/RatingSheets'));
 const CommonEvaluationsShow = lazy(() => import('./pages/Common/Evaluations/Show'));
 const CommonEvaluationsEdit = lazy(() => import('./pages/Common/Evaluations/Edit'));
 
@@ -198,6 +200,7 @@ function App() {
 
                       {/* ── Admin: Évaluations ── */}
                       <Route path="/admin/evaluations/periodes" element={<A><AdminEvaluationsPeriodes /></A>} />
+                      <Route path="/admin/evaluations/fiches" element={<A><AdminRatingSheets /></A>} />
                       <Route path="/admin/evaluations/management" element={<A><AdminEvaluationsManagement /></A>} />
                       <Route path="/admin/evaluations/history" element={<A><AdminEvaluationsHistory /></A>} />
                       <Route path="/admin/evaluations/:id" element={<A><AdminEvaluationsShow /></A>} />
@@ -287,6 +290,7 @@ function App() {
                       <Route path="/evaluations/recues" element={<G><CommonEvaluationsRecues /></G>} />
                       <Route path="/evaluations/donnees" element={<G><CommonEvaluationsDonnees /></G>} />
                       <Route path="/evaluations/historique" element={<G><CommonEvaluationsHistorique /></G>} />
+                      <Route path="/evaluations/fiches" element={<G><CommonRatingSheets /></G>} />
                       {/* Alias historique: rendait le hub au lieu de l'historique. */}
                       <Route path="/evaluations/history" element={<Navigate to="/evaluations/historique" replace />} />
                       <Route path="/evaluations/:id" element={<G><CommonEvaluationsShow /></G>} />

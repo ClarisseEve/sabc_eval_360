@@ -20,7 +20,9 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import type { PublishedRule } from '@/types/rules';
 
-const EVALUATION_TYPES = ['auto', 'pairs', 'descendante', 'ascendante', '360'] as const;
+const MATRIX_RULE_TYPES = ['auto', 'pairs', 'descendante', 'ascendante'] as const;
+const EVALUATION_TYPES = [...MATRIX_RULE_TYPES, '360'] as const;
+type MatrixRuleType = (typeof MATRIX_RULE_TYPES)[number];
 
 const TYPE_LABELS: Record<string, string> = {
   auto: 'Auto-évaluation',
@@ -28,6 +30,13 @@ const TYPE_LABELS: Record<string, string> = {
   descendante: 'Descendante',
   ascendante: 'Ascendante',
   '360': '360°',
+};
+
+const TYPE_BORDER_STYLES: Record<MatrixRuleType, string> = {
+  auto: 'border-violet-500 text-violet-700',
+  pairs: 'border-sky-500 text-sky-700',
+  descendante: 'border-emerald-600 text-emerald-700',
+  ascendante: 'border-amber-500 text-amber-700',
 };
 
 type ViewMode = 'matrix' | 'list';
@@ -131,19 +140,44 @@ export default function RulesIndexPage() {
   };
 
   const activeCount = rules.filter((rule) => rule.est_active).length;
-  const compatibleForType = rules.filter(
-    (rule) => rule.est_active && String(rule.type_evaluation).toLowerCase() === selectedType,
-  ).length;
+  const compatibleForType = rules.filter((rule) => {
+    const type = String(rule.type_evaluation).toLowerCase();
+    return rule.est_active && (
+      selectedType === '360'
+        ? MATRIX_RULE_TYPES.includes(type as MatrixRuleType)
+        : type === selectedType
+    );
+  }).length;
 
-  const openCell = (evaluator: string, evaluatee: string) => {
-    setSelection({ evaluator, evaluatee, type: selectedType });
+  const findCellRule = (evaluator: string, evaluatee: string) => {
+    if (selectedType !== '360') return findRule(evaluator, evaluatee, selectedType);
+
+    const matchingRules = MATRIX_RULE_TYPES
+      .map((type) => findRule(evaluator, evaluatee, type))
+      .filter((rule): rule is PublishedRule => rule !== null);
+
+    return matchingRules.find((rule) => rule.est_active) ?? matchingRules[0] ?? null;
   };
 
-  const goToCreate = (evaluator?: string, evaluatee?: string) => {
+  const getCellRuleType = (rule: PublishedRule | null, evaluator: string, evaluatee: string): MatrixRuleType => {
+    if (rule) {
+      const ruleType = String(rule.type_evaluation).toLowerCase();
+      return MATRIX_RULE_TYPES.find((type) => type === ruleType) ?? 'descendante';
+    }
+    return evaluator === evaluatee ? 'auto' : 'descendante';
+  };
+
+  const openCell = (evaluator: string, evaluatee: string, type?: string) => {
+    const rule = selectedType === '360' ? findCellRule(evaluator, evaluatee) : null;
+    const cellType = type ?? (rule ? String(rule.type_evaluation).toLowerCase() : evaluator === evaluatee ? 'auto' : 'descendante');
+    setSelection({ evaluator, evaluatee, type: cellType });
+  };
+
+  const goToCreate = (evaluator?: string, evaluatee?: string, type = selectedType) => {
     const params = new URLSearchParams();
     if (evaluator) params.set('role_evaluateur', evaluator);
     if (evaluatee) params.set('role_evalue', evaluatee);
-    params.set('type_evaluation', selectedType);
+    params.set('type_evaluation', type);
     navigate(`/admin/evaluations/regles/create?${params.toString()}`);
   };
 
@@ -215,7 +249,9 @@ export default function RulesIndexPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-sabc-gray-400">Compatibles ({TYPE_LABELS[selectedType] ?? selectedType})</div>
+            <div className="text-sm text-sabc-gray-400">
+              {selectedType === '360' ? 'Règles actives (360°)' : `Compatibles (${TYPE_LABELS[selectedType] ?? selectedType})`}
+            </div>
             <div className="text-2xl font-bold text-sabc-gray-900">{compatibleForType}</div>
           </CardContent>
         </Card>
@@ -277,33 +313,66 @@ export default function RulesIndexPage() {
                             {evaluator}
                           </th>
                           {roles.map((evaluatee) => {
-                            const rule = findRule(evaluator, evaluatee, selectedType);
                             const isDiagonal = evaluator === evaluatee;
-                            const compatible = Boolean(rule);
-                            const active = rule?.est_active ?? false;
 
                             return (
                               <td key={evaluatee} className="p-1 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => openCell(evaluator, evaluatee)}
-                                  title={
-                                    compatible
-                                      ? `${rule?.nom_regle ?? 'Règle'} — cliquer pour modifier`
-                                      : 'Aucune règle — cliquer pour créer'
-                                  }
-                                  className={[
-                                    'flex h-9 w-9 items-center justify-center rounded-lg border transition',
-                                    isDiagonal ? 'ring-1 ring-inset ring-sabc-gray-300' : '',
-                                    compatible
-                                      ? active
-                                        ? 'border-sabc-success/30 bg-sabc-success/10 text-sabc-success hover:bg-sabc-success/20'
-                                        : 'border-sabc-warning/30 bg-sabc-warning/10 text-sabc-warning hover:bg-sabc-warning/20'
-                                      : 'border-sabc-gray-200 bg-sabc-gray-50 text-sabc-gray-300 hover:bg-sabc-gray-100',
-                                  ].join(' ')}
-                                >
-                                  {compatible ? <Check size={16} /> : <X size={14} />}
-                                </button>
+                                {selectedType === '360' ? (
+                                  (() => {
+                                    const rule = findCellRule(evaluator, evaluatee);
+                                    const compatible = Boolean(rule);
+                                    const active = rule?.est_active ?? false;
+                                    const type = getCellRuleType(rule, evaluator, evaluatee);
+
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={() => openCell(evaluator, evaluatee)}
+                                        aria-label={`${TYPE_LABELS[type]} : ${evaluator} vers ${evaluatee}, ${compatible ? (active ? 'règle active' : 'règle inactive') : 'aucune règle'}`}
+                                        title={`${TYPE_LABELS[type]} — ${compatible ? (active ? 'règle active' : 'règle inactive') : 'aucune règle'} — cliquer pour gérer`}
+                                        className={[
+                                          'mx-auto flex h-9 w-9 items-center justify-center rounded-lg border-2 transition',
+                                          TYPE_BORDER_STYLES[type],
+                                          compatible
+                                            ? active
+                                              ? 'bg-sabc-success/10 hover:bg-sabc-success/20'
+                                              : 'bg-sabc-warning/10 text-sabc-warning hover:bg-sabc-warning/20'
+                                            : 'border-sabc-gray-200 bg-sabc-gray-50 text-sabc-gray-300 hover:bg-sabc-gray-100',
+                                          isDiagonal ? 'ring-1 ring-inset ring-sabc-gray-300' : '',
+                                        ].join(' ')}
+                                      >
+                                        {compatible ? <Check size={16} /> : <X size={14} />}
+                                      </button>
+                                    );
+                                  })()
+                                ) : (() => {
+                                  const rule = findRule(evaluator, evaluatee, selectedType);
+                                  const compatible = Boolean(rule);
+                                  const active = rule?.est_active ?? false;
+
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => openCell(evaluator, evaluatee)}
+                                      title={
+                                        compatible
+                                          ? `${rule?.nom_regle ?? 'Règle'} — cliquer pour modifier`
+                                          : 'Aucune règle — cliquer pour créer'
+                                      }
+                                      className={[
+                                        'flex h-9 w-9 items-center justify-center rounded-lg border transition',
+                                        isDiagonal ? 'ring-1 ring-inset ring-sabc-gray-300' : '',
+                                        compatible
+                                          ? active
+                                            ? 'border-sabc-success/30 bg-sabc-success/10 text-sabc-success hover:bg-sabc-success/20'
+                                            : 'border-sabc-warning/30 bg-sabc-warning/10 text-sabc-warning hover:bg-sabc-warning/20'
+                                          : 'border-sabc-gray-200 bg-sabc-gray-50 text-sabc-gray-300 hover:bg-sabc-gray-100',
+                                      ].join(' ')}
+                                    >
+                                      {compatible ? <Check size={16} /> : <X size={14} />}
+                                    </button>
+                                  );
+                                })()}
                               </td>
                             );
                           })}
@@ -337,6 +406,12 @@ export default function RulesIndexPage() {
                     <span className="flex h-5 w-5 items-center justify-center rounded border border-sabc-gray-200 ring-1 ring-inset ring-sabc-gray-300" />
                     Diagonale (auto-évaluation)
                   </span>
+                  {selectedType === '360' && MATRIX_RULE_TYPES.map((type) => (
+                    <span key={type} className="inline-flex items-center gap-1.5">
+                      <span className={`h-4 w-4 rounded border-2 ${TYPE_BORDER_STYLES[type]}`} />
+                      {TYPE_LABELS[type]}
+                    </span>
+                  ))}
                 </div>
               </>
             )}
@@ -505,7 +580,7 @@ export default function RulesIndexPage() {
                     </Button>
                     <Button
                       className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-                      onClick={() => goToCreate(selection.evaluator, selection.evaluatee)}
+                      onClick={() => goToCreate(selection.evaluator, selection.evaluatee, selection.type)}
                     >
                       <Plus size={15} className="mr-1.5" />
                       Créer la règle
