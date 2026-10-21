@@ -86,10 +86,10 @@ describe('templateToRuleCriteria', () => {
       niveau_requis: 4,
       niveaux: [
         { niveau: 1, description: 'Débutant' },
-        { niveau: 2, description: '' },
-        { niveau: 3, description: '' },
+        { niveau: 2, description: 'Description du score 2' },
+        { niveau: 3, description: 'Description du score 3' },
         { niveau: 4, description: 'Confirmé' },
-        { niveau: 5, description: '' },
+        { niveau: 5, description: 'Description du score 5' },
       ],
       improvement_axis_code: null,
       recommendation_tags: [],

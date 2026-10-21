@@ -13,6 +13,17 @@
 
 À compléter après la matrice de vérification.
 
+## Descriptions des scores dans les templates
+
+- [x] Initialiser les descriptions 1 à 5 avec « Description du score N ».
+- [x] Afficher les cinq champs de niveau horizontalement dans l'éditeur ADMIN.
+- [x] Afficher les descriptions avec les choix de note dans le formulaire d'évaluation.
+- [x] Tester normalisation, valeurs par défaut, typecheck et builds.
+
+Validation : 131 tests frontend réussis, typecheck et build frontend réussis.
+Le conteneur frontend a été reconstruit et répond sur `http://localhost:5173`;
+l'API répond toujours sur `/api/health`. Aucun commit effectué.
+
 ## Sous-tâche périodes et schedulers
 
 - [x] Rendre l'ouverture d'une période atomique et conditionnée par son état, ses dates et l'absence d'une autre période ouverte.

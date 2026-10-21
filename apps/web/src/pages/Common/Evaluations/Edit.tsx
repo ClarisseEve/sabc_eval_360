@@ -425,31 +425,35 @@ const EditEvaluation: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      {[1, 2, 3, 4, 5].map((value) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => handleScoreChange(index, value)}
-                          aria-label={`Attribuer la note ${value} sur 5 au critère ${index + 1}${critere.niveaux.find((level) => level.niveau === value)?.description ? ` : ${critere.niveaux.find((level) => level.niveau === value)?.description}` : ''}`}
-                          title={critere.niveaux.find((level) => level.niveau === value)?.description || `Niveau ${value} sur 5`}
-                          aria-pressed={notes[index]?.note === value}
-                          className={cn(
-                            'h-9 w-9 rounded-full border text-sm font-semibold transition',
-                            notes[index]?.note === value
-                              ? 'border-sabc-red-primary bg-sabc-red-primary text-white'
-                              : 'border-sabc-gray-200 bg-white text-sabc-gray-600 hover:border-sabc-red-primary/60 hover:text-sabc-red-primary dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-300'
-                          )}
-                        >
-                          {value}
-                        </button>
-                      ))}
+                    <div className="mt-4 grid grid-cols-5 gap-2">
+                      {[1, 2, 3, 4, 5].map((value) => {
+                        const description = critere.niveaux.find((level) => level.niveau === value)?.description
+                          || `Description du score ${value}`;
+
+                        return (
+                          <div key={value} className="min-w-0 space-y-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(index, value)}
+                              aria-label={`Attribuer la note ${value} sur 5 au critère ${index + 1} : ${description}`}
+                              title={description}
+                              aria-pressed={notes[index]?.note === value}
+                              className={cn(
+                                'h-9 w-9 rounded-full border text-sm font-semibold transition',
+                                notes[index]?.note === value
+                                  ? 'border-sabc-red-primary bg-sabc-red-primary text-white'
+                                  : 'border-sabc-gray-200 bg-white text-sabc-gray-600 hover:border-sabc-red-primary/60 hover:text-sabc-red-primary dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-300'
+                              )}
+                            >
+                              {value}
+                            </button>
+                            <p className="break-words text-[10px] leading-tight text-sabc-gray-500" title={description}>
+                              {description}
+                            </p>
+                          </div>
+                        );
+                      })}
                     </div>
-                    {notes[index]?.note != null && critere.niveaux.find((level) => level.niveau === notes[index]?.note)?.description ? (
-                      <p className="mt-2 rounded-md bg-sabc-gray-50 p-2 text-xs text-sabc-gray-600">
-                        {critere.niveaux.find((level) => level.niveau === notes[index]?.note)?.description}
-                      </p>
-                    ) : null}
                     {(critere.commentaireRequisSiNoteLt ?? 0) > 0 && (
                       <div className="mt-2 flex items-center gap-1.5 text-xs text-sabc-gray-500">
                         <Info className="h-3.5 w-3.5 shrink-0" />

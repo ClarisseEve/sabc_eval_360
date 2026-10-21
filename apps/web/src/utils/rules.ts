@@ -7,6 +7,7 @@ import type {
   RuleVisibilityPolicy,
 } from '@/types/rules';
 import { resolveKnownRole } from '../config/rbac';
+import { normalizeCompetenceLevels } from './competence-levels';
 
 const DEFAULT_SECTION_LABEL = 'Compétences';
 
@@ -54,53 +55,6 @@ const toTags = (value: unknown): string[] => {
   return [];
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-function getTemplateCriteria(template: unknown) {
-  if (!isRecord(template) || !Array.isArray(template.sections)) return [];
-
-  return template.sections.flatMap((section, sectionIndex) => {
-    if (!isRecord(section) || !Array.isArray(section.competences)) return [];
-
-    return section.competences
-      .filter(isRecord)
-      .map((competence) => ({ section, sectionIndex, competence }));
-  });
-}
-
-export function templateHasValidWeights(template: unknown): boolean {
-  const criteria = getTemplateCriteria(template);
-  const weights = criteria.map(({ competence }) => Number(competence.poids));
-
-  return (
-    weights.length > 0 &&
-    weights.every((weight) => Number.isFinite(weight) && weight > 0) &&
-    Math.abs(weights.reduce((total, weight) => total + weight, 0) - 100) <= 0.01
-  );
-}
-
-export function templateToRuleCriteria(template: unknown): RuleCriterion[] {
-  const criteria = getTemplateCriteria(template);
-  const hasValidWeights = templateHasValidWeights(template);
-  const baseWeight = criteria.length > 0 ? Math.floor(100 / criteria.length) : 0;
-  const remainder = criteria.length > 0 ? 100 - baseWeight * criteria.length : 0;
-
-  return criteria.map(({ section, sectionIndex, competence }, index) =>
-    normalizeRuleCriterion(
-      {
-        ...competence,
-        id: competence.id ?? `template-critere-${index + 1}`,
-        poids: hasValidWeights ? competence.poids : baseWeight + (index < remainder ? 1 : 0),
-        section_label: toStringValue(section.titre, DEFAULT_SECTION_LABEL),
-        section_order: toNumberValue(section.ordre, sectionIndex + 1),
-        niveau_requis: competence.niveau_requis,
-      },
-      index,
-    ),
-  );
-}
-
 const safeParseJson = (value: unknown): any => {
   if (typeof value !== 'string') return value;
   try {
@@ -120,12 +74,7 @@ export function normalizeRuleCriterion(raw: any, index: number): RuleCriterion {
     section_label: sectionLabel,
     section_order: toNumberValue(raw?.section_order ?? raw?.sectionOrder, 1),
     niveau_requis: toNumberValue(raw?.niveau_requis, 3),
-    niveaux: [1, 2, 3, 4, 5].map((niveau) => {
-      const level = Array.isArray(raw?.niveaux)
-        ? raw.niveaux.find((entry: any) => Number(entry?.niveau) === niveau)
-        : null;
-      return { niveau, description: toStringValue(level?.description) };
-    }),
+    niveaux: normalizeCompetenceLevels(raw?.niveaux),
     improvement_axis_code: toStringValue(raw?.improvement_axis_code) || null,
     recommendation_tags: toTags(raw?.recommendation_tags),
     recommendation_text: toStringValue(raw?.recommendation_text) || null,
@@ -399,27 +348,18 @@ export function templateHasValidWeights(template: any) {
 export function templateToRuleCriteria(template: any): RuleCriterion[] {
   const competences = getTemplateCompetences(template);
   const keepTemplateWeights = templateHasValidWeights(template);
-  const equalWeight = Math.floor((100 / competences.length) * 100) / 100;
+  const equalWeight = Math.floor(100 / competences.length);
+  const remainder = 100 - equalWeight * competences.length;
 
   return competences.map(({ section, sectionIndex, competence, competenceIndex, weight, fallback }, index) => ({
     id: String(competence.id ?? fallback?.id ?? `${sectionIndex + 1}-${competenceIndex + 1}`),
     libelle: String(competence.libelle ?? fallback?.libelle ?? ''),
     description: String(competence.description ?? fallback?.description ?? ''),
-    poids: keepTemplateWeights
-      ? weight
-      : index === competences.length - 1
-        ? Number((100 - equalWeight * (competences.length - 1)).toFixed(2))
-        : equalWeight,
+    poids: keepTemplateWeights ? weight : equalWeight + (index < remainder ? 1 : 0),
     section_label: String(section.titre ?? 'Compétences'),
     section_order: Number(section.ordre) || sectionIndex + 1,
     niveau_requis: Number(competence.niveau_requis ?? fallback?.niveau_requis) || 3,
-    niveaux: [1, 2, 3, 4, 5].map((niveau) => {
-      const levels = competence.niveaux ?? fallback?.niveaux;
-      const level = Array.isArray(levels)
-        ? levels.find((entry: any) => Number(entry?.niveau) === niveau)
-        : null;
-      return { niveau, description: String(level?.description ?? '') };
-    }),
+    niveaux: normalizeCompetenceLevels(competence.niveaux ?? fallback?.niveaux),
     improvement_axis_code: fallback?.improvement_axis_code ?? null,
     recommendation_tags: fallback?.recommendation_tags ?? [],
     recommendation_text: fallback?.recommendation_text ?? null,

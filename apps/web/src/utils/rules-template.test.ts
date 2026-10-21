@@ -38,11 +38,11 @@ describe('template rule criteria', () => {
         section_order: 2,
         niveau_requis: 4,
         niveaux: [
-          { niveau: 1, description: '' },
-          { niveau: 2, description: '' },
-          { niveau: 3, description: '' },
+          { niveau: 1, description: 'Description du score 1' },
+          { niveau: 2, description: 'Description du score 2' },
+          { niveau: 3, description: 'Description du score 3' },
           { niveau: 4, description: 'Maîtrisé' },
-          { niveau: 5, description: '' },
+          { niveau: 5, description: 'Description du score 5' },
         ],
       },
       {

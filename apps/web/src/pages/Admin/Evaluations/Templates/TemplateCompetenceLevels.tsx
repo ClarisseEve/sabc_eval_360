@@ -39,22 +39,24 @@ export function TemplateCompetenceLevels({
           </SelectContent>
         </Select>
       </div>
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="overflow-x-auto pb-1">
+        <div className="grid min-w-[900px] grid-cols-5 gap-3">
         {niveaux.map((level) => (
-          <div key={level.niveau} className="space-y-2">
+          <div key={level.niveau} className="min-w-0 space-y-2">
             <Label htmlFor={`${idPrefix}-niveau-${level.niveau}`}>
-              Proposition du niveau {level.niveau}
+              Description du score {level.niveau}
             </Label>
             <Textarea
               id={`${idPrefix}-niveau-${level.niveau}`}
               value={level.description}
               onChange={(event) => updateDescription(level.niveau, event.target.value)}
-              placeholder={`Décrire les comportements attendus au niveau ${level.niveau}...`}
-              className="min-h-[88px]"
+              placeholder={`Description du score ${level.niveau}`}
+              className="min-h-[88px] resize-y"
               required
             />
           </div>
         ))}
+        </div>
       </div>
     </div>
   );
