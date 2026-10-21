@@ -192,7 +192,7 @@ export default function AdminAnalytics() {
           <TabsContent value="overview">
             <ErrorBoundary>
               <Suspense fallback={<DashboardSkeleton />}>
-                <DashboardTab dateRange={dateRange} />
+                <DashboardTab dateRange={dateRange} periodeId={selectedPeriodeId || undefined} />
               </Suspense>
             </ErrorBoundary>
           </TabsContent>

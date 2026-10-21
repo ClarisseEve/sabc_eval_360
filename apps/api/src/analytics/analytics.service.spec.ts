@@ -199,6 +199,43 @@ describe('AnalyticsService', () => {
         String(call[0]).includes("'{visibility_policy,admin}'"),
       )).toBe(true);
     });
+
+    it('uses the filtered database trend when the analytics microservice is enabled', async () => {
+      mockConfig.get.mockImplementation((key: string, defaultVal: string) =>
+        key === 'ANALYTICS_MICROSERVICE_ENABLED' ? 'true' : defaultVal,
+      );
+      service = new AnalyticsService(mockConfig, mockPg, mockCache, mockPrisma, mockNotifications);
+      mockPg.queryOne.mockResolvedValue({ total_evaluations: '7', unique_users: '5', average_score: '4.2' });
+      mockPg.query.mockResolvedValue([]);
+      const fetchSpy = jest.spyOn(global, 'fetch');
+
+      try {
+        const result = await service.getDashboard({
+          start_date: '2026-10-01',
+          end_date: '2026-10-31',
+        });
+
+        expect(result.performance_trend).toEqual([]);
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(mockPg.query).toHaveBeenCalledWith(
+          expect.stringContaining("TO_CHAR(COALESCE(e.date_validation::date, e.date_soumission::date, e.created_at::date, e.date_creation), 'YYYY-MM')"),
+          ['2026-10-01', '2026-10-31'],
+        );
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('filters the performance trend by the selected evaluation period', async () => {
+      mockPg.queryOne.mockResolvedValue({ total_evaluations: '7', unique_users: '5', average_score: '4.2' });
+      mockPg.query.mockResolvedValue([]);
+
+      await service.getDashboard({ id_periode: '11111111-1111-4111-8111-111111111111' });
+
+      const [trendSql, trendParams] = mockPg.query.mock.calls.at(-1)!;
+      expect(String(trendSql)).toContain('e.id_periode = $1');
+      expect(trendParams).toEqual(['11111111-1111-4111-8111-111111111111']);
+    });
   });
 
   describe('visibilité des analyses personnalisées', () => {

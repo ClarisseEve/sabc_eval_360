@@ -210,13 +210,13 @@ export class AnalyticsService {
     }
   }
 
-  async getDashboard(filters: { start_date?: string; end_date?: string } = {}) {
-    const key = `analytics:dashboard:${filters.start_date ?? ''}:${filters.end_date ?? ''}`;
+  async getDashboard(filters: { start_date?: string; end_date?: string; id_periode?: string } = {}) {
+    const key = `analytics:dashboard:${filters.start_date ?? ''}:${filters.end_date ?? ''}:${filters.id_periode ?? ''}`;
     return this.cache.getOrCompute(key, 120, () => this._getDashboard(filters));
   }
 
-  private async _getDashboard(filters: { start_date?: string; end_date?: string } = {}) {
-    if (this.enabled) {
+  private async _getDashboard(filters: { start_date?: string; end_date?: string; id_periode?: string } = {}) {
+    if (this.enabled && !filters.start_date && !filters.end_date && !filters.id_periode) {
       try {
         const res = await fetch(`${this.serviceUrl}/api/v2/analytics`, {
           headers: { 'X-Service-Key': this.serviceKey },
@@ -420,12 +420,12 @@ export class AnalyticsService {
     );
   }
 
-  async getAdminOverview(filters: { start_date?: string; end_date?: string } = {}) {
-    const cacheKey = `analytics:admin:overview:${filters.start_date ?? 'all'}:${filters.end_date ?? 'all'}`;
+  async getAdminOverview(filters: { start_date?: string; end_date?: string; id_periode?: string } = {}) {
+    const cacheKey = `analytics:admin:overview:${filters.start_date ?? 'all'}:${filters.end_date ?? 'all'}:${filters.id_periode ?? 'all'}`;
     return this.cache.getOrCompute(cacheKey, 120, () => this._getAdminOverview(filters));
   }
 
-  private async _getAdminOverview(filters: { start_date?: string; end_date?: string } = {}) {
+  private async _getAdminOverview(filters: { start_date?: string; end_date?: string; id_periode?: string } = {}) {
     const today = new Date(`${getDoualaDate()}T00:00:00.000Z`);
     const [dashboard, userStats, evaluationStatus, remplacements, regionsOverview, roleAnalytics] = await Promise.all([
       this.getDashboard(filters),
@@ -580,7 +580,7 @@ export class AnalyticsService {
   }
 
   // Fallback when microservice is unavailable
-  private async getDashboardFallback(filters: { start_date?: string; end_date?: string }) {
+  private async getDashboardFallback(filters: { start_date?: string; end_date?: string; id_periode?: string }) {
     const startDate = filters.start_date ?? this.sixMonthsAgo();
     const endDate = filters.end_date ?? new Date().toISOString().split('T')[0];
 
@@ -606,16 +606,21 @@ export class AnalyticsService {
       [startDate, endDate],
     );
 
+    const trendFilter = filters.id_periode
+      ? `e.id_periode = $1 AND ${ruleVisibilitySql('admin')}`
+      : `${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2 AND ${ruleVisibilitySql('admin')}`;
+    const trendParams = filters.id_periode
+      ? [filters.id_periode]
+      : [startDate, endDate];
     const trends = await this.pg.query(
       `SELECT TO_CHAR(${EVALUATION_EFFECTIVE_DATE_E_SQL}, 'YYYY-MM') as period,
               AVG(e.note_globale) as score, COUNT(*) as count
        FROM evaluations e
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
-       WHERE ${EVALUATION_EFFECTIVE_DATE_E_SQL} BETWEEN $1 AND $2
-         AND ${ruleVisibilitySql('admin')}
+       WHERE ${trendFilter}
        GROUP BY TO_CHAR(${EVALUATION_EFFECTIVE_DATE_E_SQL}, 'YYYY-MM')
        ORDER BY period`,
-      [startDate, endDate],
+      trendParams,
     );
 
     return {
