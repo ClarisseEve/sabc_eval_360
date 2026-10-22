@@ -41,14 +41,34 @@ export function buildCreateUserPayload(form: CreateUserForm) {
     };
 }
 
+export function getCreateUserFormErrors(form: CreateUserForm) {
+    return {
+        matricule:
+            form.matricule.trim().length > 5
+                ? 'Le matricule doit contenir 5 caractères maximum.'
+                : '',
+        password:
+            form.password.length < 8
+                ? 'Le mot de passe doit contenir au moins 8 caractères.'
+                : '',
+        manager_matricule:
+            form.manager_matricule.trim().length > 5
+                ? 'Le matricule du manager doit contenir 5 caractères maximum. Laissez ce champ vide si nécessaire.'
+                : '',
+    };
+}
+
 export function isCreateUserFormValid(form: CreateUserForm): boolean {
+    const errors = getCreateUserFormErrors(form);
     return Boolean(
         form.matricule.trim() &&
+            !errors.matricule &&
             form.nom.trim() &&
             form.prenom.trim() &&
             form.email.trim() &&
-            form.password.length >= 8 &&
+            !errors.password &&
             form.id_role &&
-            form.id_region,
+            form.id_region &&
+            !errors.manager_matricule,
     );
 }

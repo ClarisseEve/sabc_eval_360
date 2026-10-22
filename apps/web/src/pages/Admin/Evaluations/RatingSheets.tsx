@@ -17,13 +17,11 @@ const CATEGORY_LABELS = Object.fromEntries(CATEGORIES.map(({ type, label }) => [
 type RoleOverview = {
     role: string;
     configuration: RatingSheetConfiguration | null;
-    configuration_verrouillee?: boolean;
     collaborateurs: Array<{
         matricule: string;
         nom: string;
         prenom: string;
         configuration_absente?: boolean;
-        configuration_verrouillee?: boolean;
         statut?: 'complete' | 'partielle';
         note_generale_sur_20?: number | null;
         categories?: Record<string, { complete: boolean; evaluations_recues: number; note_sur_20: number | null }>;
@@ -60,6 +58,7 @@ export default function AdminRatingSheetsPage() {
     const [periodId, setPeriodId] = React.useState('');
     const [selectedRole, setSelectedRole] = React.useState('');
     const [draft, setDraft] = React.useState<RatingSheetConfiguration>(() => initialConfiguration());
+    const [selectedRoleCategories, setSelectedRoleCategories] = React.useState<RatingSheetCategoryType[]>(CATEGORIES.map(({ type }) => type));
     const [selection, setSelection] = React.useState<string[]>([]);
 
     const periodsQuery = useQuery({
@@ -93,6 +92,7 @@ export default function AdminRatingSheetsPage() {
         setSelection([]);
     }, [periodId]);
 
+    const selectedCategories = draft.categories.filter((category) => selectedRoleCategories.includes(category.type)).map((category) => category.type);
     const saveMutation = useMutation({
         mutationFn: () => {
             const categories = draft.categories.filter((category) => selectedCategories.includes(category.type));
@@ -107,8 +107,6 @@ export default function AdminRatingSheetsPage() {
         },
         onError: (error) => toast.error(getErrorMessage(error)),
     });
-    const selectedCategories = draft.categories.filter((category) => selectedRoleCategories.includes(category.type)).map((category) => category.type);
-    const [selectedRoleCategories, setSelectedRoleCategories] = React.useState<RatingSheetCategoryType[]>(CATEGORIES.map(({ type }) => type));
 
     React.useEffect(() => {
         setSelectedRoleCategories(roleOverview?.configuration?.categories.map(({ type }) => type) ?? CATEGORIES.map(({ type }) => type));
@@ -134,6 +132,7 @@ export default function AdminRatingSheetsPage() {
     const updateWeight = (type: RatingSheetCategoryType, poids: number) => {
         setDraft((current) => ({
             ...current,
+            methode_calcul: 'ponderee',
             categories: current.categories.map((category) => (category.type === type ? { ...category, poids } : category)),
         }));
     };
@@ -151,8 +150,7 @@ export default function AdminRatingSheetsPage() {
         if (confirmed) publishMutation.mutate(matricules);
     };
 
-    const frozen = Boolean(roleOverview?.configuration && roleOverview.configuration_verrouillee);
-    const canSave = Boolean(periodId && selectedRole && selectedRoleCategories.length) && !frozen && !saveMutation.isPending;
+    const canSave = Boolean(periodId && selectedRole && selectedRoleCategories.length) && !saveMutation.isPending;
 
     return (
         <AdminEvaluationsLayout title="Fiches de notation">
@@ -215,14 +213,13 @@ export default function AdminRatingSheetsPage() {
                                     <h2 className="text-sabc-gray-900 text-lg font-semibold">Calcul de la note générale</h2>
                                     <p className="text-sabc-gray-600 mt-1 text-sm">
                                         Les notes de catégorie sont converties sur 20. En cas d’évaluations manquantes, les catégories disponibles
-                                        sont renormalisées. Après le premier enregistrement, la configuration ne pourra plus être modifiée dès qu’une
-                                        évaluation du poste existe.
+                                        sont renormalisées. Vous pouvez modifier et enregistrer les poids à tout moment. Les fiches déjà publiées
+                                        conservent leur contenu ; republiez-les pour appliquer la nouvelle configuration.
                                     </p>
-                                    {frozen ? (
-                                        <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-                                            Cette configuration est verrouillée : une évaluation a déjà été créée pour ce poste durant cette période.
-                                        </p>
-                                    ) : null}
+                                    <p className="text-sabc-gray-600 mt-2 text-sm">
+                                        Modifier un poids active automatiquement la pondération personnalisée. Le total des catégories choisies doit
+                                        alors être égal à 100 %.
+                                    </p>
 
                                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                                         {CATEGORIES.map(({ type, label }) => {
@@ -233,7 +230,6 @@ export default function AdminRatingSheetsPage() {
                                                         type="checkbox"
                                                         checked={selectedRoleCategories.includes(type)}
                                                         onChange={() => toggleCategory(type)}
-                                                        disabled={frozen}
                                                         aria-label={`Inclure ${label}`}
                                                     />
                                                     <span className="flex-1 text-sm">{label}</span>
@@ -246,9 +242,7 @@ export default function AdminRatingSheetsPage() {
                                                             step="0.01"
                                                             value={weight}
                                                             onChange={(event) => updateWeight(type, Number(event.target.value))}
-                                                            disabled={
-                                                                frozen || !selectedRoleCategories.includes(type) || draft.methode_calcul === 'moyenne'
-                                                            }
+                                                            disabled={!selectedRoleCategories.includes(type)}
                                                             className="border-sabc-gray-300 w-20 rounded border px-2 py-1"
                                                         />
                                                         %
@@ -263,7 +257,6 @@ export default function AdminRatingSheetsPage() {
                                             <select
                                                 className="border-sabc-gray-300 mt-1 block rounded-lg border bg-white px-3 py-2"
                                                 value={draft.methode_calcul}
-                                                disabled={frozen}
                                                 onChange={(event) =>
                                                     setDraft((current) => ({
                                                         ...current,

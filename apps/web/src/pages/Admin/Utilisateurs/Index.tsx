@@ -12,7 +12,13 @@ import { adminApi } from '@/Services/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { buildCreateUserPayload, initialCreateUserForm, isCreateUserFormValid, type CreateUserForm } from './create-user-contract';
+import {
+    buildCreateUserPayload,
+    getCreateUserFormErrors,
+    initialCreateUserForm,
+    isCreateUserFormValid,
+    type CreateUserForm,
+} from './create-user-contract';
 import { AdminUsersLayout } from './shared';
 import {
     buildUpdateUserForm,
@@ -181,6 +187,8 @@ function UsersContent() {
 
     const createError = (createMutation.error as any)?.response?.data?.message || (createMutation.error ? 'Une erreur est survenue.' : null);
     const updateError = (updateMutation.error as any)?.response?.data?.message || (updateMutation.error ? 'Une erreur est survenue.' : null);
+    const createValidationErrors = getCreateUserFormErrors(createForm);
+    const createErrorMessage = Array.isArray(createError) ? createError.join(' ') : createError;
 
     return (
         <AdminUsersLayout title="Gestion des utilisateurs">
@@ -352,7 +360,16 @@ function UsersContent() {
                                     type={type}
                                     value={createForm[key]}
                                     onChange={(e) => setCreateForm((prev) => ({ ...prev, [key]: e.target.value }))}
+                                    minLength={key === 'password' ? 8 : undefined}
                                 />
+                                {key === 'matricule' && createValidationErrors.matricule ? (
+                                    <p className="mt-1 text-xs text-red-700">{createValidationErrors.matricule}</p>
+                                ) : null}
+                                {key === 'password' ? (
+                                    <p className={`mt-1 text-xs ${createValidationErrors.password ? 'text-red-700' : 'text-sabc-gray-500'}`}>
+                                        {createValidationErrors.password || '8 caractères minimum.'}
+                                    </p>
+                                ) : null}
                             </div>
                         ))}
                         <div>
@@ -398,8 +415,11 @@ function UsersContent() {
                                     }))
                                 }
                             />
+                            <p className={`mt-1 text-xs ${createValidationErrors.manager_matricule ? 'text-red-700' : 'text-sabc-gray-500'}`}>
+                                {createValidationErrors.manager_matricule || 'Facultatif · 5 caractères maximum.'}
+                            </p>
                         </div>
-                        {createError && <p className="text-sabc-red-primary text-sm md:col-span-2">{createError}</p>}
+                        {createErrorMessage && <p className="text-sabc-red-primary text-sm md:col-span-2">{createErrorMessage}</p>}
                     </div>
 
                     <DialogFooter>

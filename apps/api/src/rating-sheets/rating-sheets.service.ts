@@ -144,7 +144,6 @@ export class RatingSheetsService {
       (user) => user.est_actif,
     );
     const matricules = users.map((user) => user.matricule);
-    const allMatricules = allRoleUsers.map((user) => user.matricule);
     const sheetRows = matricules.length
       ? await this.pg.query<RatingSheetOverviewRow>(
           `SELECT id_fiche, matricule, notification_statut, notification_erreur,
@@ -156,30 +155,6 @@ export class RatingSheetsService {
     const publishedByMatricule = new Map(
       sheetRows.map((sheet) => [sheet.matricule, sheet]),
     );
-    const evaluatedMatricules = allMatricules.length
-      ? new Set(
-          (
-            await this.pg.query<{ evalue_matricule: string }>(
-              `SELECT DISTINCT evalue_matricule FROM evaluations
-         WHERE id_periode = $1 AND evalue_matricule = ANY($2::varchar[])`,
-              [idPeriode, allMatricules],
-            )
-          ).map((row) => row.evalue_matricule),
-        )
-      : new Set<string>();
-    const lockedByRuleRole = await this.pg.query<{ role_evalue: string }>(
-      `SELECT DISTINCT r.role_evalue
-       FROM evaluations e
-       JOIN regles_evaluation r ON r.id_regle = e.id_regle
-       WHERE e.id_periode = $1 AND r.role_evalue = ANY($2::varchar[])`,
-      [idPeriode, roleNames],
-    );
-    const lockedRoles = new Set(lockedByRuleRole.map((row) => row.role_evalue));
-    for (const user of allRoleUsers) {
-      if (evaluatedMatricules.has(user.matricule))
-        lockedRoles.add(user.role_nom);
-    }
-
     const evaluations = matricules.length
       ? await this.pg.query<RatingSheetEvaluationRow>(
           `SELECT e.id_evaluation, e.evaluateur_matricule, e.evalue_matricule, e.type_evaluation,
@@ -249,7 +224,6 @@ export class RatingSheetsService {
               nom: user.nom,
               prenom: user.prenom,
               configuration_absente: true,
-              configuration_verrouillee: lockedRoles.has(role),
               fiche: sheet ?? null,
             };
           }
@@ -276,14 +250,12 @@ export class RatingSheetsService {
             statut: snapshot.statut,
             note_generale_sur_20: snapshot.note_generale_sur_20,
             categories: categoriesByType,
-            configuration_verrouillee: lockedRoles.has(role),
             fiche: sheet ?? null,
           };
         });
       return {
         role,
         configuration,
-        configuration_verrouillee: lockedRoles.has(role),
         collaborateurs,
       };
     });
@@ -307,32 +279,6 @@ export class RatingSheetsService {
 
     const validationError = validateRatingSheetConfiguration(configuration);
     if (validationError) throw new BadRequestException(validationError);
-
-    const users = await this.prisma.utilisateur.findMany({
-      where: { role_nom: role, est_admin: false },
-      select: { matricule: true },
-    });
-    const matricules = users.map((user) => user.matricule);
-    const evaluations = await this.pg.queryOne<{ total: string }>(
-      `SELECT COUNT(*)::text AS total
-       FROM evaluations e
-       LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
-       WHERE e.id_periode = $1
-         AND (r.role_evalue = $2 OR e.evalue_matricule = ANY($3::varchar[]))`,
-      [idPeriode, role, matricules],
-    );
-    const existingConfiguration = await this.pg.queryOne<{
-      id_configuration: string;
-    }>(
-      `SELECT id_configuration FROM rating_sheet_configurations
-       WHERE id_periode = $1 AND role_evalue = $2`,
-      [idPeriode, role],
-    );
-    if (existingConfiguration && Number(evaluations?.total ?? 0) > 0) {
-      throw new BadRequestException(
-        'La configuration est figée dès la première évaluation créée pour ce rôle.',
-      );
-    }
 
     const row = await this.pg.queryOne<RatingSheetConfigurationRow>(
       `INSERT INTO rating_sheet_configurations

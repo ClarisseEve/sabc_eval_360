@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildCreateUserPayload, initialCreateUserForm, isCreateUserFormValid } from './create-user-contract';
+import {
+    buildCreateUserPayload,
+    getCreateUserFormErrors,
+    initialCreateUserForm,
+    isCreateUserFormValid,
+} from './create-user-contract';
 
 const validForm = {
     ...initialCreateUserForm,
@@ -47,5 +52,22 @@ describe('create user API contract', () => {
         expect(isCreateUserFormValid(validForm)).toBe(true);
         expect(isCreateUserFormValid({ ...validForm, id_role: '' })).toBe(false);
         expect(isCreateUserFormValid({ ...validForm, password: 'short' })).toBe(false);
+    });
+
+    it('explains invalid identifier lengths and password requirements', () => {
+        const invalidForm = {
+            ...validForm,
+            matricule: 'EVE1234',
+            password: '123456',
+            manager_matricule: 'A00010E',
+        };
+
+        expect(getCreateUserFormErrors(invalidForm)).toEqual({
+            matricule: 'Le matricule doit contenir 5 caractères maximum.',
+            password: 'Le mot de passe doit contenir au moins 8 caractères.',
+            manager_matricule:
+                'Le matricule du manager doit contenir 5 caractères maximum. Laissez ce champ vide si nécessaire.',
+        });
+        expect(isCreateUserFormValid(invalidForm)).toBe(false);
     });
 });
