@@ -159,7 +159,7 @@ export class RatingSheetsService {
       ? await this.pg.query<RatingSheetEvaluationRow>(
           `SELECT e.id_evaluation, e.evaluateur_matricule, e.evalue_matricule, e.type_evaluation,
                 e.statut, e.date_validation, e.note_globale, e.notations_json,
-                r.criteres_evaluation_json AS rule_json
+                COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json) AS rule_json
          FROM evaluations e
          LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
          WHERE e.id_periode = $1
@@ -366,7 +366,7 @@ export class RatingSheetsService {
       ? await this.pg.query<RatingSheetEvaluationRow>(
           `SELECT e.id_evaluation, e.evaluateur_matricule, e.evalue_matricule, e.type_evaluation,
                 e.statut, e.date_validation, e.note_globale, e.notations_json,
-                r.criteres_evaluation_json AS rule_json
+                COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json) AS rule_json
          FROM evaluations e
          LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
          WHERE e.id_periode = $1 AND e.evalue_matricule = ANY($2::varchar[])

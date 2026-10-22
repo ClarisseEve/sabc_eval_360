@@ -119,7 +119,7 @@ export class ContreEvaluationService {
         [evaluationId],
       ),
       this.pg.query<any>(
-        `SELECT e.*, r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
+        `SELECT e.*, COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json) AS ${INTERNAL_RULE_ENVELOPE_FIELD}
          FROM evaluations e
          LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
          WHERE e.evaluation_parent_id = $1

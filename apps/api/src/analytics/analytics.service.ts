@@ -283,10 +283,10 @@ export class AnalyticsService {
        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(e.notations_json, '[]'::jsonb)) AS note
        LEFT JOIN LATERAL jsonb_array_elements(
          CASE
-           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'object'
-             THEN COALESCE(r.criteres_evaluation_json->'criteres', '[]'::jsonb)
-           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'array'
-             THEN r.criteres_evaluation_json
+           WHEN jsonb_typeof(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)) = 'object'
+             THEN COALESCE(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)->'criteres', '[]'::jsonb)
+           WHEN jsonb_typeof(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)) = 'array'
+             THEN COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)
            ELSE '[]'::jsonb
          END
        ) AS critere ON COALESCE(note->>'critere_id', note->>'id_critere', note->>'id') = critere->>'id'
@@ -677,10 +677,10 @@ export class AnalyticsService {
        CROSS JOIN LATERAL jsonb_array_elements(e.notations_json) AS note(value)
        LEFT JOIN LATERAL jsonb_array_elements(
          CASE
-           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'object'
-             THEN COALESCE(r.criteres_evaluation_json->'criteres', '[]'::jsonb)
-           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'array'
-             THEN r.criteres_evaluation_json
+           WHEN jsonb_typeof(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)) = 'object'
+             THEN COALESCE(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)->'criteres', '[]'::jsonb)
+           WHEN jsonb_typeof(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)) = 'array'
+             THEN COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)
            ELSE '[]'::jsonb
          END
        ) AS criterion(value) ON criterion.value->>'id' = note.value->>'critere_id'
@@ -1184,10 +1184,10 @@ export class AnalyticsService {
        CROSS JOIN LATERAL jsonb_array_elements(e.notations_json) AS n
        LEFT JOIN LATERAL jsonb_array_elements(
          CASE
-           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'object'
-             THEN COALESCE(r.criteres_evaluation_json->'criteres', '[]'::jsonb)
-           WHEN jsonb_typeof(r.criteres_evaluation_json) = 'array'
-             THEN r.criteres_evaluation_json
+           WHEN jsonb_typeof(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)) = 'object'
+             THEN COALESCE(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)->'criteres', '[]'::jsonb)
+           WHEN jsonb_typeof(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)) = 'array'
+             THEN COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)
            ELSE '[]'::jsonb
          END
        ) AS critere ON critere->>'id' = n->>'critere_id'

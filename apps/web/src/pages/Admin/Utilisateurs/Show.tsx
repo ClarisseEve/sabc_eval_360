@@ -13,6 +13,11 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { AdminUsersLayout } from './shared';
 import { scoreOnTwenty } from './evaluation-score';
+import { buildEvaluationCriteria } from '@/pages/Common/Evaluations/shared';
+import {
+  getAdminUserSelfEvaluations,
+  getLatestSubmittedSelfEvaluation,
+} from './evaluation-history-data';
 
 export default function ShowUser() {
   const { matricule = '' } = useParams();
@@ -44,6 +49,11 @@ export default function ShowUser() {
     queryFn: () => analyticsApi.recommandations(matricule).then((response) => response.data),
     enabled: Boolean(matricule),
   });
+  const { data: historyData, isLoading: historyLoading } = useQuery({
+    queryKey: ['admin', 'users', matricule, 'historique'],
+    queryFn: () => adminApi.users.historique(matricule).then((response) => response.data),
+    enabled: Boolean(matricule),
+  });
 
   const deactivateMutation = useMutation({
     mutationFn: async () => adminApi.users.delete(matricule),
@@ -69,8 +79,17 @@ export default function ShowUser() {
   const stats = user?.stats || {};
   const subs = Array.isArray(subordinates) ? subordinates : [];
   const profileGap = Array.isArray(gapData?.profils) ? gapData.profils[0] : null;
-  const typeScore = (type: string) => profileGap?.types?.[type]?.score ?? scoreData?.par_type?.find((entry: any) => entry.type === type)?.moyenne ?? null;
-  const typeEvaluationCount = (type: string) => Number(profileGap?.types?.[type]?.nb_evaluations ?? scoreData?.par_type?.find((entry: any) => entry.type === type)?.nb_evaluations ?? 0);
+  const selfEvaluations = getAdminUserSelfEvaluations(historyData?.data);
+  const pendingSelfEvaluation = getLatestSubmittedSelfEvaluation(selfEvaluations);
+  const pendingSelfScore = pendingSelfEvaluation?.note_globale ?? null;
+  const typeScore = (type: string) => profileGap?.types?.[type]?.score
+    ?? scoreData?.par_type?.find((entry: any) => entry.type === type)?.moyenne
+    ?? (type === 'auto' ? pendingSelfScore : null);
+  const typeEvaluationCount = (type: string) => Number(
+    profileGap?.types?.[type]?.nb_evaluations
+      ?? scoreData?.par_type?.find((entry: any) => entry.type === type)?.nb_evaluations
+      ?? (type === 'auto' && pendingSelfEvaluation ? 1 : 0),
+  );
   const axes = Array.isArray(axesData?.axes_amelioration) ? axesData.axes_amelioration : [];
   const recommendations = Array.isArray(recommendationsData?.recommandations)
     ? recommendationsData.recommandations
@@ -101,7 +120,7 @@ export default function ShowUser() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Rôle</div><div className="text-xl font-bold">{user?.role}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Statut</div><div className="text-xl font-bold">{user?.statut}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Score moyen</div><div className="text-xl font-bold">{profileScoreOnTwenty != null ? `${profileScoreOnTwenty.toFixed(2)}/20` : 'N/A'}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Score moyen validé</div><div className="text-xl font-bold">{profileScoreOnTwenty != null ? `${profileScoreOnTwenty.toFixed(2)}/20` : 'N/A'}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Subordonnés</div><div className="text-xl font-bold">{stats.subordonnes ?? 0}</div></CardContent></Card>
       </div>
 
@@ -125,7 +144,11 @@ export default function ShowUser() {
                 <div key={type} className="rounded-lg border border-sabc-gray-200 bg-white p-4">
                   <div className="text-xs text-sabc-gray-500">{label}</div>
                   <div className="mt-1 text-2xl font-bold">{scoreOnTwenty(typeScore(type)) != null ? `${scoreOnTwenty(typeScore(type))!.toFixed(2)}/20` : '—'}</div>
-                  <div className="mt-1 text-xs text-sabc-gray-500">Source : {typeScore(type) != null ? `${Number(typeScore(type)).toFixed(2)}/5` : 'non évalué'}</div>
+                  <div className="mt-1 text-xs text-sabc-gray-500">
+                    {type === 'auto' && pendingSelfEvaluation && !profileGap?.types?.auto && !scoreData?.par_type?.some((entry: any) => entry.type === 'auto')
+                      ? 'Soumise, en attente de validation'
+                      : `Source : ${typeScore(type) != null ? `${Number(typeScore(type)).toFixed(2)}/5` : 'non évalué'}`}
+                  </div>
                   <div className="mt-1 text-xs text-sabc-gray-500">{typeEvaluationCount(type)} évaluation(s)</div>
                 </div>
               ))}
@@ -140,6 +163,70 @@ export default function ShowUser() {
                 <div className="mt-1 text-xs text-sabc-gray-500">Auto + pairs + manager</div>
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Notes de l’auto-évaluation</CardTitle></CardHeader>
+        <CardContent className="space-y-5">
+          {historyLoading ? (
+            <div className="p-4 text-center text-sm text-sabc-gray-500">Chargement des notes…</div>
+          ) : selfEvaluations.length === 0 ? (
+            <p className="text-sm text-sabc-gray-500">Aucune auto-évaluation soumise ou validée avec des notes.</p>
+          ) : (
+            selfEvaluations.map((evaluation, evaluationIndex) => {
+              const criteria = buildEvaluationCriteria(evaluation);
+              const evaluationId = evaluation.id_evaluation ?? evaluationIndex;
+              const periodLabel =
+                evaluation.periode?.nom_periode ??
+                evaluation.periode?.code_periode ??
+                evaluation.periode_code ??
+                'Période non renseignée';
+
+              return (
+                <section key={evaluationId} className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="font-semibold text-sabc-gray-900">{periodLabel}</h3>
+                      {evaluation.date_soumission ? (
+                        <p className="text-xs text-sabc-gray-500">
+                          Soumise le {new Date(evaluation.date_soumission).toLocaleDateString('fr-FR')}
+                        </p>
+                      ) : null}
+                    </div>
+                    <Badge variant={evaluation.statut === 'valide' ? 'success' : 'warning'}>
+                      {evaluation.statut === 'valide' ? 'Validée' : 'En attente de validation'}
+                    </Badge>
+                  </div>
+                  {criteria.length === 0 ? (
+                    <p className="text-sm text-sabc-gray-500">Les notes de cette auto-évaluation ne sont pas disponibles.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Compétence</TableHead>
+                          <TableHead>Note / 5</TableHead>
+                          <TableHead>Commentaire</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {criteria.map((criterion) => (
+                          <TableRow key={String(criterion.id)}>
+                            <TableCell>
+                              <div className="font-medium">{criterion.libelle}</div>
+                              <div className="text-xs text-sabc-gray-500">{criterion.section}</div>
+                            </TableCell>
+                            <TableCell>{criterion.note ?? '—'}</TableCell>
+                            <TableCell>{criterion.commentaire || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </section>
+              );
+            })
           )}
         </CardContent>
       </Card>

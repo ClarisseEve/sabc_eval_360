@@ -92,7 +92,7 @@ export class DashboardCollaborateurService {
               e.type_evaluation,
               e.statut, e.id_periode, e.note_globale,
               e.date_soumission, e.created_at, p.nom_periode,
-              r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
+              COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json) AS ${INTERNAL_RULE_ENVELOPE_FIELD}
        FROM evaluations e
        JOIN periodes_evaluation p ON p.id_periode = e.id_periode
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle

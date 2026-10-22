@@ -35,6 +35,10 @@ describe('EvaluationsService', () => {
         findUnique: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      role: {
+        findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
     mockValidationNotation = {
       normaliserNotes: jest.fn().mockImplementation((rawNotes: any) => {
@@ -136,6 +140,66 @@ describe('EvaluationsService', () => {
 
       const result = await service.findById('uuid-1', evaluatorActor);
       expect(result.id_evaluation).toBe('uuid-1');
+    });
+
+    it('serves the saved position-template criteria instead of the generic rule criteria', async () => {
+      const snapshot = {
+        sections: [{ titre: 'Vente', description: 'Terrain', ordre: 1, competences: [] }],
+        criteres: [
+          {
+            id: 'prospection',
+            libelle: 'Prospection client',
+            description: 'Développe le portefeuille.',
+            poids: 100,
+            section_label: 'Vente',
+            section_order: 1,
+            niveaux: [{ niveau: 1, description: 'Ne prospecte pas.' }],
+          },
+        ],
+      };
+      mockPg.queryOne
+        .mockResolvedValueOnce({
+          id_evaluation: 'uuid-1',
+          statut: 'brouillon',
+          evaluateur_matricule: 'M1',
+          evalue_matricule: 'M2',
+          id_regle: 'rule-1',
+          criteres_snapshot_json: snapshot,
+        })
+        .mockResolvedValueOnce({ criteres_evaluation_json: visibilityEnvelope() });
+      mockPrisma.utilisateur.findMany.mockResolvedValue([
+        { matricule: 'M1', role: 'CDS', role_nom: 'CDS' },
+        { matricule: 'M2', role: 'CSC', role_nom: 'CSC' },
+      ]);
+      mockPg.query.mockResolvedValueOnce([
+        {
+          id_regle: 'rule-1',
+          nom_regle: 'Règle CSC',
+          criteres_evaluation_json: {
+            criteres: [{ id: 'generic', libelle: 'Critère générique', poids: 100 }],
+          },
+          est_active: true,
+        },
+      ]);
+
+      const result = await service.findById('uuid-1', evaluatorActor);
+
+      expect(result.regle?.criteres).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'prospection',
+            libelle: 'Prospection client',
+            niveaux: expect.arrayContaining([
+              { niveau: 1, description: 'Ne prospecte pas.' },
+            ]),
+          }),
+        ]),
+      );
+      expect(result.regle?.criteres).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'generic' }),
+        ]),
+      );
     });
 
     it('should throw NotFoundException when not found', async () => {
@@ -407,7 +471,7 @@ describe('EvaluationsService', () => {
       expect(result).toBe(true);
       expect(mockPg.execute).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE evaluations'),
-        [JSON.stringify([{ critere_id: 'c1', note: 4 }]), null, 'uuid-1'],
+        [JSON.stringify([{ critere_id: 'c1', note: 4 }]), null, 'uuid-1', null],
       );
     });
 
@@ -741,8 +805,10 @@ describe('EvaluationsService', () => {
         String(call[0]).includes('INSERT INTO evaluations'),
       );
       expect(insertCall?.[1][2]).toBe('periode-uuid');
-      expect(insertCall?.[1][5]).toBe('periode-uuid');
+      expect(insertCall?.[1][5]).toBeNull();
+      expect(insertCall?.[1][6]).toBe('periode-uuid');
       expect(insertCall?.[0]).toContain('WITH periode_active AS');
+      expect(insertCall?.[0]).toContain('WHERE id_periode = $7');
       expect(insertCall?.[0]).toContain("statut = 'ouverte'");
       expect(insertCall?.[0]).toContain('est_ouverte = true');
       expect(insertCall?.[0]).toContain('est_cloturee = false');
@@ -754,6 +820,58 @@ describe('EvaluationsService', () => {
       expect(periodCheckSql).toContain('est_ouverte = true');
       expect(periodCheckSql).toContain('est_cloturee = false');
       expect(periodCheckSql).toContain("AT TIME ZONE 'Africa/Douala'");
+    });
+
+    it('uses the assigned position template as the evaluation criteria snapshot', async () => {
+      const created = { id_evaluation: 'E1', id_periode: 'periode-uuid' };
+      mockPrisma.role.findUnique.mockResolvedValue({ id_role: 'role-csc' });
+      mockPg.queryOne
+        .mockResolvedValueOnce({
+          id_periode: 'periode-uuid',
+          code_periode: 'P1',
+          statut: 'ouverte',
+          est_ouverte: true,
+        })
+        .mockResolvedValueOnce({
+          meta_json: {
+            sections: [
+              {
+                titre: 'Vente',
+                ordre: 1,
+                competences: [
+                  {
+                    id: 'prospection',
+                    libelle: 'Prospection client',
+                    description: 'Développe le portefeuille.',
+                    poids: 100,
+                    niveaux: [
+                      { niveau: 1, description: 'Ne prospecte pas.' },
+                      { niveau: 5, description: 'Développe activement le portefeuille.' },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        })
+        .mockResolvedValueOnce(created);
+
+      await service.create('M1', 'M2', 'periode-uuid');
+
+      const insertCall = mockPg.queryOne.mock.calls.find((call: any[]) =>
+        String(call[0]).includes('INSERT INTO evaluations'),
+      );
+      const snapshot = JSON.parse(insertCall?.[1][5]);
+      expect(snapshot.criteres).toHaveLength(1);
+      expect(snapshot.criteres[0]).toMatchObject({
+        id: 'prospection',
+        libelle: 'Prospection client',
+        section_label: 'Vente',
+        niveaux: expect.arrayContaining([
+          { niveau: 1, description: 'Ne prospecte pas.' },
+          { niveau: 5, description: 'Développe activement le portefeuille.' },
+        ]),
+      });
     });
 
     it('autorise ADMIN à évaluer un utilisateur avec la règle de son rôle sans contrôle hiérarchique', async () => {

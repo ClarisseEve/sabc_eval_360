@@ -331,7 +331,7 @@ export class DashboardManagerService {
               e.date_soumission,
               EXTRACT(EPOCH FROM (NOW() - e.date_soumission))/86400 AS jours_attente,
               p.nom_periode, e.id_periode,
-              r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
+              COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json) AS ${INTERNAL_RULE_ENVELOPE_FIELD}
        FROM evaluations e
        JOIN periodes_evaluation p ON p.id_periode = e.id_periode
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle

@@ -108,7 +108,7 @@ export class EvaluationsConsultationService {
                   PARTITION BY e.evaluateur_matricule, e.evalue_matricule, e.id_periode, e.type_evaluation
                   ORDER BY COALESCE(e.date_soumission, e.updated_at, e.created_at), e.created_at, e.id_evaluation
                 )::int AS numero_tentative,
-                r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
+                COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json) AS ${INTERNAL_RULE_ENVELOPE_FIELD}
          FROM evaluations e
          LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
          ${whereClause}

@@ -428,7 +428,7 @@ const EditEvaluation: React.FC = () => {
                     <div className="mt-4 grid grid-cols-5 gap-2">
                       {[1, 2, 3, 4, 5].map((value) => {
                         const description = critere.niveaux.find((level) => level.niveau === value)?.description
-                          || `Description du score ${value}`;
+                          || 'Description non renseignée dans le template';
 
                         return (
                           <div key={value} className="min-w-0 space-y-2 text-center">
