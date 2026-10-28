@@ -5,7 +5,7 @@ import Badge from '@/Components/UI/Badge';
 import { Button } from '@/Components/UI/Button';
 import { useQuery } from '@tanstack/react-query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
-import { periodesApi } from '@/Services/api';
+import api, { periodesApi } from '@/Services/api';
 import { EvaluationPageLayout } from './shared';
 import { AlertTriangle, CheckCheck, ClipboardList, FileEdit, Send, XCircle } from 'lucide-react';
 
@@ -181,15 +181,15 @@ const EvaluationsDonnees: React.FC = () => {
   const { data, isLoading } = useQuery<{ data: EvaluationDonnee[]; stats: StatsDonnees }>({
     queryKey: ['evaluations', 'donnees', filters],
     queryFn: async () => {
-      const token = localStorage.getItem('sabc_access_token');
-      const params = new URLSearchParams();
-      if (filters.statut) params.set('statut', filters.statut);
-      if (filters.id_periode) params.set('id_periode', filters.id_periode);
-      if (filters.type_evaluation) params.set('type_evaluation', filters.type_evaluation);
-      const res = await fetch(`/api/evaluations/donnees?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      // Passe par le client API: VITE_API_URL, jeton et gestion des 401.
+      const res = await api.get<{ data: EvaluationDonnee[]; stats: StatsDonnees }>('/evaluations/donnees', {
+        params: {
+          statut: filters.statut || undefined,
+          id_periode: filters.id_periode || undefined,
+          type_evaluation: filters.type_evaluation || undefined,
+        },
       });
-      return res.json();
+      return res.data;
     },
   });
 

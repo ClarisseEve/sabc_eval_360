@@ -48,7 +48,7 @@ test('connexion — référence desktop', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Créer un compte/i })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Utiliser le compte Admin/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Utiliser le compte/i })).toHaveCount(0);
   await capture(page, '00-login-desktop.png');
 });
 

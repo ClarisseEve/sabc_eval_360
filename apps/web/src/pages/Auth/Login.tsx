@@ -8,26 +8,12 @@ import { Label } from '@/Components/UI/Label/Label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/Components/UI/Card/Card';
 import { Eye, EyeOff } from 'lucide-react';
 
-const SHOW_DEMO_ACCOUNTS = import.meta.env.VITE_SHOW_DEMO_ACCOUNTS !== 'false';
-
-type TestAccount = {
-  label: string;
-  description: string;
-  email: string;
-  username: string;
-  badge?: string;
-  badgeColor?: string;
-};
-
 const Login: React.FC = () => {
   const { login, isAuthenticated } = useAuthContext();
   const navigate = useNavigate();
 
   const [identifier, setIdentifier] = useState('');
-  // Le mot de passe de démonstration vient de VITE_DEMO_PASSWORD quand il est défini.
-  const [password, setPassword] = useState(
-    SHOW_DEMO_ACCOUNTS ? (import.meta.env.VITE_DEMO_PASSWORD ?? '12345') : '',
-  );
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [errors, setErrors] = useState<{ identifier?: string; password?: string }>({});
@@ -36,41 +22,6 @@ const Login: React.FC = () => {
   React.useEffect(() => {
     if (isAuthenticated) navigate('/dashboard', { replace: true });
   }, [isAuthenticated, navigate]);
-
-  const testAccounts: TestAccount[] = [
-    { 
-      label: 'Admin', 
-      description: 'Console 360°, règles, analytics et supervision globale', 
-      email: 'admin@sabc.local',
-      username: 'A0001',
-      badge: 'Admin',
-      badgeColor: 'bg-sabc-red-primary'
-    },
-    { 
-      label: 'DR Littoral', 
-      description: 'Pilotage régional et supervision des équipes Littoral', 
-      email: 'dr.littoral@sabc.local',
-      username: 'D1010',
-      badge: 'DR',
-      badgeColor: 'bg-sabc-red-dark'
-    },
-    { 
-      label: 'CDS Littoral', 
-      description: 'Management de proximité, équipe commerciale et validations', 
-      email: 'cds.littoral@sabc.local',
-      username: 'S1110',
-      badge: 'CDS',
-      badgeColor: 'bg-sabc-red-dark'
-    },
-    { 
-      label: 'TMO Littoral', 
-      description: 'Vue individuelle, auto-évaluation et axes d’amélioration', 
-      email: 'tmo.littoral@sabc.local',
-      username: 'T1210',
-      badge: 'TMO',
-      badgeColor: 'bg-sabc-red-dark'
-    }
-  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,38 +66,6 @@ const Login: React.FC = () => {
         </CardHeader>
         
         <CardContent className="p-6">
-          {SHOW_DEMO_ACCOUNTS && (
-            <div className="mb-6">
-              <p className="text-sm text-sabc-gray-800 mb-2 font-medium">Comptes de démonstration (dev) :</p>
-              <div className="border border-sabc-gray-200 rounded-md p-2 bg-white">
-                {testAccounts.map((account) => (
-                  <button
-                    key={account.username}
-                    type="button"
-                    className="mb-1 flex w-full flex-col rounded-md p-2 text-left transition-colors hover:bg-sabc-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary focus-visible:ring-offset-2"
-                    aria-label={`Utiliser le compte ${account.label}`}
-                    aria-pressed={identifier === account.username}
-                    onClick={() => {
-                      setIdentifier(account.username);
-                      setErrors((current) => ({ ...current, identifier: undefined }));
-                    }}
-                  >
-                    <div className="flex items-center">
-                      <span className="font-medium text-sabc-gray-800">{account.label}</span>
-                      {account.badge && (
-                        <span className={`ml-2 text-xs text-white px-2 py-0.5 rounded-full ${account.badgeColor}`}>
-                          {account.badge}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-xs text-sabc-gray-400">{account.description}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-sabc-gray-400 mt-1">Sélectionnez un compte pour remplir son identifiant local.</p>
-            </div>
-          )}
-
           <form onSubmit={handleSubmit}>
             <div className="space-y-5">
               <div className="space-y-2">
@@ -162,7 +81,7 @@ const Login: React.FC = () => {
                   aria-invalid={Boolean(errors.identifier)}
                   aria-describedby={errors.identifier ? 'identifier-error' : undefined}
                   className={`h-11 rounded-lg ${errors.identifier ? 'border-sabc-error' : 'border-sabc-gray-200'}`}
-                  placeholder="A0001 ou utilisateur@sabc.local"
+                  placeholder="Votre matricule ou votre e-mail"
                 />
                 {errors.identifier && (
                   <p id="identifier-error" role="alert" className="text-sm text-sabc-error font-medium">{errors.identifier}</p>

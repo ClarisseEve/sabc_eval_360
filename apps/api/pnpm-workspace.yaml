@@ -1,0 +1,5 @@
+# Fait de apps/api une racine pnpm autonome (comme apps/web): sans ce fichier,
+# pnpm remonte jusqu'au pnpm-workspace.yaml de la racine du dépôt et installe
+# les dépendances racine au lieu de celles de l'API (CI cassée).
+packages:
+  - .
