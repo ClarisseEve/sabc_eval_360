@@ -1194,8 +1194,10 @@ async function upsertEvaluation(seed: EvaluationSeed) {
        date_validation, validateur_matricule, statut, notations_json, commentaire_global,
        commentaire_validation, note_globale, type_evaluation, periode_code, created_at, updated_at
      )
-     SELECT $1, $2, $3, $4, $5::date, $6::timestamp, $7::timestamp, $8, $9, $10::json,
-            $11, $12, $13, $14, $15, $16::timestamp, $17::timestamp
+     -- Types explicites: les paramètres réutilisés dans le WHERE seraient sinon
+     -- déduits en text ici et en varchar là-bas (erreur PostgreSQL 42P08).
+     SELECT $1::varchar, $2::varchar, $3::uuid, $4::uuid, $5::date, $6::timestamp, $7::timestamp, $8, $9, $10::json,
+            $11, $12, $13, $14::varchar, $15, $16::timestamp, $17::timestamp
      WHERE NOT EXISTS (
        SELECT 1 FROM evaluations
        WHERE evaluateur_matricule = $1

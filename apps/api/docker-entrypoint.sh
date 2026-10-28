@@ -51,11 +51,15 @@ start_embedded_mysql() {
   done
 
   # root s'authentifie par socket Unix: aucun mot de passe root à gérer.
+  # MariaDB peut présenter 127.0.0.1 comme « localhost »: les deux hôtes sont créés.
   mariadb --socket="$MYSQL_SOCKET" <<SQL
 CREATE DATABASE IF NOT EXISTS sabc_core CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS 'sabc_user'@'127.0.0.1' IDENTIFIED BY '$password';
 ALTER USER 'sabc_user'@'127.0.0.1' IDENTIFIED BY '$password';
 GRANT ALL PRIVILEGES ON sabc_core.* TO 'sabc_user'@'127.0.0.1';
+CREATE USER IF NOT EXISTS 'sabc_user'@'localhost' IDENTIFIED BY '$password';
+ALTER USER 'sabc_user'@'localhost' IDENTIFIED BY '$password';
+GRANT ALL PRIVILEGES ON sabc_core.* TO 'sabc_user'@'localhost';
 FLUSH PRIVILEGES;
 SQL
 
