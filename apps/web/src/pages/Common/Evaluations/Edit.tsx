@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/Components/UI/Alert';
 import { Button } from '@/Components/UI/Button';
 import { Textarea } from '@/Components/UI/Textarea/Textarea';
 import { Avatar } from '@/Components/UI/Avatar/Avatar';
-import { cn } from '@/utils/helpers';
+import { cn, formatScore } from '@/utils/helpers';
 import {
   ArrowLeft,
   ArrowRight,
@@ -262,7 +262,7 @@ const EditEvaluation: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-[320px,1fr]">
+        <div className="grid gap-6 md:grid-cols-[320px_1fr]">
           <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
             <CardHeader>
               <CardTitle className="text-base">Informations clés</CardTitle>
@@ -457,7 +457,7 @@ const EditEvaluation: React.FC = () => {
                     {(critere.commentaireRequisSiNoteLt ?? 0) > 0 && (
                       <div className="mt-2 flex items-center gap-1.5 text-xs text-sabc-gray-500">
                         <Info className="h-3.5 w-3.5 shrink-0" />
-                        <span>Un commentaire sera requis si votre note est inférieure à {critere.commentaireRequisSiNoteLt}/5</span>
+                        <span>Un commentaire sera requis si votre note est inférieure à {formatScore(critere.commentaireRequisSiNoteLt)}</span>
                       </div>
                     )}
 

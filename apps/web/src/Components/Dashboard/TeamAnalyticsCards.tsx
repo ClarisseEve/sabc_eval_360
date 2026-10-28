@@ -18,6 +18,7 @@ import { EmptyState, getPriorityBadgeVariant } from '@/Components/Dashboard/Role
 import { TruncatedTableBody } from '@/Components/UI/TruncatedList/TruncatedList';
 import { getLevelLabel } from '@/utils/hierarchyDrilldown';
 import type { TeamMemberAnalytics } from '@/Hooks/queries/useRoleDashboards';
+import { formatScore } from '@/utils/helpers';
 
 type TeamAxisAggregateLike = {
   critere: string;
@@ -67,7 +68,7 @@ export function TeamAxisFrequencyChartCard({
   description,
   axes,
   emptyMessage = "Aucun axe agrégé n'est disponible sur ce périmètre.",
-  barColor = '#C62828',
+  barColor = '#D01A2C',
   tooltipLabel = 'Occurrences',
   heightClassName = 'h-72',
 }: Readonly<TeamAxisFrequencyChartCardProps>) {
@@ -239,7 +240,7 @@ export function TeamMemberAnalyticsTableCard<TMember extends TeamMemberLike>({
                         <Badge variant="secondary">Non évalué</Badge>
                       ) : (
                         <div className="space-y-2">
-                          <div className="font-medium text-sabc-gray-900 dark:text-white">{member.scoreGlobal}/5</div>
+                          <div className="font-medium text-sabc-gray-900 dark:text-white">{formatScore(member.scoreGlobal)}</div>
                           <Progress value={member.scoreGlobal} max={5} />
                         </div>
                       )}

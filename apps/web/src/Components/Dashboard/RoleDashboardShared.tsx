@@ -1,16 +1,12 @@
 import React from 'react';
 import {
+  type LucideIcon,
   ArrowDownRight,
   ArrowUpRight,
   ClipboardList,
-  Eye,
-  EyeOff,
-  ListChecks,
   RefreshCw,
-  ScrollText,
   UserRound,
   Users,
-  type LucideIcon,
 } from 'lucide-react';
 import { Head } from '@/lib/inertia-shim';
 import { DashboardExportMenu } from '@/Components/Dashboard/DashboardExportMenu';
@@ -95,43 +91,43 @@ type EvaluationTypeMeta = {
   border: string;
 };
 
-/** Ancre visuelle (icône + couleur) par type d'évaluation pour un repérage immédiat. */
+/** Icône par type d'évaluation; une seule teinte neutre pour rester dans la charte. */
 export function getEvaluationTypeMeta(value: unknown): EvaluationTypeMeta {
   switch (String(value || '').toLowerCase()) {
     case 'descendante':
       return {
         Icon: ArrowDownRight,
-        iconWrap: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-        border: 'border-l-blue-400 dark:border-l-blue-500',
+        iconWrap: 'bg-sabc-gray-100 text-sabc-gray-600 dark:bg-sabc-gray-800 dark:text-sabc-gray-300',
+        border: 'border-l-sabc-gray-300 dark:border-l-sabc-gray-600',
       };
     case 'ascendante':
       return {
         Icon: ArrowUpRight,
-        iconWrap: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
-        border: 'border-l-emerald-400 dark:border-l-emerald-500',
+        iconWrap: 'bg-sabc-gray-100 text-sabc-gray-600 dark:bg-sabc-gray-800 dark:text-sabc-gray-300',
+        border: 'border-l-sabc-gray-300 dark:border-l-sabc-gray-600',
       };
     case 'auto':
       return {
         Icon: UserRound,
-        iconWrap: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-        border: 'border-l-amber-400 dark:border-l-amber-500',
+        iconWrap: 'bg-sabc-gray-100 text-sabc-gray-600 dark:bg-sabc-gray-800 dark:text-sabc-gray-300',
+        border: 'border-l-sabc-gray-300 dark:border-l-sabc-gray-600',
       };
     case 'pairs':
       return {
         Icon: Users,
-        iconWrap: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
-        border: 'border-l-indigo-400 dark:border-l-indigo-500',
+        iconWrap: 'bg-sabc-gray-100 text-sabc-gray-600 dark:bg-sabc-gray-800 dark:text-sabc-gray-300',
+        border: 'border-l-sabc-gray-300 dark:border-l-sabc-gray-600',
       };
     case '360':
       return {
         Icon: RefreshCw,
-        iconWrap: 'bg-sabc-red-primary/10 text-sabc-red-primary dark:bg-sabc-red-primary/20 dark:text-sabc-red-light',
-        border: 'border-l-sabc-red-primary/60',
+        iconWrap: 'bg-sabc-gray-100 text-sabc-gray-600 dark:bg-sabc-gray-800 dark:text-sabc-gray-300',
+        border: 'border-l-sabc-gray-300 dark:border-l-sabc-gray-600',
       };
     default:
       return {
         Icon: ClipboardList,
-        iconWrap: 'bg-sabc-gray-100 text-sabc-gray-500 dark:bg-sabc-gray-800 dark:text-sabc-gray-400',
+        iconWrap: 'bg-sabc-gray-100 text-sabc-gray-600 dark:bg-sabc-gray-800 dark:text-sabc-gray-300',
         border: 'border-l-sabc-gray-300 dark:border-l-sabc-gray-600',
       };
   }
@@ -148,6 +144,23 @@ export function getPriorityBadgeVariant(priority: unknown): 'error' | 'warning' 
   if (value === 'moyenne' || value === 'medium') return 'warning';
   if (value === 'basse' || value === 'low') return 'info';
   return 'secondary';
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  brouillon: 'Brouillon',
+  draft: 'Brouillon',
+  soumis: 'Soumise',
+  submitted: 'Soumise',
+  valide: 'Validée',
+  validated: 'Validée',
+  rejete: 'Rejetée',
+  rejeté: 'Rejetée',
+};
+
+/** Libellé lisible d'un statut d'évaluation stocké en base (« valide » -> « Validée »). */
+export function formatStatusLabel(status: unknown): string {
+  const value = String(status || '').toLowerCase();
+  return STATUS_LABELS[value] ?? (value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Inconnu');
 }
 
 export function getStatusBadgeVariant(status: unknown): 'success' | 'warning' | 'info' | 'secondary' {
@@ -210,7 +223,7 @@ export function MetricCard({ label, value, caption }: MetricCardProps) {
     <Card>
       <CardContent className="px-5 py-4">
         <p className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{label}</p>
-        <div className="mt-1 font-[family-name:var(--font-display)] text-3xl font-semibold tabular-nums text-sabc-gray-900 dark:text-white">{value}</div>
+        <div className="mt-1 sabc-display text-3xl tabular-nums text-sabc-gray-900 dark:text-white">{value}</div>
         <p className="mt-1 text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{caption}</p>
       </CardContent>
     </Card>
@@ -233,24 +246,16 @@ export function ActiveRulesCard({
   maxItems = 4,
 }: ActiveRulesCardProps) {
   return (
-    <Card className="border-sabc-info/40 bg-sabc-info/20 dark:border-sabc-info/30 dark:bg-sabc-info/15">
-      <CardHeader className="flex-row items-center gap-2.5 space-y-0">
-        <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sabc-info text-white"
-          aria-hidden
-        >
-          <ScrollText className="h-4 w-4" />
-        </span>
-        <div className="min-w-0">
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="px-5 pb-5 pt-0">
         {rules.length === 0 ? (
           <EmptyState message={emptyMessage} />
         ) : (
-          <ul className="divide-y divide-sabc-gray-100 overflow-hidden rounded-lg border border-sabc-info/15 bg-white shadow-sm dark:divide-sabc-gray-800 dark:border-sabc-info/20 dark:bg-sabc-gray-900">
+          <ul className="divide-y divide-sabc-gray-200 overflow-hidden rounded-lg border border-sabc-gray-200 dark:divide-sabc-gray-800 dark:border-sabc-gray-700">
             {rules.slice(0, maxItems).map((rule) => {
               const typeMeta = getEvaluationTypeMeta(rule.type_evaluation);
               const TypeIcon = typeMeta.Icon;
@@ -263,7 +268,7 @@ export function ActiveRulesCard({
               return (
                 <li
                   key={rule.id_regle}
-                  className="flex items-start gap-3 px-5 py-3 transition-colors hover:bg-sabc-info/[0.06] dark:hover:bg-sabc-info/10"
+                  className="flex items-start gap-3 px-4 py-3"
                 >
                   <span
                     className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${typeMeta.iconWrap}`}
@@ -284,13 +289,11 @@ export function ActiveRulesCard({
                         ) : null}
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <Badge variant="info" className="gap-1" title={`${rule.criteres.length} critères`}>
-                          <ListChecks className="h-3 w-3" aria-hidden />
-                          {rule.criteres.length}
-                        </Badge>
-                        <Badge variant={detailed ? 'success' : 'warning'} className="gap-1" title={visibilityLabel}>
-                          {detailed ? <Eye className="h-3 w-3" aria-hidden /> : <EyeOff className="h-3 w-3" aria-hidden />}
-                          {detailed ? 'Détaillée' : 'Agrégée'}
+                        <span className="text-xs text-sabc-gray-500 dark:text-sabc-gray-400">
+                          {rule.criteres.length} critère{rule.criteres.length > 1 ? 's' : ''}
+                        </span>
+                        <Badge variant="outline" title={visibilityLabel}>
+                          {detailed ? 'Résultats détaillés' : 'Synthèse agrégée'}
                         </Badge>
                       </div>
                     </div>

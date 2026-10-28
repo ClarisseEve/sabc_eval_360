@@ -1,24 +1,70 @@
 import React, { useRef } from 'react';
 import { Link } from '@/lib/inertia-shim';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
-import { Button } from '@/Components/UI/Button/Button';
-import {
-  Clock, AlertTriangle, CheckCircle, UserCheck, Award, Activity,
-  Eye, BarChart3, Target, Filter, Download, RefreshCw
-} from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
 import { useAdminDashboard } from '@/Hooks/queries';
 import { ChartExportButton } from '@/Components/Charts/ChartExportButton';
+import { KpiCard } from '@/Components/UI/KpiCard';
+import {
+  CHART_COLORS,
+  CHART_TICK,
+  CHART_TOOLTIP_STYLE,
+  PERCENT_DOMAIN,
+  PERCENT_TICKS,
+  SCORE_DOMAIN,
+  formatChartNumber,
+  formatChartPercent,
+  formatChartScore,
+  frenchTick,
+} from '@/Components/UI/Charts/chartTheme';
+import { formatPercent } from '@/utils/helpers';
 
-const SABC_COLORS = {
-  primary: '#E53E3E',
-  accent: '#FF9800',
-  success: '#48BB78',
-  warning: '#D69E2E',
-  error: '#E53E3E',
-  info: '#3182CE',
-  gray: '#9E9E9E'
-};
+/** Entier au format français ; null si la mesure est absente (affiché « n.d. »). */
+function count(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toLocaleString('fr-FR') : null;
+}
+
+function ratioCaption(value: unknown, total: unknown): string | undefined {
+  const v = Number(value);
+  const t = Number(total);
+  if (!Number.isFinite(v) || !Number.isFinite(t) || t <= 0) return undefined;
+  return `Sur ${t.toLocaleString('fr-FR')} (${formatPercent((v / t) * 100)})`;
+}
+
+function ChartPanel({
+  title,
+  chartRef,
+  filename,
+  children,
+}: {
+  title: string;
+  chartRef: React.RefObject<HTMLDivElement | null>;
+  filename: string;
+  children: React.ReactElement;
+}) {
+  return (
+    <div className="rounded-lg border border-sabc-gray-200 bg-white p-4 dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-sabc-gray-900 dark:text-white">{title}</h3>
+        <ChartExportButton chartRef={chartRef} filename={filename} />
+      </div>
+      <div ref={chartRef} className="h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          {children}
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+const SHORTCUTS = [
+  { href: '/admin/evaluations/management', title: 'En attente', key: 'en_attente' as const, unit: 'évaluation(s) à valider' },
+  { href: '/admin/evaluations/management', title: 'En cours', key: 'en_cours' as const, unit: 'évaluation(s) à terminer' },
+  { href: '/admin/evaluations/history', title: 'Historique', key: null, unit: 'Rapports des périodes passées' },
+  { href: '/admin/analytics?tab=overview', title: 'Analyses détaillées', key: null, unit: 'Vue d’ensemble des résultats' },
+];
 
 const EvaluationsTab: React.FC = () => {
   const { data } = useAdminDashboard();
@@ -28,322 +74,136 @@ const EvaluationsTab: React.FC = () => {
   const chartRefSuperviseurs = useRef<HTMLDivElement>(null);
   const chartRefQualite = useRef<HTMLDivElement>(null);
 
-  const supervisionMetrics = [
-    {
-      label: 'Evaluations en attente',
-      value: data.evaluations_en_attente ?? 0,
-      total: data.total_evaluations || 1,
-      icon: Clock,
-      color: SABC_COLORS.warning,
-      trend: '',
-      priority: 'high' as const
-    },
-    {
-      label: 'Validations effectuees',
-      value: data.evaluations_validees ?? 0,
-      total: data.total_evaluations || 1,
-      icon: CheckCircle,
-      color: SABC_COLORS.success,
-      trend: '',
-      priority: 'normal' as const
-    },
-    {
-      label: 'Evaluations en cours',
-      value: data.evaluations_en_cours ?? 0,
-      total: data.total_evaluations || 1,
-      icon: Award,
-      color: SABC_COLORS.info,
-      trend: '',
-      priority: 'normal' as const
-    },
-    {
-      label: 'Taux completion',
-      value: Math.round(data.taux_completion ?? 0),
-      total: 100,
-      icon: Target,
-      color: SABC_COLORS.success,
-      trend: '',
-      priority: 'normal' as const
-    },
-    {
-      label: 'Utilisateurs actifs',
-      value: data.utilisateurs_actifs ?? 0,
-      total: data.total_utilisateurs || 1,
-      icon: UserCheck,
-      color: SABC_COLORS.primary,
-      trend: '',
-      priority: 'normal' as const
-    },
-    {
-      label: 'Remplacements actifs',
-      value: data.remplacements_actifs ?? 0,
-      total: Math.max(data.remplacements_actifs ?? 1, 1),
-      icon: Activity,
-      color: SABC_COLORS.info,
-      trend: '',
-      priority: 'normal' as const
-    }
-  ];
-
-  // Donnees graphiques — viendront de l'API enrichie (Task 13)
   const globalCompetencyMatrix = data.competences_globales ?? [];
   const evaluationTypeData = data.types_evaluation ?? [];
   const userAnalytics = data.analytics_utilisateurs ?? [];
   const supervisorPerformance = data.performance_superviseurs ?? [];
   const qualityMetrics = data.metriques_qualite ?? [];
 
+  const shortcutValues = {
+    en_attente: count(data.evaluations_en_attente),
+    en_cours: count(data.evaluations_en_cours),
+  };
+
   return (
-    <div className="space-y-8">
-      {/* Section Supervision des Evaluations */}
+    <div className="space-y-6">
+      {/* Supervision des évaluations */}
       <Card className="border border-sabc-gray-200">
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl font-bold text-sabc-gray-900 flex items-center gap-2">
-              <Eye className="w-6 h-6 text-sabc-red-primary" />
-              Supervision des Evaluations 360
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="flex items-center gap-1">
-                <Filter className="w-4 h-4" />
-                Filtrer
-              </Button>
-              <Link href="/admin/evaluations/management" className="flex items-center gap-1 text-sabc-red-primary hover:text-sabc-red-dark">
-                <span className="text-sm font-medium">Voir en attente</span>
-              </Link>
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>Supervision des évaluations 360°</CardTitle>
+            <Link href="/admin/evaluations/management" className="text-sm font-medium text-sabc-red-primary hover:text-sabc-red-dark">
+              Voir les évaluations en attente
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
-          {/* KPIs de supervision */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            {supervisionMetrics.map((metric) => {
-              const IconComponent = metric.icon;
-              const priorityColor = metric.priority === 'high' ? 'border-l-red-500' : 'border-l-green-500';
-              return (
-                <div key={metric.label} className={`bg-white border border-sabc-gray-200 rounded-lg p-4 border-l-4 ${priorityColor} hover:shadow-md transition-shadow`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: metric.color + '20' }}>
-                        <IconComponent className="w-4 h-4" style={{ color: metric.color }} />
-                      </div>
-                      <div className="text-sm text-sabc-gray-600">{metric.label}</div>
-                    </div>
-                    {metric.trend && (
-                      <span className={`text-xs font-medium ${metric.trend.startsWith('+') ? 'text-sabc-success' : 'text-sabc-error'}`}>
-                        {metric.trend}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-2xl font-bold text-sabc-gray-900 mb-2">
-                    {metric.value}
-                    <span className="text-sm text-sabc-gray-400 ml-1">/ {metric.total}</span>
-                  </div>
-                  <div className="w-full bg-sabc-gray-200 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full transition-all duration-300"
-                      style={{
-                        backgroundColor: metric.color,
-                        width: `${Math.min((metric.value / metric.total) * 100, 100)}%`
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <KpiCard label="Évaluations en attente" value={count(data.evaluations_en_attente)} caption={ratioCaption(data.evaluations_en_attente, data.total_evaluations)} />
+            <KpiCard label="Évaluations validées" value={count(data.evaluations_validees)} caption={ratioCaption(data.evaluations_validees, data.total_evaluations)} />
+            <KpiCard label="Évaluations en cours" value={count(data.evaluations_en_cours)} caption={ratioCaption(data.evaluations_en_cours, data.total_evaluations)} />
+            <KpiCard label="Taux de complétion" value={data.taux_completion == null ? null : formatPercent(data.taux_completion)} />
+            <KpiCard label="Utilisateurs actifs" value={count(data.utilisateurs_actifs)} caption={ratioCaption(data.utilisateurs_actifs, data.total_utilisateurs)} />
+            <KpiCard label="Remplacements actifs" value={count(data.remplacements_actifs)} />
           </div>
 
-          {/* Graphiques de supervision */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {globalCompetencyMatrix.length > 0 && (
-              <div className="bg-sabc-gray-50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Matrice de Competences</h3>
-                <div className="relative">
-                  <div className="absolute top-0 right-0 z-10">
-                    <ChartExportButton chartRef={chartRefCompetences} filename="sabc-competences" />
-                  </div>
-                  <div ref={chartRefCompetences} className="h-56">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart data={globalCompetencyMatrix}>
-                        <PolarGrid />
-                        <PolarAngleAxis dataKey="competence" tick={{ fontSize: 10 }} />
-                        <PolarRadiusAxis angle={90} domain={[0, 5]} tick={{ fontSize: 10 }} />
-                        <Radar name="Score Global" dataKey="score" stroke={SABC_COLORS.primary} fill={SABC_COLORS.primary + '30'} strokeWidth={2} />
-                        <Tooltip />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
+              <ChartPanel title="Matrice des compétences" chartRef={chartRefCompetences} filename="sabc-competences">
+                <RadarChart data={globalCompetencyMatrix}>
+                  <PolarGrid stroke={CHART_COLORS.grid} />
+                  <PolarAngleAxis dataKey="competence" tick={{ ...CHART_TICK, fontSize: 10 }} />
+                  <PolarRadiusAxis angle={90} domain={SCORE_DOMAIN} tickCount={6} tickFormatter={frenchTick} tick={{ fill: CHART_COLORS.secondary, fontSize: 10 }} />
+                  <Radar name="Score moyen" dataKey="score" stroke={CHART_COLORS.primary} fill={CHART_COLORS.primary} fillOpacity={0.15} strokeWidth={2} />
+                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => formatChartScore(value)} />
+                </RadarChart>
+              </ChartPanel>
             )}
 
             {evaluationTypeData.length > 0 && (
-              <div className="bg-sabc-gray-50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Types d'Evaluation</h3>
-                <div className="relative">
-                  <div className="absolute top-0 right-0 z-10">
-                    <ChartExportButton chartRef={chartRefTypes} filename="sabc-types-evaluation" />
-                  </div>
-                  <div ref={chartRefTypes} className="h-56">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={evaluationTypeData} layout="horizontal" margin={{ left: 80 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-                        <XAxis type="number" tick={{ fontSize: 12 }} />
-                        <YAxis dataKey="type" type="category" tick={{ fontSize: 10 }} width={80} />
-                        <Tooltip />
-                        <Bar dataKey="completed" fill={SABC_COLORS.success} name="Completees" />
-                        <Bar dataKey="target" fill={SABC_COLORS.gray} name="Objectif" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
+              <ChartPanel title="Types d’évaluation" chartRef={chartRefTypes} filename="sabc-types-evaluation">
+                <BarChart data={evaluationTypeData} layout="vertical" margin={{ left: 0, right: 12 }}>
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                  <XAxis type="number" allowDecimals={false} tickFormatter={frenchTick} tick={CHART_TICK} />
+                  <YAxis dataKey="type" type="category" tick={{ ...CHART_TICK, fontSize: 10 }} width={90} />
+                  <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => formatChartNumber(value, 0)} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="completed" fill={CHART_COLORS.primary} name="Terminées" />
+                  <Bar dataKey="target" fill={CHART_COLORS.tertiary} name="Objectif" />
+                </BarChart>
+              </ChartPanel>
             )}
 
             {userAnalytics.length > 0 && (
-              <div className="bg-sabc-gray-50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Analytics Utilisateurs</h3>
-                <div className="relative">
-                  <div className="absolute top-0 right-0 z-10">
-                    <ChartExportButton chartRef={chartRefAnalytics} filename="sabc-analytics-utilisateurs" />
-                  </div>
-                  <div ref={chartRefAnalytics} className="h-56">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={userAnalytics}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-                        <XAxis dataKey="periode" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip />
-                        <Legend />
-                        <Line type="monotone" dataKey="evaluations_donnees" stroke={SABC_COLORS.primary} strokeWidth={3} name="Donnees" />
-                        <Line type="monotone" dataKey="evaluations_recues" stroke={SABC_COLORS.success} strokeWidth={2} name="Recues" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
+              <ChartPanel title="Évaluations données et reçues" chartRef={chartRefAnalytics} filename="sabc-evaluations-utilisateurs">
+                <LineChart data={userAnalytics}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                  <XAxis dataKey="periode" tick={CHART_TICK} />
+                  <YAxis allowDecimals={false} tickFormatter={frenchTick} tick={CHART_TICK} />
+                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => formatChartNumber(value, 0)} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Line type="monotone" dataKey="evaluations_donnees" stroke={CHART_COLORS.primary} strokeWidth={2} name="Données" />
+                  <Line type="monotone" dataKey="evaluations_recues" stroke={CHART_COLORS.secondary} strokeWidth={2} name="Reçues" />
+                </LineChart>
+              </ChartPanel>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Section Performance Superviseurs */}
+      {/* Performance des superviseurs */}
       {(supervisorPerformance.length > 0 || qualityMetrics.length > 0) && (
         <Card className="border border-sabc-gray-200">
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xl font-bold text-sabc-gray-900 flex items-center gap-2">
-                <UserCheck className="w-6 h-6 text-sabc-red-primary" />
-                Performance des Superviseurs
-              </CardTitle>
-            </div>
+            <CardTitle>Performance des superviseurs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {supervisorPerformance.length > 0 && (
-                <div className="bg-sabc-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Performance par Role</h3>
-                  <div className="relative">
-                    <div className="absolute top-0 right-0 z-10">
-                      <ChartExportButton chartRef={chartRefSuperviseurs} filename="sabc-performance-superviseurs" />
-                    </div>
-                    <div ref={chartRefSuperviseurs} className="h-56">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={supervisorPerformance}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-                          <XAxis dataKey="role" tick={{ fontSize: 12 }} />
-                          <YAxis tick={{ fontSize: 12 }} />
-                          <Tooltip />
-                          <Area type="monotone" dataKey="taux_validation" stroke={SABC_COLORS.primary} fill={SABC_COLORS.primary + '30'} strokeWidth={3} name="Taux validation %" />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
+                <ChartPanel title="Taux de validation par rôle" chartRef={chartRefSuperviseurs} filename="sabc-performance-superviseurs">
+                  <AreaChart data={supervisorPerformance}>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                    <XAxis dataKey="role" tick={CHART_TICK} />
+                    <YAxis domain={PERCENT_DOMAIN} ticks={PERCENT_TICKS} tickFormatter={frenchTick} tick={CHART_TICK} />
+                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => formatChartPercent(value)} />
+                    <Area type="monotone" dataKey="taux_validation" stroke={CHART_COLORS.primary} fill={CHART_COLORS.primary} fillOpacity={0.12} strokeWidth={2} name="Taux de validation" />
+                  </AreaChart>
+                </ChartPanel>
               )}
 
               {qualityMetrics.length > 0 && (
-                <div className="bg-sabc-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-sabc-gray-900 mb-2">Analyse Qualite</h3>
-                  <div className="relative">
-                    <div className="absolute top-0 right-0 z-10">
-                      <ChartExportButton chartRef={chartRefQualite} filename="sabc-qualite" />
-                    </div>
-                    <div ref={chartRefQualite} className="h-56">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart data={qualityMetrics}>
-                          <PolarGrid />
-                          <PolarAngleAxis dataKey="critere" tick={{ fontSize: 10 }} />
-                          <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
-                          <Radar name="Score" dataKey="score" stroke={SABC_COLORS.primary} fill={SABC_COLORS.primary + '30'} strokeWidth={2} />
-                          <Tooltip />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
+                <ChartPanel title="Qualité des évaluations" chartRef={chartRefQualite} filename="sabc-qualite">
+                  <RadarChart data={qualityMetrics}>
+                    <PolarGrid stroke={CHART_COLORS.grid} />
+                    <PolarAngleAxis dataKey="critere" tick={{ ...CHART_TICK, fontSize: 10 }} />
+                    <PolarRadiusAxis angle={90} domain={PERCENT_DOMAIN} tickCount={5} tickFormatter={frenchTick} tick={{ fill: CHART_COLORS.secondary, fontSize: 10 }} />
+                    <Radar name="Score" dataKey="score" stroke={CHART_COLORS.primary} fill={CHART_COLORS.primary} fillOpacity={0.15} strokeWidth={2} />
+                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => formatChartPercent(value)} />
+                  </RadarChart>
+                </ChartPanel>
               )}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Actions de Supervision */}
+      {/* Accès rapides */}
       <Card className="border border-sabc-gray-200">
         <CardHeader>
-          <CardTitle className="text-xl font-bold text-sabc-gray-900 flex items-center gap-2">
-            <RefreshCw className="w-6 h-6 text-sabc-red-primary" />
-            Actions de Supervision
-          </CardTitle>
+          <CardTitle>Accès rapides</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Link href="/admin/evaluations/management" className="group">
-              <div className="w-full h-20 border border-sabc-gray-200 rounded-lg p-4 hover:border-sabc-red-primary hover:shadow-md transition-all flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Clock className="w-6 h-6 text-sabc-warning" />
-                  <div>
-                    <div className="font-medium text-sabc-gray-900">En Attente</div>
-                    <div className="text-sm text-sabc-gray-600">{data.evaluations_en_attente ?? 0} evaluations</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {SHORTCUTS.map((shortcut) => (
+              <Link key={shortcut.title} href={shortcut.href} className="group">
+                <div className="h-full rounded-lg border border-sabc-gray-200 p-4 transition-colors hover:border-sabc-red-primary dark:border-sabc-gray-700">
+                  <div className="font-medium text-sabc-gray-900 dark:text-white">{shortcut.title}</div>
+                  <div className="text-sm text-sabc-gray-600 dark:text-sabc-gray-400">
+                    {shortcut.key ? `${shortcutValues[shortcut.key] ?? 'n.d.'} ${shortcut.unit}` : shortcut.unit}
                   </div>
                 </div>
-              </div>
-            </Link>
-
-            <Link href="/admin/evaluations/management" className="group">
-              <div className="w-full h-20 border border-sabc-gray-200 rounded-lg p-4 hover:border-sabc-red-primary hover:shadow-md transition-all flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="w-6 h-6 text-sabc-warning" />
-                  <div>
-                    <div className="font-medium text-sabc-gray-900">En cours</div>
-                    <div className="text-sm text-sabc-gray-600">{data.evaluations_en_cours ?? 0} a completer</div>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/admin/evaluations/history" className="group">
-              <div className="w-full h-20 border border-sabc-gray-200 rounded-lg p-4 hover:border-sabc-red-primary hover:shadow-md transition-all flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Download className="w-6 h-6 text-sabc-info" />
-                  <div>
-                    <div className="font-medium text-sabc-gray-900">Historique</div>
-                    <div className="text-sm text-sabc-gray-600">Rapports</div>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/admin/analytics?tab=overview" className="group">
-              <div className="w-full h-20 border border-sabc-gray-200 rounded-lg p-4 hover:border-sabc-red-primary hover:shadow-md transition-all flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <BarChart3 className="w-6 h-6 text-sabc-success" />
-                  <div>
-                    <div className="font-medium text-sabc-gray-900">Analytics</div>
-                    <div className="text-sm text-sabc-gray-600">Detaillees</div>
-                  </div>
-                </div>
-              </div>
-            </Link>
+              </Link>
+            ))}
           </div>
         </CardContent>
       </Card>

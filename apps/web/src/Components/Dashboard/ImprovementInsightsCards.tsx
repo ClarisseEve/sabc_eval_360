@@ -2,6 +2,7 @@ import React from 'react';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { EmptyState, getPriorityBadgeVariant } from '@/Components/Dashboard/RoleDashboardShared';
+import { formatScore } from '@/utils/helpers';
 
 type ImprovementAxisLike = {
   critere?: string;
@@ -70,7 +71,7 @@ export function ImprovementAxesListCard({
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="font-medium text-sabc-gray-900 dark:text-white">{critere}</div>
                   <Badge variant={getPriorityBadgeVariant(axis.priorite)}>{axis.priorite || 'moyenne'}</Badge>
-                  <Badge variant="info">{score}/5</Badge>
+                  <Badge variant="info">{formatScore(score)}</Badge>
                 </div>
                 {suggestion ? (
                   <p className="mt-2 text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{suggestion}</p>

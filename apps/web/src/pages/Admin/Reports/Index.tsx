@@ -15,6 +15,21 @@ import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
 import { AdminReportsLayout } from './shared';
 
+const REPORT_STATUS_LABELS: Record<string, string> = {
+  brouillon: 'Brouillon',
+  finalise: 'Finalisé',
+  finalisé: 'Finalisé',
+  publie: 'Publié',
+  publié: 'Publié',
+  archive: 'Archivé',
+  archivé: 'Archivé',
+};
+
+function reportStatusLabel(statut?: string | null): string {
+  if (!statut) return 'Statut non renseigné';
+  return REPORT_STATUS_LABELS[String(statut).toLowerCase()] ?? String(statut).charAt(0).toUpperCase() + String(statut).slice(1);
+}
+
 export default function ReportsIndex() {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -56,7 +71,7 @@ export default function ReportsIndex() {
 
   return (
     <AdminReportsLayout title="Rapports">
-      <PageContainer width="narrow">
+      <PageContainer width="full">
         <PageHeader
           title="Rapports"
           description="Assemblez, organisez et exportez vos rapports d'évaluation."
@@ -129,7 +144,7 @@ export default function ReportsIndex() {
                 <div className="min-w-0">
                   <p className="truncate font-medium text-sabc-gray-900">{rapport.titre}</p>
                   <p className="mt-1 text-xs text-sabc-gray-500">
-                    {rapport.sections_json?.length ?? 0} section(s) · Statut : {rapport.statut}
+                    {rapport.sections_json?.length ?? 0} section(s) · {reportStatusLabel(rapport.statut)}
                   </p>
                 </div>
                 <div className="flex flex-shrink-0 gap-2">

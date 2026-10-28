@@ -14,25 +14,9 @@ import { cn } from '@/utils/helpers';
 
 type TooltipProps = RechartsTooltipProps<number, string>;
 
-// Utilisation des variables CSS SABC définies dans sabc-colors.css
-const COLORS = {
-  primary: 'var(--sabc-red-primary)',    // Rouge SABC principal
-  secondary: 'var(--sabc-info)',         // Bleu secondaire
-  success: 'var(--sabc-success)',        // Vert succès
-  accent: 'var(--sabc-accent)',          // Orange accent
-  neutral: 'var(--sabc-gray-400)',       // Gris neutre
-  warning: 'var(--sabc-warning)',        // Jaune attention
-};
+import { CHART_SERIES, CHART_TICK, CHART_AXIS_LINE, CHART_COLORS, frenchTick } from './chartTheme';
 
-// Palette de couleurs en tableau pour l'indexation
-const COLOR_ARRAY = [
-  'var(--sabc-red-primary)',    // Rouge SABC principal
-  'var(--sabc-accent)',         // Orange accent
-  'var(--sabc-success)',        // Vert succès
-  'var(--sabc-info)',           // Bleu secondaire
-  'var(--sabc-warning)',        // Jaune attention
-  'var(--sabc-gray-400)',       // Gris neutre
-];
+const COLOR_ARRAY = CHART_SERIES;
 
 export interface LineChartProps {
   data: Array<Record<string, any>>;
@@ -70,15 +54,7 @@ export function LineChart({
   tooltip,
   children,
 }: LineChartProps) {
-  // Default colors from SABC palette if not specified
-  const defaultColors = [
-    COLORS.primary,    // Rouge SABC principal
-    COLORS.accent,     // Orange accent
-    COLORS.success,    // Vert succès
-    COLORS.secondary,  // Bleu secondaire
-    COLORS.warning,    // Jaune attention
-    COLORS.neutral,    // Gris neutre
-  ];
+  const defaultColors = CHART_SERIES;
   
   // Rendu des lignes du graphique
   const renderLines = () => {
@@ -138,17 +114,17 @@ export function LineChart({
           data={data}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
         >
-          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />}
+          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />}
           <XAxis 
             dataKey={xAxisDataKey} 
-            tick={{ fill: 'var(--sabc-gray-400)', fontSize: 11 }}
-            tickLine={{ stroke: 'var(--sabc-gray-200)' }}
-            axisLine={{ stroke: 'var(--sabc-gray-200)' }}
+            tick={CHART_TICK}
+            tickLine={CHART_AXIS_LINE}
+            axisLine={CHART_AXIS_LINE}
           />
           <YAxis 
-            tick={{ fill: 'var(--sabc-gray-400)', fontSize: 11 }}
-            tickLine={{ stroke: 'var(--sabc-gray-200)' }}
-            axisLine={{ stroke: 'var(--sabc-gray-200)' }}
+            tick={CHART_TICK}
+            tickLine={CHART_AXIS_LINE}
+            axisLine={CHART_AXIS_LINE}
           />
           {renderLines()}
           {showLegend && (

@@ -9,35 +9,9 @@ import {
   TooltipProps
 } from 'recharts';
 
-// Utilisation des variables CSS SABC définies dans sabc-colors.css
-const COLORS = {
-  primary: 'var(--sabc-red-primary)',    // Rouge SABC principal
-  secondary: 'var(--sabc-info)',         // Bleu secondaire
-  success: 'var(--sabc-success)',        // Vert succès
-  accent: 'var(--sabc-accent)',          // Orange accent
-  neutral: 'var(--sabc-gray-400)',       // Gris neutre
-  warning: 'var(--sabc-warning)',        // Jaune attention
-};
+import { CHART_SERIES, CHART_TOOLTIP_STYLE } from './chartTheme';
 
-// Palette de couleurs en tableau pour l'indexation
-const COLOR_ARRAY = [
-  'var(--sabc-red-primary)',    // Rouge SABC principal
-  'var(--sabc-accent)',         // Orange accent
-  'var(--sabc-success)',        // Vert succès
-  'var(--sabc-info)',           // Bleu secondaire
-  'var(--sabc-warning)',        // Jaune attention
-  'var(--sabc-gray-400)',       // Gris neutre
-];
-
-// Default color array for pie slices
-const DEFAULT_COLORS = [
-  COLORS.primary,
-  COLORS.secondary, 
-  COLORS.success,
-  COLORS.accent,
-  COLORS.warning,
-  COLORS.neutral,
-];
+const COLOR_ARRAY = CHART_SERIES;
 
 export interface PieChartProps {
   data: Array<{
@@ -135,7 +109,7 @@ export function PieChart({
         dominantBaseline="central"
         fontSize={12}
       >
-        {`${(percent * 100).toFixed(0)}%`}
+        {`${(percent * 100).toFixed(0)} %`}
       </text>
     );
   };
@@ -143,7 +117,7 @@ export function PieChart({
   return (
     <div className={`w-full ${className}`}>
       {title && <h3 className="text-lg font-semibold mb-2">{title}</h3>}
-      {subtitle && <p className="text-sm text-gray-500 mb-4">{subtitle}</p>}
+      {subtitle && <p className="text-sm text-sabc-gray-500 mb-4">{subtitle}</p>}
       <ResponsiveContainer width="100%" height={height}>
         <RechartsPieChart>
           <Pie
@@ -154,7 +128,7 @@ export function PieChart({
             label={renderCustomizedLabel}
             outerRadius={outerRadius}
             innerRadius={innerRadius}
-            fill="#8884d8"
+            fill={CHART_SERIES[0]}
             dataKey={dataKey}
             nameKey={nameKey}
           >
@@ -168,14 +142,7 @@ export function PieChart({
           {tooltip ? tooltip : (
             <Tooltip
               cursor={{ fill: 'rgba(0, 0, 0, 0.04)' }}
-              contentStyle={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E0E0E0',
-                borderRadius: '12px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                fontSize: '12px',
-                padding: '8px 12px',
-              }}
+              contentStyle={CHART_TOOLTIP_STYLE}
             />
           )}
           {showLegend && (
@@ -187,7 +154,7 @@ export function PieChart({
               wrapperStyle={{ 
                 fontSize: '12px',
                 paddingTop: '8px',
-                color: '#424242'
+                color: '#4F4F4F'
               }}
             />
           )}

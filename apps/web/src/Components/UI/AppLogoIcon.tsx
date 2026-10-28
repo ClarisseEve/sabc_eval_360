@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '@/utils/helpers';
+import { BrandMark } from '@/Components/Brand/BrandMark';
 
 interface AppLogoIconProps {
   className?: string;
@@ -11,13 +11,7 @@ interface AppLogoIconProps {
  */
 export function AppLogoIcon({ className }: AppLogoIconProps) {
   return (
-    <div className={cn('flex items-center justify-center', className)}>
-      <img 
-        src="/images/logos/sabc-logo.png"
-        alt="SABC Logo" 
-        className="h-full w-full object-contain"
-      />
-    </div>
+    <BrandMark className={className} />
   );
 }
 

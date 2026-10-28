@@ -15,10 +15,12 @@ import {
 import type { LabelProps } from 'recharts';
 import { cn } from '@/utils/helpers';
 
+import { CHART_COLORS, CHART_TICK, CHART_AXIS_LINE, frenchTick, formatChartNumber } from './chartTheme';
+
 const COLORS = {
-  increase: 'var(--sabc-success)',
-  decrease: 'var(--sabc-warning)',
-  total: 'var(--sabc-red-primary)',
+  increase: CHART_COLORS.primary,
+  decrease: CHART_COLORS.secondary,
+  total: CHART_COLORS.emphasis,
 };
 
 export interface WaterfallDatum {
@@ -104,16 +106,16 @@ export function WaterfallChart({
   };
 
   const defaultTooltip = (item: ProcessedWaterfallDatum) => (
-    <div className="rounded border border-sabc-gray-200 bg-white px-3 py-2 text-xs text-sabc-gray-700 shadow-sm">
+    <div className="rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 text-xs text-sabc-gray-700">
       <div className="font-semibold text-sabc-gray-800">{item.name}</div>
       {item.type === 'total' ? (
-        <div>Total: {item.cumulative.toLocaleString()}</div>
+        <div>Total : {formatChartNumber(item.cumulative)}</div>
       ) : (
         <>
           <div>
-            Variation: {item.net >= 0 ? '+' : ''}{item.net.toLocaleString()}
+            Variation : {item.net >= 0 ? '+' : ''}{formatChartNumber(item.net)}
           </div>
-          <div>Cumul: {item.cumulative.toLocaleString()}</div>
+          <div>Cumul : {formatChartNumber(item.cumulative)}</div>
         </>
       )}
     </div>
@@ -144,7 +146,7 @@ export function WaterfallChart({
       : item.net;
     const labelText = formatLabel
       ? formatLabel(item)
-      : `${item.type !== 'total' && item.net >= 0 ? '+' : ''}${defaultLabel.toLocaleString()}`;
+      : `${item.type !== 'total' && item.net >= 0 ? '+' : ''}${formatChartNumber(defaultLabel)}`;
 
     const labelY = item.type === 'decrease'
       ? safeY + safeBarHeight + 14
@@ -154,7 +156,7 @@ export function WaterfallChart({
       <text
         x={safeX + safeWidth / 2}
         y={labelY}
-        fill="var(--sabc-gray-700)"
+        fill="#4F4F4F"
         textAnchor="middle"
         fontSize={12}
       >
@@ -178,19 +180,20 @@ export function WaterfallChart({
           data={processedData}
           margin={{ top: 16, right: 24, left: 16, bottom: 16 }}
         >
-          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />}
+          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />}
           <XAxis
             dataKey="name"
-            tick={{ fill: 'var(--sabc-gray-500)', fontSize: 12 }}
-            axisLine={{ stroke: 'var(--sabc-gray-200)' }}
-            tickLine={{ stroke: 'var(--sabc-gray-200)' }}
+            tick={CHART_TICK}
+            axisLine={CHART_AXIS_LINE}
+            tickLine={CHART_AXIS_LINE}
           />
           <YAxis
-            tick={{ fill: 'var(--sabc-gray-500)', fontSize: 12 }}
-            axisLine={{ stroke: 'var(--sabc-gray-200)' }}
-            tickLine={{ stroke: 'var(--sabc-gray-200)' }}
+            tickFormatter={frenchTick}
+            tick={CHART_TICK}
+            axisLine={CHART_AXIS_LINE}
+            tickLine={CHART_AXIS_LINE}
           />
-          <ReferenceLine y={0} stroke="var(--sabc-gray-300)" />
+          <ReferenceLine y={0} stroke={CHART_COLORS.axis} />
           <Tooltip content={renderTooltipContent} />
           {showLegend && <Legend payload={legendPayload} wrapperStyle={{ fontSize: '12px' }} />}
           <Bar dataKey="previous" stackId="waterfall" fill="transparent" isAnimationActive={false} />

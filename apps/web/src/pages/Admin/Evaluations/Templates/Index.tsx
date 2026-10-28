@@ -18,13 +18,9 @@ import {
   DropdownMenuTrigger,
 } from '@/Components/UI/DropdownMenu/DropdownMenu';
 import { MoreVertical } from 'lucide-react';
-
-function formatDate(value?: string | null) {
-  if (!value) return 'N/A';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
-}
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
+import { formatDateFr } from '@/utils/helpers';
 
 export default function TemplatesIndexPage() {
   const navigate = useNavigate();
@@ -44,27 +40,27 @@ export default function TemplatesIndexPage() {
     mutationFn: (id: string) => templatesApi.publish(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['templates'] });
-      success('Template publié.');
+      success('Modèle publié.');
     },
-    onError: () => error('Impossible de publier ce template.'),
+    onError: () => error('Impossible de publier ce modèle.'),
   });
 
   const unpublishMutation = useMutation({
     mutationFn: (id: string) => templatesApi.unpublish(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['templates'] });
-      success('Template dépublié.');
+      success('Modèle retiré de la publication.');
     },
-    onError: () => error('Impossible de dépublier ce template.'),
+    onError: () => error('Impossible de retirer ce modèle de la publication.'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => templatesApi.delete(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['templates'] });
-      success('Template supprimé.');
+      success('Modèle supprimé.');
     },
-    onError: () => error('Impossible de supprimer ce template (des assignations actives existent peut-être).'),
+    onError: () => error('Impossible de supprimer ce modèle (des assignations actives existent peut-être).'),
   });
 
   const filtered = templates.filter((t: any) =>
@@ -80,59 +76,34 @@ export default function TemplatesIndexPage() {
   // ancienne URL redirige vers cette liste jusqu'au raccordement métier.
 
   return (
-    <AdminEvaluationsLayout title="Templates d'évaluation">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Templates d'évaluation</h1>
-          <p className="mt-1 text-sm text-sabc-gray-400">
-            Formulaires réutilisables pour structurer les évaluations.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {templates.length > 0 ? (
-            <Button
-              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-              onClick={() => navigate('/admin/evaluations/templates/create')}
-            >
-              <Plus size={16} className="mr-2" />
-              Nouveau template
-            </Button>
-          ) : null}
-        </div>
-      </div>
+    <AdminEvaluationsLayout title="Modèles d’évaluation">
+      <PageHeader
+        title="Modèles d’évaluation"
+        description="Formulaires réutilisables pour structurer les évaluations."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Évaluations' }, { label: 'Modèles' }]}
+        actions={templates.length > 0 ? (
+          <Button onClick={() => navigate('/admin/evaluations/templates/create')}>
+            <Plus size={16} className="mr-2" />
+            Nouveau modèle
+          </Button>
+        ) : undefined}
+      />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-sabc-gray-400">Total templates</div>
-            <div className="text-2xl font-bold text-sabc-gray-900">{templates.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-sabc-gray-400">Publiés</div>
-            <div className="text-2xl font-bold text-sabc-success">{published}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-sabc-gray-400">Brouillons</div>
-            <div className="text-2xl font-bold text-sabc-warning">{drafts}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <KpiGrid className="lg:grid-cols-3">
+        <KpiCard label="Total modèles" value={templates.length} />
+        <KpiCard label="Publiés" value={published} />
+        <KpiCard label="Brouillons" value={drafts} />
+      </KpiGrid>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ClipboardList size={18} className="text-sabc-red-primary" />
-            Templates ({filtered.length})
-          </CardTitle>
+        <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-base">Modèles ({filtered.length})</CardTitle>
           <input
-            placeholder="Rechercher..."
+            aria-label="Rechercher un modèle"
+            placeholder="Rechercher un modèle"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-9 w-56 rounded-md border border-sabc-gray-200 bg-white px-3 text-sm placeholder:text-sabc-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary"
+            className="h-9 w-full rounded-lg sm:w-56 border border-sabc-gray-200 bg-white px-3 text-sm placeholder:text-sabc-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary"
           />
         </CardHeader>
         <CardContent>
@@ -140,20 +111,20 @@ export default function TemplatesIndexPage() {
             templates.length === 0 ? (
               <EmptyState
                 icon={ClipboardList}
-                title="Aucun template"
-                description="Créez votre premier template d’évaluation pour structurer les compétences."
+                title="Aucun modèle"
+                description="Créez votre premier modèle d’évaluation pour structurer les compétences."
                 action={
-                  <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => navigate('/admin/evaluations/templates/create')}>
-                    Nouveau template
+                  <Button onClick={() => navigate('/admin/evaluations/templates/create')}>
+                    Nouveau modèle
                   </Button>
                 }
               />
             ) : (
-              <EmptyState icon={ClipboardList} title="Aucun résultat" description="Aucun template ne correspond à votre recherche." />
+              <EmptyState icon={ClipboardList} title="Aucun résultat" description="Aucun modèle ne correspond à votre recherche." />
             )
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[720px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Titre</TableHead>
@@ -172,25 +143,25 @@ export default function TemplatesIndexPage() {
                     return (
                       <TableRow key={id}>
                         <TableCell className="font-medium">{titre}</TableCell>
-                        <TableCell className="max-w-xs truncate text-sabc-gray-400">
-                          {template.description || '—'}
+                        <TableCell className="max-w-xs truncate text-sabc-gray-500">
+                          {template.description || 'Sans description'}
                         </TableCell>
-                        <TableCell className="text-sabc-gray-400">v{template.version ?? 1}</TableCell>
+                        <TableCell className="text-sabc-gray-500">v{template.version ?? 1}</TableCell>
                         <TableCell>
                           {isPublished ? (
                             <Badge variant="success">Publié</Badge>
                           ) : template.statut === 'archived' ? (
-                            <Badge variant="secondary">Archivé</Badge>
+                            <Badge variant="outline">Archivé</Badge>
                           ) : (
-                            <Badge variant="warning">Brouillon</Badge>
+                            <Badge variant="secondary">Brouillon</Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-sabc-gray-400">{formatDate(template.updated_at)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-sabc-gray-500">{formatDateFr(template.updated_at)}</TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Ouvrir menu</span>
+                                <span className="sr-only">Actions pour le modèle {titre}</span>
                                 <MoreVertical size={16} />
                               </Button>
                             </DropdownMenuTrigger>
@@ -207,13 +178,13 @@ export default function TemplatesIndexPage() {
                                 onClick={() => isPublished ? unpublishMutation.mutate(id) : publishMutation.mutate(id)}
                               >
                                 <Power size={14} className="mr-2" />
-                                {isPublished ? 'Dépublier' : 'Publier'}
+                                {isPublished ? 'Retirer de la publication' : 'Publier'}
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                className="text-sabc-red-primary focus:text-sabc-red-primary"
+                                className="text-red-700 focus:bg-red-50 focus:text-red-800"
                                 onClick={async () => {
                                   const ok = await confirm({
-                                    title: 'Supprimer ce template ?',
+                                    title: 'Supprimer ce modèle ?',
                                     description: 'Cette action est irréversible.',
                                     confirmLabel: 'Supprimer',
                                     variant: 'destructive',

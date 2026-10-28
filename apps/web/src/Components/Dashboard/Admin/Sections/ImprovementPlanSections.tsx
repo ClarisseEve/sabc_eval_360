@@ -10,6 +10,8 @@ import { Button } from '@/Components/UI/Button/Button';
 import { EmptyState, getPriorityBadgeVariant } from '@/Components/Dashboard/RoleDashboardShared';
 import { TeamAxisFrequencyChartCard } from '@/Components/Dashboard/TeamAnalyticsCards';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
+import { CHART_COLORS, CHART_TICK, CHART_TOOLTIP_STYLE, formatChartNumber, frenchTick } from '@/Components/UI/Charts/chartTheme';
 
 export function ImprovementPlansFiltersSection({
   roleFilter,
@@ -41,7 +43,7 @@ export function ImprovementPlansFiltersSection({
   return (
     <AnalyticsFiltersCard
       title="Plans d’amélioration"
-      description="Agrégation backend admin des axes et recommandations, calculée sur l’ensemble du périmètre filtré."
+      description="Axes de progrès et recommandations de l’ensemble des collaborateurs correspondant aux filtres."
     >
       <div className="min-w-[140px] space-y-1">
         <div className="text-xs font-medium text-sabc-gray-500 dark:text-sabc-gray-400">Rôle</div>
@@ -91,15 +93,15 @@ export function ImprovementPlansFiltersSection({
       </div>
 
       <div className="flex min-w-[140px] items-end">
-        <div className="rounded-md border border-dashed border-sabc-gray-300 px-3 py-1.5 text-xs text-sabc-gray-500 dark:border-sabc-gray-700 dark:text-sabc-gray-400">
+        <div className="py-1.5 text-xs text-sabc-gray-500 dark:text-sabc-gray-400">
           {generatedAt
-            ? `${new Intl.DateTimeFormat('fr-FR', {
+            ? `Calculé le ${new Intl.DateTimeFormat('fr-FR', {
                 day: '2-digit',
                 month: 'short',
                 hour: '2-digit',
                 minute: '2-digit',
               }).format(new Date(generatedAt))}`
-            : 'Pas d\'agrégation'}
+            : 'Pas encore calculé'}
         </div>
       </div>
 
@@ -109,7 +111,7 @@ export function ImprovementPlansFiltersSection({
           onClick={onGenerate}
           loading={isGenerating}
           disabled={isGenerating}
-          className="whitespace-nowrap bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
+          className="whitespace-nowrap"
         >
           {isGenerating ? 'Génération…' : 'Générer les recommandations'}
         </Button>
@@ -119,33 +121,29 @@ export function ImprovementPlansFiltersSection({
 }
 
 export function ImprovementPlansTotalsSection({ totals }: Readonly<{ totals: any }>) {
+  const count = (value: unknown) => (value === null || value === undefined ? null : formatChartNumber(value, 0));
   const cards = [
-    { label: 'Utilisateurs filtrés', value: totals.users_filtered ?? 0 },
-    { label: 'Utilisateurs analysés', value: totals.users_analyzed ?? 0 },
-    { label: 'Recommandations', value: totals.recommendations_total ?? 0 },
-    { label: 'Priorité haute', value: totals.high_priority ?? 0 },
+    { label: 'Collaborateurs retenus', value: count(totals?.users_filtered) },
+    { label: 'Collaborateurs analysés', value: count(totals?.users_analyzed) },
+    { label: 'Recommandations', value: count(totals?.recommendations_total) },
+    { label: 'Priorité haute', value: count(totals?.high_priority) },
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <KpiGrid>
       {cards.map((card) => (
-        <Card key={card.label} className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
-          <CardContent className="p-5">
-            <div className="text-xs font-semibold text-sabc-gray-500">{card.label}</div>
-            <div className="mt-2 text-2xl font-bold text-sabc-gray-900 dark:text-white">{card.value}</div>
-          </CardContent>
-        </Card>
+        <KpiCard key={card.label} label={card.label} value={card.value} />
       ))}
-    </div>
+    </KpiGrid>
   );
 }
 
 export function RecommendationTypeBreakdownSection({ byType }: Readonly<{ byType: any[] }>) {
   return (
-    <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
+    <Card className="overflow-hidden border-sabc-gray-200">
       <CardHeader>
         <CardTitle>Répartition par type de recommandation</CardTitle>
-        <CardDescription>Nombre d’actions proposées par famille sur le périmètre filtré</CardDescription>
+        <CardDescription>Nombre d’actions proposées par famille.</CardDescription>
       </CardHeader>
       <CardContent>
         {byType.length === 0 ? (
@@ -154,11 +152,11 @@ export function RecommendationTypeBreakdownSection({ byType }: Readonly<{ byType
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byType} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-                <XAxis dataKey="type" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Bar dataKey="total" fill="#C62828" radius={[6, 6, 0, 0]} name="Recommandations" />
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="type" tickLine={false} axisLine={false} tick={CHART_TICK} />
+                <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickFormatter={frenchTick} tick={CHART_TICK} />
+                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => formatChartNumber(value, 0)} />
+                <Bar dataKey="total" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} name="Recommandations" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -172,10 +170,10 @@ export function ImprovementTopAxesSection({ topAxes }: Readonly<{ topAxes: any[]
   return (
     <TeamAxisFrequencyChartCard
       title="Axes les plus fréquents"
-      description="Critères faibles revenant le plus souvent dans le périmètre filtré"
+      description="Critères faibles revenant le plus souvent."
       axes={topAxes}
       emptyMessage="Aucun axe consolidé n’est encore disponible."
-      barColor="#1D4ED8"
+      barColor={CHART_COLORS.primary}
       heightClassName="h-72"
     />
   );
@@ -203,7 +201,7 @@ export function ImprovementRowsSection({
       <CardHeader>
         <CardTitle>Détail des recommandations</CardTitle>
         <CardDescription>
-          {usersWithRecommendations} utilisateur(s) concerné(s) sur {usersAnalyzed} analysé(s)
+          {usersWithRecommendations.toLocaleString('fr-FR')} collaborateur(s) concerné(s) sur {usersAnalyzed.toLocaleString('fr-FR')} analysé(s)
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -257,7 +255,7 @@ export function ImprovementRowsSection({
                             size="sm"
                             disabled={isValidating || isRejecting}
                             onClick={() => onValidate(row.id)}
-                            className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
+                            className="gap-1"
                           >
                             {isValidating ? 'En cours…' : 'Valider'}
                           </Button>
@@ -266,7 +264,7 @@ export function ImprovementRowsSection({
                             size="sm"
                             disabled={isValidating || isRejecting}
                             onClick={() => onReject(row.id)}
-                            className="gap-1 border-red-300 text-red-700 hover:bg-red-50"
+                            className="gap-1"
                           >
                             {isRejecting ? 'En cours…' : 'Rejeter'}
                           </Button>

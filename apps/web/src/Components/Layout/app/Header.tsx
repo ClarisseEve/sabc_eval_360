@@ -17,6 +17,7 @@ import { StatusBadge } from '@/Components/UI/Status/StatusBadge';
 import { Tooltip } from '@/Components/UI/Tooltip/Tooltip';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { useTheme } from '@/Hooks/useTheme';
+import { BrandLockup } from '@/Components/Brand/BrandMark';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { Link } from '@/lib/inertia-shim';
 import { notificationsApi } from '@/Services/api';
@@ -193,7 +194,7 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header
       className={cn(
-        'flex h-16 min-w-0 items-center justify-between border-b border-sabc-gray-200 bg-white px-2 dark:border-sabc-gray-800 dark:bg-sabc-gray-900 sm:px-4',
+        'flex h-16 min-w-0 shrink-0 items-center justify-between border-b border-sabc-gray-200 bg-white px-2 dark:border-sabc-gray-800 dark:bg-sabc-gray-900 sm:px-4',
         className,
       )}
     >
@@ -210,6 +211,8 @@ const Header: React.FC<HeaderProps> = ({
         >
           <Menu className="h-5 w-5" />
         </Button>
+        {/* Sur mobile la barre latérale est masquée: la marque passe dans l'en-tête. */}
+        <BrandLockup compact className="ml-1 lg:hidden" />
       </div>
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">

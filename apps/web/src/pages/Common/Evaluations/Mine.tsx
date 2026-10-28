@@ -11,45 +11,19 @@ import {
   ActiveRulesCard,
   QuickActionsCard,
   formatDateLabel,
+  formatEvaluationType,
+  formatStatusLabel,
+  getStatusBadgeVariant,
 } from '@/Components/Dashboard/RoleDashboardShared';
-import {
-  CalendarClock,
-  CheckCircle2,
-  Layers3,
-  PlayCircle,
-  Users2,
-} from 'lucide-react';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
 import { filterAdminApplicableRules, filterApplicableRules } from '@/utils/rules';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { paginateEligibleGroups } from './eligible-targets-data';
+import { formatScore } from '@/utils/helpers';
 
 type Target = Record<string, any>;
 const ELIGIBLE_TARGETS_PAGE_SIZE = 10;
-
-function MetricTile({
-  label,
-  value,
-  caption,
-  icon: Icon,
-}: {
-  label: string;
-  value: React.ReactNode;
-  caption: string;
-  icon: React.ElementType;
-}) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-6">
-        <Icon className="h-8 w-8 text-sabc-red-primary" />
-        <div>
-          <div className="text-2xl font-semibold text-sabc-gray-900">{value}</div>
-          <div className="text-sm text-sabc-gray-500">{label}</div>
-          <div className="mt-1 text-xs text-sabc-gray-400">{caption}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 const Mine: React.FC = () => {
   const { user } = useAuthContext();
@@ -88,28 +62,13 @@ const Mine: React.FC = () => {
       <Head title="Mes évaluations" />
 
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <Card className="border-none bg-white shadow-lg">
-          <CardContent className="flex flex-col gap-6 p-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-2">
-              <Badge variant="primary">
-                Workflow d’évaluation
-              </Badge>
-              <h1 className="text-2xl font-semibold text-sabc-gray-900">Démarrer ou reprendre vos évaluations</h1>
-              <p className="max-w-2xl text-sm text-sabc-gray-600">
-                Le flux repose maintenant sur la période ouverte et les règles publiées compatibles avec la cible sélectionnée.
-              </p>
-            </div>
-            <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-4 text-sm">
-              <div className="text-xs uppercase tracking-wide text-sabc-gray-500">Période active</div>
-              <div className="mt-1 text-base font-semibold text-sabc-gray-900">
-                {data.activePeriod?.nom_periode || data.activePeriod?.code_periode || 'Aucune période ouverte'}
-              </div>
-              <div className="mt-1 text-xs text-sabc-gray-500">
-                {data.activePeriod?.date_fin ? `Clôture le ${formatDateLabel(data.activePeriod.date_fin)}` : 'Le démarrage est bloqué tant qu’aucune période n’est ouverte.'}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <PageHeader
+          title="Mes évaluations"
+          description="Démarrez une évaluation pour un collaborateur éligible ou reprenez une évaluation en cours. Les grilles proposées dépendent de la période ouverte et du rôle de la personne évaluée."
+          meta={data.activePeriod
+            ? `Période active : ${data.activePeriod.nom_periode || data.activePeriod.code_periode}${data.activePeriod.date_fin ? ` (clôture le ${formatDateLabel(data.activePeriod.date_fin)})` : ''}`
+            : 'Aucune période ouverte : le démarrage d’une évaluation est impossible pour l’instant.'}
+        />
 
         {!data.activePeriod ? (
           <Alert>
@@ -121,7 +80,7 @@ const Mine: React.FC = () => {
                   href="/admin/evaluations/periodes"
                   className="inline-flex items-center text-sm font-medium text-sabc-red-primary underline-offset-4 hover:underline"
                 >
-                  Créer et ouvrir une période →
+                  Créer et ouvrir une période
                 </a>
               ) : (
                 <span className="text-xs text-sabc-gray-500">Contactez l’administrateur pour ouvrir un cycle d’évaluation.</span>
@@ -130,32 +89,28 @@ const Mine: React.FC = () => {
           </Alert>
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricTile
+        <KpiGrid>
+          <KpiCard
             label="Périodes ouvertes"
             value={data.summary.activePeriods}
             caption="Cycles actuellement disponibles"
-            icon={CalendarClock}
           />
-          <MetricTile
+          <KpiCard
             label="Cibles éligibles"
             value={data.summary.eligibleTargets}
             caption={isAdmin ? 'Collaborateurs actifs et disponibles' : 'Auto, pairs et subordonnés selon la hiérarchie'}
-            icon={Users2}
           />
-          <MetricTile
-            label="Règles actives"
+          <KpiCard
+            label="Grilles actives"
             value={data.summary.activeRules}
-            caption="Cadres publiés exploitables par le workflow"
-            icon={Layers3}
+            caption="Grilles d’évaluation publiées"
           />
-          <MetricTile
+          <KpiCard
             label="Historique"
             value={data.summary.historyEntries}
-            caption="Évaluations reçues ou données déjà enregistrées"
-            icon={CheckCircle2}
+            caption="Évaluations reçues ou données"
           />
-        </div>
+        </KpiGrid>
 
         <div className="grid gap-6">
           <ActiveRulesCard
@@ -171,8 +126,7 @@ const Mine: React.FC = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users2 className="h-5 w-5 text-sabc-red-primary" />
+            <CardTitle className="text-base">
               Cibles éligibles
             </CardTitle>
           </CardHeader>
@@ -189,7 +143,7 @@ const Mine: React.FC = () => {
                       href="/admin/utilisateurs"
                       className="inline-flex items-center text-sm font-medium text-sabc-red-primary underline-offset-4 hover:underline"
                     >
-                      Vérifier la configuration des utilisateurs →
+                      Vérifier la configuration des utilisateurs
                     </a>
                   )}
                 </AlertDescription>
@@ -202,7 +156,7 @@ const Mine: React.FC = () => {
                     <span className="ml-2 text-xs font-normal text-sabc-gray-500">({group.targets.length})</span>
                   </div>
                   {group.targets.map((target: Target) => (
-                    <Card key={target.matricule || `${group.key}-${target.nom}-${target.prenom}`} className="border-sabc-gray-200 shadow-sm">
+                    <Card key={target.matricule || `${group.key}-${target.nom}-${target.prenom}`} className="border-sabc-gray-200 shadow-none">
                       <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                         <div>
                           <div className="font-medium text-sabc-gray-900">{formatDisplayName(target)}</div>
@@ -225,7 +179,6 @@ const Mine: React.FC = () => {
                                   disabled={!canStart}
                                   onClick={() => handleEvaluate(target)}
                                 >
-                                  <PlayCircle className="mr-2 h-4 w-4" />
                                   Évaluer
                                 </Button>
                               </>
@@ -276,8 +229,7 @@ const Mine: React.FC = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CheckCircle2 className="h-5 w-5 text-sabc-success" />
+            <CardTitle className="text-base">
               Historique récent
             </CardTitle>
           </CardHeader>
@@ -297,13 +249,15 @@ const Mine: React.FC = () => {
                       {formatDisplayName(evaluation.evalue || {})}
                     </div>
                     <div className="text-sm text-sabc-gray-500">
-                      {evaluation.regle?.nom_regle || evaluation.type_evaluation || 'Évaluation'}
+                      {evaluation.regle?.nom_regle || formatEvaluationType(evaluation.type_evaluation)}
                     </div>
-                    <div className="text-xs text-sabc-gray-400">Statut: {evaluation.statut}</div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="info">
-                      {evaluation.note_globale != null ? `${Number(evaluation.note_globale).toFixed(1)}/5` : '—'}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm tabular-nums text-sabc-gray-700">
+                      {formatScore(evaluation.note_globale)}
+                    </span>
+                    <Badge variant={getStatusBadgeVariant(evaluation.statut)}>
+                      {formatStatusLabel(evaluation.statut)}
                     </Badge>
                     <Button variant="outline" size="sm" onClick={() => { window.location.href = `/evaluations/${evaluation.id_evaluation}`; }}>
                       Voir

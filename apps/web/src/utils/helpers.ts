@@ -146,3 +146,30 @@ export function removeFromLocalStorage(key: string) {
     console.error('Error removing from localStorage:', error);
   }
 }
+
+/**
+ * Note sur l'échelle 1-5 au format français (« 3,70 / 5 »). Une note absente
+ * donne « n.d. », jamais 0, qui se lirait comme une contre-performance.
+ */
+export function formatScore(value: unknown, digits = 2): string {
+  if (value === null || value === undefined || value === '') return 'n.d.';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 'n.d.';
+  return `${n.toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits })} / 5`;
+}
+
+/** Pourcentage au format français (« 82 % », espace insécable). Absent: « n.d. ». */
+export function formatPercent(value: unknown, digits = 0): string {
+  if (value === null || value === undefined || value === '') return 'n.d.';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 'n.d.';
+  return `${n.toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits })} %`;
+}
+
+/** Date courte française (« 26 oct. 2026 »). Absente ou invalide: « n.d. ». */
+export function formatDateFr(value: unknown): string {
+  if (!value) return 'n.d.';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return 'n.d.';
+  return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+}

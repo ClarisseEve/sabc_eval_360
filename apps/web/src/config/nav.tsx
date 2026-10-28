@@ -3,14 +3,10 @@ import {
   Home,
   ClipboardList,
   BarChart2,
-  ChevronRight,
   Users,
   UserCheck,
   Shield,
   Building,
-  MapPin,
-  Briefcase,
-  Map,
   Target,
   FileText,
 } from 'lucide-react';
@@ -19,7 +15,7 @@ import type { Role } from './rbac';
 export interface NavItem {
   title: string;
   href: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   children?: NavItem[];
   roles?: Role[];
   badge?: 'notifications';
@@ -51,20 +47,17 @@ export const NAV_ITEMS: NavItem[] = [
       {
         title: 'Mes évaluations',
         href: '/evaluations/mine',
-        icon: <ChevronRight className="h-4 w-4" />,
         roles: ALL_WITH_ADMIN,
       },
       {
         title: 'À compléter',
         href: '/evaluations/pending',
-        icon: <ChevronRight className="h-4 w-4" />,
         roles: ALL_WITH_ADMIN,
         badge: 'notifications',
       },
       {
         title: 'À valider',
         href: '/evaluations/validate',
-        icon: <ChevronRight className="h-4 w-4" />,
         roles: VALIDATION_QUEUE_ROLES,
         requiresValidationAccess: true,
         badge: 'notifications',
@@ -72,43 +65,36 @@ export const NAV_ITEMS: NavItem[] = [
       {
         title: 'Historique',
         href: '/evaluations/historique',
-        icon: <ChevronRight className="h-4 w-4" />,
         roles: ALL_WITH_ADMIN,
       },
       {
         title: 'Mes fiches de notation',
         href: '/evaluations/fiches',
-        icon: <ChevronRight className="h-4 w-4" />,
         roles: ALL_WITH_ADMIN,
       },
       {
         title: 'Gestion globale',
         href: '/admin/evaluations/management',
-        icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN'],
       },
       {
         title: 'Périodes',
         href: '/admin/evaluations/periodes',
-        icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN'],
       },
       {
         title: 'Fiches de notation',
         href: '/admin/evaluations/fiches',
-        icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN'],
       },
       {
         title: 'Règles',
         href: '/admin/evaluations/regles',
-        icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN'],
       },
       {
         title: 'Modèles',
         href: '/admin/evaluations/templates',
-        icon: <ChevronRight className="h-4 w-4" />,
         roles: ['ADMIN'],
       },
     ],
@@ -125,52 +111,48 @@ export const NAV_ITEMS: NavItem[] = [
       {
         title: 'Subordonnés',
         href: '/equipe/subordonnes',
-        icon: <ChevronRight className="h-4 w-4" />,
       },
       {
         title: 'Évaluations équipe',
         href: '/equipe/evaluations',
-        icon: <ChevronRight className="h-4 w-4" />,
       },
     ],
   },
 
   // ── Analytics (ADMIN uniquement — les managers ont leurs analyses région/équipe dans leur Tableau de bord) ──
   {
-    title: 'Analytics',
+    title: 'Analyses',
     href: '#',
     icon: <BarChart2 className="h-5 w-5" />,
     roles: ['ADMIN'],
     children: [
       {
+        title: "Vue d'ensemble",
+        href: '/admin/analytics?tab=overview',
+      },
+      {
         title: 'Par région',
         href: '/admin/analytics?tab=regions',
-        icon: <ChevronRight className="h-4 w-4" />,
       },
       {
         title: 'Par rôle',
         href: '/admin/analytics?tab=roles',
-        icon: <ChevronRight className="h-4 w-4" />,
       },
       {
         title: 'Anomalies',
         href: '/admin/analytics?tab=anomalies',
-        icon: <ChevronRight className="h-4 w-4" />,
       },
       {
         title: 'Recherche individuelle',
         href: '/admin/analytics?tab=individual',
-        icon: <ChevronRight className="h-4 w-4" />,
       },
       {
         title: 'Plans d\'amélioration',
         href: '/admin/analytics?tab=improvement',
-        icon: <ChevronRight className="h-4 w-4" />,
       },
       {
         title: 'Tendances',
         href: '/admin/analytics?tab=tendances',
-        icon: <ChevronRight className="h-4 w-4" />,
       },
     ],
   },
@@ -199,12 +181,10 @@ export const NAV_ITEMS: NavItem[] = [
       {
         title: 'Liste',
         href: '/admin/utilisateurs',
-        icon: <ChevronRight className="h-4 w-4" />,
       },
       {
         title: 'Gaps d\'évaluation',
         href: '/admin/utilisateurs/gaps',
-        icon: <ChevronRight className="h-4 w-4" />,
       },
     ],
   },
@@ -220,18 +200,9 @@ export const NAV_ITEMS: NavItem[] = [
   // ── Admin: Rôles ──
   {
     title: 'Rôles',
-    href: '#',
+    href: '/admin/roles',
     icon: <Shield className="h-5 w-5" />,
     roles: ['ADMIN'],
-    children: [
-      {
-        title: 'Gestion des rôles',
-        href: '/admin/roles',
-        icon: <ChevronRight className="h-4 w-4" />,
-      },
-      // L'ancienne route redirige vers les règles tant qu'une véritable
-      // matrice de permissions n'est pas implémentée.
-    ],
   },
 
   // ── Admin: Structure ──
@@ -244,22 +215,18 @@ export const NAV_ITEMS: NavItem[] = [
       {
         title: 'Régions',
         href: '/admin/structure/regions',
-        icon: <MapPin className="h-4 w-4" />,
       },
       {
-        title: 'Services',
+        title: 'Services commerciaux',
         href: '/admin/structure/services',
-        icon: <Briefcase className="h-4 w-4" />,
       },
       {
         title: 'Districts',
         href: '/admin/structure/districts',
-        icon: <Map className="h-4 w-4" />,
       },
       {
         title: 'Secteurs',
         href: '/admin/structure/secteurs',
-        icon: <Target className="h-4 w-4" />,
       },
     ],
   },

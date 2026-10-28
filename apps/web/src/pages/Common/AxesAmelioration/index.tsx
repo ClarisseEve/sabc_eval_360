@@ -13,9 +13,10 @@ import { Search } from 'lucide-react';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { useRoleDashboardData } from '@/Hooks/queries/useRoleDashboards';
 import { adminApi, analyticsApi } from '@/Services/api';
-import { formatPersonName } from '@/utils/helpers';
+import { formatPercent, formatPersonName, formatScore } from '@/utils/helpers';
 import { hasCapability } from '@/config/rbac';
 import { RadarChart } from '@/Components/UI/Charts/RadarChart';
+import { CHART_COLORS, CHART_TICK, CHART_TOOLTIP_STYLE, formatChartNumber, frenchTick } from '@/Components/UI/Charts/chartTheme';
 import { Input } from '@/Components/UI/Input/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
@@ -97,9 +98,49 @@ function normalizeRecommendations(payload: any): Recommendation[] {
   }));
 }
 
+/** Libellés français des familles de recommandations (les codes arrivent en minuscules). */
+const RECOMMENDATION_TYPE_LABELS: Record<string, string> = {
+  formation: 'Formation',
+  mentorat: 'Mentorat',
+  coaching: 'Coaching',
+  accompagnement: 'Accompagnement',
+  recommandation: 'Recommandation',
+  autoformation: 'Autoformation',
+  e_learning: 'E-learning',
+  'e-learning': 'E-learning',
+  stage: 'Stage',
+  projet: 'Projet',
+};
+
+/** « mentorat » devient « Mentorat », « plan_action » devient « Plan action ». */
+function formatLabel(raw: unknown): string {
+  const text = String(raw ?? '').trim();
+  if (!text) return 'n.d.';
+  const known = RECOMMENDATION_TYPE_LABELS[text.toLowerCase()];
+  if (known) return known;
+  const spaced = text.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function withLabelledCriteria<T extends { critere: string }>(axes: T[]): T[] {
+  return axes.map((axis) => ({ ...axis, critere: formatLabel(axis.critere) }));
+}
+
+/** Entier au format français, « n.d. » si absent. */
+function formatCount(value: unknown): string {
+  return formatChartNumber(value, 0);
+}
+
+function formatProgression(value: unknown): string {
+  if (value === null || value === undefined || value === '') return 'n.d.';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 'n.d.';
+  return `${n > 0 ? '+' : ''}${n.toLocaleString('fr-FR', { maximumFractionDigits: 2 })}`;
+}
+
 function buildRadarData(axes: ImprovementAxis[], maxItems = 6) {
   return axes.slice(0, maxItems).map((axis) => ({
-    axe: axis.critere,
+    axe: formatLabel(axis.critere),
     score: Number(axis.scoreActuel ?? 0),
     cible: 5,
   }));
@@ -141,14 +182,14 @@ function AxisRadarCard({
       </CardHeader>
       <CardContent>
         {radarData.length === 0 ? (
-          <EmptyState message="Aucune donnée d’axes n’est disponible pour construire le radar." />
+          <EmptyState message="Aucun axe d’amélioration pour le moment." />
         ) : (
           <RadarChart
             data={radarData}
             angleKey="axe"
             dataKeys={[
-              { key: 'score', name: 'Score observé', color: 'var(--sabc-red-primary)', fillOpacity: 0.28 },
-              { key: 'cible', name: 'Cible', color: 'var(--sabc-info)', fillOpacity: 0.08 },
+              { key: 'score', name: 'Score observé', color: CHART_COLORS.primary, fillOpacity: 0.2 },
+              { key: 'cible', name: 'Cible', color: CHART_COLORS.secondary, fillOpacity: 0.05 },
             ]}
             height={320}
           />
@@ -167,7 +208,7 @@ function IndividualAxesPage({ fallbackRole }: { fallbackRole: string }) {
     <DashboardPageFrame
       layoutUser={data.layoutUser}
       title="Mes axes d’amélioration"
-      subtitle="Lecture consolidée de vos points faibles, recommandations et règles actives"
+      subtitle="Vos points faibles, les recommandations associées et les règles qui s’appliquent"
       periodName={data.dashboard?.periode_active?.nom ?? null}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -175,32 +216,28 @@ function IndividualAxesPage({ fallbackRole }: { fallbackRole: string }) {
           label="Axes prioritaires"
           value={data.selfAxes.length}
           caption="Critères faibles remontés par les évaluations"
-          accentClassName="border-l-sabc-red-primary"
         />
         <MetricCard
           label="Recommandations"
           value={data.selfRecommendations.length}
-          caption="Actions proposées pour le cycle actif"
-          accentClassName="border-l-sabc-info"
+          caption="Actions proposées pour la période en cours"
         />
         <MetricCard
           label="Score global"
-          value={data.canSeeSelfScore && data.selfScores.scoreGlobal != null ? `${data.selfScores.scoreGlobal}/5` : 'Non applicable'}
-          caption="Lecture autorisée selon la règle active"
-          accentClassName="border-l-sabc-success"
+          value={data.canSeeSelfScore ? formatScore(data.selfScores.scoreGlobal) : 'Non applicable'}
+          caption="Visible selon les règles de votre rôle"
         />
         <MetricCard
           label="Évaluations reçues"
           value={data.receivedEvaluations.length}
-          caption="Historique reçu sur la période active"
-          accentClassName="border-l-sabc-accent"
+          caption="Sur la période en cours"
         />
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <AxisRadarCard
           title="Radar des axes"
-          description="Visualisation des critères les plus faibles"
+          description="Critères les plus faibles comparés à la cible de 5."
           axes={data.selfAxes}
         />
         <ImprovementAxesListCard
@@ -224,7 +261,7 @@ function IndividualAxesPage({ fallbackRole }: { fallbackRole: string }) {
 
       <QuickActionsCard
         actions={[
-          { label: 'Mon dashboard', href: `/${fallbackRole.toLowerCase()}/dashboard` },
+          { label: 'Mon tableau de bord', href: `/${fallbackRole.toLowerCase()}/dashboard` },
           { label: 'Mes évaluations', href: '/evaluations/mine' },
           { label: 'À compléter', href: '/evaluations/pending', variant: 'secondary' },
         ]}
@@ -289,39 +326,35 @@ function ManagerAxesPage({ fallbackRole }: { fallbackRole: string }) {
     <DashboardPageFrame
       layoutUser={data.layoutUser}
       title="Axes d’amélioration équipe"
-      subtitle="Vue agrégée de votre équipe, avec drill-down par collaborateur"
+      subtitle="Axes de votre équipe, avec le détail par collaborateur"
       periodName={data.dashboard?.periode_active?.nom ?? null}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Collaborateurs suivis"
           value={data.teamMembers.length}
-          caption="Périmètre direct actuellement remonté"
-          accentClassName="border-l-sabc-red-primary"
+          caption="Collaborateurs directs"
         />
         <MetricCard
           label="Couverture équipe"
-          value={`${data.completionRate}%`}
+          value={formatPercent(data.completionRate)}
           caption="Part de l’équipe avec score consolidé"
-          accentClassName="border-l-sabc-info"
         />
         <MetricCard
           label="Axes dominants"
           value={filteredTeamTopAxes.length}
           caption="Critères faibles remontés le plus souvent"
-          accentClassName="border-l-sabc-success"
         />
         <MetricCard
           label="Mes recommandations"
           value={data.selfRecommendations.length}
-          caption="Lecture personnelle conservée en parallèle"
-          accentClassName="border-l-sabc-accent"
+          caption="Vos propres recommandations"
         />
       </div>
 
       <AnalyticsFiltersCard
         title="Filtres équipe"
-        description="Restreindre la vue par rôle, priorité et recherche textuelle"
+        description="Filtrer par rôle, niveau, priorité ou nom."
       >
           <div className="min-w-[160px] flex-1 space-y-1">
             <div className="text-xs font-medium text-sabc-gray-500 dark:text-sabc-gray-400">Recherche</div>
@@ -382,18 +415,18 @@ function ManagerAxesPage({ fallbackRole }: { fallbackRole: string }) {
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <TeamAxisFrequencyChartCard
-          title="Top axes de l’équipe"
-          description="Fréquence d’apparition des axes faibles sur les subordonnés directs"
-          axes={filteredTeamTopAxes}
+          title="Axes les plus fréquents de l’équipe"
+          description="Axes faibles les plus fréquents chez vos collaborateurs directs."
+          axes={withLabelledCriteria(filteredTeamTopAxes)}
         />
         <ImprovementAxesListCard
           title="Mes propres axes"
-          description="Synthèse personnelle conservée pour le manager"
+          description="Vos propres points faibles."
           axes={data.selfAxes}
         />
         <HierarchyBreakdownCard
           title="Coupe hiérarchique"
-          description="Vue des axes et scores consolidés par niveau visible"
+          description="Axes et scores par niveau hiérarchique."
           members={filteredMembers}
         />
       </div>
@@ -403,7 +436,7 @@ function ManagerAxesPage({ fallbackRole }: { fallbackRole: string }) {
         selectedMatricule={selectedMatricule}
         onSelect={setSelectedMatricule}
         title="Axes par collaborateur"
-        description="Vue agrégée: seuls les axes et scores consolidés remontent hors admin"
+        description="Axes et scores de chaque collaborateur."
         showLevelColumn
         selector={{
           value: selectedMatricule,
@@ -415,14 +448,14 @@ function ManagerAxesPage({ fallbackRole }: { fallbackRole: string }) {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <HierarchyFocusCard
           title="Branche hiérarchique sélectionnée"
-          description="Lecture de la branche visible à partir du collaborateur sélectionné"
+          description="Collaborateurs rattachés au collaborateur sélectionné."
           focus={selectedMember ?? null}
           members={filteredMembers}
           onSelect={setSelectedMatricule}
         />
         <AxisRadarCard
           title={selectedMember ? `Radar de ${selectedMember.nomComplet}` : 'Radar collaborateur'}
-          description="Lecture détaillée du collaborateur sélectionné"
+          description="Détail du collaborateur sélectionné."
           axes={selectedAxesQuery.data ?? []}
         />
       </div>
@@ -441,7 +474,7 @@ function ManagerAxesPage({ fallbackRole }: { fallbackRole: string }) {
 
       <QuickActionsCard
         actions={[
-          { label: 'Mon dashboard', href: `/${fallbackRole.toLowerCase()}/dashboard` },
+          { label: 'Mon tableau de bord', href: `/${fallbackRole.toLowerCase()}/dashboard` },
           ...(canUseTeamJourneys
             ? [
                 { label: 'Vue équipe', href: '/equipe/subordonnes' },
@@ -511,39 +544,35 @@ function DirectorAxesPage({ fallbackRole }: { fallbackRole: string }) {
     <DashboardPageFrame
       layoutUser={data.layoutUser}
       title="Axes d’amélioration du périmètre"
-      subtitle="Vue étendue N-1/N-2 avec axes dominants et drill-down sur un collaborateur"
+      subtitle="Axes de l’ensemble de votre périmètre, avec le détail par collaborateur"
       periodName={data.dashboard?.periode_active?.nom ?? null}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Périmètre total"
           value={data.teamMembers.length}
-          caption="Chaîne complète remontée via tous-subordonnés"
-          accentClassName="border-l-sabc-red-primary"
+          caption="Tous les collaborateurs de votre périmètre"
         />
         <MetricCard
           label="Couverture globale"
-          value={`${data.completionRate}%`}
+          value={formatPercent(data.completionRate)}
           caption="Part du périmètre avec score consolidé"
-          accentClassName="border-l-sabc-info"
         />
         <MetricCard
           label="Axes dominants"
           value={filteredTeamTopAxes.length}
           caption="Critères faibles les plus fréquents"
-          accentClassName="border-l-sabc-success"
         />
         <MetricCard
           label="Évaluations données"
           value={data.givenEvaluations.length}
-          caption="Historique des évaluations réalisées par vous"
-          accentClassName="border-l-sabc-accent"
+          caption="Évaluations que vous avez réalisées"
         />
       </div>
 
       <AnalyticsFiltersCard
         title="Filtres périmètre"
-        description="Restreindre la vue par rôle, priorité et recherche textuelle"
+        description="Filtrer par rôle, niveau, priorité ou nom."
       >
           <div className="min-w-[160px] flex-1 space-y-1">
             <div className="text-xs font-medium text-sabc-gray-500 dark:text-sabc-gray-400">Recherche</div>
@@ -605,17 +634,17 @@ function DirectorAxesPage({ fallbackRole }: { fallbackRole: string }) {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <TeamAxisFrequencyChartCard
           title="Axes dominants du périmètre"
-          description="Axes faibles les plus fréquents sur l’ensemble de la chaîne supervisée"
-          axes={filteredTeamTopAxes}
+          description="Axes faibles les plus fréquents dans votre périmètre."
+          axes={withLabelledCriteria(filteredTeamTopAxes)}
         />
         <Card>
           <CardHeader>
             <CardTitle>Répartition par rôle</CardTitle>
-            <CardDescription>Lecture du périmètre sous l’angle des rôles supervisés</CardDescription>
+            <CardDescription>Effectif, couverture et score moyen par rôle.</CardDescription>
           </CardHeader>
           <CardContent>
             {filteredRoleBreakdown.length === 0 ? (
-              <EmptyState message="Aucune répartition par rôle n’est disponible." />
+              <EmptyState message="Aucune répartition par rôle." />
             ) : (
               <Table>
                 <TableHeader>
@@ -635,9 +664,9 @@ function DirectorAxesPage({ fallbackRole }: { fallbackRole: string }) {
                     renderRow={(entry) => (
                       <TableRow key={entry.role}>
                         <TableCell>{entry.role}</TableCell>
-                        <TableCell>{entry.members}</TableCell>
-                        <TableCell>{entry.couverture}%</TableCell>
-                        <TableCell>{entry.scoreMoyen != null ? `${entry.scoreMoyen}/5` : '—'}</TableCell>
+                        <TableCell className="tabular-nums">{formatCount(entry.members)}</TableCell>
+                        <TableCell className="tabular-nums">{formatPercent(entry.couverture)}</TableCell>
+                        <TableCell className="tabular-nums">{formatScore(entry.scoreMoyen)}</TableCell>
                       </TableRow>
                     )}
                   />
@@ -648,7 +677,7 @@ function DirectorAxesPage({ fallbackRole }: { fallbackRole: string }) {
         </Card>
         <HierarchyBreakdownCard
           title="Coupe hiérarchique"
-          description="Vue des axes et scores par niveau sur le périmètre filtré"
+          description="Axes et scores par niveau hiérarchique."
           members={filteredMembers}
         />
       </div>
@@ -657,8 +686,8 @@ function DirectorAxesPage({ fallbackRole }: { fallbackRole: string }) {
         members={filteredMembers}
         selectedMatricule={selectedMatricule}
         onSelect={setSelectedMatricule}
-        title="Drill-down collaborateur"
-        description="Sélection d’un collaborateur du périmètre pour afficher ses axes et recommandations"
+        title="Détail par collaborateur"
+        description="Sélectionnez un collaborateur pour afficher ses axes et recommandations."
         showLevelColumn
         selector={{
           value: selectedMatricule,
@@ -670,14 +699,14 @@ function DirectorAxesPage({ fallbackRole }: { fallbackRole: string }) {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <HierarchyFocusCard
           title="Branche hiérarchique sélectionnée"
-          description="Descendre dans la chaîne en sélectionnant un collaborateur ou l’un de ses subordonnés directs"
+          description="Sélectionnez un collaborateur ou l’un de ses collaborateurs directs."
           focus={selectedMember ?? null}
           members={filteredMembers}
           onSelect={setSelectedMatricule}
         />
         <AxisRadarCard
           title={selectedMember ? `Radar de ${selectedMember.nomComplet}` : 'Radar collaborateur'}
-          description="Lecture détaillée du collaborateur sélectionné"
+          description="Détail du collaborateur sélectionné."
           axes={selectedAxesQuery.data ?? []}
         />
       </div>
@@ -696,7 +725,7 @@ function DirectorAxesPage({ fallbackRole }: { fallbackRole: string }) {
 
       <QuickActionsCard
         actions={[
-          { label: 'Mon dashboard', href: `/${fallbackRole.toLowerCase()}/dashboard` },
+          { label: 'Mon tableau de bord', href: `/${fallbackRole.toLowerCase()}/dashboard` },
           ...(canUseTeamJourneys
             ? [
                 { label: 'Vue équipe', href: '/equipe/subordonnes' },
@@ -805,12 +834,12 @@ function AdminAxesPage() {
     <DashboardPageFrame
       layoutUser={layoutUser}
       title="Axes d’amélioration"
-      subtitle="Vue admin focalisée sur les axes, recommandations et la chaîne hiérarchique"
+      subtitle="Axes, recommandations et chaîne hiérarchique de l’ensemble des collaborateurs"
       periodName={null}
     >
       <AnalyticsFiltersCard
-        title="Filtres admin"
-        description="Affinez le périmètre analysé avant de sélectionner un collaborateur."
+        title="Filtres"
+        description="Affinez la sélection avant de choisir un collaborateur."
       >
           <div className="min-w-[160px] flex-1 space-y-1">
             <div className="text-xs font-medium text-sabc-gray-500 dark:text-sabc-gray-400">Recherche</div>
@@ -819,7 +848,7 @@ function AdminAxesPage() {
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Saisissez soit le code, le matricule ou bien le nom d'une personne ou d'un collaborateur"
+                placeholder="Matricule, nom ou e-mail"
                 className="h-9 pl-10"
               />
             </div>
@@ -866,7 +895,7 @@ function AdminAxesPage() {
                 <SelectItem value="all">Tous les types</SelectItem>
                 {planByType.map((entry: any) => (
                   <SelectItem key={entry.type} value={entry.type}>
-                    {entry.type}
+                    {formatLabel(entry.type)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -876,28 +905,24 @@ function AdminAxesPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Utilisateurs filtrés"
-          value={planTotals.users_filtered ?? 0}
-          caption="Périmètre ramené par les filtres admin"
-          accentClassName="border-l-sabc-red-primary"
+          label="Collaborateurs retenus"
+          value={formatCount(planTotals.users_filtered)}
+          caption="Correspondant aux filtres"
         />
         <MetricCard
-          label="Utilisateurs concernés"
-          value={planTotals.users_with_recommendations ?? 0}
+          label="Collaborateurs concernés"
+          value={formatCount(planTotals.users_with_recommendations)}
           caption="Collaborateurs avec recommandations actives"
-          accentClassName="border-l-sabc-info"
         />
         <MetricCard
           label="Recommandations"
-          value={planTotals.recommendations_total ?? 0}
-          caption="Volume du type sélectionné"
-          accentClassName="border-l-sabc-success"
+          value={formatCount(planTotals.recommendations_total)}
+          caption="Pour le type sélectionné"
         />
         <MetricCard
           label="Priorité haute"
-          value={planTotals.high_priority ?? 0}
+          value={formatCount(planTotals.high_priority)}
           caption="Actions à traiter en premier"
-          accentClassName="border-l-sabc-accent"
         />
       </div>
 
@@ -905,20 +930,27 @@ function AdminAxesPage() {
         <Card>
           <CardHeader>
             <CardTitle>Répartition par type</CardTitle>
-            <CardDescription>Volume des recommandations sur le périmètre filtré</CardDescription>
+            <CardDescription>Nombre de recommandations par type.</CardDescription>
           </CardHeader>
           <CardContent>
             {planByType.length === 0 ? (
-              <EmptyState message="Aucune recommandation agrégée n’est disponible." />
+              <EmptyState message="Aucune recommandation." />
             ) : (
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={planByType} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="type" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="total" fill="#C62828" radius={[4, 4, 0, 0]} />
+                  <BarChart
+                    data={planByType.map((entry: any) => ({ ...entry, label: formatLabel(entry.type) }))}
+                    margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
+                  >
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tick={CHART_TICK} />
+                    <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickFormatter={frenchTick} tick={CHART_TICK} />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                      contentStyle={CHART_TOOLTIP_STYLE}
+                      formatter={(value: number) => [formatCount(value), 'Recommandations']}
+                    />
+                    <Bar dataKey="total" name="Recommandations" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -927,18 +959,18 @@ function AdminAxesPage() {
         </Card>
 
         <TeamAxisFrequencyChartCard
-          title="Top axes globaux"
-          description="Axes faibles remontant le plus souvent sur le périmètre filtré"
-          axes={planTopAxes}
-          barColor="#1D4ED8"
+          title="Axes les plus fréquents"
+          description="Critères faibles revenant le plus souvent."
+          axes={withLabelledCriteria(planTopAxes)}
+          barColor={CHART_COLORS.primary}
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Recherche utilisateur</CardTitle>
+          <CardTitle>Collaborateurs</CardTitle>
           <CardDescription>
-            Saisie par matricule, nom ou email. Le détail nominatif complet des scores reste centralisé dans le dashboard admin, onglet recherche individuelle.
+            Sélectionnez un collaborateur. Le détail complet des scores se trouve dans Analyses 360°, onglet Recherche individuelle.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -946,8 +978,8 @@ function AdminAxesPage() {
             items={users}
             previewCount={12}
             keyExtractor={(entry: any) => entry.matricule}
-            modalTitle="Tous les utilisateurs"
-            modalDescription={`${users.length} utilisateur(s)`}
+            modalTitle="Tous les collaborateurs"
+            modalDescription={`${users.length.toLocaleString('fr-FR')} collaborateur(s)`}
             className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
             modalClassName="grid gap-3 md:grid-cols-2"
             renderItem={(entry: any) => (
@@ -979,23 +1011,23 @@ function AdminAxesPage() {
         <>
           <SubjectSummaryCard
             title={getFullName(selectedUser)}
-            description={`${selectedUser.role_nom || selectedUser.role} · ${selectedUser.region?.nom_region || selectedUser.region_nom || 'Région non renseignée'} · manager ${selectedUser.manager_matricule || '—'}`}
+            description={`${selectedUser.role_nom || selectedUser.role} · ${selectedUser.region?.nom_region || selectedUser.region_nom || 'Région non renseignée'} · responsable ${selectedUser.manager_matricule || 'n.d.'}`}
             metrics={[
               {
                 label: 'Axes prioritaires',
-                value: axesQuery.data?.length ?? 0,
+                value: axesQuery.data ? formatCount(axesQuery.data.length) : 'n.d.',
               },
               {
                 label: 'Recommandations',
-                value: recommendationsQuery.data?.length ?? 0,
+                value: recommendationsQuery.data ? formatCount(recommendationsQuery.data.length) : 'n.d.',
               },
               {
                 label: 'Score global',
-                value: scoresQuery.data?.score_global != null ? `${scoresQuery.data.score_global}/5` : '—',
+                value: formatScore(scoresQuery.data?.score_global),
               },
               {
                 label: 'Progression',
-                value: `${scoresQuery.data?.progression > 0 ? '+' : ''}${scoresQuery.data?.progression ?? 0}`,
+                value: formatProgression(scoresQuery.data?.progression),
               },
             ]}
           />
@@ -1008,7 +1040,7 @@ function AdminAxesPage() {
             />
             <ImprovementAxesListCard
               title="Axes détaillés"
-              description="Lecture des critères faibles de l’utilisateur sélectionné"
+              description="Critères faibles du collaborateur sélectionné."
               axes={axesQuery.data ?? []}
             />
           </div>
@@ -1021,33 +1053,33 @@ function AdminAxesPage() {
             />
             <HierarchyChainCard
               title="Chaîne hiérarchique"
-              description="Positionnement organisationnel de l’utilisateur sélectionné"
+              description="Place du collaborateur dans l’organisation."
               nodes={chain}
               selectedMatricule={selectedMatricule}
               onSelect={setSelectedMatricule}
-              emptyMessage="Aucune chaîne hiérarchique disponible pour cet utilisateur."
+              emptyMessage="Aucune chaîne hiérarchique pour ce collaborateur."
             />
           </div>
 
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
             <HierarchyFocusCard
-              title="Drill-down hiérarchique"
-              description="Navigation niveau par niveau dans la branche du collaborateur sélectionné"
+              title="Branche hiérarchique"
+              description="Parcourez niveau par niveau les collaborateurs rattachés."
               focus={focusUser}
               members={branchMembers}
               onSelect={setSelectedMatricule}
             />
             <HierarchyBreakdownCard
               title="Coupe hiérarchique de la branche"
-              description="Vue par niveau de la sous-branche chargée pour l’utilisateur sélectionné"
+              description="Nombre de collaborateurs par niveau hiérarchique."
               members={branchMembers}
             />
           </div>
 
           <QuickActionsCard
             actions={[
-              { label: 'Dashboard admin', href: '/admin/analytics?tab=improvement' },
-              { label: 'Recherche 360°', href: '/admin/analytics?tab=individual' },
+              { label: 'Plans d’amélioration', href: '/admin/analytics?tab=improvement' },
+              { label: 'Recherche individuelle', href: '/admin/analytics?tab=individual' },
             ]}
           />
         </>

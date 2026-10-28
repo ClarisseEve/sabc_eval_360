@@ -23,9 +23,9 @@ function getExportSvg(chartContainer: HTMLDivElement): SVGSVGElement | null {
 
   const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
   style.textContent = `
-    .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line { stroke: rgba(148, 163, 184, 0.6); stroke-dasharray: 3 3; }
-    .recharts-text { font-family: Arial, sans-serif; fill: #4b5563; }
-    .recharts-legend-item text { font-size: 12px; fill: #334155; }
+    .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line { stroke: #E5E5E3; stroke-dasharray: 3 3; }
+    .recharts-text { font-family: Arial, sans-serif; fill: #4F4F4F; }
+    .recharts-legend-item text { font-size: 12px; fill: #4F4F4F; }
     .recharts-default-tooltip { font-family: Arial, sans-serif; }
     text { font-family: Arial, sans-serif; }
   `;
@@ -161,7 +161,7 @@ export function ChartExportButton({ chartRef, filename = 'sabc-chart' }: Props) 
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-xs px-2 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 text-gray-600 transition-colors"
+        className="flex items-center gap-1 text-xs px-2 py-1.5 border border-sabc-gray-200 rounded-lg hover:bg-sabc-gray-50 text-sabc-gray-600 transition-colors"
         title="Exporter ce graphe"
       >
         <Download size={12} />
@@ -170,10 +170,10 @@ export function ChartExportButton({ chartRef, filename = 'sabc-chart' }: Props) 
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20 min-w-[100px]">
-          <button onClick={() => { void exportPNG(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">PNG</button>
-          <button onClick={exportSVG} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">SVG</button>
-          <button onClick={() => { void exportPDF(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">PDF</button>
+        <div className="absolute right-0 top-full mt-1 bg-white border border-sabc-gray-200 rounded-lg z-20 min-w-[100px]">
+          <button onClick={() => { void exportPNG(); }} className="block w-full text-left px-4 py-2 text-sm text-sabc-gray-700 hover:bg-sabc-gray-50">PNG</button>
+          <button onClick={exportSVG} className="block w-full text-left px-4 py-2 text-sm text-sabc-gray-700 hover:bg-sabc-gray-50">SVG</button>
+          <button onClick={() => { void exportPDF(); }} className="block w-full text-left px-4 py-2 text-sm text-sabc-gray-700 hover:bg-sabc-gray-50">PDF</button>
         </div>
       )}
     </div>

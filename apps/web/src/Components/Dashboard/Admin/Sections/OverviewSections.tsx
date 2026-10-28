@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
-  Area,
   Bar,
   BarChart,
   CartesianGrid,
@@ -19,17 +18,30 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { MapPinned } from 'lucide-react';
 import { useCountUp } from '@/Hooks/useCountUp';
-import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { EmptyState } from '@/Components/Dashboard/RoleDashboardShared';
 import { Label } from '@/Components/UI/Label/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select/Select';
 import { analyticsApi } from '@/Services/api';
+import { formatPercent, formatScore } from '@/utils/helpers';
+import {
+  CHART_COLORS,
+  CHART_SERIES,
+  CHART_TICK,
+  SCORE_DOMAIN,
+  SCORE_TICKS,
+  formatChartNumber,
+  frenchTick,
+} from '@/Components/UI/Charts/chartTheme';
 
-const STATUS_COLORS = ['#48BB78', '#D69E2E', '#FF9800', '#3182CE'];
+const STATUS_COLORS = CHART_SERIES;
+
+/** Nombre décimal au format français (« 0,25 »). */
+function formatDecimal(value: number, digits = 2) {
+  return value.toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
 
 type OverviewMetric = {
   title: string;
@@ -80,7 +92,7 @@ function OverviewMetricCell({ title, count, format, caption, index }: OverviewMe
       style={{ '--sabc-i': index } as React.CSSProperties}
     >
       <div className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{title}</div>
-      <div className="mt-1 font-[family-name:var(--font-display)] text-3xl font-semibold tabular-nums text-sabc-gray-900 dark:text-white">
+      <div className="mt-1 sabc-display text-3xl tabular-nums text-sabc-gray-900 dark:text-white">
         {value}
       </div>
       <div className="mt-1 text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{caption}</div>
@@ -100,18 +112,18 @@ function ChartTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const visiblePayload = payload.filter((entry) => entry.name !== 'Tendance');
   const formatTooltipValue = (value: number | string | undefined) => {
-    if (typeof value !== 'number' || !Number.isFinite(value)) return value ?? '—';
-    return Number.isInteger(value) ? value.toLocaleString('fr-FR') : value.toFixed(2);
+    if (typeof value !== 'number' || !Number.isFinite(value)) return value ?? 'n.d.';
+    return Number.isInteger(value) ? value.toLocaleString('fr-FR') : formatDecimal(value);
   };
 
   return (
-    <div className="rounded-lg border border-sabc-gray-200 bg-white px-4 py-3 shadow-lg dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
+    <div className="rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
       {label ? <div className="mb-2 text-xs font-semibold text-sabc-gray-500">{label}</div> : null}
       <div className="space-y-1.5">
         {visiblePayload.map((entry) => (
           <div key={entry.name} className="flex items-center justify-between gap-4 text-sm">
             <div className="flex items-center gap-2 text-sabc-gray-600">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+              <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: entry.color }} />
               <span>{entry.name}</span>
             </div>
             <span className="font-semibold text-sabc-gray-900">{formatTooltipValue(entry.value)}</span>
@@ -142,7 +154,7 @@ export function AdminOverviewMetricsSection({
       title: 'Évaluations',
       count: totalEvaluations,
       format: (v) => Math.round(v).toLocaleString('fr-FR'),
-      caption: 'Volume consolidé du cycle',
+      caption: 'Total sur la période',
     },
     {
       title: 'Collaborateurs évalués',
@@ -153,14 +165,14 @@ export function AdminOverviewMetricsSection({
     {
       title: 'Score moyen',
       count: hasData ? averageScore : null,
-      format: (v) => `${v.toFixed(2)} / 5`,
+      format: (v) => formatScore(v),
       caption: hasData ? 'Moyenne des évaluations notées' : 'Aucune évaluation notée',
     },
     {
       title: 'Taux de complétion',
       count: hasData ? completionRate : null,
-      format: (v) => `${Math.round(v)} %`,
-      caption: hasData ? `${validatedEvaluations} validées sur ${totalEvaluations}` : 'Aucune évaluation attendue',
+      format: (v) => formatPercent(v),
+      caption: hasData ? `${validatedEvaluations.toLocaleString('fr-FR')} validées sur ${totalEvaluations.toLocaleString('fr-FR')}` : 'Aucune évaluation attendue',
     },
   ];
 
@@ -176,13 +188,13 @@ export function AdminOverviewMetricsSection({
 export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[] }) {
   const latestEntry = trendData[trendData.length - 1];
   const previousEntry = trendData[trendData.length - 2];
-  const variation = latestEntry && previousEntry ? latestEntry.score - previousEntry.score : 0;
+  const variation = latestEntry && previousEntry ? latestEntry.score - previousEntry.score : null;
 
   return (
     <Card className="xl:col-span-2">
       <CardHeader>
         <CardTitle>Tendance de performance</CardTitle>
-        <CardDescription>Évolution du score moyen et du volume sur les périodes remontées par analytics</CardDescription>
+        <CardDescription>Évolution du score moyen et du nombre d'évaluations par période.</CardDescription>
       </CardHeader>
       <CardContent>
         {trendData.length === 0 ? (
@@ -190,19 +202,18 @@ export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[]
         ) : (
           <div className="space-y-5">
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
-                <div className="text-xs font-semibold text-sabc-gray-500">Période active</div>
-                <div className="mt-1 text-lg font-semibold text-sabc-gray-900">{latestEntry?.period ?? 'N/A'}</div>
+              <div className="rounded-lg border border-sabc-gray-200 px-4 py-3 dark:border-sabc-gray-700">
+                <div className="text-sm text-sabc-gray-500">Dernière période</div>
+                <div className="mt-1 text-lg font-semibold text-sabc-gray-900">{latestEntry?.period ?? 'n.d.'}</div>
               </div>
-              <div className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
-                <div className="text-xs font-semibold text-sabc-gray-500">Dernier score</div>
-                <div className="mt-1 text-lg font-semibold text-sabc-gray-900">{latestEntry?.score?.toFixed(2) ?? '0.00'}/5</div>
+              <div className="rounded-lg border border-sabc-gray-200 px-4 py-3 dark:border-sabc-gray-700">
+                <div className="text-sm text-sabc-gray-500">Dernier score</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums text-sabc-gray-900">{formatScore(latestEntry?.score)}</div>
               </div>
-              <div className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
-                <div className="text-xs font-semibold text-sabc-gray-500">Variation</div>
-                <div className="mt-1 text-lg font-semibold text-sabc-gray-900">
-                  {variation >= 0 ? '+' : ''}
-                  {variation.toFixed(2)}
+              <div className="rounded-lg border border-sabc-gray-200 px-4 py-3 dark:border-sabc-gray-700">
+                <div className="text-sm text-sabc-gray-500">Variation sur la période précédente</div>
+                <div className="mt-1 text-lg font-semibold tabular-nums text-sabc-gray-900">
+                  {variation === null ? 'n.d.' : `${variation > 0 ? '+' : ''}${formatDecimal(variation)}`}
                 </div>
               </div>
             </div>
@@ -210,25 +221,18 @@ export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[]
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={trendData} margin={{ top: 22, right: 8, left: -10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="adminTrendArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#E53E3E" stopOpacity={0.24} />
-                      <stop offset="95%" stopColor="#E53E3E" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-                  <XAxis dataKey="period" tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="left" domain={[0, 5]} tickLine={false} axisLine={false} width={34} />
-                  <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} width={34} allowDecimals={false} />
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                  <XAxis dataKey="period" tickLine={false} axisLine={false} tick={CHART_TICK} />
+                  <YAxis yAxisId="left" domain={SCORE_DOMAIN} ticks={SCORE_TICKS} tickFormatter={frenchTick} tickLine={false} axisLine={false} width={34} tick={CHART_TICK} />
+                  <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} width={40} allowDecimals={false} tickFormatter={frenchTick} tick={CHART_TICK} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Legend />
-                  <ReferenceLine yAxisId="left" y={3.5} stroke="#94A3B8" strokeDasharray="4 4" />
-                  <Bar yAxisId="right" dataKey="count" fill="#CBD5E1" name="Volume" radius={[10, 10, 0, 0]} barSize={20}>
-                    <LabelList dataKey="count" position="top" fill="#64748B" fontSize={10} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <ReferenceLine yAxisId="left" y={3.5} stroke={CHART_COLORS.secondary} strokeDasharray="4 4" />
+                  <Bar yAxisId="right" dataKey="count" fill={CHART_COLORS.tertiary} name="Évaluations" radius={[4, 4, 0, 0]} barSize={20}>
+                    <LabelList dataKey="count" position="top" fill={CHART_COLORS.tick} fontSize={10} formatter={(value: number) => formatChartNumber(value, 0)} />
                   </Bar>
-                  <Area yAxisId="left" type="monotone" dataKey="score" fill="url(#adminTrendArea)" stroke="transparent" name="Tendance" />
-                  <Line yAxisId="left" type="monotone" dataKey="score" stroke="#E53E3E" strokeWidth={3} dot={{ r: 4, fill: '#E53E3E' }} activeDot={{ r: 6 }} name="Score moyen">
-                    <LabelList dataKey="score" position="top" formatter={(value: number) => value.toFixed(2)} fill="#C62828" fontSize={10} />
+                  <Line yAxisId="left" type="monotone" dataKey="score" stroke={CHART_COLORS.primary} strokeWidth={2} dot={{ r: 3, fill: CHART_COLORS.primary }} activeDot={{ r: 5 }} name="Score moyen">
+                    <LabelList dataKey="score" position="top" formatter={(value: number) => formatDecimal(value)} fill={CHART_COLORS.emphasis} fontSize={10} />
                   </Line>
                 </ComposedChart>
               </ResponsiveContainer>
@@ -247,7 +251,7 @@ export function StatusDistributionSection({ statusData }: { statusData: StatusEn
     <Card>
       <CardHeader>
         <CardTitle>Répartition des statuts</CardTitle>
-        <CardDescription>Statut courant des évaluations administrées</CardDescription>
+        <CardDescription>Statut actuel des évaluations.</CardDescription>
       </CardHeader>
       <CardContent>
         {statusData.length === 0 ? (
@@ -259,7 +263,7 @@ export function StatusDistributionSection({ statusData }: { statusData: StatusEn
                 <PieChart>
                   <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={58} outerRadius={84} paddingAngle={4}>
                     {statusData.map((status, index) => (
-                      <Cell key={status.name} fill={status.color || STATUS_COLORS[index % STATUS_COLORS.length]} />
+                      <Cell key={status.name} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip content={<ChartTooltip />} />
@@ -267,29 +271,29 @@ export function StatusDistributionSection({ statusData }: { statusData: StatusEn
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-xs font-semibold text-sabc-gray-500">Total</div>
-                  <div className="mt-1 text-3xl font-semibold text-sabc-gray-900">{total}</div>
+                  <div className="text-xs text-sabc-gray-500">Total</div>
+                  <div className="mt-1 text-2xl font-semibold tabular-nums text-sabc-gray-900">{total.toLocaleString('fr-FR')}</div>
                 </div>
               </div>
             </div>
             <div className="space-y-2">
               {statusData.map((status) => (
-                <div key={status.name} className="rounded-lg border border-sabc-gray-200 px-3 py-3">
+                <div key={status.name} className="rounded-lg border border-sabc-gray-200 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-sabc-gray-700 dark:text-sabc-gray-200">{status.name}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-sabc-gray-500">
-                        {total > 0 ? `${((status.value / total) * 100).toFixed(0)}%` : '0%'}
+                      <span className="text-xs tabular-nums text-sabc-gray-500">
+                        {total > 0 ? formatPercent((status.value / total) * 100) : 'n.d.'}
                       </span>
-                      <Badge variant="info">{status.value}</Badge>
+                      <span className="text-sm font-semibold tabular-nums text-sabc-gray-900">{Number(status.value ?? 0).toLocaleString('fr-FR')}</span>
                     </div>
                   </div>
-                  <div className="mt-3 h-2 rounded-full bg-sabc-gray-100">
+                  <div className="mt-2 h-1.5 rounded-sm bg-sabc-gray-100">
                     <div
-                      className="h-full rounded-full"
+                      className="h-full rounded-sm"
                       style={{
                         width: `${total > 0 ? (status.value / total) * 100 : 0}%`,
-                        backgroundColor: status.color || STATUS_COLORS[0],
+                        backgroundColor: STATUS_COLORS[statusData.indexOf(status) % STATUS_COLORS.length],
                       }}
                     />
                   </div>
@@ -316,7 +320,7 @@ export function ChannelBreakdownSection({ channelData }: { channelData: ChannelE
     <Card>
       <CardHeader>
         <CardTitle>Canaux d’évaluation</CardTitle>
-        <CardDescription>Répartition par type d’évaluation et score moyen associé</CardDescription>
+        <CardDescription>Score moyen et nombre d’évaluations par type.</CardDescription>
       </CardHeader>
       <CardContent>
         {normalizedData.length === 0 ? (
@@ -326,27 +330,23 @@ export function ChannelBreakdownSection({ channelData }: { channelData: ChannelE
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={normalizedData} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
-                  <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-                  <XAxis type="number" domain={[0, 5]} tickLine={false} axisLine={false} />
-                  <YAxis type="category" dataKey="label" width={92} tickLine={false} axisLine={false} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="average_score" fill="#E53E3E" name="Score moyen" radius={[0, 10, 10, 0]} barSize={18}>
-                    {normalizedData.map((channel, index) => (
-                      <Cell key={channel.label} fill={index === 0 ? '#E53E3E' : '#F87171'} />
-                    ))}
-                  </Bar>
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                  <XAxis type="number" domain={SCORE_DOMAIN} ticks={SCORE_TICKS} tickFormatter={frenchTick} tickLine={false} axisLine={false} tick={CHART_TICK} />
+                  <YAxis type="category" dataKey="label" width={110} tickLine={false} axisLine={false} tick={CHART_TICK} />
+                  <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} content={<ChartTooltip />} />
+                  <Bar dataKey="average_score" fill={CHART_COLORS.primary} name="Score moyen" radius={[0, 4, 4, 0]} barSize={18} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {normalizedData.map((channel) => (
-                <div key={channel.label} className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/60 p-3">
+                <div key={channel.label} className="rounded-lg border border-sabc-gray-200 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-medium text-sabc-gray-900">{channel.label}</span>
-                    <Badge variant="info">{channel.volume}</Badge>
+                    <span className="text-sm tabular-nums text-sabc-gray-600">{channel.volume.toLocaleString('fr-FR')}</span>
                   </div>
-                  <div className="mt-2 text-sm text-sabc-gray-500">{Number(channel.average_score).toFixed(2)}/5 de moyenne</div>
+                  <div className="mt-1 text-sm text-sabc-gray-500">{formatScore(channel.average_score, 2)} de moyenne</div>
                 </div>
               ))}
             </div>
@@ -362,7 +362,7 @@ export function RegionalActivitySection({ regionData }: { regionData: RegionActi
     <Card>
       <CardHeader>
         <CardTitle>Activité par région</CardTitle>
-        <CardDescription>Volumes structurels par région issus du dashboard admin</CardDescription>
+        <CardDescription>Nombre d'utilisateurs et d'évaluations par région.</CardDescription>
       </CardHeader>
       <CardContent>
         {regionData.length === 0 ? (
@@ -371,16 +371,16 @@ export function RegionalActivitySection({ regionData }: { regionData: RegionActi
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={regionData} margin={{ top: 22, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-                <XAxis dataKey="region" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                <YAxis tickLine={false} axisLine={false} width={36} />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend />
-                <Bar dataKey="utilisateurs" fill="#3182CE" name="Utilisateurs" radius={[6, 6, 0, 0]} barSize={14}>
-                  <LabelList dataKey="utilisateurs" position="top" fill="#1E40AF" fontSize={10} />
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="region" tickLine={false} axisLine={false} tick={CHART_TICK} />
+                <YAxis tickLine={false} axisLine={false} width={40} allowDecimals={false} tickFormatter={frenchTick} tick={CHART_TICK} />
+                <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} content={<ChartTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="evaluations" fill={CHART_COLORS.primary} name="Évaluations" radius={[4, 4, 0, 0]} barSize={14}>
+                  <LabelList dataKey="evaluations" position="top" fill={CHART_COLORS.tick} fontSize={10} formatter={(value: number) => formatChartNumber(value, 0)} />
                 </Bar>
-                <Bar dataKey="evaluations" fill="#E53E3E" name="Évaluations" radius={[6, 6, 0, 0]} barSize={14}>
-                  <LabelList dataKey="evaluations" position="top" fill="#C62828" fontSize={10} />
+                <Bar dataKey="utilisateurs" fill={CHART_COLORS.secondary} name="Utilisateurs" radius={[4, 4, 0, 0]} barSize={14}>
+                  <LabelList dataKey="utilisateurs" position="top" fill={CHART_COLORS.tick} fontSize={10} formatter={(value: number) => formatChartNumber(value, 0)} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -422,10 +422,7 @@ export function TopRolesSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MapPinned className="h-5 w-5 text-sabc-red-primary" />
-          Rôles les plus performants
-        </CardTitle>
+        <CardTitle>Rôles les plus performants</CardTitle>
         <CardDescription>Classement des rôles selon l’axe d’analyse sélectionné.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -464,12 +461,12 @@ export function TopRolesSection({
                   <div>
                     <div className="font-medium text-sabc-gray-900 dark:text-white">{role.role}</div>
                     <div className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
-                      {role.count ?? 0} utilisateur(s) · complétion {Math.round(Number(role.completion ?? 0))}%
+                      {role.count == null ? 'n.d.' : role.count.toLocaleString('fr-FR')} utilisateur(s) · complétion {formatPercent(role.completion)}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Badge variant="info">{Number(role.avgScore ?? 0).toFixed(2)}/5</Badge>
+                  <span className="text-sm font-semibold tabular-nums text-sabc-gray-900">{formatScore(role.avgScore, 2)}</span>
                   <Link to="/admin/analytics?tab=roles"><Button variant="outline" size="sm">Analyse par rôle</Button></Link>
                 </div>
               </div>

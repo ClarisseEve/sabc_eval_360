@@ -21,6 +21,7 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
 
 const initialForm = { id_region: '', nom_region: '', est_taniere: 'false' };
 const OFFICIAL_REGIONS = [
@@ -122,18 +123,18 @@ export default function RegionsIndex() {
     (activeMutation.error ? 'Une erreur est survenue.' : null);
 
   return (
-    <AdminStructureLayout title="Gestion des régions">
+    <AdminStructureLayout title="Régions">
+      <PageHeader
+        title="Régions"
+        description="Régions de l’organisation et leur type (tanière ou hors tanière), qui détermine le niveau hiérarchique des rôles."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Structure' }, { label: 'Régions' }]}
+        actions={regions.length > 0 ? (
+          <Button onClick={openCreate}>Nouvelle région</Button>
+        ) : undefined}
+      />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle>Régions existantes</CardTitle>
-          {regions.length > 0 ? (
-            <Button
-              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-              onClick={openCreate}
-            >
-              Nouvelle région
-            </Button>
-          ) : null}
         </CardHeader>
         <CardContent>
           {regions.length === 0 ? (
@@ -141,13 +142,13 @@ export default function RegionsIndex() {
               title="Aucune région"
               description="Créez votre première région pour structurer l'organisation."
               action={
-                <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={openCreate}>
+                <Button onClick={openCreate}>
                   Nouvelle région
                 </Button>
               }
             />
           ) : (
-          <Table>
+          <Table className="min-w-[640px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Code</TableHead>
@@ -163,18 +164,19 @@ export default function RegionsIndex() {
                   <TableCell>{region.id_region}</TableCell>
                   <TableCell>{region.nom_region}</TableCell>
                   <TableCell>
-                    <Badge variant={region.est_taniere ? 'primary' : 'secondary'}>
-                      {region.est_taniere ? 'Tanière' : 'Non tanière'}
+                    <Badge variant="outline">
+                      {region.est_taniere ? 'Tanière' : 'Hors tanière'}
                     </Badge>
                   </TableCell>
                   <TableCell>{region._count?.utilisateurs ?? 0}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-1">
                       <Button variant="outline" size="sm" onClick={() => openEdit(region)}>
                         Modifier
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="ghost"
+                        className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
                         size="sm"
                         disabled={deleteMutation.isPending}
                         onClick={() => handleDelete(region.id_region, region.nom_region)}
@@ -240,7 +242,7 @@ export default function RegionsIndex() {
               <Select value={form.est_taniere} onValueChange={(value) => setForm((prev) => ({ ...prev, est_taniere: value }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="false">Non tanière</SelectItem>
+                  <SelectItem value="false">Hors tanière</SelectItem>
                   <SelectItem value="true">Tanière</SelectItem>
                 </SelectContent>
               </Select>
@@ -253,12 +255,11 @@ export default function RegionsIndex() {
               Annuler
             </Button>
             <Button
-              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               onClick={() => (editingId ? updateMutation.mutate() : createMutation.mutate())}
               disabled={!form.nom_region || !form.id_region || activeMutation.isPending}
             >
               {activeMutation.isPending
-                ? 'Enregistrement...'
+                ? 'Enregistrement…'
                 : editingId
                   ? 'Mettre à jour'
                   : 'Créer'}

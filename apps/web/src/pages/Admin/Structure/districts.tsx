@@ -20,6 +20,7 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
 import { Link } from 'react-router-dom';
 
 export default function DistrictsIndex() {
@@ -100,17 +101,17 @@ export default function DistrictsIndex() {
 
   return (
     <AdminStructureLayout title="Districts">
+      <PageHeader
+        title="Districts"
+        description="Districts rattachés aux services commerciaux."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Structure' }, { label: 'Districts' }]}
+        actions={districts.length > 0 && canCreateDistrict ? (
+          <Button onClick={() => setOpen(true)}>Nouveau district</Button>
+        ) : undefined}
+      />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle>Districts existants</CardTitle>
-          {districts.length > 0 && canCreateDistrict ? (
-            <Button
-              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-              onClick={() => setOpen(true)}
-            >
-              Nouveau district
-            </Button>
-          ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
           {districts.length === 0 ? (
@@ -121,7 +122,7 @@ export default function DistrictsIndex() {
                 : 'Chaque district doit être rattaché à un service commercial. Configurez ce prérequis avant de créer un district.'}
               action={
                 canCreateDistrict ? (
-                  <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => setOpen(true)}>
+                  <Button onClick={() => setOpen(true)}>
                     Nouveau district
                   </Button>
                 ) : (
@@ -144,7 +145,7 @@ export default function DistrictsIndex() {
                 </Link>
               </div>
             ) : null}
-            <Table>
+            <Table className="min-w-[860px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Code</TableHead>
@@ -168,12 +169,13 @@ export default function DistrictsIndex() {
                   <TableCell>{district.nb_utilisateurs ?? district.utilisateurs_count ?? 0}</TableCell>
                   <TableCell>{district.nb_secteurs ?? district.secteurs_count ?? 0}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-1">
                       <Button variant="outline" size="sm" onClick={() => openEdit(district)}>
                         Modifier
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="ghost"
+                        className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
                         size="sm"
                         disabled={Number(district.nb_utilisateurs ?? 0) > 0}
                         onClick={() => handleDelete(district.id_district, district.nom_district)}
@@ -228,7 +230,7 @@ export default function DistrictsIndex() {
               disabled={!nomDistrict || !idService || createMutation.isPending}
               onClick={() => (editingId ? updateMutation : createMutation).mutate()}
             >
-              {activeMutation.isPending ? (editingId ? 'Mise à jour...' : 'Création...') : editingId ? 'Enregistrer' : 'Créer'}
+              {activeMutation.isPending ? (editingId ? 'Mise à jour…' : 'Création…') : editingId ? 'Enregistrer' : 'Créer'}
             </Button>
           </DialogFooter>
         </DialogContent>

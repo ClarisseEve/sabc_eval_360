@@ -12,6 +12,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Progress } from '@/Components/UI/Progress/Progress';
 import { EmptyState, formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
+import { formatScore } from '@/utils/helpers';
 
 type SummaryMetric = {
   label: string;
@@ -102,9 +103,9 @@ export function ScoresByTypeCard({
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" horizontal={false} />
                 <XAxis type="number" domain={[0, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                 <YAxis dataKey="type" type="category" width={110} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} tickFormatter={(value) => formatEvaluationType(value)} />
-                <Tooltip formatter={(value: number) => [`${value}/5`, 'Score moyen']} labelFormatter={(value) => formatEvaluationType(value)} />
+                <Tooltip formatter={(value: number) => [formatScore(value), 'Score moyen']} labelFormatter={(value) => formatEvaluationType(value)} />
                 <Bar dataKey="moyenne" fill="#C62828" radius={[0, 10, 10, 0]}>
-                  <LabelList dataKey="moyenne" position="right" formatter={(value: number) => `${value.toFixed(1)}/5`} fill="#7F1D1D" fontSize={10} />
+                  <LabelList dataKey="moyenne" position="right" formatter={(value: number) => formatScore(value, 1)} fill="#7F1D1D" fontSize={10} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -114,7 +115,7 @@ export function ScoresByTypeCard({
             <div key={`${String(entry.type || 'type')}-${index}`} className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium text-sabc-gray-700 dark:text-sabc-gray-200">{formatEvaluationType(entry.type)}</span>
-                <span className="text-sabc-gray-500 dark:text-sabc-gray-400">{Number(entry.moyenne ?? 0).toFixed(2)}/5</span>
+                <span className="text-sabc-gray-500 dark:text-sabc-gray-400">{formatScore(entry.moyenne ?? 0, 2)}</span>
               </div>
               <Progress value={Number(entry.moyenne ?? 0)} max={5} />
               <div className="text-xs text-sabc-gray-400 dark:text-sabc-gray-500">

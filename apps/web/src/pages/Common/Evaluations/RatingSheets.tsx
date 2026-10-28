@@ -4,6 +4,7 @@ import { ratingSheetsApi } from '@/Services/api';
 import { useQuery } from '@tanstack/react-query';
 import { Download } from 'lucide-react';
 import { EvaluationPageLayout } from './shared';
+import { formatScore } from '@/utils/helpers';
 
 const CATEGORY_LABELS: Record<string, string> = {
     auto: 'Auto-évaluation',
@@ -136,7 +137,7 @@ export default function MyRatingSheetsPage() {
                                                             const mention = competence.mentions_par_categorie?.[category.type];
                                                             return note === null || note === undefined ? null : (
                                                                 <span key={category.type} className="bg-sabc-gray-50 rounded px-2 py-1">
-                                                                    {CATEGORY_LABELS[category.type] ?? category.type} : {note}/5 · {mention}
+                                                                    {CATEGORY_LABELS[category.type] ?? category.type} : {formatScore(note)} · {mention}
                                                                 </span>
                                                             );
                                                         })}

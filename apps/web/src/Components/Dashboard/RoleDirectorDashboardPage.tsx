@@ -14,7 +14,7 @@ import { Badge } from '@/Components/UI/Badge/Badge';
 import { useRoleDashboardData } from '@/Hooks/queries/useRoleDashboards';
 import { DOMAINES, filterByDomaine, hasCapability, type Domaine } from '@/config/rbac';
 import { Button } from '@/Components/UI/Button/Button';
-import { formatPersonName } from '@/utils/helpers';
+import { formatPersonName, formatScore, formatPercent } from '@/utils/helpers';
 import { HierarchyChainCard } from '@/Components/Dashboard/IndividualAnalyticsCards';
 import { TeamAxisFrequencyChartCard, TeamMemberAnalyticsTableCard } from '@/Components/Dashboard/TeamAnalyticsCards';
 import {
@@ -26,6 +26,7 @@ import {
   formatDateLabel,
   formatEvaluationType,
   getStatusBadgeVariant,
+  formatStatusLabel,
 } from './RoleDashboardShared';
 
 type RoleDirectorDashboardPageProps = {
@@ -70,25 +71,21 @@ export default function RoleDirectorDashboardPage({
           label="Évaluations données"
           value={data.givenEvaluations.length}
           caption="Évaluations réalisées par vous"
-          accentClassName="border-l-sabc-red-primary"
         />
         <MetricCard
           label="Validations en attente"
           value={data.toValidateEvaluations.length}
           caption="Soumissions à arbitrer"
-          accentClassName="border-l-sabc-warning"
         />
         <MetricCard
           label="Périmètre direct"
           value={data.directMembers.length}
           caption="Responsables directs"
-          accentClassName="border-l-sabc-info"
         />
         <MetricCard
           label="Couverture globale"
-          value={`${data.completionRate}%`}
-          caption={data.teamAverageScore > 0 ? `Score moyen ${data.teamAverageScore}/5` : 'Aucun score consolidé'}
-          accentClassName="border-l-sabc-success"
+          value={formatPercent(data.completionRate)}
+          caption={data.teamAverageScore > 0 ? `Score moyen ${formatScore(data.teamAverageScore)}` : 'Aucun score consolidé'}
         />
       </div>
 
@@ -107,14 +104,18 @@ export default function RoleDirectorDashboardPage({
                   <BarChart data={data.roleBreakdown} margin={{ top: 22, right: 20, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" vertical={false} />
                     <XAxis dataKey="role" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="left" domain={[0, 5]} tickLine={false} axisLine={false} width={30} />
-                    <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} width={35} />
-                    <Tooltip />
-                    <Bar yAxisId="left" dataKey="scoreMoyen" fill="#C62828" name="Score moyen" radius={[6, 6, 0, 0]}>
-                      <LabelList dataKey="scoreMoyen" position="top" formatter={(value: number) => value.toFixed(1)} fill="#7F1D1D" fontSize={9} />
+                    <YAxis yAxisId="left" domain={[0, 5]} ticks={[0, 1, 2, 3, 4, 5]} tickLine={false} axisLine={false} width={30} />
+                    <YAxis yAxisId="right" orientation="right" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v: number) => `${v} %`} tickLine={false} axisLine={false} width={44} />
+                    <Tooltip
+                      cursor={{ fill: 'var(--sabc-gray-100)' }}
+                      formatter={(value: number, name: string) => [name === 'Couverture' ? formatPercent(value) : formatScore(value), name]}
+                    />
+                    {/* Rouge pour le score, gris acier pour la couverture: deux mesures, deux couleurs de la charte. */}
+                    <Bar yAxisId="left" dataKey="scoreMoyen" fill="var(--sabc-red-primary)" name="Score moyen" radius={[3, 3, 0, 0]}>
+                      <LabelList dataKey="scoreMoyen" position="top" formatter={(value: number) => value.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} fill="var(--sabc-gray-700)" fontSize={11} />
                     </Bar>
-                    <Bar yAxisId="right" dataKey="couverture" fill="#1D4ED8" name="Couverture %" radius={[6, 6, 0, 0]}>
-                      <LabelList dataKey="couverture" position="top" formatter={(value: number) => `${Math.round(value)}%`} fill="#1E40AF" fontSize={9} />
+                    <Bar yAxisId="right" dataKey="couverture" fill="#747474" name="Couverture" radius={[3, 3, 0, 0]}>
+                      <LabelList dataKey="couverture" position="top" formatter={(value: number) => formatPercent(value)} fill="var(--sabc-gray-500)" fontSize={11} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -138,9 +139,9 @@ export default function RoleDirectorDashboardPage({
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" horizontal={false} />
                     <XAxis type="number" domain={[0, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                     <YAxis dataKey="niveau" type="category" width={120} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(value: number) => [`${value}/5`, 'Score moyen']} />
+                    <Tooltip formatter={(value: number) => [formatScore(value), 'Score moyen']} />
                     <Bar dataKey="scoreMoyen" fill="#C62828" radius={[0, 10, 10, 0]}>
-                      <LabelList dataKey="scoreMoyen" position="right" formatter={(value: number) => `${value.toFixed(1)}/5`} fill="#7F1D1D" fontSize={10} />
+                      <LabelList dataKey="scoreMoyen" position="right" formatter={(value: number) => formatScore(value, 1)} fill="#7F1D1D" fontSize={10} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -180,7 +181,7 @@ export default function RoleDirectorDashboardPage({
                     <div className="font-medium text-sabc-gray-900 dark:text-white">
                       {formatPersonName(evaluation.evalue, evaluation.evalue_matricule || 'Collaborateur')}
                     </div>
-                    <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{evaluation.statut}</Badge>
+                    <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{formatStatusLabel(evaluation.statut)}</Badge>
                   </div>
                   <div className="mt-1 text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
                     {formatEvaluationType(evaluation.type_evaluation)}
@@ -264,7 +265,7 @@ export default function RoleDirectorDashboardPage({
                     <div className="font-medium text-sabc-gray-900 dark:text-white">
                       {formatPersonName(evaluation.evalue, evaluation.evalue_matricule || 'Collaborateur')}
                     </div>
-                    <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{evaluation.statut}</Badge>
+                    <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{formatStatusLabel(evaluation.statut)}</Badge>
                   </div>
                   <div className="mt-1 text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
                     {formatEvaluationType(evaluation.type_evaluation)}

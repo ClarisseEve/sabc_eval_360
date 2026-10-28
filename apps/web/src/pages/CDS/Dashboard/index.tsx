@@ -15,7 +15,7 @@ const CDSDashboard: React.FC = () => (
     <Suspense fallback={<DashboardSkeleton />}>
       <RoleIndividualDashboardPage
         fallbackRole="CDS"
-        title="Tableau de bord Chef de Secteur"
+        title="Tableau de bord Chef de secteur"
         subtitle="Suivi de vos évaluations et de votre progression sur le secteur."
       />
     </Suspense>

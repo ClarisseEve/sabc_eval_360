@@ -14,25 +14,9 @@ import { cn } from '@/utils/helpers';
 
 type TooltipProps = RechartsTooltipProps<number, string>;
 
-// Utilisation des variables CSS SABC définies dans sabc-colors.css
-const COLORS = {
-  primary: 'var(--sabc-red-primary)',    // Rouge SABC principal
-  secondary: 'var(--sabc-info)',         // Bleu secondaire
-  success: 'var(--sabc-success)',        // Vert succès
-  accent: 'var(--sabc-accent)',          // Orange accent
-  neutral: 'var(--sabc-gray-400)',       // Gris neutre
-  warning: 'var(--sabc-warning)',        // Jaune attention
-};
+import { CHART_SERIES, CHART_COLORS } from './chartTheme';
 
-// Palette de couleurs en tableau pour l'indexation
-const COLOR_ARRAY = [
-  'var(--sabc-red-primary)',    // Rouge SABC principal
-  'var(--sabc-accent)',         // Orange accent
-  'var(--sabc-success)',        // Vert succès
-  'var(--sabc-info)',           // Bleu secondaire
-  'var(--sabc-warning)',        // Jaune attention
-  'var(--sabc-gray-400)',       // Gris neutre
-];
+const COLOR_ARRAY = CHART_SERIES;
 
 export interface RadarChartProps {
   data: Array<Record<string, any>>;
@@ -103,15 +87,16 @@ export function RadarChart({
           data={data}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
         >
-          {showGrid && <PolarGrid stroke="var(--sabc-gray-200)" />}
+          {showGrid && <PolarGrid stroke={CHART_COLORS.grid} />}
           <PolarAngleAxis
             dataKey={angleKey}
-            tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
+            tick={{ fill: CHART_COLORS.tick, fontSize: 11 }}
           />
           <PolarRadiusAxis
             angle={90}
             domain={[0, 5]}
-            tick={{ fill: 'var(--sabc-gray-400)', fontSize: 10 }}
+            tickCount={6}
+            tick={{ fill: CHART_COLORS.secondary, fontSize: 10 }}
           />
           {renderRadars()}
           {showLegend && (

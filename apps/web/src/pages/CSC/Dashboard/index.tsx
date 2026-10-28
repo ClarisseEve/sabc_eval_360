@@ -8,7 +8,7 @@ const CSCDashboard: React.FC = () => (
     <Suspense fallback={<DashboardSkeleton />}>
       <RoleManagerDashboardPage
         fallbackRole="CSC"
-        title="Tableau de bord Chef Service Commercial"
+        title="Tableau de bord Chef de service commercial"
         subtitle="Suivi temps réel des évaluations et de la performance du service commercial."
         teamTitle="Équipe commerciale"
       />

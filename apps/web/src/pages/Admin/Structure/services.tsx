@@ -20,6 +20,7 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
 import { Link } from 'react-router-dom';
 
 export default function ServicesIndex() {
@@ -98,17 +99,17 @@ export default function ServicesIndex() {
 
   return (
     <AdminStructureLayout title="Services commerciaux">
+      <PageHeader
+        title="Services commerciaux"
+        description="Services commerciaux rattachés à chaque région."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Structure' }, { label: 'Services commerciaux' }]}
+        actions={services.length > 0 && canCreateService ? (
+          <Button onClick={() => setOpen(true)}>Nouveau service</Button>
+        ) : undefined}
+      />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Services existants</CardTitle>
-          {services.length > 0 && canCreateService ? (
-            <Button
-              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-              onClick={() => setOpen(true)}
-            >
-              Nouveau service
-            </Button>
-          ) : null}
+        <CardHeader>
+          <CardTitle>Services commerciaux existants</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {services.length === 0 ? (
@@ -119,7 +120,7 @@ export default function ServicesIndex() {
                 : 'Chaque service doit être rattaché à une région. Configurez ce prérequis avant de créer un service.'}
               action={
                 canCreateService ? (
-                  <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => setOpen(true)}>
+                  <Button onClick={() => setOpen(true)}>
                     Nouveau service
                   </Button>
                 ) : (
@@ -142,7 +143,7 @@ export default function ServicesIndex() {
                 </Link>
               </div>
             ) : null}
-            <Table>
+            <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Code</TableHead>
@@ -164,12 +165,13 @@ export default function ServicesIndex() {
                   <TableCell>{service.nb_utilisateurs ?? service.utilisateurs_count ?? 0}</TableCell>
                   <TableCell>{service.nb_districts ?? service.districts_count ?? 0}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-1">
                       <Button variant="outline" size="sm" onClick={() => openEdit(service)}>
                         Modifier
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="ghost"
+                        className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
                         size="sm"
                         disabled={Number(service.nb_utilisateurs ?? 0) > 0}
                         onClick={() => handleDelete(service.id_service, service.nom_service)}
@@ -224,7 +226,7 @@ export default function ServicesIndex() {
               disabled={!nomService || !idRegion || createMutation.isPending}
               onClick={() => (editingId ? updateMutation : createMutation).mutate()}
             >
-              {activeMutation.isPending ? (editingId ? 'Mise à jour...' : 'Création...') : editingId ? 'Enregistrer' : 'Créer'}
+              {activeMutation.isPending ? (editingId ? 'Mise à jour…' : 'Création…') : editingId ? 'Enregistrer' : 'Créer'}
             </Button>
           </DialogFooter>
         </DialogContent>

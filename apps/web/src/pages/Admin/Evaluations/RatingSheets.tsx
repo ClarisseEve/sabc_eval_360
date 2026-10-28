@@ -4,7 +4,59 @@ import { useToast } from '@/Contexts/ToastContext';
 import { RatingSheetCategoryType, RatingSheetConfiguration, ratingSheetsApi } from '@/Services/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React from 'react';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
 import { AdminEvaluationsLayout } from './shared';
+
+const PERIOD_STATUS_LABELS: Record<string, string> = {
+    planifiee: 'Planifiée',
+    planifiée: 'Planifiée',
+    ouverte: 'Ouverte',
+    fermee: 'Fermée',
+    fermée: 'Fermée',
+    cloturee: 'Clôturée',
+    clôturée: 'Clôturée',
+};
+
+const DELIVERY_STATUS_LABELS: Record<string, string> = {
+    envoye: 'envoyé',
+    envoyé: 'envoyé',
+    envoyee: 'envoyée',
+    envoyée: 'envoyée',
+    cree: 'créée',
+    creee: 'créée',
+    créée: 'créée',
+    lue: 'lue',
+    lu: 'lu',
+    en_attente: 'en attente',
+    attente: 'en attente',
+    pending: 'en attente',
+    echec: 'échec',
+    échec: 'échec',
+    erreur: 'échec',
+    failed: 'échec',
+    ignore: 'non envoyé',
+    non_envoye: 'non envoyé',
+};
+
+function periodStatusLabel(statut?: string | null) {
+    if (!statut) return 'statut non renseigné';
+    return PERIOD_STATUS_LABELS[String(statut).toLowerCase()] ?? String(statut);
+}
+
+function deliveryStatusLabel(statut?: string | null) {
+    if (!statut) return 'n.d.';
+    const key = String(statut).toLowerCase();
+    return DELIVERY_STATUS_LABELS[key] ?? key.replace(/_/g, ' ');
+}
+
+function isDelivered(statut?: string | null) {
+    return ['envoye', 'envoyé', 'envoyee', 'envoyée', 'cree', 'creee', 'créée', 'lue', 'lu'].includes(String(statut ?? '').toLowerCase());
+}
+
+function formatNoteSur20(value: number | null | undefined) {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return 'n.d.';
+    return `${Number(value).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} / 20`;
+}
 
 const CATEGORIES: Array<{ type: RatingSheetCategoryType; label: string }> = [
     { type: 'auto', label: 'Auto-évaluation' },
@@ -155,12 +207,11 @@ export default function AdminRatingSheetsPage() {
     return (
         <AdminEvaluationsLayout title="Fiches de notation">
             <section className="space-y-5">
-                <div>
-                    <h1 className="text-sabc-gray-900 text-2xl font-semibold">Fiches de notation</h1>
-                    <p className="text-sabc-gray-600 mt-1 text-sm">
-                        Configurez le calcul par période et par poste, vérifiez les évaluations reçues, puis publiez les fiches individuellement.
-                    </p>
-                </div>
+                <PageHeader
+                    title="Fiches de notation"
+                    description="Configurez le calcul par période et par poste, vérifiez les évaluations reçues, puis publiez les fiches individuellement."
+                    breadcrumbs={[{ label: 'Administration' }, { label: 'Évaluations' }, { label: 'Fiches de notation' }]}
+                />
 
                 {periodsQuery.isLoading ? <p>Chargement des périodes…</p> : null}
                 {periodsQuery.isError ? <p className="text-red-700">{getErrorMessage(periodsQuery.error)}</p> : null}
@@ -173,7 +224,7 @@ export default function AdminRatingSheetsPage() {
                 {periods.length > 0 ? (
                     <>
                         <div className="border-sabc-gray-200 flex flex-wrap gap-4 rounded-lg border bg-white p-4">
-                            <label className="text-sabc-gray-700 min-w-64 flex-1 text-sm font-medium">
+                            <label className="text-sabc-gray-700 min-w-0 flex-1 basis-64 text-sm font-medium">
                                 Période d’évaluation
                                 <select
                                     className="border-sabc-gray-300 mt-1 block w-full rounded-lg border bg-white px-3 py-2"
@@ -182,12 +233,12 @@ export default function AdminRatingSheetsPage() {
                                 >
                                     {periods.map((item: any) => (
                                         <option key={item.id_periode} value={item.id_periode}>
-                                            {item.nom_periode} ({item.code_periode}) · {item.statut}
+                                            {item.nom_periode} ({item.code_periode}) · {periodStatusLabel(item.statut)}
                                         </option>
                                     ))}
                                 </select>
                             </label>
-                            <label className="text-sabc-gray-700 min-w-56 flex-1 text-sm font-medium">
+                            <label className="text-sabc-gray-700 min-w-0 flex-1 basis-56 text-sm font-medium">
                                 Poste évalué
                                 <select
                                     className="border-sabc-gray-300 mt-1 block w-full rounded-lg border bg-white px-3 py-2"
@@ -210,7 +261,7 @@ export default function AdminRatingSheetsPage() {
                         {roleOverview ? (
                             <>
                                 <div className="border-sabc-gray-200 rounded-lg border bg-white p-5">
-                                    <h2 className="text-sabc-gray-900 text-lg font-semibold">Calcul de la note générale</h2>
+                                    <h2 className="text-sabc-gray-900 text-base font-semibold">Calcul de la note générale</h2>
                                     <p className="text-sabc-gray-600 mt-1 text-sm">
                                         Les notes de catégorie sont converties sur 20. En cas d’évaluations manquantes, les catégories disponibles
                                         sont renormalisées. Vous pouvez modifier et enregistrer les poids à tout moment. Les fiches déjà publiées
@@ -289,7 +340,7 @@ export default function AdminRatingSheetsPage() {
                                 <div className="border-sabc-gray-200 rounded-lg border bg-white">
                                     <div className="border-sabc-gray-200 flex flex-wrap items-center justify-between gap-3 border-b p-4">
                                         <div>
-                                            <h2 className="text-sabc-gray-900 font-semibold">Cibles éligibles</h2>
+                                            <h2 className="text-sabc-gray-900 text-base font-semibold">Cibles éligibles</h2>
                                             <p className="text-sabc-gray-600 text-sm">
                                                 {roleOverview.collaborateurs.length} personne(s)
                                                 {roleOverview.configuration
@@ -323,7 +374,7 @@ export default function AdminRatingSheetsPage() {
                                     ) : null}
                                     <div className="overflow-x-auto">
                                         <table className="w-full min-w-[850px] text-left text-sm">
-                                            <thead className="bg-sabc-gray-50 text-sabc-gray-600 text-xs uppercase">
+                                            <thead className="bg-sabc-gray-50 text-sabc-gray-600 text-xs">
                                                 <tr>
                                                     <th className="p-3">
                                                         <span className="sr-only">Sélectionner</span>
@@ -370,33 +421,37 @@ export default function AdminRatingSheetsPage() {
                                                                             {category.complete
                                                                                 ? `${category.evaluations_recues} reçue(s)`
                                                                                 : 'Manquante'}
-                                                                            {category.note_sur_20 !== null ? ` · ${category.note_sur_20}/20` : ''}
+                                                                            {category.note_sur_20 !== null ? ` · ${formatNoteSur20(category.note_sur_20)}` : ''}
                                                                         </span>
                                                                     ) : (
-                                                                        '—'
+                                                                        'n.d.'
                                                                     )}
                                                                 </td>
                                                             );
                                                         })}
                                                         <td className="p-3">
-                                                            {person.note_generale_sur_20 === null || person.note_generale_sur_20 === undefined
-                                                                ? 'Non disponible'
-                                                                : `${person.note_generale_sur_20}/20`}
+                                                            {formatNoteSur20(person.note_generale_sur_20)}
                                                         </td>
                                                         <td className="p-3">
                                                             {person.fiche ? (
                                                                 <div className="space-y-1 text-xs">
-                                                                    <div className="text-emerald-700">
-                                                                        Publiée · notification {person.fiche.notification_statut}
-                                                                    </div>
                                                                     <div
                                                                         className={
-                                                                            person.fiche.email_statut === 'envoye'
+                                                                            isDelivered(person.fiche.notification_statut)
                                                                                 ? 'text-emerald-700'
                                                                                 : 'text-amber-700'
                                                                         }
                                                                     >
-                                                                        E-mail {person.fiche.email_statut}
+                                                                        Publiée · notification {deliveryStatusLabel(person.fiche.notification_statut)}
+                                                                    </div>
+                                                                    <div
+                                                                        className={
+                                                                            isDelivered(person.fiche.email_statut)
+                                                                                ? 'text-emerald-700'
+                                                                                : 'text-amber-700'
+                                                                        }
+                                                                    >
+                                                                        E-mail {deliveryStatusLabel(person.fiche.email_statut)}
                                                                     </div>
                                                                     {person.fiche.email_erreur ? (
                                                                         <div className="max-w-56 text-red-700">{person.fiche.email_erreur}</div>

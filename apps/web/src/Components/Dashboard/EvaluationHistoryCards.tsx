@@ -6,8 +6,10 @@ import {
   formatDateLabel,
   formatEvaluationType,
   getStatusBadgeVariant,
+  formatStatusLabel,
 } from '@/Components/Dashboard/RoleDashboardShared';
 import { Badge } from '@/Components/UI/Badge/Badge';
+import { formatScore } from '@/utils/helpers';
 
 type EvaluationHistoryEntry = {
   id_evaluation?: string | number | null;
@@ -66,11 +68,11 @@ export function EvaluationHistoryTableCard<TRow extends EvaluationHistoryEntry>(
                   <TableCell className="font-medium">{subjectCell(evaluation)}</TableCell>
                   {secondaryHeader ? <TableCell>{secondaryCell?.(evaluation) ?? '—'}</TableCell> : null}
                   <TableCell>{formatEvaluationType(evaluation.type_evaluation)}</TableCell>
-                  <TableCell>{evaluation.note_globale != null ? `${evaluation.note_globale}/5` : '—'}</TableCell>
+                  <TableCell>{evaluation.note_globale != null ? formatScore(evaluation.note_globale) : '—'}</TableCell>
                   <TableCell>{formatDateLabel(evaluation.date_soumission || evaluation.date_creation)}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(evaluation.statut)}>
-                      {String(evaluation.statut || 'inconnu')}
+                      {formatStatusLabel(evaluation.statut)}
                     </Badge>
                   </TableCell>
                 </TableRow>

@@ -15,6 +15,8 @@ interface PageHeaderProps {
   breadcrumbs?: Crumb[];
   /** Zone d'actions alignée à droite (bouton primaire, menu, filtres…). */
   actions?: React.ReactNode;
+  /** Ligne d'information discrète sous le titre (période active, périmètre…). */
+  meta?: React.ReactNode;
   className?: string;
 }
 
@@ -23,7 +25,7 @@ interface PageHeaderProps {
  * fil d'Ariane (React Router, sans rechargement) + titre à échelle unique
  * + description optionnelle + slot d'action primaire à droite.
  */
-export const PageHeader: React.FC<PageHeaderProps> = ({ title, description, breadcrumbs, actions, className }) => {
+export const PageHeader: React.FC<PageHeaderProps> = ({ title, description, breadcrumbs, actions, meta, className }) => {
   return (
     <header className={cn('flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between', className)}>
       <div className="min-w-0 space-y-1">
@@ -45,10 +47,11 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, description, brea
             ))}
           </nav>
         ) : null}
-        <h1 className="truncate text-2xl font-semibold tracking-tight text-sabc-gray-900">{title}</h1>
-        {description ? <p className="max-w-2xl text-sm leading-6 text-sabc-gray-600">{description}</p> : null}
+        <h1 className="text-2xl text-sabc-gray-900 dark:text-white">{title}</h1>
+        {description ? <p className="max-w-2xl text-sm leading-6 text-sabc-gray-600 dark:text-sabc-gray-400">{description}</p> : null}
+        {meta ? <p className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{meta}</p> : null}
       </div>
-      {actions ? <div className="flex flex-shrink-0 items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0">{actions}</div> : null}
     </header>
   );
 };

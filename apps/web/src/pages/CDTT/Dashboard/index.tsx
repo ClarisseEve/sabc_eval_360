@@ -8,7 +8,7 @@ const CDTTDashboard: React.FC = () => (
     <Suspense fallback={<DashboardSkeleton />}>
       <RoleDirectorDashboardPage
         fallbackRole="CDTT"
-        title="Tableau de bord Chef Département Trade"
+        title="Tableau de bord Chef de département trade"
         subtitle="Pilotage opérationnel des évaluations et de la performance de l'équipe Trade."
         perimeterTitle="Périmètre Trade"
         enableDomaineToggle

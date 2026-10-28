@@ -13,14 +13,16 @@ import { ToastProvider } from './Contexts/ToastContext';
 import { ConfirmProvider } from './Contexts/ConfirmContext';
 import { Toaster } from './Components/UI/Toast';
 import { ErrorBoundary } from './Components/ErrorBoundary';
+import { BrandMark } from './Components/Brand/BrandMark';
 import { useInitRouter } from './lib/inertia-shim';
 
 // ─── Loading fallback ────────────────────────────────────────────────────────
+// La capsule de l'emblème tourne pendant le chargement (repère de marque).
 const PageLoader = () => (
-  <div className="flex h-screen items-center justify-center bg-sabc-gray-50">
-    <div className="flex flex-col items-center gap-3">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-sabc-gray-200 border-t-sabc-red-primary" />
-      <span className="text-sm text-sabc-gray-400">Chargement…</span>
+  <div className="flex h-screen items-center justify-center bg-sabc-gray-50 dark:bg-sabc-gray-900" role="status">
+    <div className="flex flex-col items-center gap-4">
+      <BrandMark spin className="h-16 w-16 [&_.sabc-cap-spin]:[animation-duration:2.4s]" />
+      <span className="text-sm text-sabc-gray-500">Chargement…</span>
     </div>
   </div>
 );

@@ -6,34 +6,51 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TruncatedTableBody } from '@/Components/UI/TruncatedList/TruncatedList';
 import { useSubordonnes } from '@/Hooks/queries';
 import { EvaluationPageLayout } from '@/pages/Common/Evaluations/shared';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
+
+/** Nom lisible de la région ; le code seul n'est affiché qu'en dernier recours. */
+function formatRegion(user: Record<string, any>): string {
+  return user.region_nom || user.region?.nom_region || user.region?.nom || user.id_region || 'n.d.';
+}
 
 export default function TeamOverviewPage() {
   const { data } = useSubordonnes();
   const subordonnes = Array.isArray(data) ? data : [];
 
-  const actifs = subordonnes.filter((user: any) => user.est_actif).length;
-  const indisponibles = subordonnes.filter((user: any) => user.est_indisponible || user.statut === 'Indisponible').length;
+  // Le statut d'activité ou de disponibilité peut être absent de la réponse :
+  // on affiche alors « n.d. » au lieu d'en déduire « inactif » ou « disponible ».
+  const hasActiveField = subordonnes.some((user: any) => typeof user.est_actif === 'boolean');
+  const hasAvailabilityField = subordonnes.some((user: any) =>
+    typeof user.est_indisponible === 'boolean' || typeof user.statut === 'string',
+  );
+  const actifs = hasActiveField
+    ? subordonnes.filter((user: any) => user.est_actif === true).length
+    : null;
+  const indisponibles = hasAvailabilityField
+    ? subordonnes.filter((user: any) => user.est_indisponible === true || user.statut === 'Indisponible').length
+    : null;
   const sansManager = subordonnes.filter((user: any) => !user.manager_matricule).length;
 
   return (
     <EvaluationPageLayout pageTitle="Mon équipe">
-      <Head title="Mon équipe — SABC Eval360" />
+      <Head title="Mon équipe - SABC Eval360" />
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Mon équipe</h1>
-          <p className="text-sm text-sabc-gray-600">Les collaborateurs placés sous votre responsabilité.</p>
-        </div>
+        <PageHeader
+          title="Mon équipe"
+          description="Les collaborateurs placés sous votre responsabilité directe."
+        />
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Total</div><div className="text-2xl font-bold">{subordonnes.length}</div></CardContent></Card>
-          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Actifs</div><div className="text-2xl font-bold">{actifs}</div></CardContent></Card>
-          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Indisponibles</div><div className="text-2xl font-bold">{indisponibles}</div></CardContent></Card>
-          <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Sans manager</div><div className="text-2xl font-bold">{sansManager}</div></CardContent></Card>
-        </div>
+        <KpiGrid>
+          <KpiCard label="Total" value={subordonnes.length} />
+          <KpiCard label="Actifs" value={actifs} />
+          <KpiCard label="Indisponibles" value={indisponibles} />
+          <KpiCard label="Sans manager" value={sansManager} />
+        </KpiGrid>
 
         <Card>
           <CardHeader>
-            <CardTitle>Subordonnés directs</CardTitle>
+            <CardTitle>Subordonnés directs ({subordonnes.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {subordonnes.length === 0 ? (
@@ -61,12 +78,18 @@ export default function TeamOverviewPage() {
                       <TableRow key={user.matricule}>
                         <TableCell>{user.matricule}</TableCell>
                         <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
-                        <TableCell>{user.role}</TableCell>
-                        <TableCell>{user.id_region || 'N/A'}</TableCell>
+                        <TableCell>{user.role_nom || user.role || 'n.d.'}</TableCell>
+                        <TableCell>{formatRegion(user)}</TableCell>
                         <TableCell>
-                          <Badge variant={user.est_actif ? 'default' : 'outline'}>
-                            {user.statut || (user.est_actif ? 'Actif' : 'Inactif')}
-                          </Badge>
+                          {user.statut ? (
+                            <Badge variant={user.statut === 'Indisponible' ? 'warning' : 'outline'}>{user.statut}</Badge>
+                          ) : typeof user.est_actif === 'boolean' ? (
+                            <Badge variant={user.est_actif ? 'success' : 'outline'}>
+                              {user.est_actif ? 'Actif' : 'Inactif'}
+                            </Badge>
+                          ) : (
+                            <span className="text-sm text-sabc-gray-500">n.d.</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     )}

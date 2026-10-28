@@ -253,7 +253,7 @@ const ROLES: RoleSeed[] = [
     subordonnes: false,
     crossBranch: false,
     portee: 'region',
-    description: 'Superviseur regional marketing operationnel',
+    description: 'Superviseur regional marketing opérationnel',
   },
   {
     id: 'R0009',
@@ -305,6 +305,38 @@ for (const region of REGIONS) {
 
 // ----- Generate all users programmatically -----
 
+// Noms de démonstration réalistes, attribués de façon déterministe par index.
+const FIRST_NAMES = [
+  'Jean-Paul', 'Aïcha', 'Serge', 'Brigitte', 'Hervé', 'Nadège', 'Christian', 'Estelle',
+  'Rodrigue', 'Laure', 'Ibrahim', 'Sandrine', 'Franck', 'Mireille', 'Alain', 'Carine',
+  'Thierry', 'Hortense', 'Blaise', 'Viviane', 'Moussa', 'Josiane', 'Arnaud', 'Pélagie',
+  'Samuel', 'Gisèle', 'Didier', 'Rose', 'Patrice', 'Aminatou', 'Cédric', 'Odile',
+];
+const LAST_NAMES = [
+  'Mbarga', 'Nkoulou', 'Tchoumi', 'Ndongo', 'Abena', 'Kamga', 'Essomba', 'Bello',
+  'Tchatchoua', 'Mballa', 'Djoumessi', 'Onana', 'Eyenga', 'Ngassa', 'Manga', 'Hamadou',
+  'Nana', 'Zambo', 'Ekotto', 'Owona', 'Mvondo', 'Biya', 'Tagne', 'Ndjock', 'Mouelle',
+  'Etoundi', 'Kouam', 'Moussa', 'Nyemb', 'Bassong', 'Tsala', 'Fouda', 'Wandji',
+];
+
+function personName(idx: number): { nom: string; prenom: string } {
+  return {
+    prenom: FIRST_NAMES[(idx * 7) % FIRST_NAMES.length],
+    nom: LAST_NAMES[(idx * 11 + 3) % LAST_NAMES.length],
+  };
+}
+
+const usedEmails = new Set<string>();
+function uniqueEmail(prenom: string, nom: string): string {
+  const slug = (value: string) =>
+    value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, '');
+  const base = `${slug(prenom)}.${slug(nom)}`;
+  let email = `${base}@sabc.local`;
+  for (let n = 2; usedEmails.has(email); n++) email = `${base}${n}@sabc.local`;
+  usedEmails.add(email);
+  return email;
+}
+
 function generateUsers(): UserSeed[] {
   const users: UserSeed[] = [];
   let globalIndex = 1;
@@ -312,8 +344,8 @@ function generateUsers(): UserSeed[] {
   // 1. Admin user (demo account)
   users.push({
     matricule: 'A0001',
-    nom: 'Admin',
-    prenom: 'Systeme',
+    nom: 'SABC',
+    prenom: 'Administrateur',
     email: 'admin@sabc.local',
     role: 'ADMIN',
     roleId: 'R0000',
@@ -346,9 +378,8 @@ function generateUsers(): UserSeed[] {
         const matricule = `${prefix}${String(idx).padStart(4, '0')}`;
 
         // Demo accounts override for specific roles in Littoral
-        let email = `user${idx}@sabc.local`;
-        let nom = `Agent_${idx}`;
-        let prenom = `Prenom_${idx}`;
+        let { nom, prenom } = personName(idx);
+        let email = uniqueEmail(prenom, nom);
         let overrideMatricule = matricule;
 
         // Keep demo accounts working for Littoral first instances
@@ -356,18 +387,18 @@ function generateUsers(): UserSeed[] {
           if (entry.role === 'DR') {
             overrideMatricule = 'D1010';
             email = 'dr.littoral@sabc.local';
-            nom = 'Agent_DR_Littoral';
-            prenom = 'Demo';
+            nom = 'Atangana';
+            prenom = 'Paul';
           } else if (entry.role === 'CDS') {
             overrideMatricule = 'S1110';
             email = 'cds.littoral@sabc.local';
-            nom = 'Agent_CDS_Littoral';
-            prenom = 'Demo';
+            nom = 'Ngono';
+            prenom = 'Clarisse';
           } else if (entry.role === 'TMO') {
             overrideMatricule = 'T1210';
             email = 'tmo.littoral@sabc.local';
-            nom = 'Agent_TMO_Littoral';
-            prenom = 'Demo';
+            nom = 'Fotso';
+            prenom = 'Yannick';
           }
         }
 
@@ -431,7 +462,7 @@ const PERIODS: PeriodSeed[] = [
     code: 'P2601',
     nom: 'Cycle 2026 - Semestre 1',
     titre: 'Cycle 2026 - Semestre 1',
-    description: 'Periode active de demonstration locale',
+    description: 'Période active de démonstration locale',
     dateDebut: isoDateFromOffset(-15),
     dateFin: isoDateFromOffset(45),
     statut: 'ouverte',
@@ -443,7 +474,7 @@ const PERIODS: PeriodSeed[] = [
     code: 'P2502',
     nom: 'Cycle 2025 - Semestre 2',
     titre: 'Cycle 2025 - Semestre 2',
-    description: 'Periode precedente pour la progression',
+    description: 'Période précédente pour la progression',
     dateDebut: isoDateFromOffset(-220),
     dateFin: isoDateFromOffset(-130),
     statut: 'fermee',
@@ -458,7 +489,7 @@ const PERIODS: PeriodSeed[] = [
     code: 'P2602',
     nom: 'Cycle 2026 - Semestre 2',
     titre: 'Cycle 2026 - Semestre 2',
-    description: 'Periode planifiee de demonstration (editable et supprimable)',
+    description: 'Période planifiée de démonstration (modifiable et supprimable)',
     dateDebut: '2026-09-07',
     dateFin: '2026-12-06',
     statut: 'planifiee',
@@ -493,31 +524,31 @@ function isoTimestampFromOffset(offsetDays: number) {
 function buildCriteriaBundle(domain: 'commercial' | 'marketing' | 'sponsoring' | 'trade'): CriterionSeed[] {
   const bundles: Record<string, CriterionSeed[]> = {
     commercial: [
-      { id: 'couverture', libelle: 'Couverture terrain', description: 'Presence et couverture operationnelle', poids: 20, section: 'Execution terrain', ordreSection: 1, niveau: 4, axis: 'coverage', tags: ['terrain', 'coaching'] },
-      { id: 'execution', libelle: 'Execution commerciale', description: 'Qualite d execution des actions terrain', poids: 20, section: 'Execution terrain', ordreSection: 1, niveau: 4, axis: 'execution', tags: ['execution', 'formation'] },
-      { id: 'leadership', libelle: 'Leadership', description: 'Animation de l equipe et pilotage', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 4, axis: 'leadership', tags: ['leadership', 'mentorat'] },
-      { id: 'communication', libelle: 'Communication', description: 'Partage de l information et coordination', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 3, axis: 'communication', tags: ['communication', 'coaching'] },
-      { id: 'innovation', libelle: 'Initiative', description: 'Capacite a proposer des ameliorations', poids: 20, section: 'Developpement', ordreSection: 3, niveau: 3, axis: 'initiative', tags: ['innovation', 'mobilite'] },
+      { id: 'couverture', libelle: 'Couverture terrain', description: 'Présence et couverture opérationnelle', poids: 20, section: 'Exécution terrain', ordreSection: 1, niveau: 4, axis: 'coverage', tags: ['terrain', 'coaching'] },
+      { id: 'execution', libelle: 'Exécution commerciale', description: 'Qualité d\'exécution des actions terrain', poids: 20, section: 'Exécution terrain', ordreSection: 1, niveau: 4, axis: 'execution', tags: ['execution', 'formation'] },
+      { id: 'leadership', libelle: 'Leadership', description: 'Animation de l\'équipe et pilotage', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 4, axis: 'leadership', tags: ['leadership', 'mentorat'] },
+      { id: 'communication', libelle: 'Communication', description: 'Partage de l\'information et coordination', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 3, axis: 'communication', tags: ['communication', 'coaching'] },
+      { id: 'innovation', libelle: 'Initiative', description: 'Capacité à proposer des améliorations', poids: 20, section: 'Développement', ordreSection: 3, niveau: 3, axis: 'initiative', tags: ['innovation', 'mobilite'] },
     ],
     marketing: [
-      { id: 'activation', libelle: 'Activation marche', description: 'Qualite des activations et campagnes', poids: 20, section: 'Operations marketing', ordreSection: 1, niveau: 4, axis: 'activation', tags: ['marketing', 'formation'] },
-      { id: 'reporting', libelle: 'Reporting', description: 'Fiabilite du reporting et du suivi', poids: 20, section: 'Operations marketing', ordreSection: 1, niveau: 3, axis: 'reporting', tags: ['reporting', 'coaching'] },
-      { id: 'coordination', libelle: 'Coordination', description: 'Coordination avec les equipes terrain', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 4, axis: 'coordination', tags: ['coordination', 'mentorat'] },
-      { id: 'analyse', libelle: 'Analyse', description: 'Lecture des resultats et arbitrage', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 4, axis: 'analyse', tags: ['analyse', 'mobilite'] },
-      { id: 'innovation', libelle: 'Creativite', description: 'Capacite a renouveler les activations', poids: 20, section: 'Innovation', ordreSection: 3, niveau: 3, axis: 'creativite', tags: ['innovation', 'hackathon'] },
+      { id: 'activation', libelle: 'Activation marché', description: 'Qualité des activations et campagnes', poids: 20, section: 'Opérations marketing', ordreSection: 1, niveau: 4, axis: 'activation', tags: ['marketing', 'formation'] },
+      { id: 'reporting', libelle: 'Reporting', description: 'Fiabilité du reporting et du suivi', poids: 20, section: 'Opérations marketing', ordreSection: 1, niveau: 3, axis: 'reporting', tags: ['reporting', 'coaching'] },
+      { id: 'coordination', libelle: 'Coordination', description: 'Coordination avec les équipes terrain', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 4, axis: 'coordination', tags: ['coordination', 'mentorat'] },
+      { id: 'analyse', libelle: 'Analyse', description: 'Lecture des résultats et arbitrage', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 4, axis: 'analyse', tags: ['analyse', 'mobilite'] },
+      { id: 'innovation', libelle: 'Créativité', description: 'Capacité à renouveler les activations', poids: 20, section: 'Innovation', ordreSection: 3, niveau: 3, axis: 'creativite', tags: ['innovation', 'hackathon'] },
     ],
     sponsoring: [
-      { id: 'event', libelle: 'Gestion evenementielle', description: 'Preparation et suivi des evenements', poids: 20, section: 'Execution', ordreSection: 1, niveau: 4, axis: 'event', tags: ['event', 'formation'] },
-      { id: 'partner', libelle: 'Relation partenaires', description: 'Qualite de relation avec les partenaires', poids: 20, section: 'Execution', ordreSection: 1, niveau: 4, axis: 'partner', tags: ['partenariats', 'coaching'] },
-      { id: 'planning', libelle: 'Planification', description: 'Capacite a planifier et anticiper', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 3, axis: 'planning', tags: ['planning', 'mentorat'] },
-      { id: 'communication', libelle: 'Communication', description: 'Communication sur les evenements et resultats', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 3, axis: 'communication', tags: ['communication', 'formation'] },
-      { id: 'service', libelle: 'Qualite de service', description: 'Qualite du service rendu sur le terrain', poids: 20, section: 'Qualite', ordreSection: 3, niveau: 4, axis: 'service', tags: ['service', 'plan_developpement'] },
+      { id: 'event', libelle: 'Gestion événementielle', description: 'Préparation et suivi des événements', poids: 20, section: 'Exécution', ordreSection: 1, niveau: 4, axis: 'event', tags: ['event', 'formation'] },
+      { id: 'partner', libelle: 'Relation partenaires', description: 'Qualité de relation avec les partenaires', poids: 20, section: 'Exécution', ordreSection: 1, niveau: 4, axis: 'partner', tags: ['partenariats', 'coaching'] },
+      { id: 'planning', libelle: 'Planification', description: 'Capacité à planifier et anticiper', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 3, axis: 'planning', tags: ['planning', 'mentorat'] },
+      { id: 'communication', libelle: 'Communication', description: 'Communication sur les événements et résultats', poids: 20, section: 'Pilotage', ordreSection: 2, niveau: 3, axis: 'communication', tags: ['communication', 'formation'] },
+      { id: 'service', libelle: 'Qualité de service', description: 'Qualité du service rendu sur le terrain', poids: 20, section: 'Qualité', ordreSection: 3, niveau: 4, axis: 'service', tags: ['service', 'plan_developpement'] },
     ],
     trade: [
-      { id: 'budget', libelle: 'Maitrise budgetaire', description: 'Gestion efficace des budgets trade', poids: 20, section: 'Pilotage trade', ordreSection: 1, niveau: 4, axis: 'budget', tags: ['budget', 'formation'] },
-      { id: 'operateurs', libelle: 'Pilotage operateurs', description: 'Suivi des operateurs et partenaires trade', poids: 20, section: 'Pilotage trade', ordreSection: 1, niveau: 4, axis: 'operateurs', tags: ['operateurs', 'coaching'] },
-      { id: 'execution', libelle: 'Execution trade', description: 'Deploiement des actions trade marketing', poids: 20, section: 'Execution', ordreSection: 2, niveau: 4, axis: 'execution', tags: ['execution', 'mentorat'] },
-      { id: 'analyse', libelle: 'Analyse ROI', description: 'Analyse des resultats et rentabilite', poids: 20, section: 'Execution', ordreSection: 2, niveau: 4, axis: 'roi', tags: ['analyse', 'mobilite'] },
+      { id: 'budget', libelle: 'Maîtrise budgétaire', description: 'Gestion efficace des budgets trade', poids: 20, section: 'Pilotage trade', ordreSection: 1, niveau: 4, axis: 'budget', tags: ['budget', 'formation'] },
+      { id: 'operateurs', libelle: 'Pilotage opérateurs', description: 'Suivi des opérateurs et partenaires trade', poids: 20, section: 'Pilotage trade', ordreSection: 1, niveau: 4, axis: 'operateurs', tags: ['operateurs', 'coaching'] },
+      { id: 'execution', libelle: 'Exécution trade', description: 'Déploiement des actions trade marketing', poids: 20, section: 'Exécution', ordreSection: 2, niveau: 4, axis: 'execution', tags: ['execution', 'mentorat'] },
+      { id: 'analyse', libelle: 'Analyse ROI', description: 'Analyse des résultats et rentabilité', poids: 20, section: 'Exécution', ordreSection: 2, niveau: 4, axis: 'roi', tags: ['analyse', 'mobilite'] },
       { id: 'coordination', libelle: 'Coordination transverse', description: 'Coordination avec commercial et marketing', poids: 20, section: 'Collaboration', ordreSection: 3, niveau: 3, axis: 'coordination', tags: ['coordination', 'plan_developpement'] },
     ],
   };
@@ -530,91 +561,91 @@ function buildExtendedCriteria(role: 'CDS' | 'CDV' | 'CSC'): CriterionSeed[] {
   if (role === 'CDS') {
     return [
       // Technique (4)
-      { id: 'maitrise_produit', libelle: 'Maitrise produit', description: 'Connaissance approfondie du portefeuille produit', poids: 7, section: 'Technique', ordreSection: 1, niveau: 4, axis: 'produit', tags: ['technique', 'formation'] },
-      { id: 'techniques_commerciales', libelle: 'Techniques commerciales', description: 'Maitrise des techniques de vente et negociation', poids: 7, section: 'Technique', ordreSection: 1, niveau: 4, axis: 'vente', tags: ['technique', 'coaching'] },
+      { id: 'maitrise_produit', libelle: 'Maîtrise produit', description: 'Connaissance approfondie du portefeuille produit', poids: 7, section: 'Technique', ordreSection: 1, niveau: 4, axis: 'produit', tags: ['technique', 'formation'] },
+      { id: 'techniques_commerciales', libelle: 'Techniques commerciales', description: 'Maîtrise des techniques de vente et negociation', poids: 7, section: 'Technique', ordreSection: 1, niveau: 4, axis: 'vente', tags: ['technique', 'coaching'] },
       { id: 'gestion_temporelle', libelle: 'Gestion temporelle', description: 'Organisation du temps et respect des echeances', poids: 6, section: 'Technique', ordreSection: 1, niveau: 3, axis: 'temps', tags: ['technique', 'mentorat'] },
-      { id: 'negociation', libelle: 'Negociation', description: 'Capacite de negociation avec les clients cles', poids: 5, section: 'Technique', ordreSection: 1, niveau: 4, axis: 'negociation', tags: ['technique', 'formation'] },
+      { id: 'negociation', libelle: 'Negociation', description: 'Capacité de negociation avec les clients cles', poids: 5, section: 'Technique', ordreSection: 1, niveau: 4, axis: 'negociation', tags: ['technique', 'formation'] },
       // Analytique (4)
-      { id: 'analyse_donnees', libelle: 'Analyse donnees', description: 'Exploitation des donnees de vente', poids: 7, section: 'Analytique', ordreSection: 2, niveau: 4, axis: 'analyse', tags: ['analytique', 'formation'] },
-      { id: 'reporting_cds', libelle: 'Reporting', description: 'Qualite et regularite du reporting', poids: 6, section: 'Analytique', ordreSection: 2, niveau: 3, axis: 'reporting', tags: ['analytique', 'coaching'] },
-      { id: 'outils_analytiques', libelle: 'Outils analytiques', description: 'Maitrise des outils d analyse et de suivi', poids: 5, section: 'Analytique', ordreSection: 2, niveau: 3, axis: 'outils', tags: ['analytique', 'mentorat'] },
-      { id: 'veille_marche', libelle: 'Veille marche', description: 'Suivi des tendances et de la concurrence', poids: 5, section: 'Analytique', ordreSection: 2, niveau: 3, axis: 'veille', tags: ['analytique', 'mobilite'] },
+      { id: 'analyse_donnees', libelle: 'Analyse données', description: 'Exploitation des données de vente', poids: 7, section: 'Analytique', ordreSection: 2, niveau: 4, axis: 'analyse', tags: ['analytique', 'formation'] },
+      { id: 'reporting_cds', libelle: 'Reporting', description: 'Qualité et régularité du reporting', poids: 6, section: 'Analytique', ordreSection: 2, niveau: 3, axis: 'reporting', tags: ['analytique', 'coaching'] },
+      { id: 'outils_analytiques', libelle: 'Outils analytiques', description: 'Maîtrise des outils d analyse et de suivi', poids: 5, section: 'Analytique', ordreSection: 2, niveau: 3, axis: 'outils', tags: ['analytique', 'mentorat'] },
+      { id: 'veille_marche', libelle: 'Veille marché', description: 'Suivi des tendances et de la concurrence', poids: 5, section: 'Analytique', ordreSection: 2, niveau: 3, axis: 'veille', tags: ['analytique', 'mobilite'] },
       // Organisation (3)
-      { id: 'organisation_info', libelle: 'Organisation info', description: 'Structuration et diffusion de l information', poids: 6, section: 'Organisation', ordreSection: 3, niveau: 3, axis: 'organisation', tags: ['organisation', 'formation'] },
-      { id: 'suivi_activite', libelle: 'Suivi activite', description: 'Suivi regulier des indicateurs d activite', poids: 7, section: 'Organisation', ordreSection: 3, niveau: 4, axis: 'suivi', tags: ['organisation', 'coaching'] },
-      { id: 'priorisation', libelle: 'Priorisation', description: 'Capacite a prioriser les actions a fort impact', poids: 6, section: 'Organisation', ordreSection: 3, niveau: 3, axis: 'priorisation', tags: ['organisation', 'mentorat'] },
+      { id: 'organisation_info', libelle: 'Organisation info', description: 'Structuration et diffusion de l\'information', poids: 6, section: 'Organisation', ordreSection: 3, niveau: 3, axis: 'organisation', tags: ['organisation', 'formation'] },
+      { id: 'suivi_activite', libelle: 'Suivi activité', description: 'Suivi régulier des indicateurs d activité', poids: 7, section: 'Organisation', ordreSection: 3, niveau: 4, axis: 'suivi', tags: ['organisation', 'coaching'] },
+      { id: 'priorisation', libelle: 'Priorisation', description: 'Capacité a prioriser les actions a fort impact', poids: 6, section: 'Organisation', ordreSection: 3, niveau: 3, axis: 'priorisation', tags: ['organisation', 'mentorat'] },
       // Comportemental (6)
       { id: 'ecoute', libelle: 'Ecoute', description: 'Ecoute active des collaborateurs et clients', poids: 5, section: 'Comportemental', ordreSection: 4, niveau: 3, axis: 'ecoute', tags: ['comportemental', 'formation'] },
-      { id: 'influence', libelle: 'Influence', description: 'Capacite d influence positive sur l equipe', poids: 5, section: 'Comportemental', ordreSection: 4, niveau: 4, axis: 'influence', tags: ['comportemental', 'coaching'] },
+      { id: 'influence', libelle: 'Influence', description: 'Capacité d\'influence positive sur l\'équipe', poids: 5, section: 'Comportemental', ordreSection: 4, niveau: 4, axis: 'influence', tags: ['comportemental', 'coaching'] },
       { id: 'respect_collegues', libelle: 'Respect collegues', description: 'Respect et consideration envers les collegues', poids: 4, section: 'Comportemental', ordreSection: 4, niveau: 3, axis: 'respect', tags: ['comportemental', 'mentorat'] },
-      { id: 'empathie', libelle: 'Empathie', description: 'Capacite a comprendre les enjeux des collaborateurs', poids: 4, section: 'Comportemental', ordreSection: 4, niveau: 3, axis: 'empathie', tags: ['comportemental', 'formation'] },
-      { id: 'esprit_equipe', libelle: 'Esprit equipe', description: 'Contribution au collectif et a la cohesion', poids: 5, section: 'Comportemental', ordreSection: 4, niveau: 3, axis: 'equipe', tags: ['comportemental', 'coaching'] },
+      { id: 'empathie', libelle: 'Empathie', description: 'Capacité a comprendre les enjeux des collaborateurs', poids: 4, section: 'Comportemental', ordreSection: 4, niveau: 3, axis: 'empathie', tags: ['comportemental', 'formation'] },
+      { id: 'esprit_equipe', libelle: 'Esprit équipe', description: 'Contribution au collectif et a la cohesion', poids: 5, section: 'Comportemental', ordreSection: 4, niveau: 3, axis: 'equipe', tags: ['comportemental', 'coaching'] },
       { id: 'initiative_cds', libelle: 'Initiative', description: 'Prise d initiative et force de proposition', poids: 4, section: 'Comportemental', ordreSection: 4, niveau: 3, axis: 'initiative', tags: ['comportemental', 'mobilite'] },
     ];
   }
   if (role === 'CDV') {
     return [
       // Management terrain (6)
-      { id: 'animation_equipe', libelle: 'Animation equipe', description: 'Capacite a animer et motiver l equipe terrain', poids: 5, section: 'Management terrain', ordreSection: 1, niveau: 4, axis: 'animation', tags: ['management', 'coaching'] },
-      { id: 'coaching_terrain', libelle: 'Coaching terrain', description: 'Accompagnement et coaching des equipes', poids: 5, section: 'Management terrain', ordreSection: 1, niveau: 4, axis: 'coaching', tags: ['management', 'formation'] },
+      { id: 'animation_equipe', libelle: 'Animation équipe', description: 'Capacité à animer et motiver l\'équipe terrain', poids: 5, section: 'Management terrain', ordreSection: 1, niveau: 4, axis: 'animation', tags: ['management', 'coaching'] },
+      { id: 'coaching_terrain', libelle: 'Coaching terrain', description: 'Accompagnement et coaching des équipes', poids: 5, section: 'Management terrain', ordreSection: 1, niveau: 4, axis: 'coaching', tags: ['management', 'formation'] },
       { id: 'suivi_objectifs', libelle: 'Suivi objectifs', description: 'Suivi rigoureux des objectifs de vente', poids: 5, section: 'Management terrain', ordreSection: 1, niveau: 4, axis: 'objectifs', tags: ['management', 'mentorat'] },
       { id: 'pilotage_district', libelle: 'Pilotage district', description: 'Pilotage global du district', poids: 5, section: 'Management terrain', ordreSection: 1, niveau: 4, axis: 'pilotage', tags: ['management', 'coaching'] },
       { id: 'resolution_conflits', libelle: 'Resolution conflits', description: 'Gestion des conflits internes et externes', poids: 4, section: 'Management terrain', ordreSection: 1, niveau: 3, axis: 'conflits', tags: ['management', 'formation'] },
-      { id: 'delegation', libelle: 'Delegation', description: 'Capacite a deleguer efficacement', poids: 4, section: 'Management terrain', ordreSection: 1, niveau: 3, axis: 'delegation', tags: ['management', 'mentorat'] },
+      { id: 'delegation', libelle: 'Delegation', description: 'Capacité a deleguer efficacement', poids: 4, section: 'Management terrain', ordreSection: 1, niveau: 3, axis: 'delegation', tags: ['management', 'mentorat'] },
       // Performance commerciale (6)
       { id: 'chiffre_affaires', libelle: 'Chiffre affaires', description: 'Atteinte des objectifs de chiffre d affaires', poids: 5, section: 'Performance commerciale', ordreSection: 2, niveau: 4, axis: 'ca', tags: ['performance', 'coaching'] },
-      { id: 'part_marche', libelle: 'Part de marche', description: 'Evolution de la part de marche du district', poids: 5, section: 'Performance commerciale', ordreSection: 2, niveau: 4, axis: 'pdm', tags: ['performance', 'formation'] },
+      { id: 'part_marche', libelle: 'Part de marché', description: 'Évolution de la part de marché du district', poids: 5, section: 'Performance commerciale', ordreSection: 2, niveau: 4, axis: 'pdm', tags: ['performance', 'formation'] },
       { id: 'couverture_points', libelle: 'Couverture points de vente', description: 'Taux de couverture des points de vente', poids: 4, section: 'Performance commerciale', ordreSection: 2, niveau: 4, axis: 'couverture', tags: ['performance', 'mentorat'] },
-      { id: 'qualite_distribution', libelle: 'Qualite distribution', description: 'Qualite du reseau de distribution', poids: 4, section: 'Performance commerciale', ordreSection: 2, niveau: 3, axis: 'distribution', tags: ['performance', 'coaching'] },
+      { id: 'qualite_distribution', libelle: 'Qualité distribution', description: 'Qualité du réseau de distribution', poids: 4, section: 'Performance commerciale', ordreSection: 2, niveau: 3, axis: 'distribution', tags: ['performance', 'coaching'] },
       { id: 'gestion_stocks', libelle: 'Gestion stocks', description: 'Optimisation des niveaux de stock', poids: 4, section: 'Performance commerciale', ordreSection: 2, niveau: 3, axis: 'stocks', tags: ['performance', 'formation'] },
       { id: 'recouvrement', libelle: 'Recouvrement', description: 'Efficacite du recouvrement des creances', poids: 4, section: 'Performance commerciale', ordreSection: 2, niveau: 4, axis: 'recouvrement', tags: ['performance', 'mentorat'] },
       // Strategie (6)
-      { id: 'plan_action', libelle: 'Plan d action', description: 'Elaboration et suivi des plans d action', poids: 4, section: 'Strategie', ordreSection: 3, niveau: 3, axis: 'planification', tags: ['strategie', 'coaching'] },
-      { id: 'analyse_concurrence', libelle: 'Analyse concurrence', description: 'Veille concurrentielle et adaptation', poids: 4, section: 'Strategie', ordreSection: 3, niveau: 3, axis: 'concurrence', tags: ['strategie', 'formation'] },
-      { id: 'innovation_cdv', libelle: 'Innovation commerciale', description: 'Propositions innovantes pour le district', poids: 3, section: 'Strategie', ordreSection: 3, niveau: 3, axis: 'innovation', tags: ['strategie', 'mentorat'] },
-      { id: 'relation_clients', libelle: 'Relation clients cles', description: 'Gestion de la relation avec les clients strategiques', poids: 4, section: 'Strategie', ordreSection: 3, niveau: 4, axis: 'clients', tags: ['strategie', 'coaching'] },
-      { id: 'gestion_budget_cdv', libelle: 'Gestion budget', description: 'Maitrise du budget du district', poids: 4, section: 'Strategie', ordreSection: 3, niveau: 3, axis: 'budget', tags: ['strategie', 'formation'] },
-      { id: 'prospection', libelle: 'Prospection', description: 'Developpement de nouveaux marches', poids: 3, section: 'Strategie', ordreSection: 3, niveau: 3, axis: 'prospection', tags: ['strategie', 'mobilite'] },
+      { id: 'plan_action', libelle: 'Plan d action', description: 'Elaboration et suivi des plans d action', poids: 4, section: 'Stratégie', ordreSection: 3, niveau: 3, axis: 'planification', tags: ['strategie', 'coaching'] },
+      { id: 'analyse_concurrence', libelle: 'Analyse concurrence', description: 'Veille concurrentielle et adaptation', poids: 4, section: 'Stratégie', ordreSection: 3, niveau: 3, axis: 'concurrence', tags: ['strategie', 'formation'] },
+      { id: 'innovation_cdv', libelle: 'Innovation commerciale', description: 'Propositions innovantes pour le district', poids: 3, section: 'Stratégie', ordreSection: 3, niveau: 3, axis: 'innovation', tags: ['strategie', 'mentorat'] },
+      { id: 'relation_clients', libelle: 'Relation clients cles', description: 'Gestion de la relation avec les clients strategiques', poids: 4, section: 'Stratégie', ordreSection: 3, niveau: 4, axis: 'clients', tags: ['strategie', 'coaching'] },
+      { id: 'gestion_budget_cdv', libelle: 'Gestion budget', description: 'Maîtrise du budget du district', poids: 4, section: 'Stratégie', ordreSection: 3, niveau: 3, axis: 'budget', tags: ['strategie', 'formation'] },
+      { id: 'prospection', libelle: 'Prospection', description: 'Développement de nouveaux marches', poids: 3, section: 'Stratégie', ordreSection: 3, niveau: 3, axis: 'prospection', tags: ['strategie', 'mobilite'] },
       // Communication (6)
-      { id: 'reporting_cdv', libelle: 'Reporting CDV', description: 'Qualite et regularite du reporting', poids: 4, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'reporting', tags: ['communication', 'coaching'] },
-      { id: 'communication_equipe', libelle: 'Communication equipe', description: 'Communication interne avec l equipe', poids: 3, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'com_interne', tags: ['communication', 'formation'] },
+      { id: 'reporting_cdv', libelle: 'Reporting CDV', description: 'Qualité et régularité du reporting', poids: 4, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'reporting', tags: ['communication', 'coaching'] },
+      { id: 'communication_equipe', libelle: 'Communication équipe', description: 'Communication interne avec l\'équipe', poids: 3, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'com_interne', tags: ['communication', 'formation'] },
       { id: 'communication_direction', libelle: 'Communication direction', description: 'Communication avec la direction regionale', poids: 3, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'com_direction', tags: ['communication', 'mentorat'] },
-      { id: 'presentation', libelle: 'Presentation', description: 'Qualite des presentations et syntheses', poids: 3, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'presentation', tags: ['communication', 'coaching'] },
-      { id: 'ecoute_cdv', libelle: 'Ecoute active', description: 'Capacite d ecoute et de feedback', poids: 3, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'ecoute', tags: ['communication', 'formation'] },
-      { id: 'esprit_equipe_cdv', libelle: 'Esprit equipe CDV', description: 'Travail collaboratif avec les autres districts', poids: 3, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'equipe', tags: ['communication', 'mentorat'] },
+      { id: 'presentation', libelle: 'Presentation', description: 'Qualité des presentations et syntheses', poids: 3, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'presentation', tags: ['communication', 'coaching'] },
+      { id: 'ecoute_cdv', libelle: 'Ecoute active', description: 'Capacité d ecoute et de feedback', poids: 3, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'ecoute', tags: ['communication', 'formation'] },
+      { id: 'esprit_equipe_cdv', libelle: 'Esprit équipe CDV', description: 'Travail collaboratif avec les autres districts', poids: 3, section: 'Communication', ordreSection: 4, niveau: 3, axis: 'equipe', tags: ['communication', 'mentorat'] },
     ];
   }
   // CSC - 26 criteria
   return [
     // Execution commerciale (7)
-    { id: 'presence_terrain', libelle: 'Presence terrain', description: 'Regularite de la presence sur le terrain', poids: 4, section: 'Execution commerciale', ordreSection: 1, niveau: 4, axis: 'presence', tags: ['execution', 'coaching'] },
-    { id: 'visites_clients', libelle: 'Visites clients', description: 'Nombre et qualite des visites clients', poids: 4, section: 'Execution commerciale', ordreSection: 1, niveau: 4, axis: 'visites', tags: ['execution', 'formation'] },
-    { id: 'merchandising', libelle: 'Merchandising', description: 'Qualite de la mise en rayon et de la visibilite', poids: 4, section: 'Execution commerciale', ordreSection: 1, niveau: 4, axis: 'merchandising', tags: ['execution', 'mentorat'] },
-    { id: 'prise_commande', libelle: 'Prise de commande', description: 'Efficacite dans la prise de commande', poids: 4, section: 'Execution commerciale', ordreSection: 1, niveau: 4, axis: 'commande', tags: ['execution', 'coaching'] },
-    { id: 'livraison', libelle: 'Suivi livraison', description: 'Suivi de la livraison et satisfaction client', poids: 3, section: 'Execution commerciale', ordreSection: 1, niveau: 3, axis: 'livraison', tags: ['execution', 'formation'] },
-    { id: 'recouvrement_csc', libelle: 'Recouvrement', description: 'Suivi du recouvrement des impayees', poids: 4, section: 'Execution commerciale', ordreSection: 1, niveau: 4, axis: 'recouvrement', tags: ['execution', 'mentorat'] },
-    { id: 'prospection_csc', libelle: 'Prospection', description: 'Ouverture de nouveaux points de vente', poids: 3, section: 'Execution commerciale', ordreSection: 1, niveau: 3, axis: 'prospection', tags: ['execution', 'coaching'] },
+    { id: 'presence_terrain', libelle: 'Présence terrain', description: 'Regularite de la presence sur le terrain', poids: 4, section: 'Exécution commerciale', ordreSection: 1, niveau: 4, axis: 'presence', tags: ['execution', 'coaching'] },
+    { id: 'visites_clients', libelle: 'Visites clients', description: 'Nombre et qualité des visites clients', poids: 4, section: 'Exécution commerciale', ordreSection: 1, niveau: 4, axis: 'visites', tags: ['execution', 'formation'] },
+    { id: 'merchandising', libelle: 'Merchandising', description: 'Qualité de la mise en rayon et de la visibilite', poids: 4, section: 'Exécution commerciale', ordreSection: 1, niveau: 4, axis: 'merchandising', tags: ['execution', 'mentorat'] },
+    { id: 'prise_commande', libelle: 'Prise de commande', description: 'Efficacite dans la prise de commande', poids: 4, section: 'Exécution commerciale', ordreSection: 1, niveau: 4, axis: 'commande', tags: ['execution', 'coaching'] },
+    { id: 'livraison', libelle: 'Suivi livraison', description: 'Suivi de la livraison et satisfaction client', poids: 3, section: 'Exécution commerciale', ordreSection: 1, niveau: 3, axis: 'livraison', tags: ['execution', 'formation'] },
+    { id: 'recouvrement_csc', libelle: 'Recouvrement', description: 'Suivi du recouvrement des impayees', poids: 4, section: 'Exécution commerciale', ordreSection: 1, niveau: 4, axis: 'recouvrement', tags: ['execution', 'mentorat'] },
+    { id: 'prospection_csc', libelle: 'Prospection', description: 'Ouverture de nouveaux points de vente', poids: 3, section: 'Exécution commerciale', ordreSection: 1, niveau: 3, axis: 'prospection', tags: ['execution', 'coaching'] },
     // Connaissance produit (5)
     { id: 'gamme_produit', libelle: 'Gamme produit', description: 'Connaissance de la gamme de produits', poids: 4, section: 'Connaissance produit', ordreSection: 2, niveau: 4, axis: 'gamme', tags: ['produit', 'formation'] },
-    { id: 'argumentation', libelle: 'Argumentation', description: 'Qualite de l argumentaire commercial', poids: 4, section: 'Connaissance produit', ordreSection: 2, niveau: 4, axis: 'argumentaire', tags: ['produit', 'coaching'] },
+    { id: 'argumentation', libelle: 'Argumentation', description: 'Qualité de l argumentaire commercial', poids: 4, section: 'Connaissance produit', ordreSection: 2, niveau: 4, axis: 'argumentaire', tags: ['produit', 'coaching'] },
     { id: 'connaissance_concurrence', libelle: 'Connaissance concurrence', description: 'Connaissance des produits et strategies concurrents', poids: 3, section: 'Connaissance produit', ordreSection: 2, niveau: 3, axis: 'concurrence', tags: ['produit', 'mentorat'] },
     { id: 'formation_continue', libelle: 'Formation continue', description: 'Engagement dans la formation continue', poids: 3, section: 'Connaissance produit', ordreSection: 2, niveau: 3, axis: 'autoformation', tags: ['produit', 'formation'] },
     { id: 'promotion_nouveautes', libelle: 'Promotion nouveautes', description: 'Promotion active des nouveaux produits', poids: 4, section: 'Connaissance produit', ordreSection: 2, niveau: 4, axis: 'nouveautes', tags: ['produit', 'coaching'] },
     // Organisation et suivi (7)
     { id: 'planification_tournees', libelle: 'Planification tournees', description: 'Organisation des tournees terrain', poids: 4, section: 'Organisation et suivi', ordreSection: 3, niveau: 4, axis: 'tournees', tags: ['organisation', 'formation'] },
-    { id: 'reporting_csc', libelle: 'Reporting CSC', description: 'Fiabilite et ponctualite du reporting', poids: 4, section: 'Organisation et suivi', ordreSection: 3, niveau: 3, axis: 'reporting', tags: ['organisation', 'coaching'] },
+    { id: 'reporting_csc', libelle: 'Reporting CSC', description: 'Fiabilité et ponctualite du reporting', poids: 4, section: 'Organisation et suivi', ordreSection: 3, niveau: 3, axis: 'reporting', tags: ['organisation', 'coaching'] },
     { id: 'gestion_temps_csc', libelle: 'Gestion du temps', description: 'Optimisation du temps de travail', poids: 3, section: 'Organisation et suivi', ordreSection: 3, niveau: 3, axis: 'temps', tags: ['organisation', 'mentorat'] },
-    { id: 'utilisation_outils', libelle: 'Utilisation outils', description: 'Maitrise des outils digitaux', poids: 3, section: 'Organisation et suivi', ordreSection: 3, niveau: 3, axis: 'outils', tags: ['organisation', 'formation'] },
-    { id: 'suivi_kpi', libelle: 'Suivi KPI', description: 'Suivi regulier des indicateurs de performance', poids: 4, section: 'Organisation et suivi', ordreSection: 3, niveau: 4, axis: 'kpi', tags: ['organisation', 'coaching'] },
+    { id: 'utilisation_outils', libelle: 'Utilisation outils', description: 'Maîtrise des outils digitaux', poids: 3, section: 'Organisation et suivi', ordreSection: 3, niveau: 3, axis: 'outils', tags: ['organisation', 'formation'] },
+    { id: 'suivi_kpi', libelle: 'Suivi KPI', description: 'Suivi régulier des indicateurs de performance', poids: 4, section: 'Organisation et suivi', ordreSection: 3, niveau: 4, axis: 'kpi', tags: ['organisation', 'coaching'] },
     { id: 'archivage', libelle: 'Archivage', description: 'Tenue et archivage des documents commerciaux', poids: 3, section: 'Organisation et suivi', ordreSection: 3, niveau: 3, axis: 'archivage', tags: ['organisation', 'mentorat'] },
     { id: 'gestion_reclamations', libelle: 'Gestion reclamations', description: 'Traitement des reclamations clients', poids: 3, section: 'Organisation et suivi', ordreSection: 3, niveau: 3, axis: 'reclamations', tags: ['organisation', 'formation'] },
     // Comportement professionnel (7)
     { id: 'ponctualite', libelle: 'Ponctualite', description: 'Respect des horaires et des echeances', poids: 4, section: 'Comportement professionnel', ordreSection: 4, niveau: 3, axis: 'ponctualite', tags: ['comportement', 'coaching'] },
     { id: 'attitude', libelle: 'Attitude professionnelle', description: 'Comportement professionnel avec clients et collegues', poids: 4, section: 'Comportement professionnel', ordreSection: 4, niveau: 3, axis: 'attitude', tags: ['comportement', 'formation'] },
-    { id: 'autonomie', libelle: 'Autonomie', description: 'Capacite a travailler de maniere autonome', poids: 3, section: 'Comportement professionnel', ordreSection: 4, niveau: 3, axis: 'autonomie', tags: ['comportement', 'mentorat'] },
-    { id: 'resilience', libelle: 'Resilience', description: 'Capacite a rebondir face aux difficultes', poids: 3, section: 'Comportement professionnel', ordreSection: 4, niveau: 3, axis: 'resilience', tags: ['comportement', 'coaching'] },
-    { id: 'ethique', libelle: 'Ethique', description: 'Respect des regles et de l ethique professionnelle', poids: 4, section: 'Comportement professionnel', ordreSection: 4, niveau: 4, axis: 'ethique', tags: ['comportement', 'formation'] },
-    { id: 'esprit_equipe_csc', libelle: 'Esprit equipe', description: 'Travail d equipe et solidarite', poids: 3, section: 'Comportement professionnel', ordreSection: 4, niveau: 3, axis: 'equipe', tags: ['comportement', 'mentorat'] },
+    { id: 'autonomie', libelle: 'Autonomie', description: 'Capacité a travailler de maniere autonome', poids: 3, section: 'Comportement professionnel', ordreSection: 4, niveau: 3, axis: 'autonomie', tags: ['comportement', 'mentorat'] },
+    { id: 'resilience', libelle: 'Resilience', description: 'Capacité a rebondir face aux difficultes', poids: 3, section: 'Comportement professionnel', ordreSection: 4, niveau: 3, axis: 'resilience', tags: ['comportement', 'coaching'] },
+    { id: 'ethique', libelle: 'Ethique', description: 'Respect des règles et de l ethique professionnelle', poids: 4, section: 'Comportement professionnel', ordreSection: 4, niveau: 4, axis: 'ethique', tags: ['comportement', 'formation'] },
+    { id: 'esprit_equipe_csc', libelle: 'Esprit équipe', description: 'Travail d\'équipe et solidarite', poids: 3, section: 'Comportement professionnel', ordreSection: 4, niveau: 3, axis: 'equipe', tags: ['comportement', 'mentorat'] },
     { id: 'proactivite', libelle: 'Proactivite', description: 'Anticipation des besoins et prise d initiative', poids: 3, section: 'Comportement professionnel', ordreSection: 4, niveau: 3, axis: 'proactivite', tags: ['comportement', 'coaching'] },
   ];
 }
@@ -691,25 +722,25 @@ const ROLE_DOMAIN: Record<string, 'commercial' | 'marketing' | 'sponsoring' | 't
 };
 
 const RULE_SPECS: RuleSeed[] = [
-  { nom: 'DR vers CDS', description: 'Evaluation descendante des CDS', roleEvaluateur: 'DR', roleEvalue: 'CDS', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
-  { nom: 'DR vers CDV', description: 'Evaluation descendante des CDV', roleEvaluateur: 'DR', roleEvalue: 'CDV', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
-  { nom: 'DR vers RTM', description: 'Evaluation descendante des RTM', roleEvaluateur: 'DR', roleEvalue: 'RTM', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('marketing') },
-  { nom: 'DR vers SS', description: 'Evaluation descendante des SS', roleEvaluateur: 'DR', roleEvalue: 'SS', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('sponsoring') },
-  { nom: 'DR vers CDTT', description: 'Evaluation descendante des CDTT', roleEvaluateur: 'DR', roleEvalue: 'CDTT', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('trade') },
-  { nom: 'CDS vers CDV', description: 'Evaluation descendante des CDV', roleEvaluateur: 'CDS', roleEvalue: 'CDV', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
-  { nom: 'CDS vers CSC', description: 'Evaluation descendante des CSC', roleEvaluateur: 'CDS', roleEvalue: 'CSC', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
-  { nom: 'RTM vers TMO', description: 'Evaluation descendante des TMO', roleEvaluateur: 'RTM', roleEvalue: 'TMO', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('marketing') },
-  { nom: 'RTM vers SRMO', description: 'Evaluation descendante des SRMO', roleEvaluateur: 'RTM', roleEvalue: 'SRMO', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('marketing') },
-  { nom: 'SS vers AS', description: 'Evaluation descendante des AS', roleEvaluateur: 'SS', roleEvalue: 'AS', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('sponsoring') },
-  { nom: 'CDV vers CSC', description: 'Evaluation descendante des CSC par CDV', roleEvaluateur: 'CDV', roleEvalue: 'CSC', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
-  { nom: 'Auto CDS', description: 'Auto-evaluation des CDS', roleEvaluateur: 'CDS', roleEvalue: 'CDS', typeEvaluation: 'auto', criteria: buildCriteriaBundle('commercial') },
-  { nom: 'Auto CDV', description: 'Auto-evaluation des CDV', roleEvaluateur: 'CDV', roleEvalue: 'CDV', typeEvaluation: 'auto', criteria: buildCriteriaBundle('commercial') },
-  { nom: 'Auto CSC', description: 'Auto-evaluation des CSC', roleEvaluateur: 'CSC', roleEvalue: 'CSC', typeEvaluation: 'auto', criteria: buildCriteriaBundle('commercial') },
-  { nom: 'Auto RTM', description: 'Auto-evaluation des RTM', roleEvaluateur: 'RTM', roleEvalue: 'RTM', typeEvaluation: 'auto', criteria: buildCriteriaBundle('marketing') },
-  { nom: 'Auto TMO', description: 'Auto-evaluation des TMO', roleEvaluateur: 'TMO', roleEvalue: 'TMO', typeEvaluation: 'auto', criteria: buildCriteriaBundle('marketing') },
-  { nom: 'Auto SRMO', description: 'Auto-evaluation des SRMO', roleEvaluateur: 'SRMO', roleEvalue: 'SRMO', typeEvaluation: 'auto', criteria: buildCriteriaBundle('marketing') },
-  { nom: 'Auto SS', description: 'Auto-evaluation des SS', roleEvaluateur: 'SS', roleEvalue: 'SS', typeEvaluation: 'auto', criteria: buildCriteriaBundle('sponsoring') },
-  { nom: 'Auto AS', description: 'Auto-evaluation des AS', roleEvaluateur: 'AS', roleEvalue: 'AS', typeEvaluation: 'auto', criteria: buildCriteriaBundle('sponsoring') },
+  { nom: 'DR vers CDS', description: 'Évaluation descendante des CDS', roleEvaluateur: 'DR', roleEvalue: 'CDS', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
+  { nom: 'DR vers CDV', description: 'Évaluation descendante des CDV', roleEvaluateur: 'DR', roleEvalue: 'CDV', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
+  { nom: 'DR vers RTM', description: 'Évaluation descendante des RTM', roleEvaluateur: 'DR', roleEvalue: 'RTM', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('marketing') },
+  { nom: 'DR vers SS', description: 'Évaluation descendante des SS', roleEvaluateur: 'DR', roleEvalue: 'SS', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('sponsoring') },
+  { nom: 'DR vers CDTT', description: 'Évaluation descendante des CDTT', roleEvaluateur: 'DR', roleEvalue: 'CDTT', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('trade') },
+  { nom: 'CDS vers CDV', description: 'Évaluation descendante des CDV', roleEvaluateur: 'CDS', roleEvalue: 'CDV', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
+  { nom: 'CDS vers CSC', description: 'Évaluation descendante des CSC', roleEvaluateur: 'CDS', roleEvalue: 'CSC', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
+  { nom: 'RTM vers TMO', description: 'Évaluation descendante des TMO', roleEvaluateur: 'RTM', roleEvalue: 'TMO', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('marketing') },
+  { nom: 'RTM vers SRMO', description: 'Évaluation descendante des SRMO', roleEvaluateur: 'RTM', roleEvalue: 'SRMO', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('marketing') },
+  { nom: 'SS vers AS', description: 'Évaluation descendante des AS', roleEvaluateur: 'SS', roleEvalue: 'AS', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('sponsoring') },
+  { nom: 'CDV vers CSC', description: 'Évaluation descendante des CSC par CDV', roleEvaluateur: 'CDV', roleEvalue: 'CSC', typeEvaluation: 'descendante', criteria: buildCriteriaBundle('commercial') },
+  { nom: 'Auto CDS', description: 'Auto-évaluation des CDS', roleEvaluateur: 'CDS', roleEvalue: 'CDS', typeEvaluation: 'auto', criteria: buildCriteriaBundle('commercial') },
+  { nom: 'Auto CDV', description: 'Auto-évaluation des CDV', roleEvaluateur: 'CDV', roleEvalue: 'CDV', typeEvaluation: 'auto', criteria: buildCriteriaBundle('commercial') },
+  { nom: 'Auto CSC', description: 'Auto-évaluation des CSC', roleEvaluateur: 'CSC', roleEvalue: 'CSC', typeEvaluation: 'auto', criteria: buildCriteriaBundle('commercial') },
+  { nom: 'Auto RTM', description: 'Auto-évaluation des RTM', roleEvaluateur: 'RTM', roleEvalue: 'RTM', typeEvaluation: 'auto', criteria: buildCriteriaBundle('marketing') },
+  { nom: 'Auto TMO', description: 'Auto-évaluation des TMO', roleEvaluateur: 'TMO', roleEvalue: 'TMO', typeEvaluation: 'auto', criteria: buildCriteriaBundle('marketing') },
+  { nom: 'Auto SRMO', description: 'Auto-évaluation des SRMO', roleEvaluateur: 'SRMO', roleEvalue: 'SRMO', typeEvaluation: 'auto', criteria: buildCriteriaBundle('marketing') },
+  { nom: 'Auto SS', description: 'Auto-évaluation des SS', roleEvaluateur: 'SS', roleEvalue: 'SS', typeEvaluation: 'auto', criteria: buildCriteriaBundle('sponsoring') },
+  { nom: 'Auto AS', description: 'Auto-évaluation des AS', roleEvaluateur: 'AS', roleEvalue: 'AS', typeEvaluation: 'auto', criteria: buildCriteriaBundle('sponsoring') },
 ];
 
 // ----- Seeded RNG for reproducibility -----
@@ -1142,19 +1173,19 @@ function randomScores(criteria: CriterionSeed[], min: number, max: number): numb
 // Generate random comment from a pool
 const COMMENTS_POOL = [
   'Bonne progression ce cycle',
-  'Performance reguliere',
-  'Axes d amelioration identifies',
-  'Bonne maitrise du poste',
+  'Performance régulière',
+  'Axes d\'amélioration identifiés',
+  'Bonne maîtrise du poste',
   'Besoin de renforcement terrain',
-  'Coordination a ameliorer',
-  'Excellent travail d equipe',
+  'Coordination à améliorer',
+  'Excellent travail d\'équipe',
   'Objectifs atteints',
   'Objectifs partiellement atteints',
   'Forte implication',
   'Engagement remarquable',
-  'Des progres notables',
+  'Des progrès notables',
   'Maintenir la dynamique',
-  'Plan de developpement necessaire',
+  'Plan de développement nécessaire',
   'Communication efficace',
   'Pilotage terrain satisfaisant',
   'Besoin de coaching supplementaire',
@@ -1164,12 +1195,12 @@ const COMMENTS_POOL = [
 ];
 
 const GLOBAL_COMMENTS = [
-  'Evaluation globale positive avec quelques axes de progres.',
-  'Collaborateur fiable et regulier.',
+  'Évaluation globale positive avec quelques axes de progrès.',
+  'Collaborateur fiable et régulier.',
   'Performance a renforcer sur les fondamentaux.',
-  'Tres bon cycle, objectifs depasses.',
+  'Très bon cycle, objectifs depasses.',
   'Niveau satisfaisant, continuer les efforts.',
-  'Evaluation a discuter lors de l entretien.',
+  'Évaluation a discuter lors de l entretien.',
   'Progres significatifs par rapport au cycle precedent.',
   'Performance stable et coherente.',
   'Des difficultes rencontrees ce cycle necessitant un accompagnement.',
@@ -1178,10 +1209,10 @@ const GLOBAL_COMMENTS = [
 
 const VALIDATION_COMMENTS = [
   'Validation du cycle courant.',
-  'Evaluation validee apres entretien.',
+  'Évaluation validée après entretien.',
   'Validation avec recommandation de suivi.',
   'Validation conforme.',
-  'Validation avec plan d amelioration.',
+  'Validation avec plan d\'amélioration.',
 ];
 
 async function upsertEvaluation(seed: EvaluationSeed) {
@@ -1266,8 +1297,8 @@ async function seedTemplatesAndRules(roleIdByName: Map<string, string>) {
 
   const templateSpecs = Object.entries(ROLE_DOMAIN).map(([roleName, domain], index) => ({
     id: `00000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`,
-    nom: `Template ${roleName}`,
-    description: `Template actif local pour ${roleName}`,
+    nom: `Modèle ${roleName}`,
+    description: `Modèle d'évaluation du rôle ${roleName}`,
     evaluatedRole: roleName,
     criteria: buildCriteriaBundle(domain),
   }));
@@ -1766,7 +1797,7 @@ async function seedNotifications() {
     {
       id: randomUUID(),
       dest: 'T1210',
-      titre: 'Rappel auto-evaluation',
+      titre: 'Rappel auto-évaluation',
       message: 'Votre auto-evaluation du cycle courant a ete soumise et attend une validation manager.',
       type: 'reminder',
       link: '/evaluations/mine',

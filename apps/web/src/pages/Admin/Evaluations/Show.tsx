@@ -1,15 +1,10 @@
 import React, { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import {
-  ArrowLeft,
-  CalendarClock,
-  CheckCircle2,
-  Download,
-  FileText,
-  MessageSquare,
-  ShieldCheck,
-} from 'lucide-react';
+import { ArrowLeft, MessageSquare, Printer } from 'lucide-react';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+import { KpiCard } from '@/Components/UI/KpiCard';
+import { formatScore } from '@/utils/helpers';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
@@ -30,9 +25,9 @@ import {
 } from '@/Components/Dashboard/RoleDashboardShared';
 
 function formatDate(value?: string | null, withTime = false) {
-  if (!value) return 'Non renseigné';
+  if (!value) return 'n.d.';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Non renseigné';
+  if (Number.isNaN(date.getTime())) return 'n.d.';
   return new Intl.DateTimeFormat('fr-FR', {
     day: 'numeric',
     month: 'long',
@@ -62,51 +57,41 @@ export default function AdminEvaluationShowPage() {
 
   return (
     <AdminEvaluationsLayout title="Détail d’une évaluation">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Link to="/admin/evaluations/history">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Retour à l’historique
+      <PageHeader
+        title={context.summary.name || 'Évaluation'}
+        description={statusHelper}
+        breadcrumbs={[
+          { label: 'Administration' },
+          { label: 'Historique des évaluations', to: '/admin/evaluations/history' },
+          { label: 'Détail' },
+        ]}
+        meta={context.periodRange
+          ? `${context.periodLabel} · ${formatDateLabel(context.periodRange.start)} – ${formatDateLabel(context.periodRange.end)}`
+          : context.periodLabel}
+        actions={(
+          <>
+            <Link to="/admin/evaluations/history">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Retour à l’historique
+              </Button>
+            </Link>
+            <Link to={`/common/evaluations/${id}`}>
+              <Button variant="outline" size="sm">Vue de l’évalué</Button>
+            </Link>
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimer
             </Button>
-          </Link>
-          <Link to={`/common/evaluations/${id}`}>
-            <Button variant="outline" size="sm">Vue utilisateur</Button>
-          </Link>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => window.print()}>
-          <Download className="mr-2 h-4 w-4" />
-          Export rapide
-        </Button>
-      </div>
+          </>
+        )}
+      />
 
-      <Card className="border-none shadow-lg">
-        <CardContent className="grid gap-6 p-6 md:grid-cols-3">
-          <div className="space-y-3 md:col-span-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <EvaluationStatusBadge statut={evaluation?.statut} />
-              <span className="text-xs text-sabc-gray-500">ID {evaluation?.id_evaluation ?? evaluation?.id}</span>
-              {context.rule.type_evaluation ? <Badge variant="primary">{formatEvaluationType(context.rule.type_evaluation)}</Badge> : null}
-            </div>
-            <h1 className="text-2xl font-semibold text-sabc-gray-900">
-              {context.summary.name || 'Évaluation'}
-            </h1>
-            <p className="text-sm text-sabc-gray-600">{statusHelper}</p>
-          </div>
-          <div className="rounded-lg border border-sabc-gray-200 bg-white p-4 text-sm">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-sabc-gray-500">
-              <FileText className="h-4 w-4" />
-              Cycle
-            </div>
-            <div className="mt-1 text-base font-semibold text-sabc-gray-900">{context.periodLabel}</div>
-            {context.periodRange ? (
-              <div className="text-xs text-sabc-gray-500">
-                {`${formatDateLabel(context.periodRange.start)} — ${formatDateLabel(context.periodRange.end)}`}
-              </div>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap items-center gap-2">
+        <EvaluationStatusBadge statut={evaluation?.statut} />
+        {context.rule.type_evaluation ? <Badge variant="outline">{formatEvaluationType(context.rule.type_evaluation)}</Badge> : null}
+        <span className="text-xs text-sabc-gray-500">Référence {evaluation?.id_evaluation ?? evaluation?.id ?? 'n.d.'}</span>
+      </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -138,26 +123,18 @@ export default function AdminEvaluationShowPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[340px,1fr]">
+      <div className="grid gap-6 md:grid-cols-[340px_1fr]">
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ShieldCheck className="h-5 w-5 text-sabc-success" />
-                Synthèse admin
-              </CardTitle>
+              <CardTitle className="text-base">Synthèse</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg bg-sabc-red-light/60 p-4 text-center">
-                <div className="text-xs uppercase tracking-wide text-sabc-red-primary/80">Note globale</div>
-                <div className="mt-2 text-4xl font-bold text-sabc-red-primary">
-                  {overallScore != null ? overallScore.toFixed(2) : '—'}<span className="text-base font-normal">/5</span>
-                </div>
-              </div>
+              <KpiCard label="Note globale" value={overallScore != null ? formatScore(overallScore) : null} />
 
               <div className="grid gap-3">
                 <div className="rounded-lg border border-sabc-gray-200 p-3 text-sm">
-                  <div className="text-xs uppercase text-sabc-gray-400">Cadre</div>
+                  <div className="text-xs font-medium text-sabc-gray-500">Cadre</div>
                   <div className="mt-1 flex flex-wrap gap-2">
                     <Badge variant="info">{context.criteriaCount} critères</Badge>
                     <Badge variant="info">{context.sections.length} sections</Badge>
@@ -165,10 +142,7 @@ export default function AdminEvaluationShowPage() {
                   </div>
                 </div>
                 <div className="rounded-lg border border-sabc-gray-200 p-3 text-sm">
-                  <div className="flex items-center gap-2 text-xs uppercase text-sabc-gray-400">
-                    <CalendarClock className="h-4 w-4" />
-                    Audit temporel
-                  </div>
+                  <div className="text-xs font-medium text-sabc-gray-500">Chronologie</div>
                   <div className="mt-2 space-y-1 text-sabc-gray-700">
                     <div>Créée le {formatDate(evaluation?.created_at, true)}</div>
                     <div>Soumise le {formatDate(evaluation?.date_soumission, true)}</div>
@@ -187,7 +161,7 @@ export default function AdminEvaluationShowPage() {
 
               {evaluation?.validateur ? (
                 <Alert>
-                  <AlertTitle>{`Décision manager: ${formatDisplayName(evaluation.validateur)}`}</AlertTitle>
+                  <AlertTitle>{`Décision du manager : ${formatDisplayName(evaluation.validateur)}`}</AlertTitle>
                   <AlertDescription>
                     {evaluation?.commentaire_validation || 'Aucun commentaire de validation renseigné.'}
                   </AlertDescription>
@@ -199,7 +173,7 @@ export default function AdminEvaluationShowPage() {
           <ActiveRulesCard
             rules={evaluation?.regle ? [context.rule] : []}
             maxItems={1}
-            description="Règle publiée attachée à cette évaluation côté admin."
+            description="Règle d’évaluation appliquée à cette évaluation."
           />
         </div>
 
@@ -221,12 +195,12 @@ export default function AdminEvaluationShowPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <div className="font-semibold text-sabc-gray-900">{critere.libelle}</div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[10px] uppercase">
+                      <div className="mt-1 flex flex-wrap gap-2">
                         <Badge variant="secondary">{critere.section}</Badge>
                         {critere.poids != null ? <Badge variant="secondary">Poids {critere.poids}</Badge> : null}
                       </div>
                     </div>
-                    <Badge variant="secondary">Note {critere.note != null ? critere.note : '—'} / 5</Badge>
+                    <Badge variant="secondary">Note {formatScore(critere.note, 0)}</Badge>
                   </div>
                   {critere.description ? <p className="mt-2 text-xs text-sabc-gray-500">{critere.description}</p> : null}
                   {critere.commentaire ? (

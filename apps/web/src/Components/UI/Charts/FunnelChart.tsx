@@ -8,14 +8,9 @@ import {
 } from 'recharts';
 import { cn } from '@/utils/helpers';
 
-const COLORS = [
-  'var(--sabc-red-primary)',
-  'var(--sabc-accent)',
-  'var(--sabc-success)',
-  'var(--sabc-info)',
-  'var(--sabc-warning)',
-  'var(--sabc-gray-400)',
-];
+import { CHART_SERIES, CHART_TOOLTIP_STYLE, formatChartNumber } from './chartTheme';
+
+const COLORS = CHART_SERIES;
 
 export interface FunnelDatum {
   name: string;
@@ -56,7 +51,7 @@ export function FunnelChart({
           ratio,
           label: formatValue
             ? formatValue(item, ratio)
-            : `${Math.round(ratio * 100)}%`,
+            : `${Math.round(ratio * 100)} %`,
         };
       }),
     [data, total, formatValue]
@@ -73,14 +68,9 @@ export function FunnelChart({
               formatter={(_value: number, _name: string, entry: any) => {
                 const datum = entry.payload as (FunnelDatum & { ratio: number; label: string });
                 const labelValue = datum.label;
-                return [`${datum.value.toLocaleString()} (${labelValue})`, datum.name];
+                return [`${formatChartNumber(datum.value, 0)} (${labelValue})`, datum.name];
               }}
-              contentStyle={{
-                backgroundColor: '#ffffff',
-                border: '1px solid var(--sabc-gray-200)',
-                borderRadius: 4,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-              }}
+              contentStyle={CHART_TOOLTIP_STYLE}
             />
           )}
           <Funnel
@@ -89,7 +79,7 @@ export function FunnelChart({
             isAnimationActive
             stroke="none"
           >
-            {showValues && <LabelList dataKey="label" position="right" fill="var(--sabc-gray-700)" />}
+            {showValues && <LabelList dataKey="label" position="right" fill="#4F4F4F" />}
           </Funnel>
         </RechartsFunnelChart>
       </ResponsiveContainer>

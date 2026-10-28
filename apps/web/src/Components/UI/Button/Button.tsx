@@ -31,13 +31,13 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-sabc-red-primary text-white shadow-sm hover:bg-sabc-red-dark hover:shadow-md dark:bg-sabc-red-primary dark:text-white dark:hover:bg-sabc-red-dark',
-        primary: 'bg-sabc-red-primary text-white shadow-sm hover:bg-sabc-red-dark hover:shadow-md dark:bg-sabc-red-primary dark:text-white dark:hover:bg-sabc-red-dark',
-        success: 'bg-sabc-success text-white shadow-sm hover:bg-sabc-success/90 hover:shadow-md',
-        warning: 'bg-sabc-warning text-white shadow-sm hover:bg-sabc-warning/90 hover:shadow-md',
-        info: 'bg-sabc-info text-white shadow-sm hover:bg-sabc-info/90 hover:shadow-md',
-        error: 'bg-sabc-error text-white shadow-sm hover:bg-sabc-error/90 hover:shadow-md',
-        destructive: 'bg-red-500 text-white shadow-sm hover:bg-red-600 hover:shadow-md dark:bg-red-500 dark:text-white dark:hover:bg-red-600',
+        default: 'bg-sabc-red-primary text-white hover:bg-sabc-red-dark dark:bg-sabc-red-primary dark:text-white dark:hover:bg-sabc-red-dark',
+        primary: 'bg-sabc-red-primary text-white hover:bg-sabc-red-dark dark:bg-sabc-red-primary dark:text-white dark:hover:bg-sabc-red-dark',
+        success: 'bg-sabc-success text-white hover:bg-sabc-success/90',
+        warning: 'bg-sabc-warning text-white hover:bg-sabc-warning/90',
+        info: 'bg-sabc-info text-white hover:bg-sabc-info/90',
+        error: 'bg-sabc-error text-white hover:bg-sabc-error/90',
+        destructive: 'bg-sabc-error text-white hover:bg-sabc-red-dark',
         outline: 'border border-sabc-gray-200 bg-white hover:bg-sabc-gray-50 hover:border-sabc-gray-300 dark:border-sabc-gray-700 dark:bg-transparent dark:text-sabc-gray-200 dark:hover:bg-sabc-gray-800/50 dark:hover:border-sabc-gray-600',
         secondary: 'bg-sabc-gray-100 text-sabc-gray-700 hover:bg-sabc-gray-200 dark:bg-sabc-gray-800 dark:text-sabc-gray-200 dark:hover:bg-sabc-gray-700',
         ghost: 'text-sabc-gray-700 hover:bg-sabc-gray-100 dark:text-sabc-gray-200 dark:hover:bg-sabc-gray-800/50',

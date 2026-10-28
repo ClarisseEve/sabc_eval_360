@@ -16,46 +16,17 @@ import {
 import { evaluationsApi, periodesApi } from '@/Services/api';
 import { EvaluationPageLayout, formatDisplayName } from './shared';
 import { buildCommonHistoryParams } from './history-query';
-import { History } from 'lucide-react';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+import {
+  formatEvaluationType,
+  formatStatusLabel,
+  getStatusBadgeVariant,
+} from '@/Components/Dashboard/RoleDashboardShared';
+import { formatDateFr, formatScore } from '@/utils/helpers';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Evaluation = Record<string, any>;
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const STATUT_LABELS: Record<string, string> = {
-  brouillon: 'Brouillon',
-  soumis: 'Soumis',
-  valide: 'Validé',
-  rejete: 'Rejeté',
-};
-
-const TYPE_LABELS: Record<string, string> = {
-  auto: 'Auto-évaluation',
-  descendante: 'Descendante',
-  pairs: 'Entre pairs',
-  ascendante: 'Ascendante',
-};
-
-function statutBadgeVariant(statut: string): 'default' | 'primary' | 'success' | 'error' | 'warning' | 'secondary' {
-  switch (statut) {
-    case 'valide':    return 'success';
-    case 'soumis':    return 'primary';
-    case 'rejete':    return 'error';
-    case 'brouillon': return 'secondary';
-    default:          return 'default';
-  }
-}
-
-function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return '—';
-  try {
-    return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -106,24 +77,18 @@ const Historique: React.FC = () => {
       <Head title="Historique des évaluations" />
 
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        {/* ── Header ── */}
-        <Card className="border-none bg-white shadow-lg">
-          <CardContent className="flex flex-col gap-4 p-6">
-            <div className="flex items-center gap-3">
-              <History className="h-7 w-7 text-sabc-red-primary" />
-              <div>
-                <h1 className="text-2xl font-semibold text-sabc-gray-900">Historique des évaluations</h1>
-                <p className="text-sm text-sabc-gray-500">
-                  Consultez l'ensemble de vos évaluations passées et filtrez par statut, période ou type.
-                </p>
-              </div>
-            </div>
+        <PageHeader
+          title="Historique des évaluations"
+          description="Consultez l’ensemble de vos évaluations passées et filtrez par statut, période ou type."
+        />
 
+        <Card>
+          <CardContent className="p-4">
             {/* ── Filters ── */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               {/* Statut */}
               <div className="flex flex-col gap-1 sm:w-48">
-                <span className="text-xs font-medium text-sabc-gray-500 uppercase tracking-wide">Statut</span>
+                <span className="text-sm font-medium text-sabc-gray-700">Statut</span>
                 <Select value={statut} onValueChange={handleStatutChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Tous les statuts" />
@@ -131,16 +96,16 @@ const Historique: React.FC = () => {
                   <SelectContent>
                     <SelectItem value="tous">Tous</SelectItem>
                     <SelectItem value="brouillon">Brouillon</SelectItem>
-                    <SelectItem value="soumis">Soumis</SelectItem>
-                    <SelectItem value="valide">Validé</SelectItem>
-                    <SelectItem value="rejete">Rejeté</SelectItem>
+                    <SelectItem value="soumis">Soumise</SelectItem>
+                    <SelectItem value="valide">Validée</SelectItem>
+                    <SelectItem value="rejete">Rejetée</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Période */}
               <div className="flex flex-col gap-1 sm:w-56">
-                <span className="text-xs font-medium text-sabc-gray-500 uppercase tracking-wide">Période</span>
+                <span className="text-sm font-medium text-sabc-gray-700">Période</span>
                 <Select value={periode} onValueChange={handlePeriodeChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Toutes les périodes" />
@@ -158,7 +123,7 @@ const Historique: React.FC = () => {
 
               {/* Type */}
               <div className="flex flex-col gap-1 sm:w-48">
-                <span className="text-xs font-medium text-sabc-gray-500 uppercase tracking-wide">Type</span>
+                <span className="text-sm font-medium text-sabc-gray-700">Type</span>
                 <Select value={type} onValueChange={handleTypeChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Tous les types" />
@@ -166,16 +131,16 @@ const Historique: React.FC = () => {
                   <SelectContent>
                     <SelectItem value="tous">Tous</SelectItem>
                     <SelectItem value="auto">Auto-évaluation</SelectItem>
-                    <SelectItem value="descendante">Descendante</SelectItem>
-                    <SelectItem value="pairs">Entre pairs</SelectItem>
-                    <SelectItem value="ascendante">Ascendante</SelectItem>
+                    <SelectItem value="descendante">Évaluation descendante</SelectItem>
+                    <SelectItem value="pairs">Évaluation pair</SelectItem>
+                    <SelectItem value="ascendante">Évaluation ascendante</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Result count */}
-              <div className="mt-auto hidden text-sm text-sabc-gray-400 sm:block">
-                {total} résultat{total !== 1 ? 's' : ''}
+              <div className="hidden pb-2 text-sm text-sabc-gray-500 sm:ml-auto sm:block" aria-live="polite">
+                {total} résultat{total > 1 ? 's' : ''}
               </div>
             </div>
           </CardContent>
@@ -192,15 +157,14 @@ const Historique: React.FC = () => {
           <Alert variant="destructive">
             <AlertTitle>Erreur</AlertTitle>
             <AlertDescription>
-              Impossible de charger l'historique des évaluations. Veuillez réessayer.
+              Impossible de charger l’historique des évaluations. Veuillez réessayer.
             </AlertDescription>
           </Alert>
         )}
 
         {!isLoading && !isError && evaluations.length === 0 && (
           <Alert>
-            <History className="h-4 w-4" />
-            <AlertTitle>Aucune évaluation dans l'historique</AlertTitle>
+            <AlertTitle>Aucune évaluation dans l’historique</AlertTitle>
             <AlertDescription>
               Aucune évaluation ne correspond aux filtres sélectionnés.
             </AlertDescription>
@@ -211,15 +175,15 @@ const Historique: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                Évaluations — page {currentPage} / {totalPages}
+                Évaluations ({total})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-sabc-gray-100">
                 {evaluations.map((ev) => {
                   const evalueName = formatDisplayName(ev.evalue ?? {});
-                  const statutLabel = STATUT_LABELS[ev.statut] ?? ev.statut ?? '—';
-                  const typeLabel   = TYPE_LABELS[ev.type_evaluation] ?? ev.type_evaluation ?? '—';
+                  const statutLabel = formatStatusLabel(ev.statut);
+                  const typeLabel   = formatEvaluationType(ev.type_evaluation);
                   const regleLabel  = ev.regle?.nom_regle ?? ev.regle?.libelle ?? typeLabel;
                   const note        = ev.note_globale ?? ev.score_global ?? null;
                   const dateRef     = ev.date_soumission ?? ev.updated_at ?? ev.created_at;
@@ -235,8 +199,8 @@ const Historique: React.FC = () => {
                           {evalueName}
                         </span>
                         <span className="text-sm text-sabc-gray-500">{regleLabel}</span>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-sabc-gray-400">
-                          {dateRef && <span>{formatDate(dateRef)}</span>}
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-sabc-gray-500">
+                          {dateRef && <span>{formatDateFr(dateRef)}</span>}
                           {ev.periode?.nom_periode && (
                             <span className="rounded bg-sabc-gray-100 px-1.5 py-0.5">
                               {ev.periode.nom_periode}
@@ -248,11 +212,11 @@ const Historique: React.FC = () => {
                       {/* Right: badge + note + action */}
                       <div className="flex flex-shrink-0 items-center gap-3">
                         {note != null && (
-                          <span className="text-sm font-semibold text-sabc-gray-700">
-                            {typeof note === 'number' ? note.toFixed(1) : note} / 5
+                          <span className="text-sm font-semibold tabular-nums text-sabc-gray-700">
+                            {formatScore(note)}
                           </span>
                         )}
-                        <Badge variant={statutBadgeVariant(ev.statut)}>
+                        <Badge variant={getStatusBadgeVariant(ev.statut)}>
                           {statutLabel}
                         </Badge>
                         <Button
@@ -281,7 +245,7 @@ const Historique: React.FC = () => {
             >
               Précédent
             </Button>
-            <span className="text-sm text-sabc-gray-500">
+            <span className="text-sm text-sabc-gray-500" aria-live="polite">
               Page {currentPage} sur {totalPages}
             </span>
             <Button

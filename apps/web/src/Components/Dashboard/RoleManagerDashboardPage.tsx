@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatPersonName } from '@/utils/helpers';
+import { formatPersonName, formatScore, formatPercent } from '@/utils/helpers';
 import {
   Bar,
   BarChart,
@@ -27,6 +27,7 @@ import {
   formatDateLabel,
   formatEvaluationType,
   getStatusBadgeVariant,
+  formatStatusLabel,
   navigateTo,
 } from './RoleDashboardShared';
 import { TruncatedList } from '@/Components/UI/TruncatedList/TruncatedList';
@@ -108,29 +109,25 @@ export default function RoleManagerDashboardPage({
           label="Actions à traiter"
           value={data.pendingEvaluations.length + data.toValidateEvaluations.length}
           caption={`${data.pendingEvaluations.length} brouillon(s), ${data.toValidateEvaluations.length} validation(s)`}
-          accentClassName="border-l-sabc-red-primary"
         />
         <MetricCard
           label={data.canSeeSelfScore ? 'Mon score global' : 'Évaluations données'}
-          value={data.canSeeSelfScore && data.selfScores.scoreGlobal != null ? `${data.selfScores.scoreGlobal}/5` : data.givenEvaluations.length}
+          value={data.canSeeSelfScore && data.selfScores.scoreGlobal != null ? formatScore(data.selfScores.scoreGlobal) : data.givenEvaluations.length}
           caption={
             data.canSeeSelfScore && data.selfScores.scorePondere != null
-              ? `Score pondéré: ${data.selfScores.scorePondere}/5`
+              ? `Score pondéré : ${formatScore(data.selfScores.scorePondere)}`
               : 'Historique de vos évaluations soumises'
           }
-          accentClassName="border-l-sabc-info"
         />
         <MetricCard
           label="Score moyen équipe"
-          value={data.teamAverageScore > 0 ? `${data.teamAverageScore}/5` : '—'}
+          value={data.teamAverageScore > 0 ? formatScore(data.teamAverageScore) : 'n.d.'}
           caption={`${data.teamMembers.length} collaborateur(s) dans le périmètre direct`}
-          accentClassName="border-l-sabc-success"
         />
         <MetricCard
           label="Taux de couverture"
-          value={`${data.completionRate}%`}
+          value={formatPercent(data.completionRate)}
           caption="Part de l’équipe avec score consolidé"
-          accentClassName="border-l-sabc-accent"
         />
       </div>
 
@@ -156,7 +153,7 @@ export default function RoleManagerDashboardPage({
                         return (
                           <div className="rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 shadow-lg dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
                             <div className="mb-1 text-xs font-semibold text-sabc-gray-500">{label}</div>
-                            <div className="text-sm font-semibold text-sabc-gray-900">{Number(payload[0].value).toFixed(2)}/5</div>
+                            <div className="text-sm font-semibold text-sabc-gray-900">{formatScore(payload[0].value, 2)}</div>
                           </div>
                         );
                       }}
@@ -241,7 +238,7 @@ export default function RoleManagerDashboardPage({
                         {formatPersonName(evaluation.evalue, evaluation.evalue_matricule || 'Collaborateur')}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{evaluation.statut}</Badge>
+                        <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{formatStatusLabel(evaluation.statut)}</Badge>
                         <span className="text-xs text-sabc-gray-500 dark:text-sabc-gray-400">
                           {formatDateLabel(evaluation.date_soumission || evaluation.date_creation)}
                         </span>

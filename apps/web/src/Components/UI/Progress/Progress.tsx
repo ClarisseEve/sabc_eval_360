@@ -77,7 +77,7 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
     const actualIndicatorVariant = indicatorVariant || variant;
     
     return (
-      <div className="relative">
+      <div className={cn('relative', className)}>
         {showValue && valuePosition === 'top' && (
           <div className="mb-1 flex justify-end text-xs font-medium text-sabc-gray-500 dark:text-sabc-gray-400">
             {Math.round(percentage)}%
@@ -86,7 +86,7 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
         
         <div
           ref={ref}
-          className={cn(progressVariants({ variant, size, className }))}
+          className={cn(progressVariants({ variant, size }))}
           {...props}
         >
           <div

@@ -40,8 +40,9 @@ const tabsTriggerVariants = cva(
           'text-sabc-gray-500 data-[state=active]:bg-white data-[state=active]:text-sabc-gray-900 data-[state=active]:shadow-sm data-[state=active]:font-semibold dark:data-[state=active]:bg-sabc-gray-900 dark:data-[state=active]:text-sabc-gray-50',
         primary:
           'relative h-9 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-medium text-sabc-gray-500 shadow-none transition-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:scale-x-0 after:bg-sabc-red-primary after:transition-transform hover:text-sabc-gray-900 data-[state=active]:border-b-0 data-[state=active]:text-sabc-red-primary data-[state=active]:shadow-none data-[state=active]:after:scale-x-100 dark:text-sabc-gray-400 dark:hover:text-sabc-gray-50 dark:data-[state=active]:text-sabc-red-400',
+        // Onglet actif: fond clair et bordure rouge fine, sans aplat ni ombre.
         card:
-          'rounded-lg border border-sabc-gray-200 bg-white px-4 py-2 font-medium text-sabc-gray-400 shadow-none transition-all duration-200 hover:bg-sabc-gray-50 hover:text-sabc-gray-700 data-[state=active]:border-sabc-red-primary data-[state=active]:bg-sabc-red-primary data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-sabc-red-primary/25 data-[state=active]:font-semibold dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-500 dark:hover:bg-sabc-gray-800 dark:hover:text-sabc-gray-200 dark:data-[state=active]:border-sabc-red-400 dark:data-[state=active]:bg-sabc-red-500 dark:data-[state=active]:text-white dark:data-[state=active]:shadow-sabc-red-500/30',
+          'rounded-lg border border-sabc-gray-200 bg-white px-4 py-2 font-medium text-sabc-gray-500 transition-colors hover:text-sabc-gray-800 data-[state=active]:border-sabc-red-primary data-[state=active]:text-sabc-red-primary dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-400 dark:data-[state=active]:border-sabc-red-primary dark:data-[state=active]:text-sabc-red-primary',
       },
     },
     defaultVariants: {
@@ -156,11 +157,6 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
         role="tab"
         id={id ?? tabDomId(baseId, 'tab', value)}
         className={cn(tabsTriggerVariants({ variant: tabsVariant, className }))}
-        style={
-          isSelected && tabsVariant === 'card'
-            ? { backgroundColor: 'var(--sabc-red-primary)', color: 'white', borderColor: 'var(--sabc-red-primary)' }
-            : undefined
-        }
         aria-selected={isSelected}
         aria-controls={tabDomId(baseId, 'panel', value)}
         tabIndex={isSelected ? 0 : -1}

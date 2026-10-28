@@ -10,6 +10,7 @@ import { NAV_ITEMS, VALIDATION_QUEUE_ROLES, resolveHref } from '@/config/nav';
 import { normalizeRole, type Role } from '@/config/rbac';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import api, { hierarchyApi } from '@/Services/api';
+import { BrandLockup } from '@/Components/Brand/BrandMark';
 
 // Types pour les éléments de navigation
 interface NavItem {
@@ -92,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const activeSearch = location.search;
 
   // Détermine si un href (avec ou sans query string ?tab=...) correspond à la route active
-  const isHrefActive = React.useCallback((href: string): boolean => {
+  const matchesHref = React.useCallback((href: string): boolean => {
     if (!href || href === '#') return false;
     const [hrefPath, hrefQuery] = href.split('?');
     if (activePath !== hrefPath && !activePath.startsWith(hrefPath + '/')) {
@@ -124,6 +125,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     return filterByRole(NAV_ITEMS as NavItem[]);
   }, [canValidate, hasDirectReports, roleCode]);
+
+  // Un seul lien actif: si /admin/utilisateurs/gaps correspond, /admin/utilisateurs
+  // (simple préfixe) ne doit pas s'allumer en même temps.
+  const allHrefs = React.useMemo(() => {
+    const out: string[] = [];
+    const walk = (items: NavItem[]) => items.forEach((it) => { if (it.href && it.href !== '#') out.push(it.href); if (it.children) walk(it.children); });
+    walk(mainMenuItems);
+    return out;
+  }, [mainMenuItems]);
+
+  const isHrefActive = React.useCallback((href: string): boolean => {
+    if (!matchesHref(href)) return false;
+    const path = href.split('?')[0];
+    return !allHrefs.some((other) => {
+      const otherPath = other.split('?')[0];
+      return otherPath !== path && otherPath.startsWith(path + '/') && matchesHref(other);
+    });
+  }, [allHrefs, matchesHref]);
   
   // Ouvrir automatiquement le parent si un sous-menu est actif (sans écraser les dépliages manuels)
   useEffect(() => {
@@ -321,10 +340,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return (
       <li key={item.title} className={cn(
         "rounded-lg relative",
-        (isActive || hasActiveChild) && "bg-sabc-red-primary/8 dark:bg-sabc-red-primary/15"
+        isActive && !hasChildren && "bg-sabc-red-primary/8 dark:bg-sabc-red-primary/15"
       )}>
-        {(isActive || hasActiveChild) && (
-          <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-sabc-red-primary rounded-full" />
+        {isActive && !hasChildren && (
+          <div className="absolute left-0 top-1 bottom-1 w-[3px] bg-sabc-red-primary rounded-full" />
         )}
         {content}
         {hasChildren && isExpanded && !isCollapsed && (
@@ -341,7 +360,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id="app-sidebar"
       aria-label="Navigation principale"
       className={cn(
-        "fixed inset-y-0 left-0 z-50 flex h-dvh w-72 max-w-[85vw] flex-col bg-white shadow-[1px_0_3px_rgba(0,0,0,0.04)] transition-[width,transform] duration-300 ease-in-out dark:bg-sabc-gray-900 dark:shadow-[1px_0_3px_rgba(0,0,0,0.2)] lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:max-w-none lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 flex h-dvh w-72 max-w-[85vw] flex-col border-r border-sabc-gray-200 bg-white transition-[width,transform] duration-300 ease-in-out dark:border-sabc-gray-800 dark:bg-sabc-gray-900 lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:max-w-none lg:translate-x-0",
         isMobileOpen ? "visible translate-x-0" : "invisible -translate-x-full lg:visible",
         isCollapsed ? "lg:w-16" : "lg:w-60",
         className
@@ -349,15 +368,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       {/* En-tête du sidebar avec logo et bouton toggle */}
       <div className="flex h-16 items-center justify-between border-b border-sabc-gray-200 px-4 dark:border-sabc-gray-800">
-        {!isCollapsed && (
-          <div className="flex items-center">
-            <img 
-              src="/images/logos/sabc-logo.png"
-              alt="SABC Logo"
-              className="h-14 w-auto object-contain"
-            />
-          </div>
-        )}
+        {/* Replié, la colonne ne laisse place qu'au bouton de dépliage. */}
+        {!isCollapsed && <BrandLockup compact />}
         <Button
           variant="ghost"
           size="icon"

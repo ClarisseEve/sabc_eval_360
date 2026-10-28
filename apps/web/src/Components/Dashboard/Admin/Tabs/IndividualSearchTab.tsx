@@ -13,6 +13,7 @@ import {
   SubjectSummaryCard,
 } from '@/Components/Dashboard/IndividualAnalyticsCards';
 import { getAdminDisplayName, useAdminIndividualSearchTabData } from '@/Hooks/queries/useAdminDashboardTabs';
+import { formatScore } from '@/utils/helpers';
 
 const getFullName = getAdminDisplayName;
 
@@ -58,23 +59,26 @@ export default function IndividualSearchTab() {
         <div className="space-y-5">
           <SubjectSummaryCard
             title={getFullName(selectedUser)}
-            description={`${selectedUser.role_nom || selectedUser.role} · ${selectedUser.region?.nom_region || selectedUser.region_nom || 'Région non renseignée'} · manager ${selectedUser.manager_matricule || '—'}`}
+            description={`${selectedUser.role_nom || selectedUser.role} · ${selectedUser.region?.nom_region || selectedUser.region_nom || 'Région non renseignée'} · responsable ${selectedUser.manager_matricule || 'n.d.'}`}
             metrics={[
               {
                 label: 'Score global',
-                value: scores?.score_global != null ? `${scores.score_global}/5` : '—',
+                value: formatScore(scores?.score_global),
               },
               {
                 label: 'Score pondéré',
-                value: scores?.score_pondere != null ? `${scores.score_pondere}/5` : '—',
+                value: formatScore(scores?.score_pondere),
               },
               {
                 label: 'Progression',
-                value: `${scores?.progression > 0 ? '+' : ''}${scores?.progression ?? 0}`,
+                value:
+                  scores?.progression == null || !Number.isFinite(Number(scores.progression))
+                    ? 'n.d.'
+                    : `${Number(scores.progression) > 0 ? '+' : ''}${Number(scores.progression).toLocaleString('fr-FR', { maximumFractionDigits: 2 })}`,
               },
               {
                 label: 'Évaluations reçues',
-                value: receivedEvaluations.length,
+                value: receivedEvaluations.length.toLocaleString('fr-FR'),
               },
             ]}
           />
@@ -86,13 +90,13 @@ export default function IndividualSearchTab() {
           <div className="grid gap-5 xl:grid-cols-2">
             <ScoresByTypeCard
               title="Scores par type"
-              description="Distribution consolidée des évaluations reçues"
+              description="Score moyen des évaluations reçues, par type."
               entries={scoreByType}
             />
 
             <HierarchyChainCard
               title="Chaîne hiérarchique"
-              description="Positionnement organisationnel du collaborateur"
+              description="Place du collaborateur dans l’organisation."
               nodes={chain}
               selectedMatricule={selectedMatricule}
               onSelect={setSelectedMatricule}
@@ -103,7 +107,7 @@ export default function IndividualSearchTab() {
           <div className="grid gap-5 xl:grid-cols-2">
             <HierarchyFocusCard
               title="Branche hiérarchique sélectionnée"
-              description="Navigation de branche à partir du collaborateur sélectionné"
+              description="Collaborateurs rattachés au collaborateur sélectionné."
               focus={focusUser}
               members={branchMembers}
               onSelect={setSelectedMatricule}
@@ -113,27 +117,27 @@ export default function IndividualSearchTab() {
 
             <HierarchyBreakdownCard
               title="Répartition par niveau"
-              description="Coupe hiérarchique de la branche chargée"
+              description="Nombre de collaborateurs par niveau hiérarchique."
               members={focusUser ? [focusUser, ...branchMembers] : []}
-              emptyMessage="Aucun descendant n’est disponible pour construire la coupe hiérarchique."
+              emptyMessage="Aucun collaborateur rattaché."
             />
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">
             <EvaluationHistoryTableCard
-              title="Qui a donné quel score"
-              description="Évaluations reçues par le collaborateur sélectionné"
+              title="Évaluations reçues"
+              description="Score attribué par chaque évaluateur."
               evaluations={receivedEvaluations}
               emptyMessage="Aucune évaluation reçue n’est disponible."
               subjectHeader="Évaluateur"
               subjectCell={(evaluation: any) => getFullName(evaluation.evaluateur)}
               secondaryHeader="Rôle"
-              secondaryCell={(evaluation: any) => evaluation.evaluateur?.role_nom || evaluation.evaluateur?.role || '—'}
+              secondaryCell={(evaluation: any) => evaluation.evaluateur?.role_nom || evaluation.evaluateur?.role || 'n.d.'}
             />
 
             <EvaluationHistoryTableCard
               title="Évaluations données"
-              description="Historique des notations réalisées par ce collaborateur"
+              description="Évaluations réalisées par ce collaborateur."
               evaluations={givenEvaluations}
               emptyMessage="Aucune évaluation donnée n’est disponible."
               subjectHeader="Évalué"
@@ -144,13 +148,13 @@ export default function IndividualSearchTab() {
           <div className="grid gap-5 xl:grid-cols-2">
             <ImprovementAxesListCard
               title="Axes d’amélioration"
-              description="Faiblesses prioritaires remontées par les évaluations validées"
+              description="Points faibles prioritaires issus des évaluations validées."
               axes={axes}
             />
 
             <RecommendationsListCard
               title="Recommandations"
-              description="Actions suggérées par le moteur analytics"
+              description="Actions proposées à partir des résultats."
               recommendations={recommendations}
             />
           </div>

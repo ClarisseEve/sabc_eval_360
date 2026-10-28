@@ -8,7 +8,7 @@ const TMODashboard: React.FC = () => (
     <Suspense fallback={<DashboardSkeleton />}>
       <RoleIndividualDashboardPage
         fallbackRole="TMO"
-        title="Tableau de bord Trade Marketing Operator"
+        title="Tableau de bord Opérateur trade marketing"
         subtitle="Mon activité, mes scores et les évaluations à traiter dans le cycle courant."
       />
     </Suspense>

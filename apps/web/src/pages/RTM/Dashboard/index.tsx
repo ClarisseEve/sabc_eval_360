@@ -8,7 +8,7 @@ const RTMDashboard: React.FC = () => (
     <Suspense fallback={<DashboardSkeleton />}>
       <RoleManagerDashboardPage
         fallbackRole="RTM"
-        title="Tableau de bord Regional Trade Marketing"
+        title="Tableau de bord Trade marketing régional"
         subtitle="Indicateurs réels des évaluations et de la performance marketing régionale."
         teamTitle="Équipe marketing régionale"
       />

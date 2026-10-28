@@ -2,7 +2,7 @@ import * as React from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CheckCircle, AlertCircle, Save, Send } from 'lucide-react';
-import { cn } from '@/utils/helpers';
+import { cn, formatScore } from '@/utils/helpers';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/Components/UI/Card/Card';
 import { Slider } from '@/Components/UI/Slider/Slider';
@@ -330,7 +330,7 @@ export const EvaluationForm: React.FC<EvaluationFormProps> = ({
                             style={{ width: `${(rating / 5) * 100}%` }}
                           />
                         </div>
-                        <span className="ml-2 text-sm font-medium">{rating}/5</span>
+                        <span className="ml-2 text-sm font-medium">{formatScore(rating)}</span>
                       </div>
                     )}
                     

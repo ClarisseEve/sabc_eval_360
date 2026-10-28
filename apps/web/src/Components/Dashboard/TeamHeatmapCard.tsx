@@ -7,6 +7,7 @@ import {
   buildTeamHeatmapView,
   type TeamHeatmapResponse,
 } from './team-heatmap-data';
+import { formatScore } from '@/utils/helpers';
 
 type TeamHeatmapCardProps = {
   data: TeamHeatmapResponse | undefined;
@@ -71,14 +72,14 @@ export function TeamHeatmapCard({
               {view.forceCollective && (
                 <p className="rounded-md border-l-4 border-sabc-success bg-sabc-gray-50 px-3 py-2 text-sm text-sabc-gray-700 dark:bg-sabc-gray-800 dark:text-sabc-gray-200">
                   <span className="font-medium">Force collective — </span>
-                  {view.forceCollective.critere} : {view.forceCollective.moyenne.toFixed(2)}/5 de
+                  {view.forceCollective.critere} : {formatScore(view.forceCollective.moyenne, 2)} de
                   moyenne d’équipe.
                 </p>
               )}
               {view.axeADevelopper && (
                 <p className="rounded-md border-l-4 border-sabc-warning bg-sabc-gray-50 px-3 py-2 text-sm text-sabc-gray-700 dark:bg-sabc-gray-800 dark:text-sabc-gray-200">
                   <span className="font-medium">Axe à développer — </span>
-                  {view.axeADevelopper.critere} : {view.axeADevelopper.moyenne.toFixed(2)}/5,
+                  {view.axeADevelopper.critere} : {formatScore(view.axeADevelopper.moyenne, 2)},
                   {' '}
                   {view.axeADevelopper.partSousLeSeuil}% de l’équipe sous le niveau compétent.
                 </p>
@@ -86,7 +87,7 @@ export function TeamHeatmapCard({
               {view.relais && (
                 <p className="rounded-md border-l-4 border-sabc-info bg-sabc-gray-50 px-3 py-2 text-sm text-sabc-gray-700 dark:bg-sabc-gray-800 dark:text-sabc-gray-200">
                   <span className="font-medium">Relais interne — </span>
-                  {nomDe(view.relais.matricule)} atteint {view.relais.note.toFixed(1)}/5 en{' '}
+                  {nomDe(view.relais.matricule)} atteint {formatScore(view.relais.note, 1)} en{' '}
                   {view.relais.critere} et peut faire monter l’équipe sur cet axe.
                 </p>
               )}

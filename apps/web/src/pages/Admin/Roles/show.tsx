@@ -15,6 +15,27 @@ import { useToast } from '@/Contexts/ToastContext';
 import { AdminRolesLayout } from './shared';
 import { paginateList } from '@/utils/adminUi';
 
+const PERMISSIONS: Array<{ key: string; label: string }> = [
+  { key: 'peut_auto_evaluer', label: 'Auto-évaluation' },
+  { key: 'peut_evaluer_pairs', label: 'Évaluation des pairs' },
+  { key: 'peut_evaluer_subordonnes', label: 'Évaluation des subordonnés' },
+  { key: 'peut_cross_branch', label: 'Évaluation hors de sa branche' },
+];
+
+function capitalize(value: unknown): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase().replace(/_/g, ' ');
+}
+
+function statusVariant(label: string | null): 'success' | 'warning' | 'error' | 'secondary' {
+  const key = String(label ?? '').toLowerCase();
+  if (key === 'actif') return 'success';
+  if (key === 'indisponible') return 'warning';
+  if (key === 'suspendu') return 'error';
+  return 'secondary';
+}
+
 export default function ShowRole() {
   const { id = '' } = useParams();
   const { data } = useAdminRole(id);
@@ -37,11 +58,11 @@ export default function ShowRole() {
 
   const handleToggle = async () => {
     const ok = await confirm({
-      title: 'Basculer l’auto-évaluation pour ce rôle ?',
+      title: data?.peut_auto_evaluer ? 'Désactiver l’auto-évaluation pour ce rôle ?' : 'Activer l’auto-évaluation pour ce rôle ?',
       description: data?.peut_auto_evaluer
         ? 'L’auto-évaluation sera désactivée pour ce rôle.'
         : 'L’auto-évaluation sera activée pour ce rôle.',
-      confirmLabel: 'Basculer',
+      confirmLabel: data?.peut_auto_evaluer ? 'Désactiver' : 'Activer',
     });
     if (ok) updateMutation.mutate();
   };
@@ -67,26 +88,31 @@ export default function ShowRole() {
           <>
             <Link to="/admin/roles"><Button variant="outline">Retour</Button></Link>
             <Button variant="outline" onClick={handleToggle} disabled={updateMutation.isPending}>
-              Basculer auto-évaluation
+              {role?.peut_auto_evaluer ? 'Désactiver l’auto-évaluation' : 'Activer l’auto-évaluation'}
             </Button>
           </>
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <Card>
           <CardHeader><CardTitle>Détails</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div><span className="font-medium">Code:</span> {role?.id_role}</div>
-            <div><span className="font-medium">Branche:</span> {role?.id_branche}</div>
-            <div><span className="font-medium">Portée:</span> {role?.portee_geographique}</div>
-            <div><span className="font-medium">Niveau tanière:</span> {role?.niveau_taniere ?? 'N/A'}</div>
-            <div><span className="font-medium">Niveau non tanière:</span> {role?.niveau_non_taniere ?? 'N/A'}</div>
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Badge variant={role?.peut_auto_evaluer ? 'success' : 'secondary'}>Auto</Badge>
-              <Badge variant={role?.peut_evaluer_pairs ? 'success' : 'secondary'}>Pairs</Badge>
-              <Badge variant={role?.peut_evaluer_subordonnes ? 'success' : 'secondary'}>Subordonnés</Badge>
-              <Badge variant={role?.peut_cross_branch ? 'success' : 'secondary'}>Inter-branches</Badge>
+            <div><span className="font-medium">Code :</span> {role?.id_role || 'n.d.'}</div>
+            <div><span className="font-medium">Branche :</span> {role?.branche?.nom_branche || role?.id_branche || 'Toutes les branches'}</div>
+            <div><span className="font-medium">Portée :</span> {capitalize(role?.portee_geographique) ?? 'n.d.'}</div>
+            <div><span className="font-medium">Niveau en région tanière :</span> {role?.niveau_taniere ?? 'n.d.'}</div>
+            <div><span className="font-medium">Niveau hors tanière :</span> {role?.niveau_non_taniere ?? 'n.d.'}</div>
+            <div className="border-t border-sabc-gray-200 pt-3">
+              <div className="mb-2 font-medium">Droits d’évaluation</div>
+              <ul className="space-y-1.5">
+                {PERMISSIONS.map(({ key, label }) => (
+                  <li key={key} className="flex items-center justify-between gap-3">
+                    <span className="text-sabc-gray-700">{label}</span>
+                    <Badge variant={role?.[key] ? 'success' : 'secondary'}>{role?.[key] ? 'Autorisé' : 'Non autorisé'}</Badge>
+                  </li>
+                ))}
+              </ul>
             </div>
           </CardContent>
         </Card>
@@ -97,7 +123,7 @@ export default function ShowRole() {
             {users.length === 0 ? (
               <EmptyState title="Aucun utilisateur" description="Aucun utilisateur n’est affecté à ce rôle." />
             ) : (
-              <Table>
+              <Table className="min-w-[420px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Matricule</TableHead>
@@ -110,7 +136,12 @@ export default function ShowRole() {
                     <TableRow key={user.matricule}>
                       <TableCell>{user.matricule}</TableCell>
                       <TableCell>{[user.prenom, user.nom].filter(Boolean).join(' ')}</TableCell>
-                      <TableCell>{user.statut}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const label = capitalize(user.statut) ?? (user.est_actif === false ? 'Inactif' : user.est_actif ? 'Actif' : null);
+                          return label ? <Badge variant={statusVariant(label)}>{label}</Badge> : 'n.d.';
+                        })()}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

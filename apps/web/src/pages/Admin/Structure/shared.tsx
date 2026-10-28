@@ -21,7 +21,7 @@ export function AdminStructureLayout({
   return (
     <AppLayout user={layoutUser} pageTitle={title} notifications={[]}>
       <Head title={title} />
-      <div className="space-y-6 p-6">{children}</div>
+      <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8">{children}</div>
     </AppLayout>
   );
 }

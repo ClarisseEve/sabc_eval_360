@@ -18,7 +18,7 @@ export function PeriodeStatusBadge({ statut, estOuverte }: { statut?: string; es
     cloturee: { label: 'Clôturée', variant: 'secondary' },
     clôturée: { label: 'Clôturée', variant: 'secondary' },
   };
-  const meta = map[key] ?? { label: statut || '—', variant: 'secondary' as BadgeVariant };
+  const meta = map[key] ?? { label: statut || 'n.d.', variant: 'secondary' as BadgeVariant };
   return <Badge variant={meta.variant}>{meta.label}</Badge>;
 }
 
@@ -37,7 +37,7 @@ export function EvaluationStatusBadge({ statut }: { statut?: string }) {
     rejetee: { label: 'Rejeté', variant: 'error' },
     rejetée: { label: 'Rejeté', variant: 'error' },
   };
-  const meta = map[key] ?? { label: statut || '—', variant: 'secondary' as BadgeVariant };
+  const meta = map[key] ?? { label: statut || 'n.d.', variant: 'secondary' as BadgeVariant };
   return <Badge variant={meta.variant}>{meta.label}</Badge>;
 }
 
@@ -59,7 +59,7 @@ export function AdminEvaluationsLayout({
   return (
     <AppLayout user={layoutUser} pageTitle={title} notifications={[]}>
       <Head title={title} />
-      <div className="space-y-6 p-6">{children}</div>
+      <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8">{children}</div>
     </AppLayout>
   );
 }

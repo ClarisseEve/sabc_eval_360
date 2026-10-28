@@ -14,7 +14,7 @@ const SRMODashboard: React.FC = () => (
     <Suspense fallback={<DashboardSkeleton />}>
       <RoleIndividualDashboardPage
         fallbackRole="SRMO"
-        title="Tableau de bord Superviseur Régional Marketing Opérationnel"
+        title="Tableau de bord Superviseur régional marketing opérationnel"
         subtitle="Suivi de vos évaluations et de votre progression."
       />
     </Suspense>

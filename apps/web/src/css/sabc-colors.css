@@ -37,7 +37,7 @@
   --sabc-success: #2F855A;        /* Validations, lisible sur fond clair */
   --sabc-warning: #975A16;        /* Alertes, lisible sur fond clair */
   --sabc-error: #C53030;          /* Erreurs, contraste AA sur fond clair */
-  --sabc-info: #2B6CB0;           /* Informations, contraste AA sur fond clair */
+  --sabc-info: #5E5E5E;           /* Information neutre: gris acier (pas de bleu dans la charte) */
   
   /* Palette pour graphiques */
   --sabc-chart-1: var(--sabc-red-primary);
@@ -78,7 +78,7 @@
   --sabc-success: #4CAF50;        /* Validations - plus vif */
   --sabc-warning: #FFC107;        /* Alertes - plus vif */
   --sabc-error: #F44336;          /* Erreurs - plus vif */
-  --sabc-info: #2196F3;           /* Informations - plus vif */
+  --sabc-info: #B0B0B0;           /* Information neutre sur fond sombre */
   
   /* Palette pour graphiques - plus vive pour contraste sur fond sombre */
   --sabc-chart-1: #FF5252;        /* Rouge plus vif */

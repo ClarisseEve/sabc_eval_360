@@ -20,6 +20,7 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { EmptyState } from '@/Components/UI/EmptyState';
 import { AdminStructureLayout } from './shared';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
 import { Link } from 'react-router-dom';
 
 export default function SecteursIndex() {
@@ -117,17 +118,17 @@ export default function SecteursIndex() {
 
   return (
     <AdminStructureLayout title="Secteurs">
+      <PageHeader
+        title="Secteurs"
+        description="Secteurs rattachés à un district ou directement à un service commercial."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Structure' }, { label: 'Secteurs' }]}
+        actions={secteurs.length > 0 && canCreateSecteur ? (
+          <Button onClick={() => setOpen(true)}>Nouveau secteur</Button>
+        ) : undefined}
+      />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle>Secteurs existants</CardTitle>
-          {secteurs.length > 0 && canCreateSecteur ? (
-            <Button
-              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-              onClick={() => setOpen(true)}
-            >
-              Nouveau secteur
-            </Button>
-          ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
           {secteurs.length === 0 ? (
@@ -138,7 +139,7 @@ export default function SecteursIndex() {
                 : 'Chaque secteur doit être rattaché à un service commercial. Configurez ce prérequis avant de créer un secteur.'}
               action={
                 canCreateSecteur ? (
-                  <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={() => setOpen(true)}>
+                  <Button onClick={() => setOpen(true)}>
                     Nouveau secteur
                   </Button>
                 ) : (
@@ -161,7 +162,7 @@ export default function SecteursIndex() {
                 </Link>
               </div>
             ) : null}
-            <Table>
+            <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Code</TableHead>
@@ -181,16 +182,17 @@ export default function SecteursIndex() {
                   </TableCell>
                   <TableCell className="font-medium">{secteur.nom_secteur}</TableCell>
                   <TableCell>{secteur.nom_service}</TableCell>
-                  <TableCell>{secteur.nom_district || 'Direct service'}</TableCell>
+                  <TableCell>{secteur.nom_district || 'Aucun (rattaché au service)'}</TableCell>
                   <TableCell>{secteur.nom_region}</TableCell>
                   <TableCell>{secteur.nb_utilisateurs ?? secteur.utilisateurs_count ?? 0}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-1">
                       <Button variant="outline" size="sm" onClick={() => openEdit(secteur)}>
                         Modifier
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="ghost"
+                        className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
                         size="sm"
                         disabled={Number(secteur.nb_utilisateurs ?? 0) > 0}
                         onClick={() => handleDelete(secteur.id_secteur, secteur.nom_secteur)}
@@ -259,7 +261,7 @@ export default function SecteursIndex() {
               disabled={!nomSecteur || !idService || createMutation.isPending}
               onClick={() => (editingId ? updateMutation : createMutation).mutate()}
             >
-              {activeMutation.isPending ? (editingId ? 'Mise à jour...' : 'Création...') : editingId ? 'Enregistrer' : 'Créer'}
+              {activeMutation.isPending ? (editingId ? 'Mise à jour…' : 'Création…') : editingId ? 'Enregistrer' : 'Créer'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -4,7 +4,7 @@ import {
   AreaChart, Area
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/Components/UI/Card/Card';
-import { cn } from '@/utils/helpers';
+import { CHART_COLORS, CHART_SERIES, CHART_TICK, CHART_AXIS_LINE, CHART_TOOLTIP_STYLE, PERCENT_TICKS, formatChartPercent, frenchTick } from '@/Components/UI/Charts/chartTheme';
 
 export interface LineChartData {
   date: string;
@@ -32,14 +32,14 @@ export interface PerformanceLineChartProps {
 }
 
 export const PerformanceLineChart: React.FC<PerformanceLineChartProps> = ({
-  title = "Évolution de Performance",
+  title = "Évolution de la performance",
   description = "Progression de la performance sur la période",
   data,
   series,
   height = 300,
   yAxisDomain = [0, 100],
   chartType = 'line',
-  formatTooltip = (value) => [`${value}%`, ''],
+  formatTooltip = (value) => [formatChartPercent(value), ''],
   className,
 }) => {
   // Vérifier si les données sont valides
@@ -64,11 +64,11 @@ export const PerformanceLineChart: React.FC<PerformanceLineChartProps> = ({
             data={data}
             margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis domain={yAxisDomain} />
-            <Tooltip formatter={formatTooltip} />
-            <Legend />
+            <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+            <XAxis dataKey="date" tick={CHART_TICK} axisLine={CHART_AXIS_LINE} />
+            <YAxis domain={yAxisDomain} ticks={yAxisDomain[0] === 0 && yAxisDomain[1] === 100 ? PERCENT_TICKS : undefined} tickFormatter={frenchTick} tick={CHART_TICK} axisLine={CHART_AXIS_LINE} />
+            <Tooltip formatter={formatTooltip} contentStyle={CHART_TOOLTIP_STYLE} />
+            <Legend wrapperStyle={{ fontSize: '12px' }} />
             
             {series.map((s) => (
               <Area 
@@ -76,8 +76,8 @@ export const PerformanceLineChart: React.FC<PerformanceLineChartProps> = ({
                 type={s.type || 'monotone'}
                 dataKey={s.dataKey}
                 name={s.name}
-                stroke={s.color}
-                fill={s.color}
+                stroke={s.color || CHART_SERIES[0]}
+                fill={s.color || CHART_SERIES[0]}
                 strokeWidth={s.strokeWidth || 2}
                 fillOpacity={0.2}
               />
@@ -93,18 +93,12 @@ export const PerformanceLineChart: React.FC<PerformanceLineChartProps> = ({
           data={data}
           margin={{ top: 12, right: 24, left: 16, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-          <XAxis dataKey="date" tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
-          <YAxis domain={yAxisDomain} tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+          <XAxis dataKey="date" tick={CHART_TICK} axisLine={CHART_AXIS_LINE} />
+          <YAxis domain={yAxisDomain} ticks={yAxisDomain[0] === 0 && yAxisDomain[1] === 100 ? PERCENT_TICKS : undefined} tickFormatter={frenchTick} tick={CHART_TICK} axisLine={CHART_AXIS_LINE} />
           <Tooltip
             formatter={formatTooltip}
-            contentStyle={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E0E0E0',
-              borderRadius: '12px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-              fontSize: '12px',
-            }}
+            contentStyle={CHART_TOOLTIP_STYLE}
           />
           <Legend wrapperStyle={{ fontSize: '12px' }} />
 
@@ -114,7 +108,7 @@ export const PerformanceLineChart: React.FC<PerformanceLineChartProps> = ({
               type={s.type || 'monotone'}
               dataKey={s.dataKey}
               name={s.name}
-              stroke={s.color}
+              stroke={s.color || CHART_SERIES[0]}
               strokeWidth={s.strokeWidth || 2}
               activeDot={{ r: 6 }}
               dot={{ r: 3 }}

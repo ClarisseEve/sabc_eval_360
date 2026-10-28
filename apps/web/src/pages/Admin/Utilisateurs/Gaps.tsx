@@ -15,6 +15,8 @@ import { AdminUsersLayout } from './shared';
 import { paginateList } from '@/utils/adminUi';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/Components/UI/Dialog';
 import { DashboardExportMenu } from '@/Components/Dashboard/DashboardExportMenu';
+import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
+import { formatScore } from '@/utils/helpers';
 
 const TYPE_LABELS: Record<string, string> = {
   auto: 'Auto-évaluation',
@@ -24,14 +26,15 @@ const TYPE_LABELS: Record<string, string> = {
   '360': 'Évaluation 360°',
 };
 
+// Libellés courts : ils servent d'étiquettes d'axes (radar, barres) et ne doivent pas se chevaucher.
 const EVALUATION_TYPES = [
   ['Auto-évaluation', 'auto'],
-  ['Évaluation pairs', 'pairs'],
-  ['Évaluation manager', 'descendante'],
+  ['Pairs', 'pairs'],
+  ['Manager', 'descendante'],
 ] as const;
 
-function formatScore(score: number | null | undefined) {
-  return score == null ? '—' : `${Number(score).toFixed(2)}/5`;
+function formatNumberFr(value: number, digits = 2) {
+  return Number(value).toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
 function roundScore(value: number) {
@@ -39,7 +42,7 @@ function roundScore(value: number) {
 }
 
 function AggregatedScore({ entry }: { entry?: { score?: number | null; nb_evaluateurs?: number; nb_evaluations?: number } }) {
-  if (!entry) return <span>—</span>;
+  if (!entry) return <span>n.d.</span>;
   return (
     <span title={`${entry.nb_evaluations ?? 0} évaluation(s), ${entry.nb_evaluateurs ?? 0} évaluateur(s)`}>
       {formatScore(entry.score)}
@@ -136,27 +139,27 @@ export default function UserGaps() {
   React.useEffect(() => setPage(1), [search, metierFilter, regionFilter, brancheFilter]);
 
   return (
-    <AdminUsersLayout title="Gaps d’évaluation par profil">
+    <AdminUsersLayout title="Écarts d’évaluation par profil">
       <PageHeader
-        title="Gaps d’évaluation par profil"
+        title="Écarts d’évaluation par profil"
         description="Comparez l’auto-évaluation, les pairs et le manager pour repérer les écarts de perception et les besoins de développement."
-        breadcrumbs={[{ label: 'Administration' }, { label: 'Utilisateurs', to: '/admin/utilisateurs' }, { label: 'Gaps d’évaluation' }]}
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Utilisateurs', to: '/admin/utilisateurs' }, { label: 'Écarts d’évaluation' }]}
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Profils analysés</div><div className="text-2xl font-bold">{profiles.length}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Profils en anomalie</div><div className="text-2xl font-bold text-sabc-error">{anomalyCount}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Déficits de compétence</div><div className="text-2xl font-bold text-sabc-warning">{deficitCount}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Seuil de divergence</div><div className="text-2xl font-bold">{gapData?.seuil_divergence ?? 1.5} pts</div></CardContent></Card>
-      </div>
+      <KpiGrid>
+        <KpiCard label="Profils analysés" value={profiles.length} />
+        <KpiCard label="Profils en anomalie" value={anomalyCount} />
+        <KpiCard label="Déficits de compétence" value={deficitCount} />
+        <KpiCard label="Seuil de divergence" value={`${formatNumberFr(Number(gapData?.seuil_divergence ?? 1.5), 1)} pt`} />
+      </KpiGrid>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Radar des écarts de perception</CardTitle>
             <p className="mt-1 text-sm text-sabc-gray-600">Cliquez sur le graphique pour consulter le tableau détaillé des profils et des compétences.</p>
           </div>
-          <DashboardExportMenu targetRef={chartsRef} filename="gaps-evaluation" />
+          <DashboardExportMenu targetRef={chartsRef} filename="ecarts-evaluation" />
         </CardHeader>
         <CardContent>
           <div ref={chartsRef} className="space-y-4">
@@ -184,39 +187,39 @@ export default function UserGaps() {
             </label>
           </div>
           {isLoading ? <div className="p-8 text-center text-sabc-gray-500">Analyse des évaluations…</div> : null}
-          {!isLoading && filteredProfiles.length === 0 ? <EmptyState title="Aucun gap d’évaluation" description="Aucune évaluation valide par compétence n’est disponible pour l’administration." /> : null}
+          {!isLoading && filteredProfiles.length === 0 ? <EmptyState title="Aucun écart d’évaluation" description="Aucune évaluation valide par compétence n’est disponible pour l’administration." /> : null}
           {!isLoading && filteredProfiles.length > 0 ? (
-            <button type="button" className="block w-full cursor-pointer rounded-lg border border-sabc-gray-200 bg-white p-2 text-left transition hover:border-sabc-red-primary/60 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-sabc-red-primary/40" onClick={() => setTableOpen(true)} aria-label="Ouvrir le tableau détaillé des gaps">
+            <button type="button" className="block w-full cursor-pointer rounded-lg border border-sabc-gray-200 bg-white p-2 text-left transition hover:border-sabc-red-primary/60 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-sabc-red-primary/40" onClick={() => setTableOpen(true)} aria-label="Ouvrir le tableau détaillé des écarts">
               <div className="grid gap-4 xl:grid-cols-2">
                 <div>
                   <div className="px-3 pt-3 text-sm font-semibold text-sabc-gray-800">Écart de perception</div>
                   <ResponsiveContainer width="100%" height={350}>
-                    <RadarChart data={radarData} outerRadius="72%">
+                    <RadarChart data={radarData} outerRadius="62%" margin={{ top: 16, right: 48, bottom: 16, left: 48 }}>
                       <PolarGrid stroke="var(--sabc-gray-200)" />
-                      <PolarAngleAxis dataKey="axe" tick={{ fill: 'var(--sabc-gray-700)', fontSize: 14, fontWeight: 600 }} />
-                      <PolarRadiusAxis domain={[0, 5]} tick={{ fill: 'var(--sabc-gray-500)', fontSize: 12 }} />
+                      <PolarAngleAxis dataKey="axe" tick={{ fill: 'var(--sabc-gray-700)', fontSize: 12, fontWeight: 600 }} />
+                      <PolarRadiusAxis domain={[0, 5]} angle={90} tick={{ fill: 'var(--sabc-gray-500)', fontSize: 11 }} />
                       <Radar name="Score moyen / 5" dataKey="score" stroke="var(--sabc-red-primary)" fill="var(--sabc-red-primary)" fillOpacity={0.28} strokeWidth={3} />
-                      <Tooltip cursor={false} formatter={(value: number) => [`${Number(value).toFixed(2)}/5`, 'Score moyen']} />
+                      <Tooltip cursor={false} formatter={(value: number) => [formatScore(value), 'Score moyen']} />
                     </RadarChart>
                   </ResponsiveContainer>
                 </div>
                 <div>
                   <div className="px-3 pt-3 text-sm font-semibold text-sabc-gray-800">Score moyen par type</div>
                   <ResponsiveContainer width="100%" height={350}>
-                    <BarChart data={radarData} layout="vertical" margin={{ top: 18, right: 24, left: 12, bottom: 18 }}>
+                    <BarChart data={radarData} layout="vertical" margin={{ top: 18, right: 64, left: 4, bottom: 18 }}>
                       <CartesianGrid stroke="var(--sabc-gray-200)" horizontal={false} />
                       <XAxis type="number" domain={[0, 5]} tick={{ fill: 'var(--sabc-gray-500)', fontSize: 12 }} />
-                      <YAxis type="category" dataKey="axe" width={132} tick={{ fill: 'var(--sabc-gray-700)', fontSize: 12 }} />
+                      <YAxis type="category" dataKey="axe" width={110} tick={{ fill: 'var(--sabc-gray-700)', fontSize: 12 }} />
                       <ReferenceLine x={evaluationMedian} stroke="var(--sabc-gray-700)" strokeDasharray="5 5" strokeWidth={2} />
                       <Bar name="Score moyen / 5" dataKey="score" fill="var(--sabc-red-primary)" radius={[0, 4, 4, 0]} barSize={24} activeBar={false}>
-                        <LabelList dataKey="score" position="right" formatter={(value: number) => `${Number(value).toFixed(2)}/5`} fill="var(--sabc-gray-800)" fontSize={12} />
+                        <LabelList dataKey="score" position="right" formatter={(value: number) => formatScore(value)} fill="var(--sabc-gray-800)" fontSize={12} />
                       </Bar>
-                      <Tooltip cursor={false} formatter={(value: number) => [`${Number(value).toFixed(2)}/5`, 'Score moyen']} />
+                      <Tooltip cursor={false} formatter={(value: number) => [formatScore(value), 'Score moyen']} />
                       <Legend content={() => (
                         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-2 text-xs text-sabc-gray-600">
                           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-sabc-red-primary" />Score moyen / 5</span>
-                          <span className="inline-flex items-center gap-1.5"><span className="w-5 border-t-2 border-dashed border-sabc-gray-700" />Médiane : {evaluationMedian.toFixed(2)}/5</span>
-                          <span>Variance moyenne : {evaluationVariance.toFixed(2)}</span>
+                          <span className="inline-flex items-center gap-1.5"><span className="w-5 border-t-2 border-dashed border-sabc-gray-700" />Médiane : {formatScore(evaluationMedian)}</span>
+                          <span>Variance moyenne : {formatNumberFr(evaluationVariance)}</span>
                         </div>
                       )} />
                     </BarChart>
@@ -227,10 +230,10 @@ export default function UserGaps() {
                 {radarData.map((entry) => (
                   <div key={entry.axe} className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-sabc-gray-600">{entry.axe}</span>
-                    <span className="font-semibold text-sabc-gray-900">{entry.hasData ? `${entry.score.toFixed(2)}/5` : 'Non évalué'}</span>
+                    <span className="font-semibold text-sabc-gray-900">{entry.hasData ? formatScore(entry.score) : 'n.d.'}</span>
                   </div>
                 ))}
-                <div className="text-xs text-sabc-gray-500 sm:col-span-3">Médiane : {evaluationMedian.toFixed(2)}/5 · Variance moyenne : {evaluationVariance.toFixed(2)}</div>
+                <div className="text-xs text-sabc-gray-500 sm:col-span-3">Médiane : {formatScore(evaluationMedian)} · Variance moyenne : {formatNumberFr(evaluationVariance)}</div>
               </div>
               <div data-html2canvas-ignore="true" className="flex items-center justify-center gap-2 pb-3 text-sm font-medium text-sabc-red-primary"><Table2 className="h-4 w-4" />Cliquer pour ouvrir le tableau des données</div>
             </button>
@@ -242,13 +245,13 @@ export default function UserGaps() {
       <Dialog open={tableOpen} onOpenChange={setTableOpen}>
         <DialogContent className="max-h-[90vh] w-[96vw] max-w-7xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Données détaillées des gaps d’évaluation</DialogTitle>
+            <DialogTitle>Données détaillées des écarts d’évaluation</DialogTitle>
             <DialogDescription>Recherchez un profil et ouvrez son détail par compétence.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher par matricule, nom, rôle..." />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher par matricule, nom, rôle…" />
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[860px]">
                 <TableHeader><TableRow><TableHead>Profil</TableHead><TableHead>Rôle</TableHead><TableHead>Auto</TableHead><TableHead>Pairs</TableHead><TableHead>Manager</TableHead><TableHead>Écart max.</TableHead><TableHead>Besoin</TableHead><TableHead className="text-right">Détail</TableHead></TableRow></TableHeader>
                 <TableBody>{paginatedProfiles.items.map((profile: any) => {
                   const user = usersByMatricule.get(String(profile.matricule));
@@ -256,12 +259,12 @@ export default function UserGaps() {
                   return <React.Fragment key={profile.matricule}>
                     <TableRow className={profile.anomalie ? 'bg-amber-50/40' : undefined}>
                       <TableCell><div className="font-medium">{[user?.prenom, user?.nom].filter(Boolean).join(' ') || profile.matricule}</div><div className="text-xs text-sabc-gray-500">{profile.matricule}</div></TableCell>
-                      <TableCell>{user?.role ?? '—'}</TableCell><TableCell><AggregatedScore entry={profile.types?.auto} /></TableCell><TableCell><AggregatedScore entry={profile.types?.pairs} /></TableCell><TableCell><AggregatedScore entry={profile.types?.descendante} /></TableCell>
-                      <TableCell><span className={Number(profile.divergence) >= 1.5 ? 'font-semibold text-sabc-error' : 'text-sabc-gray-700'}>{Number(profile.divergence).toFixed(2)} pts</span></TableCell>
+                      <TableCell>{user?.role ?? 'n.d.'}</TableCell><TableCell><AggregatedScore entry={profile.types?.auto} /></TableCell><TableCell><AggregatedScore entry={profile.types?.pairs} /></TableCell><TableCell><AggregatedScore entry={profile.types?.descendante} /></TableCell>
+                      <TableCell><span className={Number(profile.divergence) >= 1.5 ? 'font-semibold text-sabc-error' : 'text-sabc-gray-700'}>{profile.divergence != null ? `${formatNumberFr(Number(profile.divergence))} pt` : 'n.d.'}</span></TableCell>
                       <TableCell>{profile.deficits > 0 ? <Badge variant="destructive">{profile.deficits} déficit(s)</Badge> : <Badge variant="success">Concordant</Badge>}</TableCell>
                       <TableCell className="text-right"><button type="button" className="inline-flex items-center gap-1 text-sm font-medium text-sabc-red-primary" onClick={() => setSelectedMatricule(expanded ? null : profile.matricule)}>{expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}Voir</button></TableCell>
                     </TableRow>
-                    {expanded ? <TableRow><TableCell colSpan={8} className="bg-sabc-gray-50/70 p-4"><div className="mb-3 flex items-center gap-2 text-sm font-semibold text-sabc-gray-800"><ShieldAlert className="h-4 w-4 text-sabc-red-primary" />Détail par compétence pour {user ? `${user.prenom} ${user.nom}` : profile.matricule}</div><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Compétence</TableHead><TableHead>Niveau requis</TableHead><TableHead>Types en déficit</TableHead><TableHead>Action recommandée</TableHead></TableRow></TableHeader><TableBody>{profile.competences.map((competence: any) => <TableRow key={competence.critere_id}><TableCell className="font-medium">{competence.critere_id}</TableCell><TableCell>{formatScore(competence.niveau_requis)}</TableCell><TableCell>{competence.gap_types.length > 0 ? competence.gap_types.map((gap: any) => `${TYPE_LABELS[gap.type] ?? gap.type} (${formatScore(gap.score)})`).join(', ') : 'Aucun'}</TableCell><TableCell>{competence.gap_types.length > 0 ? <span className="inline-flex items-center gap-1 text-sabc-warning"><GraduationCap className="h-4 w-4" />Formation ou réévaluation ciblée</span> : 'Suivi normal'}</TableCell></TableRow>)}</TableBody></Table></div></TableCell></TableRow> : null}
+                    {expanded ? <TableRow><TableCell colSpan={8} className="bg-sabc-gray-50/70 p-4"><div className="mb-3 flex items-center gap-2 text-sm font-semibold text-sabc-gray-800"><ShieldAlert className="h-4 w-4 text-sabc-gray-500" />Détail par compétence pour {user ? `${user.prenom} ${user.nom}` : profile.matricule}</div><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Compétence</TableHead><TableHead>Niveau requis</TableHead><TableHead>Types en déficit</TableHead><TableHead>Action recommandée</TableHead></TableRow></TableHeader><TableBody>{profile.competences.map((competence: any) => <TableRow key={competence.critere_id}><TableCell className="font-medium">{competence.critere_id}</TableCell><TableCell>{formatScore(competence.niveau_requis)}</TableCell><TableCell>{competence.gap_types.length > 0 ? competence.gap_types.map((gap: any) => `${TYPE_LABELS[gap.type] ?? gap.type} (${formatScore(gap.score)})`).join(', ') : 'Aucun'}</TableCell><TableCell>{competence.gap_types.length > 0 ? <span className="inline-flex items-center gap-1 text-sabc-gray-700"><GraduationCap className="h-4 w-4" />Formation ou réévaluation ciblée</span> : 'Suivi normal'}</TableCell></TableRow>)}</TableBody></Table></div></TableCell></TableRow> : null}
                   </React.Fragment>;
                 })}</TableBody>
               </Table>

@@ -187,7 +187,7 @@ export default function Builder() {
                     breadcrumbs={[{ label: 'Administration' }, { label: 'Rapports', to: '/admin/reports' }, { label: reportTitle }]}
                 />
 
-                <div className="grid items-start gap-8 xl:grid-cols-[minmax(440px,0.9fr)_minmax(0,1fr)]">
+                <div className="grid items-start gap-8 xl:grid-cols-[minmax(440px_0.9fr)_minmax(0_1fr)]">
                     <section className="space-y-4 xl:sticky xl:top-24" aria-labelledby="report-preview-title">
                     <div className="flex flex-wrap items-end justify-between gap-3">
                         <div>

@@ -11,7 +11,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: 'http://localhost:3000', changeOrigin: true },
+      // Appels en même origine, donc sans CORS. VITE_API_PROXY_TARGET permet de
+      // développer contre une API distante (ex. Railway) au lieu de l'API locale.
+      '/api': { target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000', changeOrigin: true },
     },
   },
 })

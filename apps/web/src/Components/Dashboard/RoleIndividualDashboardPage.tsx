@@ -6,7 +6,7 @@ import { Button } from '@/Components/UI/Button/Button';
 import { useRoleDashboardData } from '@/Hooks/queries/useRoleDashboards';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { analyticsApi } from '@/Services/api';
-import { formatPersonName } from '@/utils/helpers';
+import { formatPersonName, formatScore, formatPercent } from '@/utils/helpers';
 import { ScoresByTypeCard } from '@/Components/Dashboard/IndividualAnalyticsCards';
 import { BenchmarksCard } from '@/Components/Dashboard/BenchmarksCard';
 import { EvolutionCard } from '@/Components/Dashboard/EvolutionCard';
@@ -20,6 +20,7 @@ import {
   formatEvaluationType,
   getPriorityBadgeVariant,
   getStatusBadgeVariant,
+  formatStatusLabel,
   navigateTo,
 } from './RoleDashboardShared';
 
@@ -76,29 +77,25 @@ export default function RoleIndividualDashboardPage({
           label="Évaluations à faire"
           value={data.pendingEvaluations.length}
           caption="Brouillons ou soumissions en attente de votre part"
-          accentClassName="border-l-sabc-red-primary"
         />
         <MetricCard
           label="Évaluations reçues"
           value={data.receivedEvaluations.length}
           caption="Historique reçu sur la période active"
-          accentClassName="border-l-sabc-info"
         />
         <MetricCard
           label="Score global"
-          value={data.canSeeSelfScore && data.selfScores.scoreGlobal != null ? `${data.selfScores.scoreGlobal}/5` : 'Non applicable'}
+          value={data.canSeeSelfScore && data.selfScores.scoreGlobal != null ? formatScore(data.selfScores.scoreGlobal) : 'Non applicable'}
           caption={
             data.canSeeSelfScore && data.selfScores.scorePondere != null
-              ? `Score pondéré: ${data.selfScores.scorePondere}/5`
+              ? `Score pondéré : ${formatScore(data.selfScores.scorePondere)}`
               : 'Score masqué pour ce rôle'
           }
-          accentClassName="border-l-sabc-success"
         />
         <MetricCard
           label="Progression récente"
-          value={`${data.selfScores.progression > 0 ? '+' : ''}${data.selfScores.progression}`}
-          caption={`Taux de complétion personnel: ${completionRate}%`}
-          accentClassName="border-l-sabc-accent"
+          value={data.selfScores.progression ? `${data.selfScores.progression > 0 ? '+' : ''}${data.selfScores.progression.toLocaleString('fr-FR', { maximumFractionDigits: 2 })}` : 'n.d.'}
+          caption={`Taux de complétion personnel : ${formatPercent(completionRate)}`}
         />
       </div>
 
@@ -129,9 +126,9 @@ export default function RoleIndividualDashboardPage({
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{evaluation.statut}</Badge>
+                    <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{formatStatusLabel(evaluation.statut)}</Badge>
                     {evaluation.note_globale != null ? (
-                      <Badge variant="info">{evaluation.note_globale}/5</Badge>
+                      <Badge variant="info">{formatScore(evaluation.note_globale)}</Badge>
                     ) : null}
                     <Button variant="outline" size="sm" onClick={() => navigateTo(`/common/evaluations/${evaluation.id_evaluation}`)}>
                       Consulter
@@ -158,7 +155,7 @@ export default function RoleIndividualDashboardPage({
                     <div className="font-medium text-sabc-gray-900 dark:text-white">
                       {getDisplayName(evaluation.evalue, evaluation.evalue_matricule)}
                     </div>
-                    <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{evaluation.statut}</Badge>
+                    <Badge variant={getStatusBadgeVariant(evaluation.statut)}>{formatStatusLabel(evaluation.statut)}</Badge>
                   </div>
                   <div className="mt-1 text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
                     {formatEvaluationType(evaluation.type_evaluation)}
@@ -217,7 +214,7 @@ export default function RoleIndividualDashboardPage({
                     <div className="font-medium text-sabc-gray-900 dark:text-white">{axis.critere}</div>
                     <div className="flex items-center gap-2">
                       <Badge variant={getPriorityBadgeVariant(axis.priorite)}>{axis.priorite}</Badge>
-                      <Badge variant="info">{axis.scoreActuel}/5</Badge>
+                      <Badge variant="info">{formatScore(axis.scoreActuel)}</Badge>
                     </div>
                   </div>
                   {axis.suggestion ? (

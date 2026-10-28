@@ -8,7 +8,7 @@ const ASDashboard: React.FC = () => (
     <Suspense fallback={<DashboardSkeleton />}>
       <RoleIndividualDashboardPage
         fallbackRole="AS"
-        title="Tableau de bord Assistant Sponsoring"
+        title="Tableau de bord Assistant superviseur sponsoring"
         subtitle="Vue personnelle des évaluations et de la progression sur le cycle actif."
       />
     </Suspense>

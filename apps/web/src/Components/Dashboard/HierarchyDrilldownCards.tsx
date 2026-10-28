@@ -10,6 +10,7 @@ import {
   getLevelLabel,
   type HierarchyAnalyticsMember,
 } from '@/utils/hierarchyDrilldown';
+import { formatScore } from '@/utils/helpers';
 
 type HierarchyBreakdownCardProps = {
   title: string;
@@ -65,7 +66,7 @@ export function HierarchyBreakdownCard({
                   <TableRow key={row.niveau}>
                     <TableCell>{row.niveau}</TableCell>
                     <TableCell>{row.effectif}</TableCell>
-                    <TableCell>{row.scoreMoyen != null ? `${row.scoreMoyen}/5` : '—'}</TableCell>
+                    <TableCell>{row.scoreMoyen != null ? formatScore(row.scoreMoyen) : '—'}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-2">
                         {row.axes.length === 0 ? (
@@ -132,7 +133,7 @@ export function HierarchyFocusCard({
               <div className="rounded-lg border border-sabc-gray-200 p-3 dark:border-sabc-gray-800">
                 <div className="text-xs text-sabc-gray-500 dark:text-sabc-gray-400">Score branche</div>
                 <div className="mt-1 text-xl font-bold text-sabc-gray-900 dark:text-white">
-                  {branch.branchAverageScore != null ? `${branch.branchAverageScore}/5` : '—'}
+                  {branch.branchAverageScore != null ? formatScore(branch.branchAverageScore) : '—'}
                 </div>
               </div>
               <div className="rounded-lg border border-sabc-gray-200 p-3 dark:border-sabc-gray-800">
@@ -184,7 +185,7 @@ export function HierarchyFocusCard({
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium text-sabc-gray-900 dark:text-white">
-                          {member.scoreGlobal != null ? `${member.scoreGlobal}/5` : '—'}
+                          {member.scoreGlobal != null ? formatScore(member.scoreGlobal) : '—'}
                         </div>
                         <div className="text-xs text-sabc-gray-400 dark:text-sabc-gray-500">
                           {member.progression > 0 ? '+' : ''}

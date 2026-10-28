@@ -1,15 +1,6 @@
 import React from 'react';
 import { cn } from '@/utils/helpers';
 
-// Utilisation des variables CSS SABC définies dans sabc-colors.css
-const COLORS = {
-  primary: 'var(--sabc-red-primary)',    // Rouge SABC principal
-  secondary: 'var(--sabc-info)',         // Bleu secondaire
-  success: 'var(--sabc-success)',        // Vert succès
-  accent: 'var(--sabc-accent)',          // Orange accent
-  neutral: 'var(--sabc-gray-400)',       // Gris neutre
-  warning: 'var(--sabc-warning)',        // Jaune attention
-};
 
 export interface HeatMapProps {
   data: Array<{
@@ -58,12 +49,13 @@ export function HeatMap({
   const headerHeight = 72;
   const gridWidth = rowHeaderWidth + (columnWidth * xLabels.length);
   // Échelle de couleurs par défaut basée sur la palette SABC
+  // Rampe monochrome rouge : plus la note est haute, plus la teinte est soutenue.
   const defaultColorScale = [
-    { min: 0, max: 1, color: 'var(--sabc-red-light)', textColor: 'var(--sabc-gray-800)' },
-    { min: 1, max: 2, color: 'var(--sabc-red-primary)', textColor: 'white' },
-    { min: 2, max: 3, color: 'var(--sabc-accent-light)', textColor: 'var(--sabc-gray-800)' },
-    { min: 3, max: 4, color: 'var(--sabc-accent)', textColor: 'white' },
-    { min: 4, max: 5, color: 'var(--sabc-success)', textColor: 'white' },
+    { min: 0, max: 1, color: '#F7F7F5', textColor: '#4F4F4F' },
+    { min: 1, max: 2, color: '#F3D3D6', textColor: '#4F4F4F' },
+    { min: 2, max: 3, color: '#E89AA2', textColor: '#2B2B2B' },
+    { min: 3, max: 4, color: '#D01A2C', textColor: '#FFFFFF' },
+    { min: 4, max: 5, color: '#A3121F', textColor: '#FFFFFF' },
   ];
 
   const scale = colorScale || defaultColorScale;
@@ -102,7 +94,7 @@ export function HeatMap({
           <div role="row" className="flex">
             <div
               role="columnheader"
-              className="flex shrink-0 items-end border-b border-r border-sabc-gray-200 px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-sabc-gray-500 dark:border-sabc-gray-700 dark:text-sabc-gray-400"
+              className="flex shrink-0 items-end border-b border-r border-sabc-gray-200 px-3 pb-2 text-xs font-medium text-sabc-gray-500 dark:border-sabc-gray-700 dark:text-sabc-gray-400"
               style={{ width: rowHeaderWidth, height: headerHeight }}
             >
               Collaborateur / critère
@@ -134,7 +126,7 @@ export function HeatMap({
               {xLabels.map((xLabel, xIndex) => {
                 const cellData = getCellData(xLabel, yLabel);
                 const { backgroundColor, color } = getCellColor(cellData.value);
-                const cellLabel = `${xLabel}, ${yLabel} : ${formatValue ? formatValue(cellData.value) : cellData.value.toFixed(1)}`;
+                const cellLabel = `${xLabel}, ${yLabel} : ${formatValue ? formatValue(cellData.value) : cellData.value.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
                 const cellStyle = {
                   width: columnWidth,
                   height: cellSize,
@@ -153,7 +145,7 @@ export function HeatMap({
                     onClick={() => handleCellClick(xLabel, yLabel, cellData.value)}
                     title={tooltip ? cellLabel : undefined}
                   >
-                    {formatValue ? formatValue(cellData.value) : cellData.value.toFixed(1)}
+                    {formatValue ? formatValue(cellData.value) : cellData.value.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                   </button>
                 ) : (
                   <div
@@ -164,7 +156,7 @@ export function HeatMap({
                     style={cellStyle}
                     title={tooltip ? cellLabel : undefined}
                   >
-                    {formatValue ? formatValue(cellData.value) : cellData.value.toFixed(1)}
+                    {formatValue ? formatValue(cellData.value) : cellData.value.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                   </div>
                 );
               })}
@@ -183,7 +175,7 @@ export function HeatMap({
                 style={{ backgroundColor: item.color }}
               ></div>
               <span className="text-xs text-sabc-gray-600 dark:text-sabc-gray-400">
-                {item.min} - {item.max}
+                {item.min.toLocaleString('fr-FR')} à {item.max.toLocaleString('fr-FR')}
               </span>
             </div>
           ))}

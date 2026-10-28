@@ -18,6 +18,37 @@ import {
   getAdminUserSelfEvaluations,
   getLatestSubmittedSelfEvaluation,
 } from './evaluation-history-data';
+import { formatDateFr, formatScore } from '@/utils/helpers';
+import { KpiCard } from '@/Components/UI/KpiCard';
+
+const TYPE_LABELS: Record<string, string> = {
+  auto: 'Auto-évaluation',
+  pairs: 'Pairs',
+  descendante: 'Manager',
+  ascendante: 'Ascendante',
+};
+
+/** Note sur 20 au format français (« 14,80 / 20 »). Absente : « n.d. ». */
+function formatOnTwenty(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
+  return `${Number(value).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / 20`;
+}
+
+/** Statut affiché : libellé et couleur suivent la même valeur. */
+function userStatusLabel(user: any): string | null {
+  const raw = String(user?.statut ?? '').trim();
+  if (raw) return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  if (user?.est_actif === undefined || user?.est_actif === null) return null;
+  return user.est_actif ? 'Actif' : 'Inactif';
+}
+
+function userStatusVariant(label: string | null): 'success' | 'warning' | 'error' | 'secondary' {
+  const key = String(label ?? '').toLowerCase();
+  if (key === 'actif') return 'success';
+  if (key === 'indisponible') return 'warning';
+  if (key === 'suspendu') return 'error';
+  return 'secondary';
+}
 
 export default function ShowUser() {
   const { matricule = '' } = useParams();
@@ -100,6 +131,7 @@ export default function ShowUser() {
   const totalEvaluations = ['auto', 'pairs', 'descendante'].reduce((sum, type) => sum + typeEvaluationCount(type), 0);
   const maxGap = Number(profileGap?.divergence ?? 0);
   const profileScoreOnTwenty = scoreOnTwenty(stats.score_moyen);
+  const statusLabel = userStatusLabel(user);
   const overallScoreOnTwenty = scoreOnTwenty(scoreData?.score_global);
 
   return (
@@ -117,11 +149,11 @@ export default function ShowUser() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Rôle</div><div className="text-xl font-bold">{user?.role}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Statut</div><div className="text-xl font-bold">{user?.statut}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Score moyen validé</div><div className="text-xl font-bold">{profileScoreOnTwenty != null ? `${profileScoreOnTwenty.toFixed(2)}/20` : 'N/A'}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Subordonnés</div><div className="text-xl font-bold">{stats.subordonnes ?? 0}</div></CardContent></Card>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard label="Rôle" value={user?.role} />
+        <KpiCard label="Statut" value={statusLabel} />
+        <KpiCard label="Score moyen validé" value={formatOnTwenty(profileScoreOnTwenty)} />
+        <KpiCard label="Subordonnés" value={stats.subordonnes ?? subs.length} />
       </div>
 
       <Card>
@@ -130,38 +162,34 @@ export default function ShowUser() {
           {scoresLoading || gapsLoading ? (
             <div className="p-6 text-center text-sm text-sabc-gray-500">Chargement des résultats d’évaluation…</div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-              <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-4">
-                <div className="text-xs text-sabc-gray-500">Score global</div>
-                <div className="mt-1 text-2xl font-bold">{overallScoreOnTwenty != null ? `${overallScoreOnTwenty.toFixed(2)}/20` : '—'}</div>
-                <div className="mt-1 text-xs text-sabc-gray-500">Source : {scoreData?.score_global != null ? `${Number(scoreData.score_global).toFixed(2)}/5` : 'non évalué'}</div>
-              </div>
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+              <KpiCard
+                label="Score global"
+                value={formatOnTwenty(overallScoreOnTwenty)}
+                caption={`Sur 5 : ${formatScore(scoreData?.score_global, 2)}`}
+              />
               {[
                 ['auto', 'Auto-évaluation'],
-                ['pairs', 'Évaluations pairs'],
-                ['descendante', 'Évaluation manager'],
+                ['pairs', 'Évaluations des pairs'],
+                ['descendante', 'Évaluation du manager'],
               ].map(([type, label]) => (
-                <div key={type} className="rounded-lg border border-sabc-gray-200 bg-white p-4">
-                  <div className="text-xs text-sabc-gray-500">{label}</div>
-                  <div className="mt-1 text-2xl font-bold">{scoreOnTwenty(typeScore(type)) != null ? `${scoreOnTwenty(typeScore(type))!.toFixed(2)}/20` : '—'}</div>
-                  <div className="mt-1 text-xs text-sabc-gray-500">
-                    {type === 'auto' && pendingSelfEvaluation && !profileGap?.types?.auto && !scoreData?.par_type?.some((entry: any) => entry.type === 'auto')
+                <KpiCard
+                  key={type}
+                  label={label}
+                  value={formatOnTwenty(scoreOnTwenty(typeScore(type)))}
+                  caption={
+                    type === 'auto' && pendingSelfEvaluation && !profileGap?.types?.auto && !scoreData?.par_type?.some((entry: any) => entry.type === 'auto')
                       ? 'Soumise, en attente de validation'
-                      : `Source : ${typeScore(type) != null ? `${Number(typeScore(type)).toFixed(2)}/5` : 'non évalué'}`}
-                  </div>
-                  <div className="mt-1 text-xs text-sabc-gray-500">{typeEvaluationCount(type)} évaluation(s)</div>
-                </div>
+                      : `Sur 5 : ${formatScore(typeScore(type), 2)} · ${typeEvaluationCount(type)} évaluation(s)`
+                  }
+                />
               ))}
-              <div className="rounded-lg border border-sabc-gray-200 bg-white p-4">
-                <div className="text-xs text-sabc-gray-500">Écart maximal</div>
-                <div className={`mt-1 text-2xl font-bold ${maxGap >= 1.5 ? 'text-sabc-error' : 'text-sabc-success'}`}>{profileGap ? `${maxGap.toFixed(2)} pts` : '—'}</div>
-                <div className="mt-1 text-xs text-sabc-gray-500">Seuil : 1,5 pt</div>
-              </div>
-              <div className="rounded-lg border border-sabc-gray-200 bg-white p-4">
-                <div className="text-xs text-sabc-gray-500">Nombre d’évaluations</div>
-                <div className="mt-1 text-2xl font-bold">{totalEvaluations || '—'}</div>
-                <div className="mt-1 text-xs text-sabc-gray-500">Auto + pairs + manager</div>
-              </div>
+              <KpiCard
+                label="Écart maximal"
+                value={profileGap ? `${maxGap.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pt` : null}
+                caption={profileGap && maxGap >= 1.5 ? 'Au-dessus du seuil de 1,5 pt' : 'Seuil : 1,5 pt'}
+              />
+              <KpiCard label="Nombre d’évaluations" value={totalEvaluations || null} caption="Auto + pairs + manager" />
             </div>
           )}
         </CardContent>
@@ -191,7 +219,7 @@ export default function ShowUser() {
                       <h3 className="font-semibold text-sabc-gray-900">{periodLabel}</h3>
                       {evaluation.date_soumission ? (
                         <p className="text-xs text-sabc-gray-500">
-                          Soumise le {new Date(evaluation.date_soumission).toLocaleDateString('fr-FR')}
+                          Soumise le {formatDateFr(evaluation.date_soumission)}
                         </p>
                       ) : null}
                     </div>
@@ -202,11 +230,11 @@ export default function ShowUser() {
                   {criteria.length === 0 ? (
                     <p className="text-sm text-sabc-gray-500">Les notes de cette auto-évaluation ne sont pas disponibles.</p>
                   ) : (
-                    <Table>
+                    <Table className="min-w-[560px]">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Compétence</TableHead>
-                          <TableHead>Note / 5</TableHead>
+                          <TableHead>Note</TableHead>
                           <TableHead>Commentaire</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -217,8 +245,8 @@ export default function ShowUser() {
                               <div className="font-medium">{criterion.libelle}</div>
                               <div className="text-xs text-sabc-gray-500">{criterion.section}</div>
                             </TableCell>
-                            <TableCell>{criterion.note ?? '—'}</TableCell>
-                            <TableCell>{criterion.commentaire || '—'}</TableCell>
+                            <TableCell className="whitespace-nowrap tabular-nums">{formatScore(criterion.note, 0)}</TableCell>
+                            <TableCell>{criterion.commentaire || 'Aucun commentaire'}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -237,13 +265,13 @@ export default function ShowUser() {
           <CardContent>
             {criticalCompetences.length === 0 ? <p className="text-sm text-sabc-gray-500">Aucune compétence sous le niveau requis détectée.</p> : (
               <div className="space-y-3">{criticalCompetences.map((competence: any) => (
-                <div key={competence.critere_id} className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                <div key={competence.critere_id} className="rounded-lg border border-sabc-gray-200 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-medium text-sabc-gray-900">{competence.critere_id}</span>
                     <Badge variant="warning">À renforcer</Badge>
                   </div>
-                  <div className="mt-1 text-xs text-sabc-gray-600">Niveau requis : {Number(competence.niveau_requis).toFixed(2)}/5</div>
-                  <div className="mt-2 text-xs text-sabc-gray-700">{competence.gap_types.map((gap: any) => `${gap.type} : ${Number(gap.score).toFixed(2)}/5`).join(' · ')}</div>
+                  <div className="mt-1 text-xs text-sabc-gray-600">Niveau requis : {formatScore(competence.niveau_requis, 2)}</div>
+                  <div className="mt-2 text-xs text-sabc-gray-700">{competence.gap_types.map((gap: any) => `${TYPE_LABELS[String(gap.type).toLowerCase()] ?? gap.type} : ${formatScore(gap.score, 2)}`).join(' · ')}</div>
                 </div>
               ))}</div>
             )}
@@ -261,7 +289,7 @@ export default function ShowUser() {
                   </Badge>
                 </div>
                 <div className="mt-1 text-sm text-sabc-gray-600">
-                  Score : {axis.score_actuel ?? axis.moyenne ?? '—'}/5 · niveau requis : {axis.niveau_requis ?? '—'}/5 · écart : {axis.ecart ?? '—'} pt(s)
+                  Score : {formatScore(axis.score_actuel ?? axis.moyenne, 2)} · niveau requis : {formatScore(axis.niveau_requis, 2)} · écart : {axis.ecart != null ? `${Number(axis.ecart).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} pt(s)` : 'n.d.'}
                 </div>
                 <p className="mt-2 text-sm">{axis.suggestion}</p>
                 {axis.objectif_smart ? <p className="mt-1 text-xs text-sabc-gray-500">{axis.objectif_smart}</p> : null}
@@ -283,18 +311,18 @@ export default function ShowUser() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <Card>
           <CardHeader><CardTitle>Détails</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div><span className="font-medium">Matricule:</span> {user?.matricule}</div>
-            <div><span className="font-medium">Téléphone:</span> {user?.telephone || 'N/A'}</div>
-            <div><span className="font-medium">Région:</span> {user?.region?.nom_region || user?.id_region}</div>
-            <div><span className="font-medium">Branche:</span> {user?.branche?.nom_branche || user?.id_branche}</div>
-            <div><span className="font-medium">Manager:</span> {user?.manager_matricule || 'N/A'}</div>
+            <div><span className="font-medium">Matricule :</span> {user?.matricule || 'n.d.'}</div>
+            <div><span className="font-medium">Téléphone :</span> {user?.telephone || 'n.d.'}</div>
+            <div><span className="font-medium">Région :</span> {user?.region?.nom_region || 'n.d.'}</div>
+            <div><span className="font-medium">Branche :</span> {user?.branche?.nom_branche || 'n.d.'}</div>
+            <div><span className="font-medium">Manager :</span> {user?.manager_matricule || 'n.d.'}</div>
             <div className="flex gap-2 pt-2">
-              <Badge variant={user?.est_actif ? 'success' : 'secondary'}>{user?.est_actif ? 'Actif' : 'Inactif'}</Badge>
-              <Badge variant={user?.est_admin ? 'primary' : 'secondary'}>{user?.est_admin ? 'Admin' : 'Standard'}</Badge>
+              <Badge variant={userStatusVariant(statusLabel)}>{statusLabel ?? 'Statut non renseigné'}</Badge>
+              <Badge variant="outline">{user?.est_admin ? 'Administrateur' : 'Utilisateur standard'}</Badge>
             </div>
           </CardContent>
         </Card>
@@ -305,7 +333,7 @@ export default function ShowUser() {
             {subs.length === 0 ? (
               <EmptyState title="Aucun subordonné" description="Cet utilisateur n’encadre aucun collaborateur direct." />
             ) : (
-              <Table>
+              <Table className="min-w-[420px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Matricule</TableHead>
@@ -318,7 +346,7 @@ export default function ShowUser() {
                     <TableRow key={sub.matricule}>
                       <TableCell>{sub.matricule}</TableCell>
                       <TableCell>{[sub.prenom, sub.nom].filter(Boolean).join(' ')}</TableCell>
-                      <TableCell>{sub.role}</TableCell>
+                      <TableCell>{sub.role || 'n.d.'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

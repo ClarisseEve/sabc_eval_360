@@ -8,7 +8,7 @@ const CDVDashboard: React.FC = () => (
     <Suspense fallback={<DashboardSkeleton />}>
       <RoleManagerDashboardPage
         fallbackRole="CDV"
-        title="Tableau de bord Chef District Vente"
+        title="Tableau de bord Chef de district vente"
         subtitle="Suivi du district, des évaluations en attente et de la performance individuelle."
         teamTitle="Équipe du district"
       />

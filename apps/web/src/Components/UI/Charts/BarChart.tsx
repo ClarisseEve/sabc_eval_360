@@ -11,15 +11,7 @@ import {
   TooltipProps
 } from 'recharts';
 
-// Utilisation des variables CSS SABC définies dans sabc-colors.css
-const COLORS = {
-  primary: 'var(--sabc-red-primary)',    // Rouge SABC principal
-  secondary: 'var(--sabc-info)',         // Bleu secondaire
-  success: 'var(--sabc-success)',        // Vert succès
-  accent: 'var(--sabc-accent)',          // Orange accent
-  neutral: 'var(--sabc-gray-400)',       // Gris neutre
-  warning: 'var(--sabc-warning)',        // Jaune attention
-};
+import { CHART_SERIES, CHART_TICK, CHART_AXIS_LINE, CHART_COLORS, CHART_TOOLTIP_STYLE, frenchTick } from './chartTheme';
 
 export interface BarChartProps {
   children?: React.ReactNode;
@@ -59,15 +51,7 @@ export function BarChart({
   children,
   categories = []
 }: BarChartProps) {
-  // Default colors from SABC palette if not specified
-  const defaultColors = [
-    COLORS.primary,    // Rouge SABC principal
-    COLORS.accent,     // Orange accent
-    COLORS.success,    // Vert succès
-    COLORS.secondary,  // Bleu secondaire
-    COLORS.warning,    // Jaune attention
-    COLORS.neutral,    // Gris neutre
-  ];
+  const defaultColors = CHART_SERIES;
   
   // Rendu des barres du graphique
   const renderBars = () => {
@@ -125,7 +109,7 @@ export function BarChart({
           {showGrid && (
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="var(--sabc-gray-200)"
+              stroke={CHART_COLORS.grid}
               horizontal={true}
               vertical={layout !== 'vertical'}
             />
@@ -135,27 +119,28 @@ export function BarChart({
             <>
               <XAxis 
                 dataKey={xAxisDataKey} 
-                tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
-                axisLine={{ stroke: '#E0E0E0' }}
+                tick={CHART_TICK}
+                axisLine={CHART_AXIS_LINE}
               />
               <YAxis 
-                tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
-                axisLine={{ stroke: '#E0E0E0' }}
+                tick={CHART_TICK}
+                axisLine={CHART_AXIS_LINE}
               />
             </>
           ) : (
             <>
               <XAxis 
                 type="number"
-                tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
-                axisLine={{ stroke: '#E0E0E0' }}
+                tickFormatter={frenchTick}
+                tick={CHART_TICK}
+                axisLine={CHART_AXIS_LINE}
               />
               <YAxis 
                 dataKey={xAxisDataKey}
                 type="category"
-                tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
+                tick={CHART_TICK}
                 width={140}
-                axisLine={{ stroke: '#E0E0E0' }}
+                axisLine={CHART_AXIS_LINE}
               />
             </>
           )}
@@ -165,14 +150,7 @@ export function BarChart({
           ) : (
             <Tooltip
               cursor={{ fill: 'rgba(0, 0, 0, 0.04)' }}
-              contentStyle={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E0E0E0',
-                borderRadius: '12px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                fontSize: '12px',
-                padding: '8px 12px',
-              }}
+              contentStyle={CHART_TOOLTIP_STYLE}
             />
           )}
           

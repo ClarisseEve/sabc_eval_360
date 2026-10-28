@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/Components/UI/Card/Card';
-import { cn } from '@/utils/helpers';
+import { CHART_COLORS, CHART_SERIES, CHART_TICK, CHART_AXIS_LINE, CHART_TOOLTIP_STYLE, PERCENT_TICKS, formatChartPercent, frenchTick } from '@/Components/UI/Charts/chartTheme';
 
 export interface BarChartData {
   name: string;
@@ -29,14 +29,14 @@ export interface PerformanceBarChartProps {
 }
 
 export const PerformanceBarChart: React.FC<PerformanceBarChartProps> = ({
-  title = "Performance par Département",
+  title = "Performance par département",
   description = "Comparaison des performances entre services",
   data,
   series,
   height = 300,
   yAxisDomain = [0, 100],
   stacked = false,
-  formatTooltip = (value) => [`${value}%`, ''],
+  formatTooltip = (value) => [formatChartPercent(value), ''],
   className,
 }) => {
   // Vérifier si les données sont valides
@@ -58,19 +58,12 @@ export const PerformanceBarChart: React.FC<PerformanceBarChartProps> = ({
                 data={data}
                 margin={{ top: 12, right: 24, left: 16, bottom: 5 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-                <XAxis dataKey="name" tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
-                <YAxis domain={yAxisDomain} tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }} axisLine={{ stroke: '#E0E0E0' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="name" tick={CHART_TICK} axisLine={CHART_AXIS_LINE} />
+                <YAxis domain={yAxisDomain} ticks={yAxisDomain[0] === 0 && yAxisDomain[1] === 100 ? PERCENT_TICKS : undefined} tickFormatter={frenchTick} tick={CHART_TICK} axisLine={CHART_AXIS_LINE} />
                 <Tooltip
                   formatter={formatTooltip}
-                  contentStyle={{
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #E0E0E0',
-                    borderRadius: '12px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                    fontSize: '12px',
-                    padding: '8px 12px',
-                  }}
+                  contentStyle={CHART_TOOLTIP_STYLE}
                 />
                 <Legend wrapperStyle={{ fontSize: '12px' }} />
 
@@ -79,7 +72,7 @@ export const PerformanceBarChart: React.FC<PerformanceBarChartProps> = ({
                     key={s.dataKey}
                     dataKey={s.dataKey}
                     name={s.name}
-                    fill={s.color}
+                    fill={s.color || CHART_SERIES[0]}
                     radius={[4, 4, 0, 0]}
                     stackId={stacked ? 'stack' : undefined}
                     animationDuration={500}

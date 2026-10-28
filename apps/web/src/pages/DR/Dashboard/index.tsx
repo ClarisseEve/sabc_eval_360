@@ -8,7 +8,7 @@ const DRDashboard: React.FC = () => (
     <Suspense fallback={<DashboardSkeleton />}>
       <RoleDirectorDashboardPage
         fallbackRole="DR"
-        title="Tableau de bord Directeur Régional"
+        title="Tableau de bord Directeur régional"
         subtitle="Pilotage régional des évaluations, de la couverture hiérarchique et des performances agrégées."
         perimeterTitle="Périmètre régional"
       />

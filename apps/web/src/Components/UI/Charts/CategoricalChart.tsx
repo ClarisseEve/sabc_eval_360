@@ -11,15 +11,7 @@ import {
   TooltipProps
 } from 'recharts';
 
-// Following SABC design system color palette
-const COLORS = {
-  primary: '#E53E3E',    // Rouge SABC principal
-  secondary: '#3182CE',  // Bleu secondaire
-  success: '#48BB78',    // Vert succès
-  accent: '#FF9800',     // Orange accent
-  neutral: '#9E9E9E',    // Gris neutre
-  warning: '#D69E2E',    // Jaune attention
-};
+import { CHART_SERIES, CHART_TICK, CHART_AXIS_LINE, CHART_COLORS, CHART_TOOLTIP_STYLE, frenchTick } from './chartTheme';
 
 export interface CategoricalChartProps {
   data: Array<Record<string, any>>;
@@ -52,20 +44,12 @@ export function CategoricalChart({
   barSize = 20,
   tooltip,
 }: CategoricalChartProps) {
-  // Default colors from SABC palette if not specified
-  const defaultColors = [
-    COLORS.primary,
-    COLORS.secondary,
-    COLORS.success,
-    COLORS.accent,
-    COLORS.warning,
-    COLORS.neutral,
-  ];
+  const defaultColors = CHART_SERIES;
 
   return (
     <div className={`w-full ${className}`}>
-      {title && <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>}
-      {subtitle && <p className="text-sm text-gray-500 mb-4">{subtitle}</p>}
+      {title && <h3 className="text-lg font-semibold text-sabc-gray-900 mb-1">{title}</h3>}
+      {subtitle && <p className="text-sm text-sabc-gray-500 mb-4">{subtitle}</p>}
       
       <ResponsiveContainer width="100%" height={height}>
         <BarChart
@@ -78,26 +62,21 @@ export function CategoricalChart({
           }}
           barSize={barSize}
         >
-          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />}
+          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />}
           
           <XAxis 
             dataKey={xAxisDataKey} 
-            tick={{ fill: '#424242', fontSize: 12 }}
-            axisLine={{ stroke: '#E0E0E0' }}
+            tick={CHART_TICK}
+            axisLine={CHART_AXIS_LINE}
           />
           <YAxis 
-            tick={{ fill: '#424242', fontSize: 12 }}
-            axisLine={{ stroke: '#E0E0E0' }}
+            tick={CHART_TICK}
+            axisLine={CHART_AXIS_LINE}
           />
           
           <Tooltip 
             cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
-            contentStyle={{ 
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E0E0E0',
-              borderRadius: '4px',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-            }}
+            contentStyle={CHART_TOOLTIP_STYLE}
           />
           
           {showLegend && (

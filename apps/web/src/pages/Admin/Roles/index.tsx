@@ -25,6 +25,31 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { paginateList } from '@/utils/adminUi';
 import { AdminRolesLayout } from './shared';
+import { Trash2 } from 'lucide-react';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
+
+/**
+ * Niveau hiérarchique lisible. Un rôle porte un niveau pour les régions « tanière »
+ * et un pour les autres régions ; s'ils sont identiques, un seul niveau est affiché.
+ */
+function formatRoleLevel(role: { niveau_taniere?: number | null; niveau_non_taniere?: number | null }): string {
+  const t = role?.niveau_taniere;
+  const nt = role?.niveau_non_taniere;
+  if (t == null && nt == null) return 'n.d.';
+  if (t != null && nt != null && Number(t) === Number(nt)) return `Niveau ${t}`;
+  const parts: string[] = [];
+  if (t != null) parts.push(`Tanière : ${t}`);
+  if (nt != null) parts.push(`Hors tanière : ${nt}`);
+  return parts.join(' · ');
+}
+
+const ROLE_PERMISSION_LABELS: Array<{ key: string; label: string }> = [
+  { key: 'peut_auto_evaluer', label: 'Auto-évaluation' },
+  { key: 'peut_evaluer_pairs', label: 'Pairs' },
+  { key: 'peut_evaluer_subordonnes', label: 'Subordonnés' },
+  { key: 'peut_cross_branch', label: 'Inter-branches' },
+];
 
 const initialForm = {
   id_role: '',
@@ -108,6 +133,20 @@ export default function RolesIndex() {
     );
   }, [roles, search]);
 
+  const branchNames = useMemo(
+    () => new Map<string, string>((Array.isArray(branches) ? branches : []).map((branch: any) => [String(branch.id_branche), branch.nom_branche])),
+    [branches],
+  );
+  const branchLabel = (role: any) =>
+    role.id_branche ? branchNames.get(String(role.id_branche)) || role.id_branche : 'Toutes les branches';
+
+  const stats = useMemo(() => ({
+    total: roles.length,
+    subordonnes: roles.filter((role: any) => Boolean(role.peut_evaluer_subordonnes)).length,
+    pairs: roles.filter((role: any) => Boolean(role.peut_evaluer_pairs)).length,
+    crossBranch: roles.filter((role: any) => Boolean(role.peut_cross_branch)).length,
+  }), [roles]);
+
   const pageSize = 8;
   const paginatedRoles = useMemo(() => paginateList(filteredRoles, { page, pageSize }), [filteredRoles, page]);
   const activePageCount = paginatedRoles.pageCount;
@@ -122,27 +161,19 @@ export default function RolesIndex() {
 
   return (
     <AdminRolesLayout title="Gestion des rôles">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Gestion des rôles</h1>
-          <p className="text-sm text-sabc-gray-600">CRUD réel sur les rôles SABC.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-            onClick={() => setOpen(true)}
-          >
-            Nouveau rôle
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Gestion des rôles"
+        description="Postes de l’organisation, niveau hiérarchique et droits d’évaluation associés."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Rôles' }]}
+        actions={<Button onClick={() => setOpen(true)}>Nouveau rôle</Button>}
+      />
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Total</div><div className="text-2xl font-bold">{roles.length}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Tanière</div><div className="text-2xl font-bold">{roles.filter((r: any) => r.niveau_taniere != null).length}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Non tanière</div><div className="text-2xl font-bold">{roles.filter((r: any) => r.niveau_non_taniere != null).length}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Inter-branches</div><div className="text-2xl font-bold">{roles.filter((r: any) => r.peut_cross_branch).length}</div></CardContent></Card>
-      </div>
+      <KpiGrid>
+        <KpiCard label="Rôles" value={stats.total} />
+        <KpiCard label="Évaluent leurs subordonnés" value={stats.subordonnes} />
+        <KpiCard label="Évaluent leurs pairs" value={stats.pairs} />
+        <KpiCard label="Évaluent hors de leur branche" value={stats.crossBranch} />
+      </KpiGrid>
 
       <Card>
         <CardHeader>
@@ -154,7 +185,7 @@ export default function RolesIndex() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher par code, nom, description ou branche"
           />
-          <Table>
+          <Table className="min-w-[820px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Code</TableHead>
@@ -178,28 +209,31 @@ export default function RolesIndex() {
                       <div className="font-medium">{role.nom_role}</div>
                       <div className="text-xs text-sabc-gray-500">{role.description || 'Aucune description'}</div>
                     </TableCell>
-                    <TableCell>{role.id_branche}</TableCell>
+                    <TableCell>{branchLabel(role)}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">
-                        {role.niveau_taniere != null ? `T ${role.niveau_taniere}` : role.niveau_non_taniere != null ? `NT ${role.niveau_non_taniere}` : 'N/A'}
-                      </Badge>
+                      <span className="whitespace-nowrap text-sm text-sabc-gray-700">{formatRoleLevel(role)}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {role.peut_auto_evaluer && <Badge variant="secondary">Auto</Badge>}
-                        {role.peut_evaluer_pairs && <Badge variant="secondary">Pairs</Badge>}
-                        {role.peut_evaluer_subordonnes && <Badge variant="secondary">Subs</Badge>}
-                        {role.peut_cross_branch && <Badge variant="secondary">Cross</Badge>}
+                        {ROLE_PERMISSION_LABELS.filter(({ key }) => role[key]).map(({ key, label }) => (
+                          <Badge key={key} variant="outline">{label}</Badge>
+                        ))}
+                        {ROLE_PERMISSION_LABELS.every(({ key }) => !role[key]) ? (
+                          <span className="text-xs text-sabc-gray-500">Aucun droit d’évaluation</span>
+                        ) : null}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-1">
                         <Link to={`/admin/roles/${role.id_role}`}>
                           <Button variant="outline" size="sm">Voir</Button>
                         </Link>
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
+                          aria-label={`Supprimer le rôle ${role.nom_role}`}
+                          title="Supprimer"
                           onClick={async () => {
                             const ok = await confirm({
                               title: `Supprimer le rôle ${role.nom_role} ?`,
@@ -210,7 +244,7 @@ export default function RolesIndex() {
                             if (ok) deleteMutation.mutate(role.id_role);
                           }}
                         >
-                          Supprimer
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -271,7 +305,7 @@ export default function RolesIndex() {
                 </SelectContent>
               </Select>
               {!branchesPending && branches.length === 0 ? (
-                <p role="status" className="mt-1 text-xs text-amber-700">Aucune branche disponible; créez d’abord une branche.</p>
+                <p role="status" className="mt-1 text-xs text-amber-700">Aucune branche disponible ; créez d’abord une branche.</p>
               ) : null}
             </div>
             <div>
@@ -281,7 +315,7 @@ export default function RolesIndex() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="taniere">Tanière</SelectItem>
-                    <SelectItem value="non_taniere">Non tanière</SelectItem>
+                    <SelectItem value="non_taniere">Hors tanière</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={form.niveau} onValueChange={(value) => setForm((p) => ({ ...p, niveau: value }))}>
@@ -312,11 +346,10 @@ export default function RolesIndex() {
           <DialogFooter>
             <Button variant="outline" onClick={closeModal}>Annuler</Button>
             <Button
-              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               disabled={!form.id_role || !form.nom_role || !form.id_branche || branchesPending || branches.length === 0 || createMutation.isPending}
               onClick={() => createMutation.mutate()}
             >
-              {createMutation.isPending ? 'Création...' : 'Créer'}
+              {createMutation.isPending ? 'Création…' : 'Créer'}
             </Button>
           </DialogFooter>
         </DialogContent>

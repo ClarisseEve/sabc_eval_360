@@ -29,6 +29,25 @@ import {
     type RoleReference,
     type UpdateUserForm,
 } from './update-user-contract';
+import { formatScore } from '@/utils/helpers';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+
+type BadgeVariant = 'success' | 'warning' | 'error' | 'secondary' | 'outline';
+
+/** Libellé et couleur dérivés du statut AFFICHÉ (et non de est_actif seul). */
+function getUserStatusPresentation(user: { statut?: string | null; est_actif?: boolean | null }): { label: string; variant: BadgeVariant } {
+    const raw = String(user?.statut ?? '').trim();
+    const key = raw
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    if (key === 'actif') return { label: 'Actif', variant: 'success' };
+    if (key === 'indisponible') return { label: 'Indisponible', variant: 'warning' };
+    if (key === 'suspendu') return { label: 'Suspendu', variant: 'error' };
+    if (key === 'inactif') return { label: 'Inactif', variant: 'secondary' };
+    if (raw) return { label: raw.charAt(0).toUpperCase() + raw.slice(1), variant: 'secondary' };
+    return user?.est_actif ? { label: 'Actif', variant: 'success' } : { label: 'Inactif', variant: 'secondary' };
+}
 
 const createTextFields: Array<{
     key: keyof CreateUserForm;
@@ -70,11 +89,11 @@ function Pagination({
     for (let i = start; i <= end; i++) pages.push(i);
 
     return (
-        <div className="border-sabc-gray-200 flex items-center justify-between border-t pt-4">
+        <div className="border-sabc-gray-200 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sabc-gray-600 text-sm">
                 {(meta.page - 1) * meta.limit + 1}–{Math.min(meta.page * meta.limit, meta.total)} sur {meta.total} utilisateurs
             </p>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
                 <Button variant="outline" size="sm" disabled={meta.page <= 1} onClick={() => onPageChange(meta.page - 1)}>
                     Précédent
                 </Button>
@@ -84,7 +103,7 @@ function Pagination({
                         variant={p === meta.page ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => onPageChange(p)}
-                        className={p === meta.page ? 'bg-sabc-red-primary text-white' : ''}
+                        aria-current={p === meta.page ? 'page' : undefined}
                     >
                         {p}
                     </Button>
@@ -136,6 +155,22 @@ function UsersContent() {
         queryKey: ['admin', 'structure', 'regions'],
         queryFn: () => adminApi.structure.regions().then((response) => response.data),
     });
+
+    const { data: branches = [] } = useQuery({
+        queryKey: ['admin', 'structure', 'branches'],
+        queryFn: () => adminApi.structure.branches().then((response) => response.data),
+    });
+
+    const regionNames = new Map<string, string>(
+        (Array.isArray(regions) ? regions : []).map((region: any) => [String(region.id_region), region.nom_region]),
+    );
+    const branchNames = new Map<string, string>(
+        (Array.isArray(branches) ? branches : []).map((branche: any) => [String(branche.id_branche), branche.nom_branche]),
+    );
+    const regionLabel = (user: any) =>
+        user.region?.nom_region || (user.id_region ? regionNames.get(String(user.id_region)) : undefined) || 'n.d.';
+    const branchLabel = (user: any) =>
+        user.branche?.nom_branche || (user.id_branche ? branchNames.get(String(user.id_branche)) : undefined) || 'n.d.';
 
     const users = response?.data ?? (Array.isArray(response) ? response : []);
     const meta = response?.meta ?? { total: users.length, page: 1, limit: 15, totalPages: 1 };
@@ -192,26 +227,24 @@ function UsersContent() {
 
     return (
         <AdminUsersLayout title="Gestion des utilisateurs">
-            <div className="flex items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-sabc-gray-900 text-2xl font-bold">Gestion des utilisateurs</h1>
-                    <p className="text-sabc-gray-600 text-sm">
-                        {meta.total} utilisateur{meta.total > 1 ? 's' : ''} au total
-                    </p>
-                </div>
-                <div className="flex gap-2">
-                    <Link to="/admin/utilisateurs/gaps" className={buttonVariants({ variant: 'outline' })}>
-                        Analyse des gaps
-                    </Link>
-                    {canCreateUser ? (
-                        <Button className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white" onClick={() => setCreateOpen(true)}>
-                            Nouvel utilisateur
-                        </Button>
-                    ) : referencesPending ? (
-                        <Button disabled>Chargement…</Button>
-                    ) : null}
-                </div>
-            </div>
+            <PageHeader
+                title="Gestion des utilisateurs"
+                description="Comptes, rôles et rattachements des collaborateurs évalués."
+                breadcrumbs={[{ label: 'Administration' }, { label: 'Utilisateurs' }]}
+                meta={`${meta.total} utilisateur${meta.total > 1 ? 's' : ''} au total`}
+                actions={(
+                    <>
+                        <Link to="/admin/utilisateurs/gaps" className={buttonVariants({ variant: 'outline' })}>
+                            Analyse des écarts
+                        </Link>
+                        {canCreateUser ? (
+                            <Button onClick={() => setCreateOpen(true)}>Nouvel utilisateur</Button>
+                        ) : referencesPending ? (
+                            <Button disabled>Chargement…</Button>
+                        ) : null}
+                    </>
+                )}
+            />
 
             {!referencesPending && !canCreateUser ? (
                 <div role="status" className="flex flex-col gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -245,14 +278,14 @@ function UsersContent() {
                     <CardTitle>Utilisateurs</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_210px_210px] lg:items-end">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0_1fr)_210px_210px] lg:items-end">
                         <div className="space-y-1">
                             <Label htmlFor="users-search">Rechercher</Label>
                             <Input
                                 id="users-search"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Matricule, nom, e-mail, rôle..."
+                                placeholder="Matricule, nom, e-mail, rôle…"
                             />
                         </div>
                         <div className="space-y-1">
@@ -277,13 +310,13 @@ function UsersContent() {
                         </div>
                     </div>
 
-                    <Table>
+                    <Table className="min-w-[960px]">
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Matricule</TableHead>
                                 <TableHead>Nom</TableHead>
                                 <TableHead>Rôle</TableHead>
-                                <TableHead>Score moyen /5</TableHead>
+                                <TableHead>Score moyen</TableHead>
                                 <TableHead>Région</TableHead>
                                 <TableHead>Branche</TableHead>
                                 <TableHead>Statut</TableHead>
@@ -306,21 +339,18 @@ function UsersContent() {
                                         <div className="text-sabc-gray-500 text-xs">{user.email}</div>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant="primary">{user.role}</Badge>
+                                        <Badge variant="outline">{user.role || 'n.d.'}</Badge>
                                     </TableCell>
                                     <TableCell>
-                                        {user.score_moyen != null ? (
-                                            <span className={Number(user.score_moyen) < 3 ? 'font-medium text-sabc-error' : Number(user.score_moyen) > 3 ? 'font-medium text-sabc-success' : ''}>
-                                                {`${Number(user.score_moyen).toFixed(2)}/5`}
-                                            </span>
-                                        ) : 'Non évalué'}
+                                        <span className="whitespace-nowrap tabular-nums">{formatScore(user.score_moyen, 2)}</span>
                                     </TableCell>
-                                    <TableCell>{user.region?.nom_region || user.id_region}</TableCell>
-                                    <TableCell>{user.branche?.nom_branche || user.id_branche}</TableCell>
+                                    <TableCell>{regionLabel(user)}</TableCell>
+                                    <TableCell>{branchLabel(user)}</TableCell>
                                     <TableCell>
-                                        <Badge variant={user.est_actif ? 'success' : 'secondary'}>
-                                            {user.statut || (user.est_actif ? 'Actif' : 'Inactif')}
-                                        </Badge>
+                                        {(() => {
+                                            const status = getUserStatusPresentation(user);
+                                            return <Badge variant={status.variant}>{status.label}</Badge>;
+                                        })()}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
@@ -427,11 +457,10 @@ function UsersContent() {
                             Annuler
                         </Button>
                         <Button
-                            className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white"
                             disabled={!canCreateUser || !isCreateUserFormValid(createForm) || createMutation.isPending}
                             onClick={() => createMutation.mutate()}
                         >
-                            {createMutation.isPending ? 'Création...' : 'Créer'}
+                            {createMutation.isPending ? 'Création…' : 'Créer'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -514,11 +543,10 @@ function UsersContent() {
                             Annuler
                         </Button>
                         <Button
-                            className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white"
                             disabled={!isUpdateUserFormValid(editForm) || updateMutation.isPending}
                             onClick={() => updateMutation.mutate()}
                         >
-                            {updateMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
+                            {updateMutation.isPending ? 'Enregistrement…' : 'Enregistrer'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

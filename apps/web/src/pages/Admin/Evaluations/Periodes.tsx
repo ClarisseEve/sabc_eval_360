@@ -18,6 +18,9 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { periodesApi } from '@/Services/api';
 import { EmptyState } from '@/Components/UI/EmptyState';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
+import { formatDateFr, formatPercent } from '@/utils/helpers';
 import { AdminEvaluationsLayout, PeriodeStatusBadge } from './shared';
 
 type FormState = {
@@ -35,13 +38,6 @@ const EMPTY_FORM: FormState = {
   date_debut: '',
   date_fin: '',
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return 'N/A';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
-}
 
 function toInputDate(date: Date) {
   const year = date.getFullYear();
@@ -222,29 +218,30 @@ export default function AdminPeriodesPage() {
 
   return (
     <AdminEvaluationsLayout title="Périodes d'évaluation">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Périodes d’évaluation</h1>
-          <p className="text-sm text-sabc-gray-600">Gestion des cycles d’évaluation, ouverture, clôture et mise à jour.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => refresh()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Rafraîchir
-          </Button>
-          <Button className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark" onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nouvelle période
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Périodes d’évaluation"
+        description="Création, ouverture, fermeture et mise à jour des cycles d’évaluation."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Évaluations' }, { label: 'Périodes' }]}
+        actions={(
+          <>
+            <Button variant="outline" onClick={() => refresh()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Rafraîchir
+            </Button>
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nouvelle période
+            </Button>
+          </>
+        )}
+      />
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Total</div><div className="text-2xl font-bold">{stats.total}</div></CardContent></Card>
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Ouvertes</div><div className="text-2xl font-bold text-sabc-success">{stats.ouvertes}</div></CardContent></Card>
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Fermées</div><div className="text-2xl font-bold text-sabc-gray-700">{stats.fermees}</div></CardContent></Card>
-        <Card><CardContent className="p-5"><div className="text-sm text-sabc-gray-600">Planifiées</div><div className="text-2xl font-bold text-sabc-accent">{stats.planifiees}</div></CardContent></Card>
-      </div>
+      <KpiGrid>
+        <KpiCard label="Total" value={stats.total} />
+        <KpiCard label="Ouvertes" value={stats.ouvertes} />
+        <KpiCard label="Fermées" value={stats.fermees} />
+        <KpiCard label="Planifiées" value={stats.planifiees} />
+      </KpiGrid>
 
       <Card>
         <CardHeader>
@@ -259,7 +256,7 @@ export default function AdminPeriodesPage() {
               description={search ? 'Aucune période ne correspond à votre recherche.' : 'Créez une première période d’évaluation pour démarrer.'}
             />
           ) : (
-            <Table>
+            <Table className="min-w-[760px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Période</TableHead>
@@ -277,34 +274,41 @@ export default function AdminPeriodesPage() {
                       <div className="font-medium text-sabc-gray-900">{periode.nom_periode}</div>
                       <div className="text-xs text-sabc-gray-500">{periode.code_periode}</div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm text-sabc-gray-600">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {formatDate(periode.date_debut)} - {formatDate(periode.date_fin)}
-                      </div>
+                    <TableCell className="whitespace-nowrap text-sm text-sabc-gray-600">
+                      {formatDateFr(periode.date_debut)} – {formatDateFr(periode.date_fin)}
                     </TableCell>
                     <TableCell><PeriodeStatusBadge statut={periode.statut} estOuverte={periode.est_ouverte} /></TableCell>
-                    <TableCell>{periode.nb_evaluations_completees ?? 0} / {periode.nb_evaluations_attendues ?? 0}</TableCell>
-                    <TableCell>{Number(periode.taux_completion ?? 0).toFixed(0)}%</TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">
+                      {periode.nb_evaluations_attendues == null
+                        ? 'n.d.'
+                        : `${periode.nb_evaluations_completees ?? 0} / ${periode.nb_evaluations_attendues}`}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">{formatPercent(periode.taux_completion)}</TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => startEdit(periode)}>
-                          <Edit3 className="mr-1 h-3.5 w-3.5" />
-                          Modifier
-                        </Button>
+                      <div className="flex justify-end gap-1">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => toggleMutation.mutate(periode.id_periode)}
                           disabled={isBusy || periode.est_cloturee}
-                          title={periode.est_cloturee ? 'Période terminée — non modifiable' : undefined}
+                          title={periode.est_cloturee ? 'Période terminée : non modifiable' : undefined}
                         >
                           <Power className="mr-1 h-3.5 w-3.5" />
                           {periode.est_ouverte ? 'Fermer' : 'Ouvrir'}
                         </Button>
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => startEdit(periode)}
+                          aria-label={`Modifier la période ${periode.nom_periode}`}
+                          title="Modifier"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
                           onClick={async () => {
                             const ok = await confirm({
                               title: 'Supprimer cette période ?',
@@ -315,9 +319,10 @@ export default function AdminPeriodesPage() {
                             if (ok) deleteMutation.mutate(periode.id_periode);
                           }}
                           disabled={isBusy}
+                          aria-label={`Supprimer la période ${periode.nom_periode}`}
+                          title="Supprimer"
                         >
-                          <Trash2 className="mr-1 h-3.5 w-3.5" />
-                          Supprimer
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -406,7 +411,6 @@ export default function AdminPeriodesPage() {
               Annuler
             </Button>
             <Button
-              className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
               disabled={saveMutation.isPending || isFormIncomplete}
               onClick={() => {
                 setModalError(null);

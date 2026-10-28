@@ -3,7 +3,7 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip, Legend
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/Components/UI/Card/Card';
-import { cn } from '@/utils/helpers';
+import { CHART_COLORS, CHART_TOOLTIP_STYLE, formatChartPercent } from '@/Components/UI/Charts/chartTheme';
 
 export interface SkillRadarData {
   skill: string;
@@ -28,16 +28,16 @@ export interface SkillsRadarProps {
 }
 
 export const SkillsRadar: React.FC<SkillsRadarProps> = ({
-  title = "Profil de Compétences",
+  title = "Profil de compétences",
   description = "Analyse des compétences par catégorie",
   data,
   showAverage = false,
   height = 300,
   colors = {
-    primary: "#E53E3E",
-    secondary: "#3182CE",
-    primaryFill: "#E53E3E",
-    secondaryFill: "#3182CE"
+    primary: CHART_COLORS.primary,
+    secondary: CHART_COLORS.secondary,
+    primaryFill: CHART_COLORS.primary,
+    secondaryFill: CHART_COLORS.secondary
   },
   className,
 }) => {
@@ -67,16 +67,16 @@ export const SkillsRadar: React.FC<SkillsRadarProps> = ({
           {isValidData ? (
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart outerRadius={90} data={normalizedData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="skill" />
-                <PolarRadiusAxis domain={[0, 100]} />
+                <PolarGrid stroke={CHART_COLORS.grid} />
+                <PolarAngleAxis dataKey="skill" tick={{ fill: CHART_COLORS.tick, fontSize: 11 }} />
+                <PolarRadiusAxis domain={[0, 100]} tickCount={5} tick={{ fill: CHART_COLORS.secondary, fontSize: 10 }} />
                 
                 <Radar
                   name="Compétences"
                   dataKey="value"
                   stroke={colors.primary}
                   fill={colors.primaryFill || colors.primary}
-                  fillOpacity={0.6}
+                  fillOpacity={0.25}
                 />
                 
                 {showAverage && (
@@ -85,12 +85,12 @@ export const SkillsRadar: React.FC<SkillsRadarProps> = ({
                     dataKey="average"
                     stroke={colors.secondary}
                     fill={colors.secondaryFill || colors.secondary}
-                    fillOpacity={0.4}
+                    fillOpacity={0.15}
                   />
                 )}
                 
-                <Tooltip formatter={(value) => [`${value}%`, '']} />
-                <Legend />
+                <Tooltip formatter={(value) => [formatChartPercent(value), '']} contentStyle={CHART_TOOLTIP_STYLE} />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
               </RadarChart>
             </ResponsiveContainer>
           ) : (

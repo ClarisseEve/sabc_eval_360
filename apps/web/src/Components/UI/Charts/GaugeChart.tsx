@@ -8,8 +8,10 @@ import {
 } from 'recharts';
 import { cn } from '@/utils/helpers';
 
-const DEFAULT_COLOR = 'var(--sabc-red-primary)';
-const TRACK_COLOR = 'var(--sabc-gray-100)';
+import { CHART_COLORS, CHART_TOOLTIP_STYLE } from './chartTheme';
+
+const DEFAULT_COLOR = CHART_COLORS.primary;
+const TRACK_COLOR = CHART_COLORS.track;
 
 export interface GaugeChartProps {
   value: number;
@@ -62,7 +64,7 @@ export function GaugeChart({
 
   const displayedValue = formatValue
     ? formatValue(clamped, completion)
-    : `${Math.round(completion * 100)}%`;
+    : `${Math.round(completion * 100)} %`;
 
   return (
     <div className={cn('w-full', className)}>
@@ -93,15 +95,10 @@ export function GaugeChart({
                   const labelKey = segmentName === 'progress' ? 'Réalisé' : 'Reste';
                   const text = formatTooltip
                     ? formatTooltip(actual, percent)
-                    : `${Math.round(percent * 100)}%`;
+                    : `${Math.round(percent * 100)} %`;
                   return [text, labelKey];
                 }}
-                contentStyle={{
-                  backgroundColor: '#ffffff',
-                  border: '1px solid var(--sabc-gray-200)',
-                  borderRadius: 4,
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-                }}
+                contentStyle={CHART_TOOLTIP_STYLE}
               />
             )}
           </RechartsPieChart>

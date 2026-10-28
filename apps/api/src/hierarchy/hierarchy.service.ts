@@ -69,6 +69,8 @@ export class HierarchyService {
       select: {
         matricule: true, nom: true, prenom: true, email: true,
         role: true, role_nom: true, manager_matricule: true, niveau_hierarchique: true, id_region: true,
+        // Statut et libellé de région affichés par la page « Mon équipe ».
+        est_actif: true, region_nom: true,
       },
     });
   }

@@ -14,6 +14,20 @@ import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
 import { AdminRemplacementsLayout } from './shared';
 import { useAdminUsers } from '@/Hooks/queries';
+import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
+import { formatDateFr } from '@/utils/helpers';
+
+function formatPerson(prenom?: string, nom?: string, matricule?: string) {
+  const name = [prenom, nom].filter(Boolean).join(' ');
+  if (name && matricule) return `${name} (${matricule})`;
+  return name || matricule || 'n.d.';
+}
+
+function formatRange(debut?: string | null, fin?: string | null) {
+  if (!debut && !fin) return 'n.d.';
+  if (!fin) return `À partir du ${formatDateFr(debut)}`;
+  return `${formatDateFr(debut)} – ${formatDateFr(fin)}`;
+}
 
 type Statut = 'actif' | 'avenir' | 'termine';
 
@@ -69,7 +83,7 @@ export default function RemplacementsIndex() {
     }
   };
 
-  // Statut dérivé du bucket d'origine (et non d'un booléen) — corrige l'affichage
+  // Statut dérivé du bucket d'origine (et non d'un booléen) : corrige l'affichage
   // erroné d'un remplacement « à venir » comme « Terminé ».
   const rows = useMemo(() => {
     const tag = (arr: any[] | undefined, statut: Statut) => (arr || []).map((r) => ({ ...r, _statut: statut }));
@@ -108,7 +122,7 @@ export default function RemplacementsIndex() {
     <AdminRemplacementsLayout title="Gestion des remplacements">
       <PageHeader
         title="Gestion des remplacements"
-        description="Remplacements actifs, à venir et historiques, sur les données réelles."
+        description="Remplacements temporaires en cours, à venir et terminés."
         breadcrumbs={[{ label: 'Administration' }, { label: 'Remplacements' }]}
         actions={hasRemplacements && canCreateReplacement ? (
           <Link to="/admin/remplacements/create" className={buttonVariants()}>
@@ -129,11 +143,11 @@ export default function RemplacementsIndex() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Actifs</div><div className="text-2xl font-bold">{data.actifs.length}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">À venir</div><div className="text-2xl font-bold">{data.aVenir.length}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-sabc-gray-600">Historique</div><div className="text-2xl font-bold">{data.historique.length}</div></CardContent></Card>
-      </div>
+      <KpiGrid className="lg:grid-cols-3">
+        <KpiCard label="En cours" value={data?.actifs?.length} />
+        <KpiCard label="À venir" value={data?.aVenir?.length} />
+        <KpiCard label="Terminés" value={data?.historique?.length} />
+      </KpiGrid>
 
       <Card>
         <CardHeader><CardTitle>Remplacements</CardTitle></CardHeader>
@@ -162,7 +176,7 @@ export default function RemplacementsIndex() {
               />
             )
           ) : (
-            <Table>
+            <Table className="min-w-[860px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Titulaire</TableHead>
@@ -183,18 +197,26 @@ export default function RemplacementsIndex() {
                     const meta = STATUT_META[row._statut as Statut] ?? STATUT_META.termine;
                     return (
                       <TableRow key={row.id_remplacement}>
-                        <TableCell>{[row.titulaire_prenom, row.titulaire_nom].filter(Boolean).join(' ')} ({row.titulaire_matricule})</TableCell>
-                        <TableCell>{[row.remplacant_prenom, row.remplacant_nom].filter(Boolean).join(' ')} ({row.remplacant_matricule})</TableCell>
-                        <TableCell>{row.role_remplace}</TableCell>
-                        <TableCell>{row.date_debut} {row.date_fin ? `→ ${row.date_fin}` : ''}</TableCell>
+                        <TableCell>{formatPerson(row.titulaire_prenom, row.titulaire_nom, row.titulaire_matricule)}</TableCell>
+                        <TableCell>{formatPerson(row.remplacant_prenom, row.remplacant_nom, row.remplacant_matricule)}</TableCell>
+                        <TableCell>{row.role_remplace || 'n.d.'}</TableCell>
+                        <TableCell className="whitespace-nowrap">{formatRange(row.date_debut, row.date_fin)}</TableCell>
                         <TableCell><Badge variant={meta.variant}>{meta.label}</Badge></TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-1">
                             <Link to={`/admin/remplacements/${row.id_remplacement}`}><Button variant="outline" size="sm">Voir</Button></Link>
-                            <Link to={`/admin/remplacements/${row.id_remplacement}/edit`}><Button variant="outline" size="sm">Modifier</Button></Link>
                             {row._statut === 'actif' ? (
-                              <Button variant="outline" size="sm" onClick={() => handleTerminer(String(row.id_remplacement))}>Terminer</Button>
-                            ) : null}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800"
+                                onClick={() => handleTerminer(String(row.id_remplacement))}
+                              >
+                                Terminer
+                              </Button>
+                            ) : (
+                              <Link to={`/admin/remplacements/${row.id_remplacement}/edit`}><Button variant="ghost" size="sm">Modifier</Button></Link>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

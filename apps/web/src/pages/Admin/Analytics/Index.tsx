@@ -10,8 +10,7 @@ import { DashboardSkeleton } from '@/Components/Dashboard/DashboardSkeleton';
 import { DashboardExportMenu } from '@/Components/Dashboard/DashboardExportMenu';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { analyticsApi, periodesApi } from '@/Services/api';
-import { Calendar } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
 import { useToast } from '@/Contexts/ToastContext';
 
 const DashboardTab = React.lazy(() => import('@/Components/Dashboard/Admin/Tabs/DashboardTab'));
@@ -33,6 +32,9 @@ const ADMIN_TABS = [
 ] as const;
 
 type AdminTabValue = (typeof ADMIN_TABS)[number]['value'];
+
+/** Onglets dont les données suivent le filtre de période. */
+const PERIOD_FILTERED_TABS: readonly AdminTabValue[] = ['overview', 'regions', 'roles'];
 
 function resolveTab(rawValue: string | null): AdminTabValue {
   if (ADMIN_TABS.some((tab) => tab.value === rawValue)) {
@@ -118,76 +120,64 @@ export default function AdminAnalytics() {
     }
   };
 
+  const periodFilterApplies = PERIOD_FILTERED_TABS.includes(activeTab);
+
   return (
-    <AppLayout user={layoutUser} pageTitle="Analytics 360°" notifications={[]}>
-      <Head title="Analytics 360° - SABC Eval360" />
+    <AppLayout user={layoutUser} pageTitle="Analyses 360°" notifications={[]}>
+      <Head title="Analyses 360° - SABC Eval360" />
 
       <div className="container mx-auto px-4 py-6">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-sabc-gray-900 dark:text-white">Analytics 360°</h1>
-            <p className="text-sm text-sabc-gray-600 dark:text-sabc-gray-400">
-              Exploration approfondie des performances, régions, rôles, anomalies et tendances.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {periodes.length > 0 && (
-              <div className="flex items-center gap-2 rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
-                <Calendar size={15} className="shrink-0 text-sabc-gray-400" />
-                <select
-                  value={selectedPeriodeId}
-                  onChange={(e) => handlePeriodeChange(e.target.value)}
-                  className="border-none bg-transparent text-sm text-sabc-gray-900 outline-none"
-                >
-                  <option value="">Toutes les périodes</option>
-                  {periodes.map((p: any) => (
-                    <option key={p.id_periode} value={p.id_periode}>
-                      {p.nom_periode}
-                      {p.est_ouverte ? ' (active)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <DashboardExportMenu
-              targetRef={dashboardRef}
-              filename="analytics-360-dashboard"
-              captureSelector="[role='tabpanel']"
-              onRawExport={(format) => { void downloadExport(format); }}
-              isRawExporting={exporting}
-            />
-          </div>
-        </div>
+        <PageHeader
+          className="mb-6"
+          title="Analyses 360°"
+          description="Performances, régions, rôles, anomalies et tendances des évaluations."
+          meta={periodFilterApplies && selectedPeriode ? `Période : ${selectedPeriode.nom_periode}` : undefined}
+          actions={
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              {periodes.length > 0 && periodFilterApplies && (
+                <label className="flex items-center gap-2 text-sm text-sabc-gray-600 dark:text-sabc-gray-400">
+                  <span className="shrink-0">Période</span>
+                  <select
+                    value={selectedPeriodeId}
+                    onChange={(e) => handlePeriodeChange(e.target.value)}
+                    className="h-9 w-full min-w-0 rounded-lg border border-sabc-gray-200 bg-white px-2 text-sm text-sabc-gray-900 outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary sm:w-56 dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-100"
+                  >
+                    <option value="">Toutes les périodes</option>
+                    {periodes.map((p: any) => (
+                      <option key={p.id_periode} value={p.id_periode}>
+                        {p.nom_periode}
+                        {p.est_ouverte ? ' (en cours)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <DashboardExportMenu
+                targetRef={dashboardRef}
+                filename="analyses-360"
+                captureSelector="[role='tabpanel']"
+                onRawExport={(format) => { void downloadExport(format); }}
+                isRawExporting={exporting}
+              />
+            </div>
+          }
+        />
 
-        <Card className="mb-6 border-sabc-red-primary/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Extraction des données d’évaluation</CardTitle>
-            <CardDescription>
-              Une ligne par compétence et par évaluation, avec les informations de l’évalué, de l’évaluateur, le score et son niveau d’acquisition.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2 text-sm text-sabc-gray-600 md:flex-row md:items-center md:justify-between">
-            <span>{selectedPeriode ? `Périmètre sélectionné : ${selectedPeriode.nom_periode}` : 'Périmètre sélectionné : toutes les périodes'}</span>
-            <span className="text-xs text-sabc-gray-500">Le fichier est généré côté serveur pour supporter les extractions volumineuses.</span>
-          </CardContent>
-        </Card>
-
-        <Tabs ref={dashboardRef} value={activeTab} variant="card" onValueChange={handleTabChange}>
-          <TabsList className="mb-4 flex w-full flex-nowrap overflow-x-auto scrollbar-hide justify-start gap-2 pb-1">
+        <Tabs ref={dashboardRef} value={activeTab} variant="primary" onValueChange={handleTabChange}>
+          {/* Barre d'onglets défilante sur petit écran, barre de défilement visible */}
+          <TabsList className="mb-4 flex w-full flex-nowrap justify-start overflow-x-auto pb-px [scrollbar-width:thin]">
             {ADMIN_TABS.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value} className="gap-2">
+              <TabsTrigger key={tab.value} value={tab.value} className="shrink-0 gap-2 px-3">
                 <span>{tab.label}</span>
                 {tab.value === 'anomalies' && anomalyTotal > 0 && (
-                  <Badge
-                    variant={activeTab === tab.value ? 'secondary' : 'destructive'}
-                    className="border-0 px-2 py-0.5 text-[11px] leading-none"
-                  >
+                  <Badge variant="secondary" className="border-0 px-1.5 py-0.5 text-[11px] leading-none tabular-nums">
                     {anomalyTotal > 99 ? '99+' : anomalyTotal}
                   </Badge>
                 )}
               </TabsTrigger>
             ))}
           </TabsList>
+
 
           <TabsContent value="overview">
             <ErrorBoundary>

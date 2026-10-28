@@ -13,14 +13,9 @@ import {
 import type { TooltipProps as RechartsTooltipProps } from 'recharts';
 import { cn } from '@/utils/helpers';
 
-const COLORS = [
-  'var(--sabc-red-primary)',
-  'var(--sabc-accent)',
-  'var(--sabc-success)',
-  'var(--sabc-info)',
-  'var(--sabc-warning)',
-  'var(--sabc-gray-400)',
-];
+import { CHART_SERIES, CHART_TICK, CHART_AXIS_LINE, CHART_COLORS, CHART_TOOLTIP_STYLE, frenchTick } from './chartTheme';
+
+const COLORS = CHART_SERIES;
 
 export interface ScatterSeries {
   name?: string;
@@ -79,7 +74,7 @@ export function ScatterChart({
   zAxisRange = [60, 360],
   children,
 }: ScatterChartProps) {
-  const datasets = (series && series.length > 0 ? series : [{ name: xAxisName && yAxisName ? `${yAxisName} vs ${xAxisName}` : 'Série', data }]).map(
+  const datasets = (series && series.length > 0 ? series : [{ name: xAxisName && yAxisName ? `${yAxisName} selon ${xAxisName}` : 'Série', data }]).map(
     (entry, index) => ({
       name: entry.name || `Série ${index + 1}`,
       data: entry.data || data,
@@ -96,12 +91,7 @@ export function ScatterChart({
       return (
         <Tooltip
           cursor={{ strokeDasharray: '3 3' }}
-          contentStyle={{
-            backgroundColor: '#ffffff',
-            border: '1px solid var(--sabc-gray-200)',
-            borderRadius: 4,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-          }}
+          contentStyle={CHART_TOOLTIP_STYLE}
           formatter={(value: number | string, name: string) => [value, name]}
         />
       );
@@ -111,12 +101,7 @@ export function ScatterChart({
       return (
         <Tooltip
           cursor={{ strokeDasharray: '3 3' }}
-          contentStyle={{
-            backgroundColor: '#ffffff',
-            border: '1px solid var(--sabc-gray-200)',
-            borderRadius: 4,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-          }}
+          contentStyle={CHART_TOOLTIP_STYLE}
           content={tooltip}
         />
       );
@@ -133,24 +118,26 @@ export function ScatterChart({
         <RechartsScatterChart
           margin={{ top: 20, right: 24, left: 16, bottom: 20 }}
         >
-          {showGrid && <CartesianGrid stroke="var(--sabc-gray-200)" strokeDasharray="3 3" />}
+          {showGrid && <CartesianGrid stroke={CHART_COLORS.grid} strokeDasharray="3 3" />}
           <XAxis
             type="number"
             dataKey={xAxisDataKey}
             name={xAxisName || xAxisDataKey}
             unit={xAxisUnit}
-            tick={{ fill: 'var(--sabc-gray-500)', fontSize: 12 }}
-            axisLine={{ stroke: 'var(--sabc-gray-200)' }}
-            tickLine={{ stroke: 'var(--sabc-gray-200)' }}
+            tickFormatter={frenchTick}
+            tick={CHART_TICK}
+            axisLine={CHART_AXIS_LINE}
+            tickLine={CHART_AXIS_LINE}
           />
           <YAxis
             type="number"
             dataKey={yAxisDataKey}
             name={yAxisName || yAxisDataKey}
             unit={yAxisUnit}
-            tick={{ fill: 'var(--sabc-gray-500)', fontSize: 12 }}
-            axisLine={{ stroke: 'var(--sabc-gray-200)' }}
-            tickLine={{ stroke: 'var(--sabc-gray-200)' }}
+            tickFormatter={frenchTick}
+            tick={CHART_TICK}
+            axisLine={CHART_AXIS_LINE}
+            tickLine={CHART_AXIS_LINE}
           />
           {zAxisDataKey && (
             <ZAxis

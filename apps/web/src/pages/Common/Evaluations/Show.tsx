@@ -210,7 +210,7 @@ const ShowEvaluation: React.FC = () => {
           </Card>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-[340px,1fr]">
+        <div className="grid gap-6 md:grid-cols-[340px_1fr]">
           <div className="space-y-6">
             <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
               <CardContent className="p-0">

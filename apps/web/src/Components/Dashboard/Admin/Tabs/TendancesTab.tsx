@@ -1,6 +1,5 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { useAdminTendancesTabData } from '@/Hooks/queries/useAdminDashboardTabs';
-import { ChartExportButton } from '@/Components/Charts/ChartExportButton';
 import {
   ComposedChart,
   Bar,
@@ -12,6 +11,18 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import {
+  CHART_COLORS,
+  CHART_TICK,
+  CHART_TOOLTIP_STYLE,
+  PERCENT_DOMAIN,
+  PERCENT_TICKS,
+  SCORE_DOMAIN,
+  SCORE_TICKS,
+  formatChartPercent,
+  frenchTick,
+} from '@/Components/UI/Charts/chartTheme';
+import { formatPercent, formatScore } from '@/utils/helpers';
 
 type Region = {
   id_region: string;
@@ -25,26 +36,36 @@ type Tendance = {
   date_debut: string;
   date_fin: string;
   score_moyen: number | null;
-  taux_completion: number;
+  taux_completion: number | null;
   nb_evaluations: number;
   nb_valides: number;
   delta_score: number | null;
   delta_completion: number | null;
 };
 
+const SELECT_CLASS =
+  'h-9 w-full rounded-lg border border-sabc-gray-200 bg-white px-3 text-sm text-sabc-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary sm:w-auto dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-200';
+
+function formatUpdatedAt(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'n.d.';
+  return date.toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 function TendancesContent() {
   const [regionFilter, setRegionFilter] = React.useState('all');
   const [roleFilter, setRoleFilter] = React.useState('all');
-  const chartRef = useRef<HTMLDivElement>(null);
   const { tendances, regionOptions, roleOptions, generatedAt } = useAdminTendancesTabData({
     regionFilter,
     roleFilter,
   });
 
-  const chartData = (tendances as Tendance[]).map((t) => ({
-    periode: t.code_periode || t.nom_periode,
+  const rows = tendances as Tendance[];
+  const chartData = rows.map((t) => ({
+    // Le nom lisible de la période prime sur son code technique (P2502).
+    periode: t.nom_periode || t.code_periode,
     score: t.score_moyen != null ? Number(t.score_moyen) : null,
-    completion: Number(t.taux_completion ?? 0),
+    completion: t.taux_completion != null ? Number(t.taux_completion) : null,
     nb: Number(t.nb_evaluations ?? 0),
     delta: t.delta_score,
   }));
@@ -52,11 +73,12 @@ function TendancesContent() {
   return (
     <div className="space-y-5">
       {/* Filtres */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         <select
+          aria-label="Région"
           value={regionFilter}
           onChange={(e) => setRegionFilter(e.target.value)}
-          className="rounded-lg border border-sabc-gray-200 bg-white px-3 py-1.5 text-sm text-sabc-gray-700 shadow-sm focus:outline-none focus:ring-1 focus:ring-sabc-red-primary"
+          className={SELECT_CLASS}
         >
           <option value="all">Toutes les régions</option>
           {(regionOptions as Region[]).map((r) => (
@@ -66,9 +88,10 @@ function TendancesContent() {
           ))}
         </select>
         <select
+          aria-label="Rôle"
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="rounded-lg border border-sabc-gray-200 bg-white px-3 py-1.5 text-sm text-sabc-gray-700 shadow-sm focus:outline-none focus:ring-1 focus:ring-sabc-red-primary"
+          className={SELECT_CLASS}
         >
           <option value="all">Tous les rôles</option>
           {(roleOptions as string[]).map((role) => (
@@ -78,8 +101,8 @@ function TendancesContent() {
           ))}
         </select>
         {generatedAt && (
-          <span className="ml-auto self-center text-xs text-sabc-gray-500">
-            Mis à jour : {new Date(generatedAt).toLocaleString('fr-FR')}
+          <span className="text-xs text-sabc-gray-500 sm:ml-auto">
+            Mis à jour le {formatUpdatedAt(generatedAt)}
           </span>
         )}
       </div>
@@ -87,67 +110,61 @@ function TendancesContent() {
       {/* Graphique */}
       {chartData.length === 0 ? (
         <div className="rounded-lg border border-dashed border-sabc-gray-300 p-8 text-center text-sabc-gray-500">
-          Aucune donnée de tendance disponible pour les filtres sélectionnés.
+          Aucune tendance pour les filtres sélectionnés.
         </div>
       ) : (
-        <div className="rounded-lg border border-sabc-gray-200/80 bg-white p-4 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-sabc-gray-500">
-              Évolution par période
-            </h3>
-            <ChartExportButton chartRef={chartRef} filename="sabc-tendances" />
-          </div>
-          <div ref={chartRef} className="h-72">
+        <div className="rounded-lg border border-sabc-gray-200 bg-white p-4 dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
+          <h3 className="mb-4 text-sm font-semibold text-sabc-gray-900 dark:text-white">Évolution par période</h3>
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-                <XAxis dataKey="periode" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+              <ComposedChart data={chartData} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="periode" tick={CHART_TICK} tickLine={false} axisLine={false} />
                 <YAxis
                   yAxisId="score"
-                  domain={[0, 5]}
+                  domain={SCORE_DOMAIN}
+                  ticks={SCORE_TICKS}
+                  tickFormatter={frenchTick}
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 11 }}
-                  label={{ value: 'Score /5', angle: -90, position: 'insideLeft', fontSize: 11 }}
+                  tick={CHART_TICK}
                 />
                 <YAxis
                   yAxisId="completion"
                   orientation="right"
-                  domain={[0, 100]}
+                  domain={PERCENT_DOMAIN}
+                  ticks={PERCENT_TICKS}
+                  tickFormatter={(value: number) => `${frenchTick(value)} %`}
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 11 }}
-                  label={{
-                    value: '% complétion',
-                    angle: 90,
-                    position: 'insideRight',
-                    fontSize: 11,
-                  }}
+                  tick={CHART_TICK}
+                  width={48}
                 />
                 <Tooltip
+                  cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                  contentStyle={CHART_TOOLTIP_STYLE}
                   formatter={(value: string | number | (string | number)[], name: string) => {
-                    if (name === 'Score moyen') return value != null ? [`${value}/5`, name] : ['—', name];
-                    if (name === 'Taux complétion') return [`${value}%`, name];
+                    if (name === 'Score moyen') return [formatScore(value), name];
+                    if (name === 'Taux de complétion') return [formatChartPercent(value, 1), name];
                     return [value, name];
                   }}
                 />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar
                   yAxisId="completion"
                   dataKey="completion"
-                  name="Taux complétion"
-                  fill="#93C5FD"
-                  opacity={0.7}
-                  radius={[6, 6, 0, 0]}
+                  name="Taux de complétion"
+                  fill={CHART_COLORS.tertiary}
+                  radius={[4, 4, 0, 0]}
                 />
                 <Line
                   yAxisId="score"
                   type="monotone"
                   dataKey="score"
                   name="Score moyen"
-                  stroke="#EF4444"
+                  stroke={CHART_COLORS.primary}
                   strokeWidth={2}
-                  dot={{ r: 4 }}
+                  dot={{ r: 3, fill: CHART_COLORS.primary }}
                   connectNulls
                 />
               </ComposedChart>
@@ -157,47 +174,32 @@ function TendancesContent() {
       )}
 
       {/* Table résumé */}
-      {(tendances as Tendance[]).length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-sabc-gray-200/80 bg-white shadow-sm">
+      {rows.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-sabc-gray-200 bg-white dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
           <table className="w-full text-sm">
-            <thead className="bg-sabc-gray-50">
+            <thead className="bg-sabc-gray-50 dark:bg-sabc-gray-800">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-sabc-gray-500">Période</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-500">Score moyen</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-500">Δ Score</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-500">Taux complétion</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-500">Évaluations</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-sabc-gray-600">Période</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-600">Score moyen</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-600">Évolution du score</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-600">Taux de complétion</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-600">Évaluations</th>
               </tr>
             </thead>
             <tbody>
-              {(tendances as Tendance[]).map((t) => (
-                <tr key={t.id_periode} className="border-t border-sabc-gray-100 hover:bg-sabc-gray-50">
-                  <td className="px-4 py-3 font-medium text-sabc-gray-900">{t.nom_periode || t.code_periode}</td>
-                  <td className="px-4 py-3 text-right text-sabc-gray-700">
-                    {t.score_moyen != null ? `${Number(t.score_moyen).toFixed(2)}/5` : '—'}
+              {rows.map((t) => (
+                <tr key={t.id_periode} className="border-t border-sabc-gray-100 hover:bg-sabc-gray-50 dark:border-sabc-gray-800">
+                  <td className="px-4 py-3 font-medium text-sabc-gray-900 dark:text-white">{t.nom_periode || t.code_periode}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-sabc-gray-700">{formatScore(t.score_moyen, 2)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-sabc-gray-700">
+                    {t.delta_score != null
+                      ? `${t.delta_score > 0 ? '+' : ''}${Number(t.delta_score).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : 'n.d.'}
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    {t.delta_score != null ? (
-                      <span
-                        className={
-                          t.delta_score > 0
-                            ? 'text-green-600'
-                            : t.delta_score < 0
-                              ? 'text-red-600'
-                              : 'text-sabc-gray-500'
-                        }
-                      >
-                        {t.delta_score > 0 ? '+' : ''}
-                        {Number(t.delta_score).toFixed(2)}
-                      </span>
-                    ) : (
-                      <span className="text-sabc-gray-400">—</span>
-                    )}
+                  <td className="px-4 py-3 text-right tabular-nums text-sabc-gray-700">{formatPercent(t.taux_completion, 1)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-sabc-gray-700">
+                    {Number(t.nb_evaluations ?? 0).toLocaleString('fr-FR')}
                   </td>
-                  <td className="px-4 py-3 text-right text-sabc-gray-700">
-                    {Number(t.taux_completion ?? 0).toFixed(1)}%
-                  </td>
-                  <td className="px-4 py-3 text-right text-sabc-gray-700">{t.nb_evaluations}</td>
                 </tr>
               ))}
             </tbody>

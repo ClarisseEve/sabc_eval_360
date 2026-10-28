@@ -8,7 +8,7 @@ const SSDashboard: React.FC = () => (
     <Suspense fallback={<DashboardSkeleton />}>
       <RoleManagerDashboardPage
         fallbackRole="SS"
-        title="Tableau de bord Superviseur Sponsoring"
+        title="Tableau de bord Superviseur sponsoring"
         subtitle="Suivi des évaluations, des scores et de l'encadrement sponsoring."
         teamTitle="Équipe sponsoring"
       />

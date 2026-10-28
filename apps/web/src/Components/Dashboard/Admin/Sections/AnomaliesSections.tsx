@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle2, Info, RefreshCw, Shield, Siren, TriangleAlert, Zap } from 'lucide-react';
+import { CheckCircle2, RefreshCw, Zap } from 'lucide-react';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/Components/UI/Pagination';
 import { EmptyState } from '@/Components/Dashboard/RoleDashboardShared';
 import { paginateList } from '@/utils/adminUi';
-import { cn } from '@/utils/helpers';
+import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
+import { cn, formatPercent } from '@/utils/helpers';
 
 type AlertFilter = 'all' | 'critical' | 'warning' | 'info';
 
@@ -22,10 +23,10 @@ type AnomalyRow = {
   details?: Record<string, unknown>;
 };
 
-const SEVERITY_CONFIG: Record<string, { icon: React.ElementType; color: string; badgeVariant: 'destructive' | 'secondary' | 'outline' }> = {
-  critical: { icon: AlertTriangle, color: '#E53E3E', badgeVariant: 'destructive' },
-  warning: { icon: AlertCircle, color: '#D69E2E', badgeVariant: 'secondary' },
-  info: { icon: Info, color: '#3182CE', badgeVariant: 'outline' },
+const SEVERITY_CONFIG: Record<string, { label: string; delay: string; badgeVariant: 'destructive' | 'secondary' | 'outline' }> = {
+  critical: { label: 'Critique', delay: 'À traiter sous 24 h', badgeVariant: 'destructive' },
+  warning: { label: 'Avertissement', delay: 'Revue sous 48 h', badgeVariant: 'secondary' },
+  info: { label: 'Surveillance', delay: 'À suivre', badgeVariant: 'outline' },
 };
 
 const FILTERS: Array<{ value: AlertFilter; label: string }> = [
@@ -38,7 +39,7 @@ const FILTERS: Array<{ value: AlertFilter; label: string }> = [
 function formatTypeLabel(type: string) {
   switch (type) {
     case 'divergence_auto_vs_autres':
-      return 'Divergence auto vs externes';
+      return 'Écart auto-évaluation / évaluations externes';
     case 'baisse_performance':
       return 'Baisse de performance';
     case 'uniformite_evaluations':
@@ -46,7 +47,10 @@ function formatTypeLabel(type: string) {
     case 'biais_evaluateur':
       return 'Biais évaluateur';
     default:
-      return type.replace(/_/g, ' ');
+      {
+        const label = type.replace(/_/g, ' ');
+        return label.charAt(0).toUpperCase() + label.slice(1);
+      }
   }
 }
 
@@ -54,31 +58,31 @@ function buildSignalMetric(row: AnomalyRow) {
   const details = row.details ?? {};
 
   if (typeof details.ecart === 'number') {
-    return `${details.ecart.toFixed(1)} pt d'écart`;
+    return `Écart de ${details.ecart.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} pt`;
   }
 
   if (typeof details.progression === 'number') {
-    return `${Math.abs(details.progression).toFixed(1)} pt sur 3 mois`;
+    return `${Math.abs(details.progression).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} pt sur 3 mois`;
   }
 
   if (typeof details.variance === 'number') {
-    return `Variance ${details.variance.toFixed(2)}`;
+    return `Variance ${details.variance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   if (typeof details.nb_evaluations === 'number') {
-    return `${details.nb_evaluations} évaluations concernées`;
+    return `${details.nb_evaluations.toLocaleString('fr-FR')} évaluations concernées`;
   }
 
-  return 'Signal consolidé par analytics';
+  return 'n.d.';
 }
 
 function buildActionLabel(row: AnomalyRow) {
   if (row.type === 'divergence_auto_vs_autres') {
-    return 'Comparer les écarts par cycle et déclencher une revue managériale ciblée.';
+    return 'Comparer les écarts par période et organiser un entretien avec le responsable.';
   }
 
   if (row.type === 'baisse_performance') {
-    return 'Vérifier les évaluations récentes et activer un plan d’accompagnement court terme.';
+    return 'Vérifier les évaluations récentes et mettre en place un accompagnement à court terme.';
   }
 
   if (row.type === 'uniformite_evaluations') {
@@ -86,7 +90,7 @@ function buildActionLabel(row: AnomalyRow) {
   }
 
   if (row.type === 'biais_evaluateur') {
-    return 'Auditer le pattern de notation puis corriger avec calibration transverse.';
+    return 'Examiner les notes attribuées par cet évaluateur puis organiser une séance d’harmonisation.';
   }
 
   return 'Analyser le signal puis affecter une action corrective.';
@@ -116,7 +120,7 @@ export function AnomalySummarySection({
     const order = { critical: 0, warning: 1, info: 2 };
     return order[left.severite] - order[right.severite];
   });
-  const criticalShare = total > 0 ? ((severityStats.critical ?? 0) / total) * 100 : 0;
+  const criticalShare = total > 0 ? ((severityStats.critical ?? 0) / total) * 100 : null;
   const immediateRows = rankedRows.filter((row) => row.severite !== 'info').slice(0, 4);
   const topTypes = Object.entries(
     rows.reduce<Record<string, number>>((accumulator, row) => {
@@ -128,114 +132,61 @@ export function AnomalySummarySection({
     .sort((left, right) => right[1] - left[1])
     .slice(0, 4);
   const topTypeMax = Math.max(...topTypes.map(([, count]) => count), 1);
-  const summaryCards = [
-    { label: 'Alertes ouvertes', value: total, color: '#111827', icon: Shield, caption: 'Flux agrégé temps réel' },
-    { label: 'Critiques', value: severityStats.critical ?? 0, color: '#E53E3E', icon: AlertTriangle, caption: 'Traitement prioritaire' },
-    { label: 'Avertissements', value: severityStats.warning ?? 0, color: '#D69E2E', icon: AlertCircle, caption: 'Nécessitent calibration' },
-    { label: 'Surveillance', value: severityStats.info ?? 0, color: '#3182CE', icon: Info, caption: 'Signaux à suivre' },
-  ];
 
   return (
     <div className="space-y-5">
-      <Card className="overflow-hidden border-sabc-gray-200/80 bg-[radial-gradient(circle_at_top_right,_rgba(229,62,62,0.08),_transparent_35%),linear-gradient(180deg,_rgba(255,255,255,1),_rgba(248,250,252,0.92))] shadow-sm">
-        <CardContent className="grid gap-5 p-6 xl:grid-cols-[1.3fr,0.7fr]">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-medium text-sabc-red-primary">
-              <Siren className="h-4 w-4" />
-              Centre de supervision
-            </div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-sabc-gray-900">
-              Alertes et anomalies pilotées sur les données réelles
-            </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-sabc-gray-600">
-              Suivez en temps réel les anomalies et incohérences détectées sur les évaluations,
-              priorisez les alertes critiques et traitez-les avant qu'elles n'impactent les résultats.
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              {FILTERS.map((filter) => {
-                const isActive = activeFilter === filter.value;
-                const count =
-                  filter.value === 'all'
-                    ? total
-                    : Number(severityStats[filter.value] ?? 0);
-
-                return (
-                  <button
-                    key={filter.value}
-                    type="button"
-                    onClick={() => onFilterChange(filter.value)}
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors',
-                      isActive
-                        ? 'border-sabc-red-primary bg-sabc-red-primary text-white shadow-sm'
-                        : 'border-sabc-gray-200 bg-white text-sabc-gray-700 hover:border-sabc-red-primary/30 hover:text-sabc-red-primary',
-                    )}
-                  >
-                    <span>{filter.label}</span>
-                    <span className={cn(
-                      'rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                      isActive ? 'bg-white/20 text-white' : 'bg-sabc-gray-100 text-sabc-gray-700',
-                    )}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <div className="rounded-lg border border-sabc-gray-200/80 bg-white/85 p-4 shadow-sm">
-              <div className="text-xs font-semibold text-sabc-gray-500">Charge critique</div>
-              <div className="mt-2 text-2xl font-semibold text-sabc-gray-900">{criticalShare.toFixed(0)}%</div>
-              <p className="mt-1 text-sm text-sabc-gray-500">Part des alertes qui demandent une intervention rapide.</p>
-            </div>
-            <div className="rounded-lg border border-sabc-gray-200/80 bg-white/85 p-4 shadow-sm">
-              <div className="text-xs font-semibold text-sabc-gray-500">Vue active</div>
-              <div className="mt-2 text-lg font-semibold text-sabc-gray-900">
-                {activeFilter === 'all' ? 'Toutes les alertes' : `Alertes ${getSeverityLabel(activeFilter)}`}
-              </div>
-              <p className="mt-1 text-sm text-sabc-gray-500">
-                {activeFilter === 'all'
-                  ? 'Surveillance globale de la plateforme.'
-                  : 'Filtre utile pour traiter les lots par niveau d’urgence.'}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {summaryCards.map((card) => {
-          const IconComp = card.icon;
-          return (
-            <Card key={card.label} className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-lg" style={{ backgroundColor: `${card.color}18` }}>
-                    <IconComp className="h-5 w-5" style={{ color: card.color }} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-sabc-gray-600">{card.label}</div>
-                    <div className="text-2xl font-bold text-sabc-gray-900">{card.value}</div>
-                    <div className="mt-1 text-xs text-sabc-gray-500">{card.caption}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-sabc-gray-900 dark:text-white">Alertes et anomalies</h2>
+          <p className="text-sm text-sabc-gray-600 dark:text-sabc-gray-400">
+            Incohérences détectées dans les évaluations, classées par niveau d'urgence.
+          </p>
+        </div>
+        <div
+          role="group"
+          aria-label="Filtrer par niveau d'urgence"
+          className="inline-flex w-full overflow-x-auto rounded-lg border border-sabc-gray-200 bg-white p-0.5 sm:w-auto dark:border-sabc-gray-700 dark:bg-sabc-gray-900"
+        >
+          {FILTERS.map((filter) => {
+            const isActive = activeFilter === filter.value;
+            const count = filter.value === 'all' ? total : Number(severityStats[filter.value] ?? 0);
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => onFilterChange(filter.value)}
+                className={cn(
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
+                  isActive
+                    ? 'bg-sabc-gray-100 font-semibold text-sabc-gray-900 dark:bg-sabc-gray-800 dark:text-white'
+                    : 'text-sabc-gray-600 hover:text-sabc-gray-900 dark:text-sabc-gray-400',
+                )}
+              >
+                <span>{filter.label}</span>
+                <span className="tabular-nums text-sabc-gray-500">{count.toLocaleString('fr-FR')}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[1.15fr,0.85fr]">
-        <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
+      <KpiGrid>
+        <KpiCard label="Alertes ouvertes" value={total.toLocaleString('fr-FR')} />
+        <KpiCard
+          label="Critiques"
+          value={(severityStats.critical ?? 0).toLocaleString('fr-FR')}
+          caption={criticalShare === null ? undefined : `${formatPercent(criticalShare)} du total`}
+        />
+        <KpiCard label="Avertissements" value={(severityStats.warning ?? 0).toLocaleString('fr-FR')} />
+        <KpiCard label="Surveillance" value={(severityStats.info ?? 0).toLocaleString('fr-FR')} />
+      </KpiGrid>
+
+      <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+        <Card className="overflow-hidden border-sabc-gray-200">
           <CardHeader className="border-b border-sabc-gray-100">
-            <CardTitle className="flex items-center gap-2">
-              <TriangleAlert className="h-5 w-5 text-sabc-red-primary" />
-              Priorités immédiates
-            </CardTitle>
-            <CardDescription>Les alertes les plus risquées sont remontées en premier pour agir vite.</CardDescription>
+            <CardTitle>Priorités immédiates</CardTitle>
+            <CardDescription>Alertes critiques et avertissements, les plus urgents en premier.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 pt-6">
             {immediateRows.length === 0 ? (
@@ -243,31 +194,20 @@ export function AnomalySummarySection({
             ) : (
               immediateRows.map((row, index) => {
                 const config = SEVERITY_CONFIG[row.severite] || SEVERITY_CONFIG.info;
-                const IconComp = config.icon;
-
                 return (
-                  <div key={`${row.type}-${row.matricule ?? 'global'}-${index}`} className="rounded-lg border border-sabc-gray-200/80 bg-white p-4 shadow-sm">
+                  <div key={`${row.type}-${row.matricule ?? 'global'}-${index}`} className="rounded-lg border border-sabc-gray-200 bg-white p-4 dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${config.color}18` }}>
-                            <IconComp className="h-4 w-4" style={{ color: config.color }} />
-                          </span>
-                          <div>
-                            <div className="font-medium text-sabc-gray-900">{formatTypeLabel(row.type)}</div>
-                            <div className="text-xs text-sabc-gray-500">{row.matricule ?? 'Analyse globale'}</div>
-                          </div>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-sabc-gray-600">{row.description}</p>
+                        <div className="font-medium text-sabc-gray-900 dark:text-white">{formatTypeLabel(row.type)}</div>
+                        <div className="text-xs text-sabc-gray-500">{row.matricule ?? 'Analyse globale'}</div>
+                        <p className="mt-2 text-sm leading-6 text-sabc-gray-600 dark:text-sabc-gray-400">{row.description}</p>
                       </div>
-                      <Badge variant={config.badgeVariant}>{row.severite}</Badge>
+                      <Badge variant={config.badgeVariant}>{config.label}</Badge>
                     </div>
-                    <div className="mt-4 rounded-lg bg-sabc-gray-50 px-3 py-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-sabc-gray-500">
-                        Action recommandée
-                      </div>
-                      <p className="mt-1 text-sm leading-5 text-sabc-gray-600">{buildActionLabel(row)}</p>
-                    </div>
+                    <p className="mt-3 border-t border-sabc-gray-100 pt-3 text-sm leading-5 text-sabc-gray-600 dark:border-sabc-gray-800 dark:text-sabc-gray-400">
+                      <span className="font-medium text-sabc-gray-700 dark:text-sabc-gray-300">Action recommandée : </span>
+                      {buildActionLabel(row)}
+                    </p>
                   </div>
                 );
               })
@@ -275,22 +215,22 @@ export function AnomalySummarySection({
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
+        <Card className="overflow-hidden border-sabc-gray-200">
           <CardHeader className="border-b border-sabc-gray-100">
             <CardTitle>Signaux récurrents</CardTitle>
-            <CardDescription>Typologies qui reviennent le plus souvent dans les seeds et calculs analytics.</CardDescription>
+            <CardDescription>Types d'anomalies les plus fréquents.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
             {topTypes.length === 0 ? (
-              <EmptyState message="Aucun signal récurrent disponible." />
+              <EmptyState message="Aucun signal récurrent." />
             ) : (
               topTypes.map(([label, count]) => (
-                <div key={label} className="rounded-lg border border-sabc-gray-200/80 bg-white p-4 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium text-sabc-gray-900">{label}</span>
-                    <Badge variant="info">{count}</Badge>
+                <div key={label}>
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-medium text-sabc-gray-900 dark:text-white">{label}</span>
+                    <span className="tabular-nums text-sabc-gray-600">{count.toLocaleString('fr-FR')}</span>
                   </div>
-                  <Progress value={count} max={topTypeMax} className="mt-4 h-2.5" />
+                  <Progress value={count} max={topTypeMax} className="mt-2 h-2" />
                 </div>
               ))
             )}
@@ -331,20 +271,17 @@ export function AnomaliesTableSection({
   }, [rows.length]);
 
   return (
-    <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
+    <Card className="overflow-hidden border-sabc-gray-200">
       <CardHeader className="border-b border-sabc-gray-100">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-sabc-red-primary" />
-              File opérationnelle des alertes
-            </CardTitle>
+            <CardTitle>Liste des alertes</CardTitle>
             <CardDescription>
-              {rows.length} alerte(s) affichée(s)
-              {activeFilter !== 'all' ? ` sur ${totalRows.length}` : ''} pour le filtre courant.
+              {rows.length.toLocaleString('fr-FR')} alerte(s) affichée(s)
+              {activeFilter !== 'all' ? ` sur ${totalRows.length.toLocaleString('fr-FR')}` : ''}.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -352,7 +289,7 @@ export function AnomaliesTableSection({
               disabled={isRunningDetection}
             >
               <Zap className={`mr-2 h-4 w-4 ${isRunningDetection ? 'animate-pulse' : ''}`} />
-              {isRunningDetection ? 'Détection...' : 'Lancer détection'}
+              {isRunningDetection ? 'Détection en cours…' : 'Lancer la détection'}
             </Button>
             <Button variant="outline" size="sm" onClick={onRefresh} disabled={isFetching}>
               <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -364,11 +301,10 @@ export function AnomaliesTableSection({
       <CardContent className="p-0">
         {rows.length === 0 ? (
           <div className="py-10 text-center text-sabc-gray-500">
-            <Shield className="mx-auto mb-3 h-12 w-12 text-sabc-gray-300" />
             <p className="font-medium">Aucune alerte détectée</p>
             <p className="text-sm">
               {activeFilter === 'all'
-                ? 'Le système ne remonte pas de signal bloquant sur la fenêtre actuelle.'
+                ? 'Aucune anomalie bloquante sur la période.'
                 : `Aucune alerte ${getSeverityLabel(activeFilter)} pour la sélection courante.`}
             </p>
           </div>
@@ -388,7 +324,6 @@ export function AnomaliesTableSection({
               <TableBody>
                 {paginatedRows.items.map((row, index) => {
                   const config = SEVERITY_CONFIG[row.severite] || SEVERITY_CONFIG.info;
-                  const IconComp = config.icon;
                   const rowKey = `${row.type}-${row.matricule ?? 'global'}-${index}`;
                   const isAcknowledging = acknowledgeLoading !== null && row.id === acknowledgeLoading;
                   return (
@@ -396,22 +331,11 @@ export function AnomaliesTableSection({
                       key={rowKey}
                       className={cn(
                         row.resolue && 'opacity-60',
-                        !row.resolue && row.severite === 'critical' && 'bg-red-50/40',
-                        !row.resolue && row.severite === 'warning' && 'bg-amber-50/30',
                       )}
                     >
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ backgroundColor: `${config.color}18` }}>
-                            <IconComp className="h-4 w-4" style={{ color: config.color }} />
-                          </span>
-                          <div>
-                            <Badge variant={config.badgeVariant}>{row.severite}</Badge>
-                            <div className="mt-1 text-xs text-sabc-gray-500">
-                              {row.severite === 'critical' ? 'Action < 24h' : row.severite === 'warning' ? 'Revue 48h' : 'Surveillance'}
-                            </div>
-                          </div>
-                        </div>
+                        <Badge variant={config.badgeVariant}>{config.label}</Badge>
+                        <div className="mt-1 text-xs text-sabc-gray-500">{config.delay}</div>
                       </TableCell>
                       <TableCell className="min-w-[220px]">
                         <div className="font-medium text-sabc-gray-900">{formatTypeLabel(row.type)}</div>
@@ -432,13 +356,13 @@ export function AnomaliesTableSection({
                             size="sm"
                             disabled={isAcknowledging}
                             onClick={() => onAcknowledge(row.id!)}
-                            className="gap-1 border-green-300 text-green-700 hover:bg-green-50"
+                            className="gap-1"
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             {isAcknowledging ? 'En cours…' : 'Marquer résolu'}
                           </Button>
                         ) : (
-                          <span className="text-xs text-sabc-gray-400">—</span>
+                          <span className="text-xs text-sabc-gray-400">n.d.</span>
                         )}
                       </TableCell>
                     </TableRow>

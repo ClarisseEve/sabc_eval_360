@@ -1,7 +1,9 @@
 import React from 'react';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Check, Edit, LayoutGrid, List, Pencil, Plus, Power, Trash2, X } from 'lucide-react';
+import { Check, Edit, LayoutGrid, List, Pencil, Plus, Power, Trash2 } from 'lucide-react';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
 import { adminApi, reglesApi } from '@/Services/api';
 import { AdminEvaluationsLayout } from '../shared';
 import { Button } from '@/Components/UI/Button/Button';
@@ -32,11 +34,27 @@ const TYPE_LABELS: Record<string, string> = {
   '360': '360°',
 };
 
-const TYPE_BORDER_STYLES: Record<MatrixRuleType, string> = {
-  auto: 'border-violet-500 text-violet-700',
-  pairs: 'border-sky-500 text-sky-700',
-  descendante: 'border-emerald-600 text-emerald-700',
-  ascendante: 'border-amber-500 text-amber-700',
+// Code court affiché dans les cellules de la vue 360° (un seul état visuel par sens :
+// la couleur indique le statut de la règle, le code indique son type).
+const TYPE_CODES: Record<MatrixRuleType, string> = {
+  auto: 'Au',
+  pairs: 'Pa',
+  descendante: 'De',
+  ascendante: 'As',
+};
+
+type CellState = 'active' | 'inactive' | 'none';
+
+const CELL_STYLES: Record<CellState, string> = {
+  active: 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+  inactive: 'border-dashed border-sabc-gray-400 bg-white text-sabc-gray-500 hover:bg-sabc-gray-50 dark:bg-transparent',
+  none: 'border-sabc-gray-200 bg-sabc-gray-50 text-transparent hover:border-sabc-gray-300 hover:bg-white hover:text-sabc-gray-400 dark:border-sabc-gray-700 dark:bg-sabc-gray-800/40',
+};
+
+const CELL_STATE_LABELS: Record<CellState, string> = {
+  active: 'règle active',
+  inactive: 'règle inactive',
+  none: 'aucune règle',
 };
 
 type ViewMode = 'matrix' | 'list';
@@ -183,22 +201,21 @@ export default function RulesIndexPage() {
 
   return (
     <AdminEvaluationsLayout title="Règles d’évaluation">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Règles d’évaluation</h1>
-          <p className="mt-1 text-sm text-sabc-gray-400">
-            Matrice de compatibilité entre rôles évaluateurs et rôles évalués.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title="Règles d’évaluation"
+        description="Qui évalue qui : compatibilité entre rôles évaluateurs et rôles évalués, par type d’évaluation."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Évaluations' }, { label: 'Règles' }]}
+        actions={(
+          <>
           {/* View toggle: matrix vs. detailed list */}
-          <div className="flex items-center rounded-lg border border-sabc-gray-200 p-1">
+          <div className="flex items-center rounded-lg border border-sabc-gray-200 p-1" role="group" aria-label="Affichage">
             <button
               type="button"
+              aria-pressed={view === 'matrix'}
               onClick={() => setView('matrix')}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                 view === 'matrix'
-                  ? 'bg-sabc-red-primary text-white'
+                  ? 'bg-sabc-gray-100 text-sabc-gray-900 dark:bg-sabc-gray-800 dark:text-white'
                   : 'text-sabc-gray-600 hover:bg-sabc-gray-100'
               }`}
             >
@@ -207,10 +224,11 @@ export default function RulesIndexPage() {
             </button>
             <button
               type="button"
+              aria-pressed={view === 'list'}
               onClick={() => setView('list')}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                 view === 'list'
-                  ? 'bg-sabc-red-primary text-white'
+                  ? 'bg-sabc-gray-100 text-sabc-gray-900 dark:bg-sabc-gray-800 dark:text-white'
                   : 'text-sabc-gray-600 hover:bg-sabc-gray-100'
               }`}
             >
@@ -218,60 +236,40 @@ export default function RulesIndexPage() {
               Liste
             </button>
           </div>
-          <Button
-            className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
-            onClick={() => goToCreate()}
-          >
+          <Button onClick={() => goToCreate()}>
             <Plus size={16} className="mr-2" />
             Nouvelle règle
           </Button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-sabc-gray-400">Total règles</div>
-            <div className="text-2xl font-bold text-sabc-gray-900">{rules.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-sabc-gray-400">Actives</div>
-            <div className="text-2xl font-bold text-sabc-success">{activeCount}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-sabc-gray-400">Rôles</div>
-            <div className="text-2xl font-bold text-sabc-gray-900">{roles.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-sabc-gray-400">
-              {selectedType === '360' ? 'Règles actives (360°)' : `Compatibles (${TYPE_LABELS[selectedType] ?? selectedType})`}
-            </div>
-            <div className="text-2xl font-bold text-sabc-gray-900">{compatibleForType}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <KpiGrid>
+        <KpiCard label="Total règles" value={rules.length} />
+        <KpiCard label="Actives" value={activeCount} />
+        <KpiCard label="Rôles" value={roles.length} />
+        <KpiCard
+          label={selectedType === '360' ? 'Règles actives (360°)' : `Actives : ${TYPE_LABELS[selectedType] ?? selectedType}`}
+          value={compatibleForType}
+        />
+      </KpiGrid>
 
       {view === 'matrix' ? (
         <Card>
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <CardTitle>Matrice de compatibilité</CardTitle>
-              {/* Type filter as tabs — the matrix recomputes for the selected type */}
+              {/* Filtre par type : la matrice est recalculée pour le type choisi */}
               <div className="flex flex-wrap items-center gap-1 rounded-lg border border-sabc-gray-200 p-1">
                 {EVALUATION_TYPES.map((type) => (
                   <button
                     key={type}
                     type="button"
+                    aria-pressed={selectedType === type}
                     onClick={() => setSelectedType(type)}
                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                       selectedType === type
-                        ? 'bg-sabc-red-primary text-white'
+                        ? 'bg-sabc-gray-100 text-sabc-gray-900 dark:bg-sabc-gray-800 dark:text-white'
                         : 'text-sabc-gray-600 hover:bg-sabc-gray-100'
                     }`}
                   >
@@ -287,19 +285,21 @@ export default function RulesIndexPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="border-collapse text-sm">
+                  <table className="w-full min-w-max border-collapse text-sm">
                     <thead>
                       <tr>
-                        <th className="sticky left-0 z-10 bg-white px-3 py-2 text-left text-xs font-semibold uppercase text-sabc-gray-500">
-                          <div className="flex flex-col">
-                            <span>Évaluateur</span>
-                            <span className="font-normal normal-case text-sabc-gray-400">↓ / Évalué →</span>
-                          </div>
+                        <th
+                          scope="col"
+                          className="sticky left-0 z-10 min-w-[11rem] border-b border-r border-sabc-gray-200 bg-white px-3 py-2 text-left align-bottom text-xs font-medium text-sabc-gray-500 dark:border-sabc-gray-700 dark:bg-sabc-gray-900"
+                        >
+                          <span className="block">Évaluateur (lignes)</span>
+                          <span className="block">Évalué (colonnes)</span>
                         </th>
                         {roles.map((evaluatee) => (
                           <th
                             key={evaluatee}
-                            className="min-w-[3.5rem] px-2 py-2 text-center text-xs font-semibold text-sabc-gray-700"
+                            scope="col"
+                            className="min-w-[3.5rem] border-b border-sabc-gray-200 px-1 py-2 text-center align-bottom text-xs font-semibold text-sabc-gray-700 dark:border-sabc-gray-700 dark:text-sabc-gray-300"
                           >
                             {evaluatee}
                           </th>
@@ -308,71 +308,37 @@ export default function RulesIndexPage() {
                     </thead>
                     <tbody>
                       {roles.map((evaluator) => (
-                        <tr key={evaluator}>
-                          <th className="sticky left-0 z-10 bg-white px-3 py-2 text-left text-xs font-semibold text-sabc-gray-700">
+                        <tr key={evaluator} className="hover:bg-sabc-gray-50/60 dark:hover:bg-sabc-gray-800/30">
+                          <th
+                            scope="row"
+                            className="sticky left-0 z-10 border-r border-sabc-gray-200 bg-white px-3 py-1.5 text-left text-xs font-semibold text-sabc-gray-700 dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-300"
+                          >
                             {evaluator}
                           </th>
                           {roles.map((evaluatee) => {
-                            const isDiagonal = evaluator === evaluatee;
+                            const rule = findCellRule(evaluator, evaluatee);
+                            const state: CellState = rule ? (rule.est_active ? 'active' : 'inactive') : 'none';
+                            const type = selectedType === '360' ? getCellRuleType(rule, evaluator, evaluatee) : null;
+                            const typeLabel = TYPE_LABELS[type ?? selectedType] ?? selectedType;
+                            const label = `${typeLabel} : ${evaluator} évalue ${evaluatee}, ${CELL_STATE_LABELS[state]}. ${rule ? 'Gérer la règle' : 'Créer une règle'}`;
 
                             return (
                               <td key={evaluatee} className="p-1 text-center">
-                                {selectedType === '360' ? (
-                                  (() => {
-                                    const rule = findCellRule(evaluator, evaluatee);
-                                    const compatible = Boolean(rule);
-                                    const active = rule?.est_active ?? false;
-                                    const type = getCellRuleType(rule, evaluator, evaluatee);
-
-                                    return (
-                                      <button
-                                        type="button"
-                                        onClick={() => openCell(evaluator, evaluatee)}
-                                        aria-label={`${TYPE_LABELS[type]} : ${evaluator} vers ${evaluatee}, ${compatible ? (active ? 'règle active' : 'règle inactive') : 'aucune règle'}`}
-                                        title={`${TYPE_LABELS[type]} — ${compatible ? (active ? 'règle active' : 'règle inactive') : 'aucune règle'} — cliquer pour gérer`}
-                                        className={[
-                                          'mx-auto flex h-9 w-9 items-center justify-center rounded-lg border-2 transition',
-                                          TYPE_BORDER_STYLES[type],
-                                          compatible
-                                            ? active
-                                              ? 'bg-sabc-success/10 hover:bg-sabc-success/20'
-                                              : 'bg-sabc-warning/10 text-sabc-warning hover:bg-sabc-warning/20'
-                                            : 'border-sabc-gray-200 bg-sabc-gray-50 text-sabc-gray-300 hover:bg-sabc-gray-100',
-                                          isDiagonal ? 'ring-1 ring-inset ring-sabc-gray-300' : '',
-                                        ].join(' ')}
-                                      >
-                                        {compatible ? <Check size={16} /> : <X size={14} />}
-                                      </button>
-                                    );
-                                  })()
-                                ) : (() => {
-                                  const rule = findRule(evaluator, evaluatee, selectedType);
-                                  const compatible = Boolean(rule);
-                                  const active = rule?.est_active ?? false;
-
-                                  return (
-                                    <button
-                                      type="button"
-                                      onClick={() => openCell(evaluator, evaluatee)}
-                                      title={
-                                        compatible
-                                          ? `${rule?.nom_regle ?? 'Règle'} — cliquer pour modifier`
-                                          : 'Aucune règle — cliquer pour créer'
-                                      }
-                                      className={[
-                                        'flex h-9 w-9 items-center justify-center rounded-lg border transition',
-                                        isDiagonal ? 'ring-1 ring-inset ring-sabc-gray-300' : '',
-                                        compatible
-                                          ? active
-                                            ? 'border-sabc-success/30 bg-sabc-success/10 text-sabc-success hover:bg-sabc-success/20'
-                                            : 'border-sabc-warning/30 bg-sabc-warning/10 text-sabc-warning hover:bg-sabc-warning/20'
-                                          : 'border-sabc-gray-200 bg-sabc-gray-50 text-sabc-gray-300 hover:bg-sabc-gray-100',
-                                      ].join(' ')}
-                                    >
-                                      {compatible ? <Check size={16} /> : <X size={14} />}
-                                    </button>
-                                  );
-                                })()}
+                                <button
+                                  type="button"
+                                  onClick={() => openCell(evaluator, evaluatee)}
+                                  aria-label={label}
+                                  title={rule?.nom_regle ? `${rule.nom_regle} (${CELL_STATE_LABELS[state]})` : label}
+                                  className={`mx-auto flex h-9 w-9 items-center justify-center rounded-lg border text-xs font-semibold transition ${CELL_STYLES[state]}`}
+                                >
+                                  {state === 'none' ? (
+                                    <Plus size={14} aria-hidden="true" />
+                                  ) : type && rule ? (
+                                    TYPE_CODES[type]
+                                  ) : (
+                                    <Check size={16} aria-hidden="true" />
+                                  )}
+                                </button>
                               </td>
                             );
                           })}
@@ -382,36 +348,34 @@ export default function RulesIndexPage() {
                   </table>
                 </div>
 
-                {/* Legend */}
-                <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-sabc-gray-500">
+                {/* Légende */}
+                <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-sabc-gray-600">
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 items-center justify-center rounded border border-sabc-success/30 bg-sabc-success/10 text-sabc-success">
-                      <Check size={12} />
+                    <span className={`flex h-5 w-5 items-center justify-center rounded border ${CELL_STYLES.active}`}>
+                      <Check size={12} aria-hidden="true" />
                     </span>
-                    Compatible (règle active)
+                    Règle active
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 items-center justify-center rounded border border-sabc-warning/30 bg-sabc-warning/10 text-sabc-warning">
-                      <Check size={12} />
+                    <span className={`flex h-5 w-5 items-center justify-center rounded border ${CELL_STYLES.inactive}`}>
+                      <Check size={12} aria-hidden="true" />
                     </span>
-                    Règle existante mais inactive
+                    Règle inactive
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 items-center justify-center rounded border border-sabc-gray-200 bg-sabc-gray-50 text-sabc-gray-300">
-                      <X size={11} />
-                    </span>
-                    Incompatible (aucune règle)
+                    <span className="flex h-5 w-5 rounded border border-sabc-gray-200 bg-sabc-gray-50" />
+                    Aucune règle (cliquer pour en créer une)
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 items-center justify-center rounded border border-sabc-gray-200 ring-1 ring-inset ring-sabc-gray-300" />
-                    Diagonale (auto-évaluation)
-                  </span>
-                  {selectedType === '360' && MATRIX_RULE_TYPES.map((type) => (
-                    <span key={type} className="inline-flex items-center gap-1.5">
-                      <span className={`h-4 w-4 rounded border-2 ${TYPE_BORDER_STYLES[type]}`} />
-                      {TYPE_LABELS[type]}
+                  {selectedType === '360' ? (
+                    <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                      {MATRIX_RULE_TYPES.map((type) => (
+                        <span key={type}>
+                          <span className="font-semibold text-sabc-gray-800">{TYPE_CODES[type]}</span> {TYPE_LABELS[type]}
+                        </span>
+                      ))}
                     </span>
-                  ))}
+                  ) : null}
+                  <span>La diagonale correspond aux évaluations d’un rôle par lui-même.</span>
                 </div>
               </>
             )}
@@ -427,14 +391,14 @@ export default function RulesIndexPage() {
               <div className="py-12 text-center text-sabc-gray-400">Aucune règle d’évaluation définie.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[760px]">
                   <thead className="bg-sabc-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-sabc-gray-800">Nom</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-sabc-gray-800">Contexte</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-sabc-gray-800">Critères</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-sabc-gray-800">Statut</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase text-sabc-gray-800">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-sabc-gray-600">Nom</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-sabc-gray-600">Contexte</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-sabc-gray-600">Critères</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-sabc-gray-600">Statut</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-sabc-gray-600">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-sabc-gray-200">
@@ -449,7 +413,7 @@ export default function RulesIndexPage() {
                             <Badge variant="secondary">{rule.role_evaluateur || 'Tous'}</Badge>
                             <span>→</span>
                             <Badge variant="secondary">{rule.role_evalue || 'Tous'}</Badge>
-                            <Badge variant="primary">{rule.type_evaluation || 'N/A'}</Badge>
+                            <Badge variant="outline">{rule.type_evaluation ? (TYPE_LABELS[String(rule.type_evaluation).toLowerCase()] ?? rule.type_evaluation) : 'Type non défini'}</Badge>
                           </div>
                         </td>
                         <td className="px-4 py-4 text-sm text-sabc-gray-700">
@@ -459,26 +423,29 @@ export default function RulesIndexPage() {
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <Badge className={rule.est_active ? 'bg-sabc-success text-white' : 'bg-sabc-gray-400 text-white'}>
+                          <Badge variant={rule.est_active ? 'success' : 'secondary'}>
                             {rule.est_active ? 'Active' : 'Inactive'}
                           </Badge>
                         </td>
                         <td className="px-4 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button
-                              variant="outline"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Modifier la règle ${rule.nom_regle}`}
+                              title="Modifier"
                               onClick={() => navigate(`/admin/evaluations/regles/${rule.id_regle}/edit`)}
                             >
-                              <Edit size={14} />
+                              <Edit size={15} />
                             </Button>
                             <Button
-                              variant="outline"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`${rule.est_active ? 'Désactiver' : 'Activer'} la règle ${rule.nom_regle}`}
+                              title={rule.est_active ? 'Désactiver' : 'Activer'}
                               onClick={() => toggleMutation.mutate(rule.id_regle)}
-                              className={rule.est_active ? 'text-sabc-error hover:bg-red-50' : 'text-sabc-success hover:bg-green-50'}
                             >
-                              <Power size={14} />
+                              <Power size={15} />
                             </Button>
                           </div>
                         </td>
@@ -522,13 +489,7 @@ export default function RulesIndexPage() {
                           {currentRule.description || 'Sans description'}
                         </div>
                       </div>
-                      <Badge
-                        className={
-                          currentRule.est_active
-                            ? 'bg-sabc-success text-white'
-                            : 'bg-sabc-gray-400 text-white'
-                        }
-                      >
+                      <Badge variant={currentRule.est_active ? 'success' : 'secondary'}>
                         {currentRule.est_active ? 'Active' : 'Inactive'}
                       </Badge>
                     </div>
@@ -541,7 +502,7 @@ export default function RulesIndexPage() {
                   <DialogFooter className="gap-2">
                     <Button
                       variant="outline"
-                      className="text-sabc-error hover:bg-red-50"
+                      className="border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50 hover:text-red-800"
                       loading={deleteMutation.isPending}
                       onClick={() => handleDelete(currentRule)}
                     >
@@ -558,7 +519,6 @@ export default function RulesIndexPage() {
                       {currentRule.est_active ? 'Désactiver' : 'Activer'}
                     </Button>
                     <Button
-                      className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
                       onClick={() =>
                         navigate(`/admin/evaluations/regles/${currentRule.id_regle}/edit`)
                       }
@@ -572,14 +532,13 @@ export default function RulesIndexPage() {
                 <div className="space-y-4">
                   <div className="rounded-lg border border-dashed border-sabc-gray-300 bg-sabc-gray-50 p-4 text-sm text-sabc-gray-500">
                     Aucune règle ne lie ces deux rôles pour ce type d’évaluation. Vous pouvez en créer
-                    une — le couple de rôles et le type seront pré-remplis.
+                    une : le couple de rôles et le type seront pré-remplis.
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setSelection(null)}>
                       Annuler
                     </Button>
                     <Button
-                      className="bg-sabc-red-primary text-white hover:bg-sabc-red-dark"
                       onClick={() => goToCreate(selection.evaluator, selection.evaluatee, selection.type)}
                     >
                       <Plus size={15} className="mr-1.5" />

@@ -193,7 +193,7 @@ export default function EvaluationFormPage() {
           </CardContent>
         </Card>
       ) : (
-      <div className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <Card>
           <CardHeader>
             <CardTitle>Paramètres de création</CardTitle>

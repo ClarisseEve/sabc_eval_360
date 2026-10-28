@@ -11,14 +11,9 @@ import {
 } from 'recharts';
 import { cn } from '@/utils/helpers';
 
-const COLORS = [
-  'var(--sabc-red-primary)',
-  'var(--sabc-accent)',
-  'var(--sabc-success)',
-  'var(--sabc-info)',
-  'var(--sabc-warning)',
-  'var(--sabc-gray-400)',
-];
+import { CHART_SERIES, CHART_TICK, CHART_AXIS_LINE, CHART_COLORS, CHART_TOOLTIP_STYLE, frenchTick } from './chartTheme';
+
+const COLORS = CHART_SERIES;
 
 export interface AreaDefinition {
   dataKey: string;
@@ -106,29 +101,25 @@ export function AreaChart({
           data={data}
           margin={{ top: 10, right: 24, left: 0, bottom: 0 }}
         >
-          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />}
+          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />}
           <XAxis
             dataKey={xAxisDataKey}
-            tick={{ fill: 'var(--sabc-gray-500)', fontSize: 12 }}
-            axisLine={{ stroke: 'var(--sabc-gray-200)' }}
-            tickLine={{ stroke: 'var(--sabc-gray-200)' }}
+            tick={CHART_TICK}
+            axisLine={CHART_AXIS_LINE}
+            tickLine={CHART_AXIS_LINE}
           />
           <YAxis
-            tick={{ fill: 'var(--sabc-gray-500)', fontSize: 12 }}
-            axisLine={{ stroke: 'var(--sabc-gray-200)' }}
-            tickLine={{ stroke: 'var(--sabc-gray-200)' }}
+            tickFormatter={frenchTick}
+            tick={CHART_TICK}
+            axisLine={CHART_AXIS_LINE}
+            tickLine={CHART_AXIS_LINE}
           />
           {tooltip ? (
             <Tooltip content={tooltip as any} />
           ) : (
             <Tooltip
               cursor={{ strokeDasharray: '3 3' }}
-              contentStyle={{
-                backgroundColor: '#ffffff',
-                border: '1px solid var(--sabc-gray-200)',
-                borderRadius: 4,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-              }}
+              contentStyle={CHART_TOOLTIP_STYLE}
             />
           )}
           {showLegend && (

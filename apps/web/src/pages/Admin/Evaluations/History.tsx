@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, ClipboardList, Download, Search } from 'lucide-react';
+import { Printer, Search } from 'lucide-react';
+import { PageHeader } from '@/Components/UI/Page/PageHeader';
+import { formatDateFr, formatScore } from '@/utils/helpers';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
@@ -15,13 +17,6 @@ import { buildAdminHistoryParams } from './history-query';
 function formatPerson(user?: any) {
   if (!user) return 'Inconnu';
   return [user.prenom, user.nom].filter(Boolean).join(' ').trim() || user.matricule || 'Inconnu';
-}
-
-function formatDate(value?: string | Date | null) {
-  if (!value) return 'N/A';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'N/A';
-  return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function normalizeStatus(status?: string) {
@@ -40,17 +35,17 @@ function Pagination({ meta, onPageChange }: { meta: { total: number; page: numbe
   for (let i = start; i <= end; i++) pages.push(i);
 
   return (
-    <div className="flex items-center justify-between border-t border-sabc-gray-200 pt-4">
+    <div className="flex flex-col gap-3 border-t border-sabc-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-sabc-gray-600">
         {(meta.page - 1) * meta.limit + 1}–{Math.min(meta.page * meta.limit, meta.total)} sur {meta.total} évaluations
       </p>
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-1">
         <Button variant="outline" size="sm" disabled={meta.page <= 1} onClick={() => onPageChange(meta.page - 1)}>
           Précédent
         </Button>
         {pages.map((p) => (
           <Button key={p} variant={p === meta.page ? 'default' : 'outline'} size="sm" onClick={() => onPageChange(p)}
-            className={p === meta.page ? 'bg-sabc-red-primary text-white' : ''}>
+            aria-current={p === meta.page ? 'page' : undefined}>
             {p}
           </Button>
         ))}
@@ -96,31 +91,35 @@ export default function EvaluationHistoryPage() {
 
   return (
     <AdminEvaluationsLayout title="Historique des évaluations">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-sabc-gray-900">Historique des évaluations</h1>
-          <p className="text-sm text-sabc-gray-600">{meta.total} évaluation{meta.total > 1 ? 's' : ''} au total</p>
-        </div>
-        <div className="flex gap-2">
-          <Link to="/admin/evaluations/management">
-            <Button variant="outline">Gestion</Button>
-          </Link>
-          <Button variant="outline" onClick={() => window.print()}>
-            <Download className="mr-2 h-4 w-4" />
-            Export rapide
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Historique des évaluations"
+        description="Toutes les évaluations enregistrées, filtrables par statut."
+        breadcrumbs={[{ label: 'Administration' }, { label: 'Évaluations' }, { label: 'Historique' }]}
+        meta={`${meta.total} évaluation${meta.total > 1 ? 's' : ''} au total`}
+        actions={(
+          <>
+            <Link to="/admin/evaluations/management">
+              <Button variant="outline">Pilotage</Button>
+            </Link>
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimer
+            </Button>
+          </>
+        )}
+      />
 
       <Card>
         <CardHeader>
           <CardTitle>Filtres</CardTitle>
         </CardHeader>
         <CardContent>
+          <label htmlFor="history-status" className="sr-only">Statut</label>
           <select
+            id="history-status"
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="rounded-md border border-sabc-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sabc-red-primary"
+            className="w-full rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 sm:w-64 focus:outline-none focus:ring-2 focus:ring-sabc-red-primary"
           >
             <option value="all">Tous les statuts</option>
             <option value="brouillon">Brouillon</option>
@@ -143,7 +142,7 @@ export default function EvaluationHistoryPage() {
               description="Aucune évaluation ne correspond aux filtres courants."
             />
           ) : (
-            <Table>
+            <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Évaluation</TableHead>
@@ -161,22 +160,14 @@ export default function EvaluationHistoryPage() {
                   <TableRow key={row.id}>
                     <TableCell>
                       <div className="font-medium text-sabc-gray-900">{row.titre}</div>
-                      <div className="mt-1 flex items-center gap-1 text-xs text-sabc-gray-500">
-                        <ClipboardList className="h-3.5 w-3.5" />
-                        {row.id}
-                      </div>
+                      <div className="mt-1 text-xs text-sabc-gray-500">{row.id}</div>
                     </TableCell>
                     <TableCell>{row.evaluateur}</TableCell>
                     <TableCell>{row.evalue}</TableCell>
-                    <TableCell>{row.periode}</TableCell>
+                    <TableCell>{row.periode || 'n.d.'}</TableCell>
                     <TableCell><EvaluationStatusBadge statut={row.statut} /></TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm text-sabc-gray-600">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {formatDate(row.date)}
-                      </div>
-                    </TableCell>
-                    <TableCell>{row.note != null ? row.note.toFixed(2) : 'N/A'}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-sabc-gray-600">{formatDateFr(row.date)}</TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">{formatScore(row.note)}</TableCell>
                     <TableCell className="text-right">
                       <Link to={`/admin/evaluations/${row.id}`}>
                         <Button variant="outline" size="sm">Ouvrir</Button>
