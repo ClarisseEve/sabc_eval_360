@@ -21,7 +21,7 @@ export default function TeamOverviewPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-sabc-gray-900">Mon équipe</h1>
-          <p className="text-sm text-sabc-gray-600">Vue réelle des subordonnés remontés par la hiérarchie NestJS.</p>
+          <p className="text-sm text-sabc-gray-600">Les collaborateurs placés sous votre responsabilité.</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">

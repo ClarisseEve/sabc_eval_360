@@ -5,8 +5,23 @@ import { useAuthContext } from '@/Contexts/AuthContext';
 import { Button } from '@/Components/UI/Button/Button';
 import { Input } from '@/Components/UI/Input/Input';
 import { Label } from '@/Components/UI/Label/Label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/Components/UI/Card/Card';
 import { Eye, EyeOff } from 'lucide-react';
+
+/** Cercle cranté de la capsule du logo: 21 crans, comme une capsule couronne. */
+function CrownCap({ className = '' }: { className?: string }) {
+  const teeth = 21;
+  const points = Array.from({ length: teeth * 2 }, (_, i) => {
+    const angle = (Math.PI * i) / teeth;
+    const radius = i % 2 === 0 ? 100 : 92;
+    return `${(100 + radius * Math.cos(angle)).toFixed(2)},${(100 + radius * Math.sin(angle)).toFixed(2)}`;
+  }).join(' ');
+  return (
+    <svg viewBox="0 0 200 200" aria-hidden className={className}>
+      <polygon points={points} fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <circle cx="100" cy="100" r="84" fill="none" stroke="currentColor" strokeWidth="0.6" />
+    </svg>
+  );
+}
 
 const Login: React.FC = () => {
   const { login, isAuthenticated } = useAuthContext();
@@ -46,30 +61,46 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="bg-sabc-gray-50 flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
+    <div className="flex min-h-svh bg-white dark:bg-sabc-gray-900">
       <Head title="Connexion - SABC Évaluation 360°" />
-      
-      <div className="flex flex-col items-center mb-8">
-        <div className="w-40 h-20 mb-4">
-          <img 
-            src="/images/logos/sabc-logo.png" 
-            alt="SABC Logo" 
-            className="w-full h-full object-contain"
-          />
+
+      {/* Panneau de marque: logo, capsule animée, nom du produit */}
+      <aside className="relative hidden w-[46%] flex-col justify-between overflow-hidden border-r border-sabc-gray-200 bg-sabc-gray-50 p-12 dark:border-sabc-gray-700 dark:bg-sabc-gray-800 lg:flex">
+        {/* Le PNG a un fond blanc: multiply le fond dans le panneau gris. */}
+        <img src="/images/logos/sabc-logo.png" alt="SABC, Boissons du Cameroun" className="sabc-fade h-20 w-auto self-start object-contain mix-blend-multiply dark:rounded-md dark:bg-white dark:p-2 dark:mix-blend-normal" />
+
+        <div className="relative z-10 max-w-md sabc-rise" style={{ '--sabc-i': 2 } as React.CSSProperties}>
+          <p className="flex items-center gap-2 text-sm font-medium text-sabc-gray-500">
+            <span className="inline-block h-2 w-2 rounded-full bg-sabc-accent" aria-hidden />
+            Direction commerciale et marketing
+          </p>
+          <h1 className="mt-3 text-4xl font-semibold leading-tight text-sabc-gray-900 dark:text-white">
+            Évaluation <span className="text-sabc-red-primary">360°</span>
+          </h1>
+          <p className="mt-4 text-base text-sabc-gray-600 dark:text-sabc-gray-300">
+            Évaluations croisées, validation hiérarchique et suivi des compétences des équipes terrain, région par région.
+          </p>
         </div>
-      </div>
-      
-      <Card className="w-full max-w-lg shadow-lg border-0">
-        <CardHeader className="text-center border-b border-sabc-gray-200 bg-white rounded-t-xl">
-          <CardTitle className="text-2xl font-semibold text-[#424242]">Connexion</CardTitle>
-          <CardDescription className="text-[#9E9E9E]">Connectez-vous pour accéder à votre tableau de bord</CardDescription>
-        </CardHeader>
-        
-        <CardContent className="p-6">
+
+        <p className="relative z-10 text-sm text-sabc-gray-500">&copy; {new Date().getFullYear()} SABC. Tous droits réservés.</p>
+
+        <CrownCap className="sabc-cap-spin pointer-events-none absolute -bottom-40 -right-40 h-[34rem] w-[34rem] text-sabc-gray-300 dark:text-sabc-gray-600" />
+      </aside>
+
+      {/* Formulaire */}
+      <main className="flex flex-1 items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm sabc-rise">
+          <img src="/images/logos/sabc-logo.png" alt="SABC, Boissons du Cameroun" className="mb-10 h-16 w-auto object-contain lg:hidden dark:rounded-md dark:bg-white dark:p-2" />
+
+          <h2 className="text-2xl font-semibold text-sabc-gray-900 dark:text-white">Connexion</h2>
+          <p className="mt-1 mb-8 text-sm text-sabc-gray-500 dark:text-sabc-gray-400">
+            Identifiez-vous avec votre matricule ou votre adresse e-mail.
+          </p>
+
           <form onSubmit={handleSubmit}>
             <div className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="identifier" className="text-sabc-gray-800 font-medium">Matricule ou Email</Label>
+                <Label htmlFor="identifier" className="text-sabc-gray-800 font-medium">Matricule ou e-mail</Label>
                 <Input
                   id="identifier"
                   type="text"
@@ -87,7 +118,7 @@ const Login: React.FC = () => {
                   <p id="identifier-error" role="alert" className="text-sm text-sabc-error font-medium">{errors.identifier}</p>
                 )}
               </div>
-              
+          
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password" className="text-sabc-gray-800 font-medium">Mot de passe</Label>
@@ -124,7 +155,7 @@ const Login: React.FC = () => {
                 )}
               </div>
             </div>
-            
+        
             <Button
               type="submit"
               className="mt-8 w-full h-12 text-base font-semibold"
@@ -135,18 +166,12 @@ const Login: React.FC = () => {
               {processing ? 'Connexion en cours...' : 'Se connecter'}
             </Button>
           </form>
-        </CardContent>
-        
-        <CardFooter className="flex justify-center border-t border-sabc-gray-200 p-6 bg-white rounded-b-xl">
-          <p className="text-center text-sm text-sabc-gray-700">
+
+          <p className="mt-8 border-t border-sabc-gray-200 pt-6 text-sm text-sabc-gray-500 dark:border-sabc-gray-700 dark:text-sabc-gray-400">
             Besoin d’un accès ? Contactez votre administrateur.
           </p>
-        </CardFooter>
-      </Card>
-      
-      <div className="mt-6 text-center text-sm text-[#9E9E9E]">
-        &copy; {new Date().getFullYear()} SABC - Tous droits réservés
-      </div>
+        </div>
+      </main>
     </div>
   );
 };

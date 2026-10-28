@@ -56,7 +56,7 @@ export default function AppearanceTabs() {
               {options.map(({ value, label, icon: Icon }) => (
                 <div
                   key={value}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-colors ${
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors ${
                     mode === value
                       ? 'border-sabc-red-primary bg-sabc-red-primary/5'
                       : 'border-sabc-gray-200 hover:border-sabc-gray-300 dark:border-sabc-gray-700'

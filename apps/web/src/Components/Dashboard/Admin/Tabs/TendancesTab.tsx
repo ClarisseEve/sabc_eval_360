@@ -92,7 +92,7 @@ function TendancesContent() {
       ) : (
         <div className="rounded-lg border border-sabc-gray-200/80 bg-white p-4 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">
+            <h3 className="text-sm font-semibold text-sabc-gray-500">
               Évolution par période
             </h3>
             <ChartExportButton chartRef={chartRef} filename="sabc-tendances" />
@@ -162,11 +162,11 @@ function TendancesContent() {
           <table className="w-full text-sm">
             <thead className="bg-sabc-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Période</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Score moyen</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Δ Score</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Taux complétion</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Évaluations</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-sabc-gray-500">Période</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-500">Score moyen</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-500">Δ Score</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-500">Taux complétion</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-sabc-gray-500">Évaluations</th>
               </tr>
             </thead>
             <tbody>

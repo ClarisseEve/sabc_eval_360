@@ -652,7 +652,7 @@ export class AnalyticsService {
       audience === 'admin' ? ruleVisibilitySql('admin') : EVALUATED_VISIBILITY_SQL;
     const criteria = await this.pg.query<any>(
       `WITH latest AS (
-         SELECT e.id_evaluation, e.id_regle, e.notations_json,
+         SELECT e.id_evaluation, e.id_regle, e.notations_json, e.criteres_snapshot_json,
                 ROW_NUMBER() OVER (
                   ORDER BY ${EVALUATION_EFFECTIVE_TS_E_SQL} DESC, e.created_at DESC, e.id_evaluation DESC
                 ) AS recency_rank
@@ -1160,6 +1160,7 @@ export class AnalyticsService {
     const rows = await this.pg.query<any>(
       `WITH latest AS (
        SELECT e.id_evaluation, e.evalue_matricule, e.type_evaluation, e.id_regle, e.notations_json,
+              e.criteres_snapshot_json,
               ROW_NUMBER() OVER (
                 PARTITION BY e.evalue_matricule, e.type_evaluation
                 ORDER BY COALESCE(e.date_soumission, e.updated_at, e.created_at) DESC,

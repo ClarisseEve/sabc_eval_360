@@ -16,7 +16,7 @@ const tabsRootVariants = cva('', {
 });
 
 const tabsListVariants = cva(
-  'inline-flex items-center justify-center rounded-xl bg-sabc-gray-100 p-0.5 dark:bg-sabc-gray-800',
+  'inline-flex items-center justify-center rounded-lg bg-sabc-gray-100 p-0.5 dark:bg-sabc-gray-800',
   {
     variants: {
       variant: {
@@ -41,7 +41,7 @@ const tabsTriggerVariants = cva(
         primary:
           'relative h-9 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-medium text-sabc-gray-500 shadow-none transition-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:scale-x-0 after:bg-sabc-red-primary after:transition-transform hover:text-sabc-gray-900 data-[state=active]:border-b-0 data-[state=active]:text-sabc-red-primary data-[state=active]:shadow-none data-[state=active]:after:scale-x-100 dark:text-sabc-gray-400 dark:hover:text-sabc-gray-50 dark:data-[state=active]:text-sabc-red-400',
         card:
-          'rounded-xl border border-sabc-gray-200 bg-white px-4 py-2 font-medium text-sabc-gray-400 shadow-none transition-all duration-200 hover:bg-sabc-gray-50 hover:text-sabc-gray-700 data-[state=active]:border-sabc-red-primary data-[state=active]:bg-sabc-red-primary data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-sabc-red-primary/25 data-[state=active]:font-semibold dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-500 dark:hover:bg-sabc-gray-800 dark:hover:text-sabc-gray-200 dark:data-[state=active]:border-sabc-red-400 dark:data-[state=active]:bg-sabc-red-500 dark:data-[state=active]:text-white dark:data-[state=active]:shadow-sabc-red-500/30',
+          'rounded-lg border border-sabc-gray-200 bg-white px-4 py-2 font-medium text-sabc-gray-400 shadow-none transition-all duration-200 hover:bg-sabc-gray-50 hover:text-sabc-gray-700 data-[state=active]:border-sabc-red-primary data-[state=active]:bg-sabc-red-primary data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-sabc-red-primary/25 data-[state=active]:font-semibold dark:border-sabc-gray-700 dark:bg-sabc-gray-900 dark:text-sabc-gray-500 dark:hover:bg-sabc-gray-800 dark:hover:text-sabc-gray-200 dark:data-[state=active]:border-sabc-red-400 dark:data-[state=active]:bg-sabc-red-500 dark:data-[state=active]:text-white dark:data-[state=active]:shadow-sabc-red-500/30',
       },
     },
     defaultVariants: {

@@ -10,7 +10,7 @@ import { EmptyState } from '@/Components/Dashboard/RoleDashboardShared';
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 shadow-lg">
+    <div className="rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 shadow-lg">
       {label && <div className="mb-1.5 text-xs font-semibold text-sabc-gray-500">{label}</div>}
       {payload.map((e: any) => (
         <div key={e.name} className="flex items-center gap-2 text-sm">
@@ -84,7 +84,7 @@ export function RegionSelectionSection({
               <Card key={card.label}>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.color}`}>
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${card.color}`}>
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>
@@ -158,7 +158,7 @@ export function RegionalRankingSection({
               <Card key={card.label}>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.color}`}>
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${card.color}`}>
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>

@@ -36,7 +36,7 @@ const AdminStructureIndex: React.FC = () => {
         {KPIS.map((kpi) => {
           const counts = { regions: regions.length, services: services.length, districts: districts.length, secteurs: secteurs.length };
           return (
-            <Link key={kpi.key} to={kpi.to} className="rounded-xl transition hover:opacity-90">
+            <Link key={kpi.key} to={kpi.to} className="rounded-lg transition hover:opacity-90">
               <Card className="transition hover:border-sabc-gray-300">
                 <CardContent className="p-6">
                   <div className="text-sm text-sabc-gray-500">{kpi.label}</div>

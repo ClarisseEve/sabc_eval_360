@@ -19,7 +19,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Activity, BarChart3, MapPinned, Target, Users } from 'lucide-react';
+import { MapPinned } from 'lucide-react';
+import { useCountUp } from '@/Hooks/useCountUp';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
@@ -32,9 +33,10 @@ const STATUS_COLORS = ['#48BB78', '#D69E2E', '#FF9800', '#3182CE'];
 
 type OverviewMetric = {
   title: string;
-  value: React.ReactNode;
+  /** Valeur animée; null quand la mesure n'existe pas encore. */
+  count: number | null;
+  format: (value: number) => string;
   caption: string;
-  icon: React.ElementType;
 };
 
 type TrendEntry = {
@@ -69,22 +71,20 @@ type TopRoleEntry = {
   avgScore?: number;
 };
 
-function OverviewMetricCard({ title, value, caption, icon: Icon }: OverviewMetric) {
+function OverviewMetricCell({ title, count, format, caption, index }: OverviewMetric & { index: number }) {
+  const animated = useCountUp(count ?? 0);
+  const value = count === null ? 'n.d.' : format(animated);
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{title}</div>
-            <div className="mt-1 text-2xl font-bold text-sabc-gray-900 dark:text-white">{value}</div>
-            <div className="mt-2 text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{caption}</div>
-          </div>
-          <div className="rounded-full bg-sabc-red-primary/10 p-3 text-sabc-red-primary">
-            <Icon className="h-5 w-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div
+      className="sabc-rise -mb-px -mr-px border-b border-r border-sabc-gray-200 px-5 py-4 dark:border-sabc-gray-700"
+      style={{ '--sabc-i': index } as React.CSSProperties}
+    >
+      <div className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{title}</div>
+      <div className="mt-1 font-[family-name:var(--font-display)] text-3xl font-semibold tabular-nums text-sabc-gray-900 dark:text-white">
+        {value}
+      </div>
+      <div className="mt-1 text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{caption}</div>
+    </div>
   );
 }
 
@@ -105,8 +105,8 @@ function ChartTooltip({
   };
 
   return (
-    <div className="rounded-2xl border border-sabc-gray-200 bg-white px-4 py-3 shadow-lg dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
-      {label ? <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">{label}</div> : null}
+    <div className="rounded-lg border border-sabc-gray-200 bg-white px-4 py-3 shadow-lg dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
+      {label ? <div className="mb-2 text-xs font-semibold text-sabc-gray-500">{label}</div> : null}
       <div className="space-y-1.5">
         {visiblePayload.map((entry) => (
           <div key={entry.name} className="flex items-center justify-between gap-4 text-sm">
@@ -135,37 +135,39 @@ export function AdminOverviewMetricsSection({
   completionRate: number;
   validatedEvaluations: number;
 }) {
+  // Sans évaluation, une moyenne ou un taux à 0 se lirait comme une contre-performance.
+  const hasData = totalEvaluations > 0;
   const metrics: OverviewMetric[] = [
     {
-      title: 'Total évaluations',
-      value: totalEvaluations,
+      title: 'Évaluations',
+      count: totalEvaluations,
+      format: (v) => Math.round(v).toLocaleString('fr-FR'),
       caption: 'Volume consolidé du cycle',
-      icon: Activity,
     },
     {
       title: 'Collaborateurs évalués',
-      value: uniqueUsers,
-      caption: 'Utilisateurs distincts touchés par les évaluations',
-      icon: Users,
+      count: uniqueUsers,
+      format: (v) => Math.round(v).toLocaleString('fr-FR'),
+      caption: 'Personnes ayant reçu au moins une évaluation',
     },
     {
       title: 'Score moyen',
-      value: averageScore.toFixed(2),
-      caption: 'Moyenne globale sur les évaluations notées',
-      icon: Target,
+      count: hasData ? averageScore : null,
+      format: (v) => `${v.toFixed(2)} / 5`,
+      caption: hasData ? 'Moyenne des évaluations notées' : 'Aucune évaluation notée',
     },
     {
       title: 'Taux de complétion',
-      value: `${Math.round(completionRate)}%`,
-      caption: `${validatedEvaluations} validées / ${totalEvaluations}`,
-      icon: BarChart3,
+      count: hasData ? completionRate : null,
+      format: (v) => `${Math.round(v)} %`,
+      caption: hasData ? `${validatedEvaluations} validées sur ${totalEvaluations}` : 'Aucune évaluation attendue',
     },
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {metrics.map((metric) => (
-        <OverviewMetricCard key={metric.title} {...metric} />
+    <div className="grid overflow-hidden rounded-lg border border-sabc-gray-200 bg-white dark:border-sabc-gray-700 dark:bg-sabc-gray-900 sm:grid-cols-2 xl:grid-cols-4">
+      {metrics.map((metric, index) => (
+        <OverviewMetricCell key={metric.title} index={index} {...metric} />
       ))}
     </div>
   );
@@ -188,16 +190,16 @@ export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[]
         ) : (
           <div className="space-y-5">
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Période active</div>
+              <div className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
+                <div className="text-xs font-semibold text-sabc-gray-500">Période active</div>
                 <div className="mt-1 text-lg font-semibold text-sabc-gray-900">{latestEntry?.period ?? 'N/A'}</div>
               </div>
-              <div className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Dernier score</div>
+              <div className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
+                <div className="text-xs font-semibold text-sabc-gray-500">Dernier score</div>
                 <div className="mt-1 text-lg font-semibold text-sabc-gray-900">{latestEntry?.score?.toFixed(2) ?? '0.00'}/5</div>
               </div>
-              <div className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Variation</div>
+              <div className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
+                <div className="text-xs font-semibold text-sabc-gray-500">Variation</div>
                 <div className="mt-1 text-lg font-semibold text-sabc-gray-900">
                   {variation >= 0 ? '+' : ''}
                   {variation.toFixed(2)}
@@ -265,14 +267,14 @@ export function StatusDistributionSection({ statusData }: { statusData: StatusEn
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Total</div>
+                  <div className="text-xs font-semibold text-sabc-gray-500">Total</div>
                   <div className="mt-1 text-3xl font-semibold text-sabc-gray-900">{total}</div>
                 </div>
               </div>
             </div>
             <div className="space-y-2">
               {statusData.map((status) => (
-                <div key={status.name} className="rounded-2xl border border-sabc-gray-200 px-3 py-3">
+                <div key={status.name} className="rounded-lg border border-sabc-gray-200 px-3 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-sabc-gray-700 dark:text-sabc-gray-200">{status.name}</span>
                     <div className="flex items-center gap-2">
@@ -339,7 +341,7 @@ export function ChannelBreakdownSection({ channelData }: { channelData: ChannelE
 
             <div className="grid grid-cols-3 gap-2">
               {normalizedData.map((channel) => (
-                <div key={channel.label} className="rounded-2xl border border-sabc-gray-200/80 bg-sabc-gray-50/60 p-3">
+                <div key={channel.label} className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/60 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-medium text-sabc-gray-900">{channel.label}</span>
                     <Badge variant="info">{channel.volume}</Badge>

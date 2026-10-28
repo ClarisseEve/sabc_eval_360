@@ -37,13 +37,13 @@ export default function ForgotPassword() {
                             <h3 className="font-medium text-sabc-gray-800 mb-2">Service Informatique SABC</h3>
                             <ul className="text-sm text-sabc-gray-600 space-y-2">
                                 <li className="flex items-center">
-                                    <span className="mr-2">📞</span> Téléphone: +237 233 42 75 00 (poste 1234)
+                                    Téléphone : +237 233 42 75 00 (poste 1234)
                                 </li>
                                 <li className="flex items-center">
-                                    <span className="mr-2">✉️</span> Email: support@sabc.cm
+                                    E-mail : support@sabc.cm
                                 </li>
                                 <li className="flex items-center">
-                                    <span className="mr-2">🕒</span> Horaires: Lun-Ven, 8h-17h
+                                    Horaires : Lun-Ven, 8h-17h
                                 </li>
                             </ul>
                         </div>

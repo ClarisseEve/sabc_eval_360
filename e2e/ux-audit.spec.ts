@@ -18,7 +18,7 @@ async function capture(page: Page, relativePath: string) {
 
 async function login(page: Page, identifier: string) {
   await page.goto('/login');
-  await page.getByLabel('Matricule ou Email').fill(identifier);
+  await page.getByLabel('Matricule ou e-mail').fill(identifier);
   await page.getByLabel('Mot de passe', { exact: true }).fill(requireSeedPassword());
   await page.getByRole('button', { name: 'Se connecter' }).click();
   await expect(page).not.toHaveURL(/\/login$/, { timeout: 15_000 });

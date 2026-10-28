@@ -9,7 +9,6 @@ import {
   FileText,
   MessageSquare,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { Button } from '@/Components/UI/Button/Button';
@@ -81,7 +80,7 @@ export default function AdminEvaluationShowPage() {
         </Button>
       </div>
 
-      <Card className="border-none bg-gradient-to-br from-white via-white to-sabc-red-light/40 shadow-lg">
+      <Card className="border-none shadow-lg">
         <CardContent className="grid gap-6 p-6 md:grid-cols-3">
           <div className="space-y-3 md:col-span-2">
             <div className="flex flex-wrap items-center gap-3">
@@ -149,7 +148,7 @@ export default function AdminEvaluationShowPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-xl bg-sabc-red-light/60 p-4 text-center">
+              <div className="rounded-lg bg-sabc-red-light/60 p-4 text-center">
                 <div className="text-xs uppercase tracking-wide text-sabc-red-primary/80">Note globale</div>
                 <div className="mt-2 text-4xl font-bold text-sabc-red-primary">
                   {overallScore != null ? overallScore.toFixed(2) : '—'}<span className="text-base font-normal">/5</span>
@@ -207,7 +206,6 @@ export default function AdminEvaluationShowPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="h-5 w-5 text-sabc-accent" />
               Critères évalués
             </CardTitle>
           </CardHeader>

@@ -197,7 +197,7 @@ const EvaluationsIndex: React.FC = () => {
               <a
                 key={link.href}
                 href={link.href}
-                className="flex flex-col items-center gap-2 rounded-lg border border-sabc-gray-200 bg-white p-4 text-center shadow-sm transition-all hover:-translate-y-1 hover:border-sabc-red-primary hover:shadow-md dark:border-sabc-gray-700 dark:bg-sabc-gray-900"
+                className="flex flex-col items-center gap-2 rounded-lg border border-sabc-gray-200 bg-white p-4 text-center shadow-sm transition-all hover:border-sabc-red-primary hover:shadow-md dark:border-sabc-gray-700 dark:bg-sabc-gray-900"
               >
                 <span className="rounded-md bg-sabc-red-primary/10 p-2">
                   {link.icon}

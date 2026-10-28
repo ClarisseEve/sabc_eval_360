@@ -55,7 +55,7 @@ export default function MyRatingSheetsPage() {
                     </p>
                 ) : null}
                 {!sheetsQuery.isLoading && !sheetsQuery.isError && !sheetsQuery.data?.length ? (
-                    <div className="border-sabc-gray-200 text-sabc-gray-600 rounded-xl border bg-white p-8 text-center text-sm">
+                    <div className="border-sabc-gray-200 text-sabc-gray-600 rounded-lg border bg-white p-8 text-center text-sm">
                         Aucune fiche de notation n’a encore été publiée pour votre compte.
                     </div>
                 ) : null}
@@ -64,7 +64,7 @@ export default function MyRatingSheetsPage() {
                         const content = sheet.contenu_json;
                         const categories = Array.isArray(content?.categories) ? content.categories : [];
                         return (
-                            <article key={sheet.id_fiche} className="border-sabc-gray-200 rounded-xl border bg-white p-5 shadow-sm">
+                            <article key={sheet.id_fiche} className="border-sabc-gray-200 rounded-lg border bg-white p-5 shadow-sm">
                                 <div className="flex flex-wrap items-start justify-between gap-4">
                                     <div>
                                         <h2 className="text-sabc-gray-900 text-lg font-semibold">

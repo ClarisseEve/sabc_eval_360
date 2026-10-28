@@ -154,7 +154,7 @@ export default function RoleManagerDashboardPage({
                       content={({ active, payload, label }: any) => {
                         if (!active || !payload?.length) return null;
                         return (
-                          <div className="rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 shadow-lg dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
+                          <div className="rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 shadow-lg dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
                             <div className="mb-1 text-xs font-semibold text-sabc-gray-500">{label}</div>
                             <div className="text-sm font-semibold text-sabc-gray-900">{Number(payload[0].value).toFixed(2)}/5</div>
                           </div>

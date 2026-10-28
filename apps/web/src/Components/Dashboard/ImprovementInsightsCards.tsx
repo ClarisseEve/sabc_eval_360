@@ -126,7 +126,7 @@ export function AnalyticsFiltersCard({
   contentClassName = 'flex flex-wrap items-end gap-3',
 }: AnalyticsFiltersCardProps) {
   return (
-    <div className="rounded-xl border border-sabc-gray-200 bg-white px-4 py-3 shadow-sm dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
+    <div className="rounded-lg border border-sabc-gray-200 bg-white px-4 py-3 shadow-sm dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
       <div className="mb-2 flex items-baseline gap-2">
         <span className="text-sm font-semibold text-sabc-gray-900 dark:text-white">{title}</span>
         <span className="text-xs text-sabc-gray-400">{description}</span>

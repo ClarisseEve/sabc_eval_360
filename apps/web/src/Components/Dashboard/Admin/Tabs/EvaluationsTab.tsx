@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/C
 import { Button } from '@/Components/UI/Button/Button';
 import {
   Clock, AlertTriangle, CheckCircle, UserCheck, Award, Activity,
-  Eye, BarChart3, ArrowUpRight, Target, Filter, Download, RefreshCw
+  Eye, BarChart3, Target, Filter, Download, RefreshCw
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
 import { useAdminDashboard } from '@/Hooks/queries';
@@ -109,7 +109,6 @@ const EvaluationsTab: React.FC = () => {
               </Button>
               <Link href="/admin/evaluations/management" className="flex items-center gap-1 text-sabc-red-primary hover:text-sabc-red-dark">
                 <span className="text-sm font-medium">Voir en attente</span>
-                <ArrowUpRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
@@ -307,7 +306,6 @@ const EvaluationsTab: React.FC = () => {
                     <div className="text-sm text-sabc-gray-600">{data.evaluations_en_attente ?? 0} evaluations</div>
                   </div>
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-sabc-gray-400 group-hover:text-sabc-red-primary transition-colors" />
               </div>
             </Link>
 
@@ -320,7 +318,6 @@ const EvaluationsTab: React.FC = () => {
                     <div className="text-sm text-sabc-gray-600">{data.evaluations_en_cours ?? 0} a completer</div>
                   </div>
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-sabc-gray-400 group-hover:text-sabc-red-primary transition-colors" />
               </div>
             </Link>
 
@@ -333,7 +330,6 @@ const EvaluationsTab: React.FC = () => {
                     <div className="text-sm text-sabc-gray-600">Rapports</div>
                   </div>
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-sabc-gray-400 group-hover:text-sabc-red-primary transition-colors" />
               </div>
             </Link>
 
@@ -346,7 +342,6 @@ const EvaluationsTab: React.FC = () => {
                     <div className="text-sm text-sabc-gray-600">Detaillees</div>
                   </div>
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-sabc-gray-400 group-hover:text-sabc-red-primary transition-colors" />
               </div>
             </Link>
           </div>

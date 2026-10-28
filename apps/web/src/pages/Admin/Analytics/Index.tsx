@@ -132,7 +132,7 @@ export default function AdminAnalytics() {
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {periodes.length > 0 && (
-              <div className="flex items-center gap-2 rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
+              <div className="flex items-center gap-2 rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-sabc-gray-700 dark:bg-sabc-gray-100">
                 <Calendar size={15} className="shrink-0 text-sabc-gray-400" />
                 <select
                   value={selectedPeriodeId}

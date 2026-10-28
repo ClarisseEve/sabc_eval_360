@@ -186,7 +186,7 @@ export default function UserGaps() {
           {isLoading ? <div className="p-8 text-center text-sabc-gray-500">Analyse des évaluations…</div> : null}
           {!isLoading && filteredProfiles.length === 0 ? <EmptyState title="Aucun gap d’évaluation" description="Aucune évaluation valide par compétence n’est disponible pour l’administration." /> : null}
           {!isLoading && filteredProfiles.length > 0 ? (
-            <button type="button" className="block w-full cursor-pointer rounded-xl border border-sabc-gray-200 bg-white p-2 text-left transition hover:border-sabc-red-primary/60 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-sabc-red-primary/40" onClick={() => setTableOpen(true)} aria-label="Ouvrir le tableau détaillé des gaps">
+            <button type="button" className="block w-full cursor-pointer rounded-lg border border-sabc-gray-200 bg-white p-2 text-left transition hover:border-sabc-red-primary/60 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-sabc-red-primary/40" onClick={() => setTableOpen(true)} aria-label="Ouvrir le tableau détaillé des gaps">
               <div className="grid gap-4 xl:grid-cols-2">
                 <div>
                   <div className="px-3 pt-3 text-sm font-semibold text-sabc-gray-800">Écart de perception</div>

@@ -42,7 +42,10 @@ const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(
     
     const getInitials = (nameStr: string) => {
       const names = nameStr.split(' ');
-      return names
+      // Deux lettres au plus: prénom et dernier nom, pour tenir dans la pastille.
+      const parts = names.filter(Boolean);
+      const letters = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : parts;
+      return letters
         .map((n) => n[0])
         .join('')
         .toUpperCase();

@@ -14,7 +14,6 @@ import {
   FileText,
   MessageSquare,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useEvaluation } from '@/Hooks/queries';
@@ -131,7 +130,7 @@ const ShowEvaluation: React.FC = () => {
           </div>
         </div>
 
-        <Card className="border-none bg-gradient-to-br from-white via-white to-sabc-red-light/40 shadow-lg dark:from-sabc-gray-900 dark:via-sabc-gray-900 dark:to-sabc-gray-800">
+        <Card className="border-none shadow-lg">
           <CardContent className="grid gap-6 p-6 md:grid-cols-3">
             <div className="md:col-span-2 space-y-3">
               <div className="flex flex-wrap items-center gap-3">
@@ -217,9 +216,9 @@ const ShowEvaluation: React.FC = () => {
               <CardContent className="p-0">
                 <div className="flex">
                   {/* Score — gauche, large */}
-                  <div className="flex w-44 shrink-0 flex-col items-center justify-center border-r border-sabc-gray-200 bg-gradient-to-b from-sabc-red-light/50 to-white py-6 dark:border-sabc-gray-700 dark:from-sabc-red-primary/10 dark:to-sabc-gray-900">
+                  <div className="flex w-44 shrink-0 flex-col items-center justify-center border-r border-sabc-gray-200 py-6 dark:border-sabc-gray-700">
                     <ShieldCheck className="mb-1.5 h-6 w-6 text-sabc-success" />
-                    <div className="text-[10px] font-semibold uppercase tracking-widest text-sabc-gray-400">Note globale</div>
+                    <div className="text-[10px] font-semibold text-sabc-gray-400">Note globale</div>
                     <div
                       className={`mt-1 text-5xl font-extrabold leading-none ${
                         overallScore != null && getScoreTone(overallScore) === 'success' ? 'text-sabc-success' : 'text-sabc-red-primary'
@@ -303,7 +302,6 @@ const ShowEvaluation: React.FC = () => {
           <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Sparkles className="h-5 w-5 text-sabc-accent" />
                 Détail des critères évalués
               </CardTitle>
             </CardHeader>
@@ -328,7 +326,7 @@ const ShowEvaluation: React.FC = () => {
                     return (
                       <div
                         key={String(critere.id ?? index)}
-                        className="group relative flex flex-col items-center rounded-xl border border-sabc-gray-200 px-3 py-4 text-center transition hover:border-sabc-red-primary/40 hover:shadow-sm dark:border-sabc-gray-700"
+                        className="group relative flex flex-col items-center rounded-lg border border-sabc-gray-200 px-3 py-4 text-center transition hover:border-sabc-red-primary/40 hover:shadow-sm dark:border-sabc-gray-700"
                         title={[critere.description, critere.commentaire].filter(Boolean).join('\n\n')}
                       >
                         <span className="mb-2 inline-block rounded-full bg-sabc-gray-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sabc-gray-500 dark:bg-sabc-gray-800">

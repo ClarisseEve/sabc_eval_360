@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useLocation } from 'react-router-dom';
 import { cn, humanizeDisplayText } from '@/utils/helpers';
 import { Header } from '@/Components/Layout/app/Header';
 import { Sidebar } from '@/Components/Layout/app/Sidebar';
@@ -37,6 +38,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   children,
   className,
 }) => {
+  const location = useLocation();
   const resolvedUser = {
     name: humanizeDisplayText(user?.name) || 'Utilisateur',
     email: user?.email || '',
@@ -131,7 +133,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           onMenuClick={openMobileSidebar}
           isMenuOpen={mobileSidebarOpen}
           onLogout={onLogout}
-          className="sticky top-0 z-30 mx-2 mt-2 rounded-2xl shadow-md"
+          className="sticky top-0 z-30"
         />
         
         {/* Suppression de la section des breadcrumbs */}
@@ -141,7 +143,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           "min-w-0 flex-1 p-2 md:p-4 lg:p-6",
           className
         )}>
-          {children}
+          {/* La clé relance l'animation d'entrée à chaque changement de page. */}
+          <div key={location.pathname} className="sabc-rise">
+            {children}
+          </div>
         </main>
       </div>
     </div>

@@ -193,7 +193,7 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header
       className={cn(
-        'flex h-16 min-w-0 items-center justify-between border-b border-sabc-gray-200 bg-white px-2 shadow-sm dark:border-sabc-gray-800 dark:bg-sabc-gray-900 sm:px-4',
+        'flex h-16 min-w-0 items-center justify-between border-b border-sabc-gray-200 bg-white px-2 dark:border-sabc-gray-800 dark:bg-sabc-gray-900 sm:px-4',
         className,
       )}
     >
@@ -251,7 +251,7 @@ const Header: React.FC<HeaderProps> = ({
               id="header-notifications"
               role="dialog"
               aria-label="Notifications"
-              className="fixed left-2 right-2 top-20 z-50 rounded-2xl border border-sabc-gray-200 bg-white p-3 shadow-xl dark:border-sabc-gray-700 dark:bg-sabc-gray-900 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80"
+              className="fixed left-2 right-2 top-20 z-50 rounded-lg border border-sabc-gray-200 bg-white p-3 shadow-xl dark:border-sabc-gray-700 dark:bg-sabc-gray-900 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80"
             >
               <div className="mb-2 flex items-center justify-between gap-2 border-b border-sabc-gray-200 pb-2 dark:border-sabc-gray-800">
                 <h2 className="font-medium text-sabc-gray-900 dark:text-white">Notifications</h2>
@@ -283,7 +283,7 @@ const Header: React.FC<HeaderProps> = ({
                       key={notification.id}
                       onClick={() => selectNotification(notification)}
                       className={cn(
-                        'w-full rounded-xl border border-sabc-gray-200 p-2 text-left transition-colors hover:bg-sabc-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 dark:border-sabc-gray-700 dark:hover:bg-sabc-gray-800/70',
+                        'w-full rounded-lg border border-sabc-gray-200 p-2 text-left transition-colors hover:bg-sabc-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 dark:border-sabc-gray-700 dark:hover:bg-sabc-gray-800/70',
                         !notification.read && 'bg-sabc-gray-50 dark:bg-sabc-gray-800/50',
                       )}
                     >
@@ -323,7 +323,7 @@ const Header: React.FC<HeaderProps> = ({
               aria-expanded={showUserMenu}
               aria-haspopup="menu"
               aria-controls="header-user-menu"
-              className="flex items-center gap-2 rounded-xl px-1 py-1 transition-colors hover:bg-sabc-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 dark:hover:bg-sabc-gray-800/70 sm:px-2"
+              className="flex items-center gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-sabc-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 dark:hover:bg-sabc-gray-800/70 sm:px-2"
             >
               <Avatar name={user.name} src={user.avatar} size="sm" />
               <span className="hidden flex-col items-start text-left md:flex">
@@ -342,7 +342,7 @@ const Header: React.FC<HeaderProps> = ({
               <div
                 id="header-user-menu"
                 role="menu"
-                className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-sabc-gray-200 bg-white p-2 shadow-xl dark:border-sabc-gray-700 dark:bg-sabc-gray-900"
+                className="absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-sabc-gray-200 bg-white p-2 shadow-xl dark:border-sabc-gray-700 dark:bg-sabc-gray-900"
               >
                 <div className="border-b border-sabc-gray-200 px-3 py-2 dark:border-sabc-gray-800 md:hidden">
                   <p className="truncate text-sm font-medium text-sabc-gray-900 dark:text-white">{user.name}</p>
@@ -352,7 +352,7 @@ const Header: React.FC<HeaderProps> = ({
                   href="/settings/profile"
                   role="menuitem"
                   onClick={() => setShowUserMenu(false)}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-sabc-gray-700 transition-colors hover:bg-sabc-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 dark:text-sabc-gray-200 dark:hover:bg-sabc-gray-800"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-sabc-gray-700 transition-colors hover:bg-sabc-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 dark:text-sabc-gray-200 dark:hover:bg-sabc-gray-800"
                 >
                   <User className="h-4 w-4" />
                   Mon profil
@@ -361,7 +361,7 @@ const Header: React.FC<HeaderProps> = ({
                   href="/settings"
                   role="menuitem"
                   onClick={() => setShowUserMenu(false)}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-sabc-gray-700 transition-colors hover:bg-sabc-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 dark:text-sabc-gray-200 dark:hover:bg-sabc-gray-800"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-sabc-gray-700 transition-colors hover:bg-sabc-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 dark:text-sabc-gray-200 dark:hover:bg-sabc-gray-800"
                 >
                   <Settings className="h-4 w-4" />
                   Paramètres

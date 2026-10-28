@@ -165,14 +165,14 @@ export default function AdminRatingSheetsPage() {
                 {periodsQuery.isLoading ? <p>Chargement des périodes…</p> : null}
                 {periodsQuery.isError ? <p className="text-red-700">{getErrorMessage(periodsQuery.error)}</p> : null}
                 {!periods.length && !periodsQuery.isLoading ? (
-                    <div className="border-sabc-gray-200 text-sabc-gray-600 rounded-xl border bg-white p-6 text-sm">
+                    <div className="border-sabc-gray-200 text-sabc-gray-600 rounded-lg border bg-white p-6 text-sm">
                         Aucune période d’évaluation n’est disponible.
                     </div>
                 ) : null}
 
                 {periods.length > 0 ? (
                     <>
-                        <div className="border-sabc-gray-200 flex flex-wrap gap-4 rounded-xl border bg-white p-4">
+                        <div className="border-sabc-gray-200 flex flex-wrap gap-4 rounded-lg border bg-white p-4">
                             <label className="text-sabc-gray-700 min-w-64 flex-1 text-sm font-medium">
                                 Période d’évaluation
                                 <select
@@ -209,7 +209,7 @@ export default function AdminRatingSheetsPage() {
 
                         {roleOverview ? (
                             <>
-                                <div className="border-sabc-gray-200 rounded-xl border bg-white p-5">
+                                <div className="border-sabc-gray-200 rounded-lg border bg-white p-5">
                                     <h2 className="text-sabc-gray-900 text-lg font-semibold">Calcul de la note générale</h2>
                                     <p className="text-sabc-gray-600 mt-1 text-sm">
                                         Les notes de catégorie sont converties sur 20. En cas d’évaluations manquantes, les catégories disponibles
@@ -286,7 +286,7 @@ export default function AdminRatingSheetsPage() {
                                     </div>
                                 </div>
 
-                                <div className="border-sabc-gray-200 rounded-xl border bg-white">
+                                <div className="border-sabc-gray-200 rounded-lg border bg-white">
                                     <div className="border-sabc-gray-200 flex flex-wrap items-center justify-between gap-3 border-b p-4">
                                         <div>
                                             <h2 className="text-sabc-gray-900 font-semibold">Cibles éligibles</h2>

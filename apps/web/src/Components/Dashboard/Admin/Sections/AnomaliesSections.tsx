@@ -186,13 +186,13 @@ export function AnomalySummarySection({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <div className="rounded-2xl border border-sabc-gray-200/80 bg-white/85 p-4 shadow-sm">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Charge critique</div>
+            <div className="rounded-lg border border-sabc-gray-200/80 bg-white/85 p-4 shadow-sm">
+              <div className="text-xs font-semibold text-sabc-gray-500">Charge critique</div>
               <div className="mt-2 text-2xl font-semibold text-sabc-gray-900">{criticalShare.toFixed(0)}%</div>
               <p className="mt-1 text-sm text-sabc-gray-500">Part des alertes qui demandent une intervention rapide.</p>
             </div>
-            <div className="rounded-2xl border border-sabc-gray-200/80 bg-white/85 p-4 shadow-sm">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">Vue active</div>
+            <div className="rounded-lg border border-sabc-gray-200/80 bg-white/85 p-4 shadow-sm">
+              <div className="text-xs font-semibold text-sabc-gray-500">Vue active</div>
               <div className="mt-2 text-lg font-semibold text-sabc-gray-900">
                 {activeFilter === 'all' ? 'Toutes les alertes' : `Alertes ${getSeverityLabel(activeFilter)}`}
               </div>
@@ -213,7 +213,7 @@ export function AnomalySummarySection({
             <Card key={card.label} className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
               <CardContent className="p-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: `${card.color}18` }}>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg" style={{ backgroundColor: `${card.color}18` }}>
                     <IconComp className="h-5 w-5" style={{ color: card.color }} />
                   </div>
                   <div className="min-w-0">
@@ -230,7 +230,7 @@ export function AnomalySummarySection({
 
       <div className="grid gap-5 xl:grid-cols-[1.15fr,0.85fr]">
         <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
-          <CardHeader className="border-b border-sabc-gray-100 bg-gradient-to-r from-white to-sabc-gray-50">
+          <CardHeader className="border-b border-sabc-gray-100">
             <CardTitle className="flex items-center gap-2">
               <TriangleAlert className="h-5 w-5 text-sabc-red-primary" />
               Priorités immédiates
@@ -246,11 +246,11 @@ export function AnomalySummarySection({
                 const IconComp = config.icon;
 
                 return (
-                  <div key={`${row.type}-${row.matricule ?? 'global'}-${index}`} className="rounded-2xl border border-sabc-gray-200/80 bg-white p-4 shadow-sm">
+                  <div key={`${row.type}-${row.matricule ?? 'global'}-${index}`} className="rounded-lg border border-sabc-gray-200/80 bg-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ backgroundColor: `${config.color}18` }}>
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${config.color}18` }}>
                             <IconComp className="h-4 w-4" style={{ color: config.color }} />
                           </span>
                           <div>
@@ -262,7 +262,7 @@ export function AnomalySummarySection({
                       </div>
                       <Badge variant={config.badgeVariant}>{row.severite}</Badge>
                     </div>
-                    <div className="mt-4 rounded-2xl bg-sabc-gray-50 px-3 py-2">
+                    <div className="mt-4 rounded-lg bg-sabc-gray-50 px-3 py-2">
                       <div className="text-[11px] font-semibold uppercase tracking-wide text-sabc-gray-500">
                         Action recommandée
                       </div>
@@ -276,7 +276,7 @@ export function AnomalySummarySection({
         </Card>
 
         <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
-          <CardHeader className="border-b border-sabc-gray-100 bg-gradient-to-r from-white to-sabc-gray-50">
+          <CardHeader className="border-b border-sabc-gray-100">
             <CardTitle>Signaux récurrents</CardTitle>
             <CardDescription>Typologies qui reviennent le plus souvent dans les seeds et calculs analytics.</CardDescription>
           </CardHeader>
@@ -285,7 +285,7 @@ export function AnomalySummarySection({
               <EmptyState message="Aucun signal récurrent disponible." />
             ) : (
               topTypes.map(([label, count]) => (
-                <div key={label} className="rounded-2xl border border-sabc-gray-200/80 bg-white p-4 shadow-sm">
+                <div key={label} className="rounded-lg border border-sabc-gray-200/80 bg-white p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-medium text-sabc-gray-900">{label}</span>
                     <Badge variant="info">{count}</Badge>
@@ -332,7 +332,7 @@ export function AnomaliesTableSection({
 
   return (
     <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
-      <CardHeader className="border-b border-sabc-gray-100 bg-gradient-to-r from-white to-sabc-gray-50">
+      <CardHeader className="border-b border-sabc-gray-100">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -402,7 +402,7 @@ export function AnomaliesTableSection({
                     >
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: `${config.color}18` }}>
+                          <span className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ backgroundColor: `${config.color}18` }}>
                             <IconComp className="h-4 w-4" style={{ color: config.color }} />
                           </span>
                           <div>

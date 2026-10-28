@@ -99,7 +99,7 @@ const Mine: React.FC = () => {
                 Le flux repose maintenant sur la période ouverte et les règles publiées compatibles avec la cible sélectionnée.
               </p>
             </div>
-            <div className="rounded-xl border border-sabc-gray-200 bg-sabc-gray-50 p-4 text-sm">
+            <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-4 text-sm">
               <div className="text-xs uppercase tracking-wide text-sabc-gray-500">Période active</div>
               <div className="mt-1 text-base font-semibold text-sabc-gray-900">
                 {data.activePeriod?.nom_periode || data.activePeriod?.code_periode || 'Aucune période ouverte'}

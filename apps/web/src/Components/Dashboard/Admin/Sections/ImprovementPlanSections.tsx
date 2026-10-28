@@ -131,7 +131,7 @@ export function ImprovementPlansTotalsSection({ totals }: Readonly<{ totals: any
       {cards.map((card) => (
         <Card key={card.label} className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
           <CardContent className="p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sabc-gray-500">{card.label}</div>
+            <div className="text-xs font-semibold text-sabc-gray-500">{card.label}</div>
             <div className="mt-2 text-2xl font-bold text-sabc-gray-900 dark:text-white">{card.value}</div>
           </CardContent>
         </Card>

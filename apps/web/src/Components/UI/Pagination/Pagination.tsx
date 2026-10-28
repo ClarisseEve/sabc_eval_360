@@ -48,7 +48,7 @@ const PaginationLink = ({
     className={cn(
       'w-9 h-9 transition-all duration-200',
       isActive && 'bg-sabc-red-primary text-white hover:bg-sabc-red-dark scale-105 shadow-sm',
-      !isActive && 'hover:scale-105 hover:shadow-sm',
+      !isActive && ' hover:shadow-sm',
       className
     )}
     {...props}

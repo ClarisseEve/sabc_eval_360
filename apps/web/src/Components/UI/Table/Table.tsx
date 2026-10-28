@@ -36,7 +36,7 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
     
     if (responsive) {
       return (
-        <div className="w-full overflow-auto rounded-xl">
+        <div className="w-full overflow-auto rounded-lg">
           <table ref={ref} className={tableClasses} {...props} />
         </div>
       );

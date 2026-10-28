@@ -6,7 +6,7 @@ function StatsCardsSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-sabc-gray-200 bg-white p-5 dark:border-sabc-gray-800 dark:bg-sabc-gray-900">
+        <div key={i} className="rounded-lg border border-sabc-gray-200 bg-white p-5 dark:border-sabc-gray-800 dark:bg-sabc-gray-900">
           <Skeleton variant="text" className="mb-3 h-3 w-24" />
           <Skeleton className="mb-2 h-8 w-20" />
           <Skeleton variant="text" className="h-3 w-32" />
@@ -19,7 +19,7 @@ function StatsCardsSkeleton() {
 /** Skeleton for a chart card */
 function ChartSkeleton() {
   return (
-    <div className="rounded-xl border border-sabc-gray-200 bg-white p-5 dark:border-sabc-gray-800 dark:bg-sabc-gray-900">
+    <div className="rounded-lg border border-sabc-gray-200 bg-white p-5 dark:border-sabc-gray-800 dark:bg-sabc-gray-900">
       <Skeleton variant="text" className="mb-4 h-5 w-40" />
       <Skeleton className="h-[250px] w-full rounded-lg" />
     </div>
@@ -29,7 +29,7 @@ function ChartSkeleton() {
 /** Skeleton for a table/list section */
 function TableSkeleton() {
   return (
-    <div className="rounded-xl border border-sabc-gray-200 bg-white p-5 dark:border-sabc-gray-800 dark:bg-sabc-gray-900">
+    <div className="rounded-lg border border-sabc-gray-200 bg-white p-5 dark:border-sabc-gray-800 dark:bg-sabc-gray-900">
       <Skeleton variant="text" className="mb-4 h-5 w-48" />
       <Skeleton variant="table" rows={5} />
     </div>

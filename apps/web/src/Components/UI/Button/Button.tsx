@@ -27,7 +27,7 @@ const Spinner = ({ className }: { className?: string }) => (
 );
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white dark:ring-offset-sabc-gray-950 cursor-pointer active:scale-[0.97]",
+  "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white dark:ring-offset-sabc-gray-950 cursor-pointer active:scale-[0.97]",
   {
     variants: {
       variant: {
@@ -46,8 +46,8 @@ const buttonVariants = cva(
       size: {
         default: 'h-9 px-4',
         sm: 'h-8 px-3 rounded-lg text-[0.8125rem]',
-        lg: 'h-10 px-6 rounded-xl text-sm',
-        icon: 'h-9 w-9 rounded-xl',
+        lg: 'h-10 px-6 rounded-lg text-sm',
+        icon: 'h-9 w-9 rounded-lg',
       },
     },
     defaultVariants: {

@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Head } from '@/lib/inertia-shim';
 import { Link } from 'react-router-dom';
 import AppLayout from '@/Components/Layout/app/AppLayout';
-import { Card, CardContent } from '@/Components/UI/Card';
 import { WelcomeMessage } from '@/Components/UI/WelcomeMessage';
 import { ErrorBoundary } from '@/Components/ErrorBoundary';
 import { useAuthContext } from '@/Contexts/AuthContext';
@@ -11,23 +10,13 @@ import { analyticsApi, periodesApi, reglesApi } from '@/Services/api';
 import { useAdminOverviewTabData } from '@/Hooks/queries/useAdminDashboardTabs';
 import { DashboardExportMenu } from '@/Components/Dashboard/DashboardExportMenu';
 import { AdminOverviewMetricsSection } from '@/Components/Dashboard/Admin/Sections/OverviewSections';
-import {
-  AlertTriangle,
-  BarChart3,
-  CalendarClock,
-  CheckCircle2,
-  ClipboardList,
-  FileText,
-  Layers3,
-  ShieldAlert,
-  Users,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 function KpiSkeleton() {
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-28 animate-pulse rounded-2xl bg-sabc-gray-100 dark:bg-sabc-gray-800" />
+        <div key={i} className="h-28 animate-pulse rounded-lg bg-sabc-gray-100 dark:bg-sabc-gray-800" />
       ))}
     </div>
   );
@@ -47,12 +36,12 @@ function AdminKpis() {
 }
 
 const QUICK_LINKS = [
-  { label: 'Analytics 360°', caption: 'Analyses détaillées par région, rôle, tendances', href: '/admin/analytics?tab=overview', icon: BarChart3 },
-  { label: 'Gestion des évaluations', caption: 'Suivi global des évaluations', href: '/admin/evaluations/management', icon: ClipboardList },
-  { label: 'Périodes', caption: 'Ouvrir / fermer les cycles', href: '/admin/evaluations/periodes', icon: CalendarClock },
-  { label: 'Règles', caption: 'Cadres et critères d’évaluation', href: '/admin/evaluations/regles', icon: Layers3 },
-  { label: 'Utilisateurs', caption: 'Annuaire et hiérarchie', href: '/admin/utilisateurs', icon: Users },
-  { label: 'Rapports', caption: 'Exports PPTX / XLSX', href: '/admin/reports', icon: FileText },
+  { label: 'Analyses 360°', caption: 'Résultats par région, rôle et tendance', href: '/admin/analytics?tab=overview' },
+  { label: 'Gestion des évaluations', caption: 'Suivi global des évaluations', href: '/admin/evaluations/management' },
+  { label: 'Périodes', caption: 'Ouverture et clôture des cycles', href: '/admin/evaluations/periodes' },
+  { label: 'Règles', caption: 'Cadres et critères d’évaluation', href: '/admin/evaluations/regles' },
+  { label: 'Utilisateurs', caption: 'Annuaire et hiérarchie', href: '/admin/utilisateurs' },
+  { label: 'Rapports', caption: 'Exports PowerPoint et Excel', href: '/admin/reports' },
 ];
 
 export default function AdminDashboard() {
@@ -102,7 +91,7 @@ export default function AdminDashboard() {
 
         {/* Checklist de configuration */}
         {!isSetupComplete && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
               <div className="flex-1">
@@ -140,12 +129,33 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Indicateurs clés en un coup d'œil */}
+        {/* Campagne en cours et anomalies: une ligne d'état, sans tuiles décoratives */}
+        <section
+          data-dashboard-export-section
+          className="flex flex-col gap-3 border-y border-sabc-gray-200 py-4 text-sm dark:border-sabc-gray-700 sm:flex-row sm:items-center sm:gap-8"
+        >
+          <div>
+            <span className="text-sabc-gray-500">Campagne en cours : </span>
+            <span className="font-semibold text-sabc-gray-900 dark:text-white">
+              {openPeriode ? (openPeriode.nom_periode || openPeriode.code_periode) : 'aucune période ouverte'}
+            </span>
+          </div>
+          <Link
+            to="/admin/analytics?tab=anomalies"
+            className="text-sabc-gray-700 hover:text-sabc-red-primary dark:text-sabc-gray-300"
+          >
+            <span className={anomalyTotal > 0 ? 'font-semibold text-sabc-red-primary' : 'font-semibold'}>
+              {anomalyTotal}
+            </span>{' '}
+            {anomalyTotal > 1 ? 'anomalies à examiner' : anomalyTotal === 1 ? 'anomalie à examiner' : 'anomalie détectée'}
+          </Link>
+        </section>
+
         <section data-dashboard-export-section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-sabc-gray-900 dark:text-white">Indicateurs clés</h2>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold text-sabc-gray-900 dark:text-white">Indicateurs du cycle</h2>
             <Link to="/admin/analytics?tab=overview" className="text-sm font-medium text-sabc-red-primary hover:underline">
-              Voir les analyses détaillées →
+              Analyses détaillées
             </Link>
           </div>
           <ErrorBoundary>
@@ -155,57 +165,20 @@ export default function AdminDashboard() {
           </ErrorBoundary>
         </section>
 
-        {/* Alertes & état des campagnes */}
-        <div data-dashboard-export-section className="grid gap-4 md:grid-cols-2">
-          <Link to="/admin/analytics?tab=anomalies" className="block">
-            <Card className="transition-shadow hover:shadow-md">
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${anomalyTotal > 0 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                  <ShieldAlert className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-sabc-gray-900 dark:text-white">{anomalyTotal}</div>
-                  <div className="text-sm text-sabc-gray-500">
-                    {anomalyTotal > 0 ? 'Anomalies à examiner' : 'Aucune anomalie détectée'}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Card>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sabc-gray-100 text-sabc-gray-600 dark:bg-sabc-gray-800">
-                <CalendarClock className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="text-base font-semibold text-sabc-gray-900 dark:text-white">
-                  {openPeriode ? (openPeriode.nom_periode || openPeriode.code_periode) : 'Aucune période ouverte'}
-                </div>
-                <div className="text-sm text-sabc-gray-500">
-                  {openPeriode ? 'Campagne en cours' : 'Ouvrez une période pour lancer les évaluations'}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Accès rapides */}
         <section data-dashboard-export-section>
-          <h2 className="mb-3 text-base font-semibold text-sabc-gray-900 dark:text-white">Accès rapides</h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-            {QUICK_LINKS.map(({ label, caption, href, icon: Icon }) => (
-              <Link key={href} to={href} className="block">
-                <Card className="h-full transition-all hover:-translate-y-0.5 hover:border-sabc-red-primary/40 hover:shadow-md">
-                  <CardContent className="flex h-full flex-col gap-2 p-4">
-                    <Icon className="h-6 w-6 text-sabc-red-primary" />
-                    <div className="text-sm font-semibold text-sabc-gray-900 dark:text-white">{label}</div>
-                    <div className="text-xs text-sabc-gray-500">{caption}</div>
-                  </CardContent>
-                </Card>
+          <h2 className="mb-3 text-lg font-semibold text-sabc-gray-900 dark:text-white">Administration</h2>
+          <nav aria-label="Administration" className="grid overflow-hidden rounded-lg border border-sabc-gray-200 bg-white dark:border-sabc-gray-700 dark:bg-sabc-gray-900 sm:grid-cols-2 xl:grid-cols-3">
+            {QUICK_LINKS.map(({ label, caption, href }) => (
+              <Link
+                key={href}
+                to={href}
+                className="group -mb-px -mr-px border-b border-r border-sabc-gray-200 px-5 py-4 transition-colors hover:bg-sabc-gray-50 dark:border-sabc-gray-700 dark:hover:bg-sabc-gray-800"
+              >
+                <div className="font-semibold text-sabc-gray-900 group-hover:text-sabc-red-primary dark:text-white">{label}</div>
+                <div className="mt-0.5 text-sm text-sabc-gray-500">{caption}</div>
               </Link>
             ))}
-          </div>
+          </nav>
         </section>
       </div>
     </AppLayout>

@@ -220,16 +220,16 @@ const CompareEvaluations: React.FC<CompareEvaluationsProps> = ({ evaluations }) 
                 <table className="min-w-full divide-y divide-sabc-gray-200">
                   <thead>
                     <tr>
-                      <th className="px-4 py-3 bg-sabc-gray-100 text-left text-xs font-medium text-sabc-gray-800 uppercase tracking-wider">
+                      <th className="px-4 py-3 bg-sabc-gray-100 text-left text-xs font-medium text-sabc-gray-800">
                         Compétence
                       </th>
-                      <th className="px-4 py-3 bg-sabc-gray-100 text-center text-xs font-medium text-sabc-gray-800 uppercase tracking-wider">
+                      <th className="px-4 py-3 bg-sabc-gray-100 text-center text-xs font-medium text-sabc-gray-800">
                         {comparisonData.evaluation1.periode} {comparisonData.evaluation1.annee}
                       </th>
-                      <th className="px-4 py-3 bg-sabc-gray-100 text-center text-xs font-medium text-sabc-gray-800 uppercase tracking-wider">
+                      <th className="px-4 py-3 bg-sabc-gray-100 text-center text-xs font-medium text-sabc-gray-800">
                         {comparisonData.evaluation2.periode} {comparisonData.evaluation2.annee}
                       </th>
-                      <th className="px-4 py-3 bg-sabc-gray-100 text-center text-xs font-medium text-sabc-gray-800 uppercase tracking-wider">
+                      <th className="px-4 py-3 bg-sabc-gray-100 text-center text-xs font-medium text-sabc-gray-800">
                         Évolution
                       </th>
                     </tr>

@@ -132,7 +132,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
                 setData('departement', '');
                 setData('user_id', '');
               }}
-              className="w-full rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
             >
               <option value="">Toutes les régions</option>
               {regions.map((region) => (
@@ -154,7 +154,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
                 setSelectedUser(null); // Réinitialiser l'utilisateur
                 setData('user_id', '');
               }}
-              className="w-full rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
               disabled={!selectedRegion}
             >
               <option value="">Tous les départements</option>
@@ -175,7 +175,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
             <select
               value={data.user_id as string}
               onChange={(e) => setSelectedUser(parseInt(e.target.value, 10))}
-              className="w-full rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
             >
               <option value="">Sélectionner un utilisateur</option>
               {filteredUsers.map((user) => (
@@ -196,7 +196,7 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
             <select
               value={data.annee as string}
               onChange={(e) => setSelectedAnnee(e.target.value ? parseInt(e.target.value, 10) : null)}
-              className="w-full rounded-xl border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-sabc-gray-200 bg-white px-3 py-2 text-sm"
             >
               <option value="">Toutes les années</option>
               {annees.map((annee) => (
@@ -264,16 +264,16 @@ const EvolutionChart: React.FC<EvolutionChartProps> = ({ users, regions, departe
                 <table className="min-w-full divide-y divide-sabc-gray-200">
                   <thead>
                     <tr>
-                      <th className="px-4 py-3 bg-sabc-gray-100 text-left text-xs font-medium text-sabc-gray-800 uppercase tracking-wider">
+                      <th className="px-4 py-3 bg-sabc-gray-100 text-left text-xs font-medium text-sabc-gray-800">
                         Code
                       </th>
-                      <th className="px-4 py-3 bg-sabc-gray-100 text-left text-xs font-medium text-sabc-gray-800 uppercase tracking-wider">
+                      <th className="px-4 py-3 bg-sabc-gray-100 text-left text-xs font-medium text-sabc-gray-800">
                         Période
                       </th>
-                      <th className="px-4 py-3 bg-sabc-gray-100 text-center text-xs font-medium text-sabc-gray-800 uppercase tracking-wider">
+                      <th className="px-4 py-3 bg-sabc-gray-100 text-center text-xs font-medium text-sabc-gray-800">
                         Score moyen
                       </th>
-                      <th className="px-4 py-3 bg-sabc-gray-100 text-left text-xs font-medium text-sabc-gray-800 uppercase tracking-wider">
+                      <th className="px-4 py-3 bg-sabc-gray-100 text-left text-xs font-medium text-sabc-gray-800">
                         Date de validation
                       </th>
                     </tr>

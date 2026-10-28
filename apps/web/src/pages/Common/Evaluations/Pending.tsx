@@ -178,7 +178,7 @@ const Pending: React.FC = () => {
                 Reprenez un brouillon ou corrigez une évaluation renvoyée. Les soumissions envoyées et les validations manager sont suivies dans leurs espaces dédiés.
               </p>
             </div>
-            <div className="rounded-xl border border-sabc-gray-200 bg-sabc-gray-50 p-4 text-sm">
+            <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-4 text-sm">
               <div className="text-xs uppercase tracking-wide text-sabc-gray-500">Période active</div>
               <div className="mt-1 text-base font-semibold text-sabc-gray-900">
                 {data.activePeriod?.nom_periode || data.activePeriod?.code_periode || 'Aucune période ouverte'}

@@ -192,7 +192,7 @@ export default function RulesIndexPage() {
         </div>
         <div className="flex items-center gap-2">
           {/* View toggle: matrix vs. detailed list */}
-          <div className="flex items-center rounded-xl border border-sabc-gray-200 p-1">
+          <div className="flex items-center rounded-lg border border-sabc-gray-200 p-1">
             <button
               type="button"
               onClick={() => setView('matrix')}
@@ -263,7 +263,7 @@ export default function RulesIndexPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <CardTitle>Matrice de compatibilité</CardTitle>
               {/* Type filter as tabs — the matrix recomputes for the selected type */}
-              <div className="flex flex-wrap items-center gap-1 rounded-xl border border-sabc-gray-200 p-1">
+              <div className="flex flex-wrap items-center gap-1 rounded-lg border border-sabc-gray-200 p-1">
                 {EVALUATION_TYPES.map((type) => (
                   <button
                     key={type}
@@ -514,7 +514,7 @@ export default function RulesIndexPage() {
 
               {currentRule ? (
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-sabc-gray-200 p-4">
+                  <div className="rounded-lg border border-sabc-gray-200 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-medium text-sabc-gray-900">{currentRule.nom_regle}</div>
@@ -570,7 +570,7 @@ export default function RulesIndexPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-dashed border-sabc-gray-300 bg-sabc-gray-50 p-4 text-sm text-sabc-gray-500">
+                  <div className="rounded-lg border border-dashed border-sabc-gray-300 bg-sabc-gray-50 p-4 text-sm text-sabc-gray-500">
                     Aucune règle ne lie ces deux rôles pour ce type d’évaluation. Vous pouvez en créer
                     une — le couple de rôles et le type seront pré-remplis.
                   </div>

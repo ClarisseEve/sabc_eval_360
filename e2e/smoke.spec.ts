@@ -13,7 +13,7 @@ async function login(
   password = requireSeedPassword(),
 ) {
   await page.goto('/login');
-  await page.getByLabel('Matricule ou Email').fill(identifier);
+  await page.getByLabel('Matricule ou e-mail').fill(identifier);
   // exact: sinon le libellé matche aussi le bouton « Afficher le mot de passe ».
   await page.getByLabel('Mot de passe', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Se connecter' }).click();

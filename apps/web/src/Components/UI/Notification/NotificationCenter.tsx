@@ -89,7 +89,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-sabc-gray-200 bg-white shadow-xl dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
+        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-lg border border-sabc-gray-200 bg-white shadow-xl dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-sabc-gray-100 px-4 py-2.5 dark:border-sabc-gray-800">
             <span className="text-sm font-semibold text-sabc-gray-900 dark:text-white">

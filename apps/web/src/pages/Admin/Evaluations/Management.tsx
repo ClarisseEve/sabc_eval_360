@@ -2,7 +2,6 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import {
-  ArrowUpRight,
   BarChart3,
   Calendar,
   CalendarClock,
@@ -10,7 +9,6 @@ import {
   History,
   ListChecks,
   Radar,
-  Sparkles,
 } from 'lucide-react';
 import { Badge } from '@/Components/UI/Badge/Badge';
 import { buttonVariants } from '@/Components/UI/Button/Button';
@@ -192,7 +190,7 @@ export default function EvaluationManagementPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-sabc-gray-900">Pilotage global des évaluations</h1>
-          <p className="text-sm text-sabc-gray-600">Vue de pilotage basée sur les données réelles des périodes et analytics NestJS.</p>
+          <p className="text-sm text-sabc-gray-600">Avancement des périodes et des évaluations, tous rôles confondus.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {canCreateEvaluation ? (
@@ -235,7 +233,7 @@ export default function EvaluationManagementPage() {
       </div>
 
       <Card className="overflow-hidden border-sabc-gray-200/80 shadow-sm">
-        <CardHeader className="border-b border-sabc-gray-100 bg-gradient-to-r from-sabc-gray-50 via-white to-sabc-red-primary/5">
+        <CardHeader className="border-b border-sabc-gray-100">
           <CardTitle>Périodes en cours</CardTitle>
           <CardDescription>Vue consolidée des périodes actives et de leur progression réelle.</CardDescription>
         </CardHeader>
@@ -274,7 +272,6 @@ export default function EvaluationManagementPage() {
         <Card className="border-sabc-gray-200/80 shadow-sm">
           <CardContent className="p-4">
             <div className="mb-3 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-sabc-red-primary" />
               <span className="text-sm font-semibold text-sabc-gray-900">Statuts</span>
             </div>
             <div className="space-y-2">
@@ -326,7 +323,6 @@ export default function EvaluationManagementPage() {
         <Card className="border-sabc-gray-200/80 shadow-sm">
           <CardContent className="p-4">
             <div className="mb-3 flex items-center gap-2">
-              <ArrowUpRight className="h-4 w-4 text-sabc-red-primary" />
               <span className="text-sm font-semibold text-sabc-gray-900">Actions rapides</span>
             </div>
             <div className="space-y-1.5">
@@ -340,7 +336,6 @@ export default function EvaluationManagementPage() {
                   >
                     <Icon className="h-4 w-4 shrink-0 text-sabc-gray-400 group-hover:text-sabc-red-primary" />
                     <span className="font-medium">{action.title}</span>
-                    <ArrowUpRight className="ml-auto h-3.5 w-3.5 text-sabc-gray-300 group-hover:text-sabc-red-primary" />
                   </Link>
                 );
               })}

@@ -179,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <button
         type="button"
         className={cn(
-          "relative flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40",
+          "relative flex w-full items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sabc-red-primary/40",
           getActiveClassName(hasActiveChild),
           hoverClassName
         )}
@@ -271,7 +271,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <Link
         href={item.href}
         className={cn(
-          "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out",
+          "flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out",
           isCollapsed ? "justify-center" : "justify-start",
           isActive
             ? "text-sabc-red-primary dark:text-sabc-red-light font-semibold"
@@ -320,7 +320,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     return (
       <li key={item.title} className={cn(
-        "rounded-xl relative",
+        "rounded-lg relative",
         (isActive || hasActiveChild) && "bg-sabc-red-primary/8 dark:bg-sabc-red-primary/15"
       )}>
         {(isActive || hasActiveChild) && (

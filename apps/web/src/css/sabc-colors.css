@@ -5,29 +5,33 @@
 
 :root {
   /* Couleurs Primaires (OBLIGATOIRES) */
-  --sabc-red-primary: #E53E3E;    /* Rouge SABC principal */
-  --sabc-red-light: #FED7D7;      /* Rouge clair backgrounds */
-  --sabc-red-dark: #C53030;       /* Rouge foncé hover/active */
-  --sabc-accent: #FF9800;         /* Orange accent */
-  --sabc-accent-light: #FFE0B2;   /* Orange clair */
+  /* Rouge du logo (#E61C30) assombri pour atteindre le contraste AA sur blanc. */
+  --sabc-red-primary: #D01A2C;    /* Rouge SABC principal (logo) */
+  --sabc-red-light: #FBE8EA;      /* Teinte rouge pour fonds de sélection */
+  --sabc-red-dark: #A3121F;       /* Rouge foncé hover/active */
+  /* Or du point du « i » dans le logo: accent rare, en aplat uniquement
+     (contraste insuffisant pour du texte sur blanc). */
+  --sabc-accent: #FDC42D;
+  --sabc-accent-light: #FFF6DB;
 
   /* Nuances de Gris (COMPLÈTES) */
-  --sabc-gray-50: #F5F5F4;        /* Background app (warm stone) */
-  --sabc-gray-50-rgb: 245, 245, 244;  /* Version RGB pour transparence */
-  --sabc-gray-100: #FAFAF9;       /* Background cards (warm white) */
-  --sabc-gray-100-rgb: 250, 250, 249;  /* Version RGB pour transparence */
-  --sabc-gray-200: #E0E0E0;       /* Bordures, séparateurs */
-  --sabc-gray-200-rgb: 224, 224, 224;  /* Version RGB pour transparence */
-  --sabc-gray-300: #BDBDBD;       /* Bordures actives, séparateurs secondaires */
-  --sabc-gray-400: #757575;       /* Texte secondaire, contraste AA sur fond blanc */
-  --sabc-gray-400-rgb: 117, 117, 117;  /* Version RGB pour transparence */
-  --sabc-gray-500: #616161;       /* Texte tertiaire, labels */
-  --sabc-gray-600: #515151;       /* Texte corps, descriptions */
-  --sabc-gray-700: #424242;       /* Texte intermédiaire */
-  --sabc-gray-800: #424242;       /* Texte principal */
-  --sabc-gray-800-rgb: 66, 66, 66;  /* Version RGB pour transparence */
-  --sabc-gray-900: #1A202C;       /* Titres importants */
-  --sabc-gray-900-rgb: 26, 32, 44;  /* Version RGB pour transparence */
+  /* Gris acier de la capsule du logo (#747474), décliné en échelle neutre. */
+  --sabc-gray-50: #F4F4F3;        /* Background app */
+  --sabc-gray-50-rgb: 244, 244, 243;  /* Version RGB pour transparence */
+  --sabc-gray-100: #F9F9F8;       /* Fonds secondaires */
+  --sabc-gray-100-rgb: 249, 249, 248;  /* Version RGB pour transparence */
+  --sabc-gray-200: #E3E3E1;       /* Bordures, séparateurs */
+  --sabc-gray-200-rgb: 227, 227, 225;  /* Version RGB pour transparence */
+  --sabc-gray-300: #C9C9C6;       /* Bordures actives, séparateurs secondaires */
+  --sabc-gray-400: #747474;       /* Gris capsule: texte secondaire, AA sur blanc */
+  --sabc-gray-400-rgb: 116, 116, 116;  /* Version RGB pour transparence */
+  --sabc-gray-500: #636363;       /* Texte tertiaire, labels */
+  --sabc-gray-600: #4F4F4F;       /* Texte corps, descriptions */
+  --sabc-gray-700: #3D3D3D;       /* Texte intermédiaire */
+  --sabc-gray-800: #2E2E2E;       /* Texte principal */
+  --sabc-gray-800-rgb: 46, 46, 46;  /* Version RGB pour transparence */
+  --sabc-gray-900: #1C1C1C;       /* Titres importants */
+  --sabc-gray-900-rgb: 28, 28, 28;  /* Version RGB pour transparence */
 
   /* Couleurs Fonctionnelles */
   --sabc-success: #2F855A;        /* Validations, lisible sur fond clair */
@@ -47,11 +51,11 @@
 /* Thème sombre - Appliqué quand la classe .dark est présente sur le document */
 .dark {
   /* Couleurs Primaires en mode sombre */
-  --sabc-red-primary: #E53E3E;    /* Rouge SABC principal - inchangé */
-  --sabc-red-light: #FED7D7;      /* Rouge clair backgrounds */
-  --sabc-red-dark: #C53030;       /* Rouge foncé hover/active */
-  --sabc-accent: #FF9800;         /* Orange accent */
-  --sabc-accent-light: #FFE0B2;   /* Orange clair */
+  --sabc-red-primary: #EE4655;    /* Rouge logo éclairci pour fond sombre */
+  --sabc-red-light: #3A1418;      /* Teinte rouge sur fond sombre */
+  --sabc-red-dark: #F26B77;       /* Hover sur fond sombre */
+  --sabc-accent: #FDC42D;
+  --sabc-accent-light: #3A2F12;
 
   /* Nuances de Gris adaptées au thème sombre */
   --sabc-gray-50: #121212;        /* Background app - sombre */

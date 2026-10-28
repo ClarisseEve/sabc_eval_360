@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/utils/helpers';
 
 const cardVariants = cva(
-  'rounded-2xl border shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] transition-all duration-200',
+  'rounded-lg border transition-colors duration-150',
   {
     variants: {
       variant: {
@@ -22,7 +22,7 @@ const cardVariants = cva(
         plain: 'border-transparent bg-transparent text-inherit shadow-none dark:border-transparent dark:bg-transparent dark:text-inherit',
       },
       hover: {
-        true: 'transition-all duration-200 hover:translate-y-[-2px] hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-sabc-gray-900/30',
+        true: 'hover:border-sabc-gray-300 dark:hover:border-sabc-gray-600',
       },
     },
     defaultVariants: {

@@ -203,7 +203,7 @@ export default function Builder() {
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-sabc-gray-200 bg-sabc-gray-100 p-4 dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
+                    <div className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-100 p-4 dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
                         <div className="mb-3 flex items-center justify-between text-xs text-sabc-gray-500">
                             <span>{previewFormat === 'pptx' ? 'Aperçu des diapositives PowerPoint' : 'Aperçu du document Word'}</span>
                             <span>Slide {previewSlide + 1} / {totalSlides}</span>

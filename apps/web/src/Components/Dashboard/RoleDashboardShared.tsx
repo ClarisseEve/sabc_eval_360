@@ -41,7 +41,7 @@ type MetricCardProps = {
   label: string;
   value: React.ReactNode;
   caption: string;
-  accentClassName: string;
+  accentClassName?: string;
 };
 
 type QuickAction = {
@@ -180,8 +180,8 @@ export function DashboardPageFrame({
           </div>
           <div className="flex items-center gap-2 self-start md:self-auto">
             {periodName ? (
-              <Badge variant="info" className="w-fit">
-                Période active: {periodName}
+              <Badge variant="secondary" className="w-fit">
+                Période active : {periodName}
               </Badge>
             ) : null}
             <DashboardExportMenu targetRef={dashboardRef} filename={title} />
@@ -191,9 +191,9 @@ export function DashboardPageFrame({
         {degradedSources.length > 0 && (
           <div
             role="alert"
-            className="rounded-md border-l-4 border-sabc-warning bg-sabc-gray-50 px-4 py-3 text-sm text-sabc-gray-700 dark:bg-sabc-gray-800 dark:text-sabc-gray-200"
+            className="rounded-md border border-sabc-accent/40 bg-sabc-accent-light px-4 py-3 text-sm text-sabc-gray-800 dark:text-sabc-gray-200"
           >
-            <span className="font-medium">Données partielles — </span>
+            <span className="font-semibold">Données partielles : </span>
             {degradedSources.join(', ')} n'ont pas pu être chargées. Les chiffres
             affichés sont incomplets: ne les interprétez pas comme des zéros réels.
           </div>
@@ -205,13 +205,13 @@ export function DashboardPageFrame({
   );
 }
 
-export function MetricCard({ label, value, caption, accentClassName }: MetricCardProps) {
+export function MetricCard({ label, value, caption }: MetricCardProps) {
   return (
-    <Card className={`border-l-4 ${accentClassName}`}>
-      <CardContent className="p-5">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sabc-gray-500 dark:text-sabc-gray-400">{label}</p>
-        <div className="mt-1.5 text-2xl font-bold text-sabc-gray-900 dark:text-white">{value}</div>
-        <p className="mt-1.5 text-xs text-sabc-gray-400 dark:text-sabc-gray-500">{caption}</p>
+    <Card>
+      <CardContent className="px-5 py-4">
+        <p className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{label}</p>
+        <div className="mt-1 font-[family-name:var(--font-display)] text-3xl font-semibold tabular-nums text-sabc-gray-900 dark:text-white">{value}</div>
+        <p className="mt-1 text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{caption}</p>
       </CardContent>
     </Card>
   );
@@ -219,7 +219,7 @@ export function MetricCard({ label, value, caption, accentClassName }: MetricCar
 
 export function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-sabc-gray-300 p-6 text-center text-sm text-sabc-gray-500 dark:border-sabc-gray-700 dark:text-sabc-gray-400">
+    <div className="rounded-md bg-sabc-gray-50 px-4 py-5 text-sm text-sabc-gray-500 dark:bg-sabc-gray-800 dark:text-sabc-gray-400">
       {message}
     </div>
   );
@@ -250,7 +250,7 @@ export function ActiveRulesCard({
         {rules.length === 0 ? (
           <EmptyState message={emptyMessage} />
         ) : (
-          <ul className="divide-y divide-sabc-gray-100 overflow-hidden rounded-xl border border-sabc-info/15 bg-white shadow-sm dark:divide-sabc-gray-800 dark:border-sabc-info/20 dark:bg-sabc-gray-900">
+          <ul className="divide-y divide-sabc-gray-100 overflow-hidden rounded-lg border border-sabc-info/15 bg-white shadow-sm dark:divide-sabc-gray-800 dark:border-sabc-info/20 dark:bg-sabc-gray-900">
             {rules.slice(0, maxItems).map((rule) => {
               const typeMeta = getEvaluationTypeMeta(rule.type_evaluation);
               const TypeIcon = typeMeta.Icon;
@@ -313,10 +313,9 @@ export function ActiveRulesCard({
 
 export function QuickActionsCard({ actions }: { actions: QuickAction[] }) {
   return (
-    <Card className="border-sabc-red-primary/20 bg-gradient-to-r from-sabc-red-primary/5 to-transparent dark:from-sabc-red-primary/10">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-sabc-red-primary dark:text-sabc-red-light">Actions rapides</CardTitle>
-        <CardDescription>Accès direct aux flux déjà en production</CardDescription>
+        <CardTitle>Actions rapides</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-3">
         {actions.map((action) => (
