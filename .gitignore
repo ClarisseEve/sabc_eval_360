@@ -9,6 +9,7 @@ apps/api/node_modules/
 .env
 .env.*
 !.env.example
+!.env.railway.example
 
 # OS
 .DS_Store

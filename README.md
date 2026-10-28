@@ -187,6 +187,7 @@ erreurs déjà commises.
 - La section « Production » ci-dessus liste les variables obligatoires.
 - [Checklist de bascule](docs/operations/nestjs-cutover-checklist.md)
 - [Déploiement multi-réplicas](docs/operations/scaled-deployment.md)
+- [Déploiement Railway + Vercel](docs/deployment-railway.md)
 - [Plan de performance](docs/operations/performance-rollout.md)
 
 Les cinq points P1 de la synthèse d'audit ont été traités : accès inter-régions
