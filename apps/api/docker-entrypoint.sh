@@ -71,6 +71,14 @@ if [ "${EMBEDDED_MYSQL:-false}" = "true" ]; then
 fi
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+  # Une migration Prisma en échec bloque toutes les suivantes (P3009), et le
+  # conteneur redémarre avant qu'une console soit disponible. Nommer ici la
+  # migration à marquer « rolled back » (uniquement si son échec n'a rien
+  # appliqué), redéployer, puis retirer la variable.
+  if [ -n "${PRISMA_ROLLED_BACK_MIGRATION:-}" ]; then
+    echo "[entrypoint] Migration $PRISMA_ROLLED_BACK_MIGRATION marquée rolled back..."
+    pnpm exec prisma migrate resolve --rolled-back "$PRISMA_ROLLED_BACK_MIGRATION" || true
+  fi
   echo "[entrypoint] Application des migrations MySQL + PostgreSQL..."
   pnpm db:migrate:all
 fi

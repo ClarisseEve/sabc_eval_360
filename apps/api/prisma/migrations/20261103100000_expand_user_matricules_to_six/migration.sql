@@ -1,16 +1,23 @@
+-- MariaDB refuse de modifier une colonne référencée par une clé étrangère
+-- (erreur 1833), même pour l'élargir: toutes les FK vers
+-- utilisateurs.matricule sont supprimées avant les MODIFY, puis recréées.
+ALTER TABLE `logs_administration`
+    DROP FOREIGN KEY `logs_administration_matricule_utilisateur_foreign`;
+
 ALTER TABLE `utilisateurs`
-    DROP FOREIGN KEY `utilisateurs_manager_matricule_foreign`,
+    DROP FOREIGN KEY `utilisateurs_manager_matricule_foreign`;
+
+ALTER TABLE `utilisateurs`
     MODIFY `matricule` VARCHAR(6) NOT NULL,
     MODIFY `manager_matricule` VARCHAR(6) NULL;
+
+ALTER TABLE `logs_administration`
+    MODIFY `matricule_utilisateur` VARCHAR(6) NULL;
 
 ALTER TABLE `utilisateurs`
     ADD CONSTRAINT `utilisateurs_manager_matricule_foreign`
     FOREIGN KEY (`manager_matricule`) REFERENCES `utilisateurs`(`matricule`)
     ON DELETE SET NULL ON UPDATE NO ACTION;
-
-ALTER TABLE `logs_administration`
-    DROP FOREIGN KEY `logs_administration_matricule_utilisateur_foreign`,
-    MODIFY `matricule_utilisateur` VARCHAR(6) NULL;
 
 ALTER TABLE `logs_administration`
     ADD CONSTRAINT `logs_administration_matricule_utilisateur_foreign`
