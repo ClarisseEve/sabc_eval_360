@@ -35,6 +35,8 @@ export interface Evaluation {
   notations_json: any;
   criteres_snapshot_json?: unknown;
   commentaire_global: string | null;
+  commentaire_points_forts?: string | null;
+  commentaire_axes_amelioration?: string | null;
   commentaire_validation?: string | null;
   note_globale: number | null;
   type_evaluation: string;
@@ -292,8 +294,29 @@ export class EvaluationsService {
       );
     }
 
-    const created = await this.pg.queryOne<Evaluation>(
-      `WITH periode_active AS (
+    const created = await this.pg.withTransaction(async (client) => {
+      await client.query(
+        'SELECT pg_advisory_xact_lock(hashtext($1))',
+        [JSON.stringify([evaluateurMatricule, evalueMatricule, idPeriode, typeEval])],
+      );
+      const existing = await client.query(
+        `SELECT id_evaluation
+         FROM evaluations
+         WHERE evaluateur_matricule = $1
+           AND evalue_matricule = $2
+           AND id_periode = $3
+           AND type_evaluation = $4
+         LIMIT 1`,
+        [evaluateurMatricule, evalueMatricule, idPeriode, typeEval],
+      );
+      if (existing.rows.length > 0) {
+        throw new BadRequestException(
+          "Une évaluation de ce type existe déjà pour cette personne pendant cette période.",
+        );
+      }
+
+      const result = await client.query(
+        `WITH periode_active AS (
          SELECT id_periode, code_periode
          FROM periodes_evaluation
          WHERE id_periode = $7
@@ -311,16 +334,18 @@ export class EvaluationsService {
               'brouillon', '[]', $5, p.code_periode, $6::jsonb, NOW(), NOW()
        FROM periode_active AS p
        RETURNING *`,
-      [
-        evaluateurMatricule,
-        evalueMatricule,
-        idPeriode,
-        idRegle ?? null,
-        typeEval,
-        criteriaSnapshot ? JSON.stringify(criteriaSnapshot) : null,
-        idPeriode,
-      ],
-    );
+        [
+          evaluateurMatricule,
+          evalueMatricule,
+          idPeriode,
+          idRegle ?? null,
+          typeEval,
+          criteriaSnapshot ? JSON.stringify(criteriaSnapshot) : null,
+          idPeriode,
+        ],
+      );
+      return result.rows[0] as Evaluation | undefined;
+    });
     if (!created) {
       throw new BadRequestException("Impossible de créer l'évaluation");
     }
@@ -344,7 +369,14 @@ export class EvaluationsService {
     return false;
   }
 
-  async updateNotes(id: string, actor: EvaluationActor, notes: any[], commentaire?: string): Promise<boolean> {
+  async updateNotes(
+    id: string,
+    actor: EvaluationActor,
+    notes: any[],
+    commentaire?: string,
+    commentairePointsForts?: string,
+    commentaireAxesAmelioration?: string,
+  ): Promise<boolean> {
     const eval_ = await this.loadEvaluation(id);
     this.assertEvaluationOwner(eval_, actor);
     if (!this.canEditEvaluation(eval_)) {
@@ -380,15 +412,35 @@ export class EvaluationsService {
         );
       }
     }
+    const hasSplitComments =
+      commentairePointsForts !== undefined ||
+      commentaireAxesAmelioration !== undefined;
+    const commentaireGlobal = hasSplitComments
+      ? [
+          commentairePointsForts?.trim()
+            ? `Points forts :\n${commentairePointsForts.trim()}`
+            : '',
+          commentaireAxesAmelioration?.trim()
+            ? `Compétences non acquises ou à améliorer :\n${commentaireAxesAmelioration.trim()}`
+            : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n') || null
+      : commentaire ?? null;
+
     await this.pg.execute(
       `UPDATE evaluations
        SET notations_json = $1, commentaire_global = $2,
-           criteres_snapshot_json = COALESCE(criteres_snapshot_json, $4::jsonb),
+           commentaire_points_forts = COALESCE($3, commentaire_points_forts),
+           commentaire_axes_amelioration = COALESCE($4, commentaire_axes_amelioration),
+           criteres_snapshot_json = COALESCE(criteres_snapshot_json, $6::jsonb),
            updated_at = NOW()
-       WHERE id_evaluation = $3`,
+       WHERE id_evaluation = $5`,
       [
         JSON.stringify(normalized.notes),
-        commentaire ?? null,
+        commentaireGlobal,
+        commentairePointsForts ?? null,
+        commentaireAxesAmelioration ?? null,
         id,
         criteriaSnapshot ? JSON.stringify(criteriaSnapshot) : null,
       ],

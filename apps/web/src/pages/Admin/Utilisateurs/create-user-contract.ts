@@ -8,6 +8,9 @@ export type CreateUserForm = {
     id_region: string;
     telephone: string;
     manager_matricule: string;
+    id_service: string;
+    id_district: string;
+    id_secteur: string;
 };
 
 export const initialCreateUserForm: CreateUserForm = {
@@ -20,6 +23,9 @@ export const initialCreateUserForm: CreateUserForm = {
     id_region: '',
     telephone: '',
     manager_matricule: '',
+    id_service: '',
+    id_district: '',
+    id_secteur: '',
 };
 
 const nullable = (value: string): string | null => {
@@ -38,22 +44,25 @@ export function buildCreateUserPayload(form: CreateUserForm) {
         id_region: form.id_region,
         telephone: nullable(form.telephone),
         manager_matricule: nullable(form.manager_matricule),
+        id_service: nullable(form.id_service),
+        id_district: nullable(form.id_district),
+        id_secteur: nullable(form.id_secteur),
     };
 }
 
 export function getCreateUserFormErrors(form: CreateUserForm) {
     return {
         matricule:
-            form.matricule.trim().length > 5
-                ? 'Le matricule doit contenir 5 caractères maximum.'
+            form.matricule.trim().length > 6
+                ? 'Le matricule doit contenir 6 caractères maximum.'
                 : '',
         password:
             form.password.length < 8
                 ? 'Le mot de passe doit contenir au moins 8 caractères.'
                 : '',
         manager_matricule:
-            form.manager_matricule.trim().length > 5
-                ? 'Le matricule du manager doit contenir 5 caractères maximum. Laissez ce champ vide si nécessaire.'
+            form.manager_matricule.trim().length > 6
+                ? 'Le matricule du manager doit contenir 6 caractères maximum. Laissez ce champ vide si nécessaire.'
                 : '',
     };
 }

@@ -14,7 +14,7 @@ const emptyStringToNull = ({ value }: { value: unknown }) =>
 
 export class CreateUserDto {
   @IsString()
-  @MaxLength(5)
+  @MaxLength(6)
   matricule: string;
 
   @IsString()
@@ -44,7 +44,7 @@ export class CreateUserDto {
   @Transform(emptyStringToNull)
   @IsOptional()
   @IsString()
-  @MaxLength(5)
+  @MaxLength(6)
   manager_matricule?: string | null;
 
   @Transform(emptyStringToNull)
@@ -115,7 +115,7 @@ export class UpdateUserDto {
   @Transform(emptyStringToNull)
   @IsOptional()
   @IsString()
-  @MaxLength(5)
+  @MaxLength(6)
   manager_matricule?: string | null;
 
   @Transform(emptyStringToNull)

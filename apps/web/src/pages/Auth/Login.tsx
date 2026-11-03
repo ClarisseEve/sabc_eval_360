@@ -49,12 +49,11 @@ const Login: React.FC = () => {
         <div className="dark:bg-sabc-gray-900 flex min-h-svh bg-white">
             <Head title="Connexion - SABC Évaluation 360°" />
 
-            {/* Panneau de marque: emblème à capsule tournante, nom du produit */}
+            {/* Panneau de marque de l'entreprise et nom du produit */}
             <aside className="border-sabc-gray-200 bg-sabc-gray-50 dark:border-sabc-gray-700 dark:bg-sabc-gray-800 relative hidden w-[46%] flex-col justify-between overflow-hidden border-r p-12 lg:flex">
-                <p className="sabc-display text-sabc-gray-500 text-sm font-normal">SABC · Boissons du Cameroun</p>
+                <BrandMark className="h-auto w-40" />
 
                 <div className="max-w-md">
-                    <BrandMark spin className="sabc-fade h-44 w-44" title="SABC, Boissons du Cameroun" />
                     <div className="sabc-rise mt-10" style={{ '--sabc-i': 2 } as React.CSSProperties}>
                         <p className="text-sabc-gray-500 flex items-center gap-2 text-sm font-medium">
                             <span className="bg-sabc-accent inline-block h-2 w-2 rounded-full" aria-hidden />

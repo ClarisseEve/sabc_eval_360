@@ -138,6 +138,9 @@ export class ExportService {
 
   private readBrandLogo(): Buffer {
     const candidates = [
+      resolve(process.cwd(), '../web/public/images/logos/boissons-du-cameroun.png'),
+      resolve(__dirname, '../../../../web/public/images/logos/boissons-du-cameroun.png'),
+      resolve(__dirname, '../../../web/public/images/logos/boissons-du-cameroun.png'),
       resolve(process.cwd(), 'assets/sabc-logo.png'),
       resolve(process.cwd(), '../web/public/images/logos/sabc-logo.png'),
       resolve(__dirname, '../../../../web/public/images/logos/sabc-logo.png'),

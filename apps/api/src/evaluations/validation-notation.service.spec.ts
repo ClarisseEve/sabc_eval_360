@@ -7,6 +7,7 @@ describe('ValidationNotationService - intégrité de soumission', () => {
     {
       id: 'c1',
       poids: 75,
+      niveau_requis: 4,
       commentaire_requis_si_note_lt: 3,
       echelle: { min: 1, max: 5 },
     },
@@ -56,7 +57,7 @@ describe('ValidationNotationService - intégrité de soumission', () => {
     expect(result.errors.join(' ')).toContain('Il manque 1 note');
   });
 
-  it('applique le seuil de commentaire défini par la règle, jamais celui de la note', () => {
+  it('exige un commentaire sous le niveau requis du critère', () => {
     const result = service.validatePourSoumission(
       [
         { critere_id: 'c1', note: 2, seuil: 1 } as any,
@@ -66,7 +67,33 @@ describe('ValidationNotationService - intégrité de soumission', () => {
     );
 
     expect(result.valid).toBe(false);
-    expect(result.errors.join(' ')).toContain('inférieure à 3');
+    expect(result.errors.join(' ')).toContain('inférieure au niveau requis de 4');
+  });
+
+  it('exige un commentaire pour justifier la note maximale de 5', () => {
+    const result = service.validatePourSoumission(
+      [
+        { critere_id: 'c1', note: 5 },
+        { critere_id: 'c2', note: 4 },
+      ],
+      criteres,
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('justifier une note maximale de 5');
+  });
+
+  it('accepte les notes au niveau requis et les notes maximales commentées', () => {
+    const result = service.validatePourSoumission(
+      [
+        { critere_id: 'c1', note: 4 },
+        { critere_id: 'c2', note: 5, commentaire: 'Résultats au niveau maximal' },
+      ],
+      criteres,
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it("applique l'échelle de chaque critère fournie par le serveur", () => {

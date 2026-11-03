@@ -10,6 +10,7 @@ type SubmissionCriterion = {
   id?: string | number | null;
   critere_id?: string | number | null;
   poids?: number | null;
+  niveau_requis?: number | null;
   commentaire_requis_si_note_lt?: number | null;
   echelle?: {
     min?: number | null;
@@ -27,8 +28,10 @@ export class ValidationNotationService {
     note: number,
     commentaire: string | null | undefined,
     seuil = 3,
+    niveauRequis = 3,
   ): { valid: boolean; error?: string } {
-    if (note < seuil) {
+    const seuilEffectif = Math.max(seuil, niveauRequis);
+    if (note === 5 || note < seuilEffectif) {
       const isEmpty =
         commentaire === null ||
         commentaire === undefined ||
@@ -36,7 +39,9 @@ export class ValidationNotationService {
       if (isEmpty) {
         return {
           valid: false,
-          error: `Un commentaire est obligatoire pour une note inférieure à ${seuil}.`,
+          error: note === 5
+            ? 'Un commentaire est obligatoire pour justifier une note maximale de 5.'
+            : `Un commentaire est obligatoire pour une note inférieure au niveau requis de ${seuilEffectif}.`,
         };
       }
     }
@@ -87,6 +92,7 @@ export class ValidationNotationService {
       critere_id?: string;
       commentaire?: string | null;
       seuil?: number;
+      niveau_requis?: number;
       [key: string]: any;
     }>,
     seuil = 3,
@@ -98,6 +104,7 @@ export class ValidationNotationService {
         n.note,
         n.commentaire,
         effectiveSeuil,
+        n.niveau_requis ?? 3,
       );
       if (!result.valid) {
         const label =
@@ -186,20 +193,20 @@ export class ValidationNotationService {
         );
       }
 
-      const threshold = critere.commentaire_requis_si_note_lt;
-      if (
-        typeof threshold === 'number' &&
-        Number.isFinite(threshold) &&
-        note.note < threshold
-      ) {
-        const hasComment =
-          typeof note.commentaire === 'string' &&
-          note.commentaire.trim().length > 0;
-        if (!hasComment) {
-          errors.push(
-            `critère « ${id} » : Un commentaire est obligatoire pour une note inférieure à ${threshold}.`,
-          );
-        }
+      const requiredLevel = Number.isFinite(critere.niveau_requis)
+        ? Number(critere.niveau_requis)
+        : 3;
+      const configuredThreshold = Number.isFinite(critere.commentaire_requis_si_note_lt)
+        ? Number(critere.commentaire_requis_si_note_lt)
+        : 0;
+      const commentResult = this.validateCommentaireObligatoire(
+        note.note,
+        note.commentaire,
+        configuredThreshold,
+        requiredLevel,
+      );
+      if (!commentResult.valid) {
+        errors.push(`critère « ${id} » : ${commentResult.error}`);
       }
     });
 

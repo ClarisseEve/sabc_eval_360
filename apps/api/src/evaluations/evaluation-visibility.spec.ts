@@ -35,6 +35,8 @@ describe('evaluation visibility policy', () => {
       note_globale: 4.5,
       notations_json: [{ note: 4, commentaire: 'privé' }],
       commentaire_global: 'privé',
+      commentaire_points_forts: 'privé',
+      commentaire_axes_amelioration: 'privé',
       commentaire_validation: 'privé',
       motif_rejet: 'privé',
       __rule_envelope: {
@@ -51,6 +53,8 @@ describe('evaluation visibility policy', () => {
         note_globale: 4.5,
         notations_json: null,
         commentaire_global: null,
+        commentaire_points_forts: null,
+        commentaire_axes_amelioration: null,
         commentaire_validation: null,
         motif_rejet: null,
       }),

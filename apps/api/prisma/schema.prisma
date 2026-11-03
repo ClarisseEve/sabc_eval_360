@@ -57,7 +57,7 @@ model Role {
 }
 
 model Utilisateur {
-  matricule                  String              @id @db.VarChar(5)
+  matricule                  String              @id @db.VarChar(6)
   nom                        String              @db.VarChar(100)
   prenom                     String              @db.VarChar(100)
   email                      String              @unique(map: "utilisateurs_email_unique") @db.VarChar(100)
@@ -68,7 +68,7 @@ model Utilisateur {
   password                   String              @db.VarChar(255)
   password_change_required   Boolean             @default(false)
   role                       String              @db.VarChar(50)
-  manager_matricule          String?             @db.VarChar(5)
+  manager_matricule          String?             @db.VarChar(6)
   niveau_hierarchique        Int                 @default(0)
   id_region                  String?             @db.VarChar(5)
   id_service                 String?             @db.VarChar(10)
@@ -168,7 +168,7 @@ model Secteur {
 
 model LogAdministration {
   id_log                String       @id @db.VarChar(5)
-  matricule_utilisateur String?      @db.VarChar(5)
+  matricule_utilisateur String?      @db.VarChar(6)
   action                String       @db.VarChar(100)
   entite                String       @db.VarChar(50)
   id_entite             String?      @db.VarChar(20)
@@ -215,7 +215,7 @@ model migrations {
 
 model notifications_utilisateurs {
   id_notification        String    @id @db.VarChar(36)
-  destinataire_matricule String    @db.VarChar(5)
+  destinataire_matricule String    @db.VarChar(6)
   titre                  String    @db.VarChar(150)
   message                String    @db.Text
   type                   String    @db.VarChar(30)
@@ -223,7 +223,7 @@ model notifications_utilisateurs {
   donnees_json           Json?
   id_evaluation          String?   @db.VarChar(36)
   id_remplacement        BigInt?
-  expediteur_matricule   String?   @db.VarChar(5)
+  expediteur_matricule   String?   @db.VarChar(6)
   est_lu                 Boolean   @default(false)
   date_creation          DateTime  @default(now()) @db.DateTime(0)
   date_lecture           DateTime? @db.DateTime(0)
@@ -249,8 +249,8 @@ model personal_access_tokens {
 
 model replacement_temporaire {
   id_remplacement        BigInt    @id @default(autoincrement())
-  titulaire_matricule    String    @db.VarChar(5)
-  remplacant_matricule   String    @db.VarChar(5)
+  titulaire_matricule    String    @db.VarChar(6)
+  remplacant_matricule   String    @db.VarChar(6)
   role_remplace          String    @db.VarChar(50)
   region_remplacement    String    @db.VarChar(100)
   service_remplacement   String?   @db.VarChar(100)
@@ -259,7 +259,7 @@ model replacement_temporaire {
   date_fin_effective     DateTime? @db.Date
   duree_prevue_jours     Int
   motif                  String    @db.VarChar(255)
-  cree_par               String    @db.VarChar(5)
+  cree_par               String    @db.VarChar(6)
   est_actif              Boolean   @default(true)
   notifications_envoyees Boolean   @default(false)
   equipe_notifiee        Boolean   @default(false)
@@ -272,7 +272,7 @@ model replacement_temporaire {
 
 model sessions {
   id            String  @id @db.VarChar(255)
-  user_id       String? @db.VarChar(5)
+  user_id       String? @db.VarChar(6)
   ip_address    String? @db.VarChar(45)
   user_agent    String? @db.Text
   payload       String  @db.LongText

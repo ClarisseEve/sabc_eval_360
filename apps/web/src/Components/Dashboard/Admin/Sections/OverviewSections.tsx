@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
@@ -28,7 +29,6 @@ import { analyticsApi } from '@/Services/api';
 import { formatPercent, formatScore } from '@/utils/helpers';
 import {
   CHART_COLORS,
-  CHART_SERIES,
   CHART_TICK,
   SCORE_DOMAIN,
   SCORE_TICKS,
@@ -36,7 +36,7 @@ import {
   frenchTick,
 } from '@/Components/UI/Charts/chartTheme';
 
-const STATUS_COLORS = CHART_SERIES;
+const STATUS_COLORS = ['#48BB78', '#D69E2E', '#FF9800', '#3182CE'];
 
 /** Nombre décimal au format français (« 0,25 »). */
 function formatDecimal(value: number, digits = 2) {
@@ -154,7 +154,7 @@ export function AdminOverviewMetricsSection({
       title: 'Évaluations',
       count: totalEvaluations,
       format: (v) => Math.round(v).toLocaleString('fr-FR'),
-      caption: 'Total sur la période',
+      caption: 'Volume consolidé du cycle',
     },
     {
       title: 'Collaborateurs évalués',
@@ -194,7 +194,7 @@ export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[]
     <Card className="xl:col-span-2">
       <CardHeader>
         <CardTitle>Tendance de performance</CardTitle>
-        <CardDescription>Évolution du score moyen et du nombre d'évaluations par période.</CardDescription>
+        <CardDescription>Évolution du score moyen et du volume sur les périodes remontées par analytics</CardDescription>
       </CardHeader>
       <CardContent>
         {trendData.length === 0 ? (
@@ -202,16 +202,16 @@ export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[]
         ) : (
           <div className="space-y-5">
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-lg border border-sabc-gray-200 px-4 py-3 dark:border-sabc-gray-700">
-                <div className="text-sm text-sabc-gray-500">Dernière période</div>
+              <div className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
+                <div className="text-xs font-semibold text-sabc-gray-500">Période active</div>
                 <div className="mt-1 text-lg font-semibold text-sabc-gray-900">{latestEntry?.period ?? 'n.d.'}</div>
               </div>
-              <div className="rounded-lg border border-sabc-gray-200 px-4 py-3 dark:border-sabc-gray-700">
-                <div className="text-sm text-sabc-gray-500">Dernier score</div>
+              <div className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
+                <div className="text-xs font-semibold text-sabc-gray-500">Dernier score</div>
                 <div className="mt-1 text-lg font-semibold tabular-nums text-sabc-gray-900">{formatScore(latestEntry?.score)}</div>
               </div>
-              <div className="rounded-lg border border-sabc-gray-200 px-4 py-3 dark:border-sabc-gray-700">
-                <div className="text-sm text-sabc-gray-500">Variation sur la période précédente</div>
+              <div className="rounded-lg border border-sabc-gray-200/80 bg-sabc-gray-50/70 px-4 py-3 dark:border-sabc-gray-700 dark:bg-sabc-gray-200/30">
+                <div className="text-xs font-semibold text-sabc-gray-500">Variation</div>
                 <div className="mt-1 text-lg font-semibold tabular-nums text-sabc-gray-900">
                   {variation === null ? 'n.d.' : `${variation > 0 ? '+' : ''}${formatDecimal(variation)}`}
                 </div>
@@ -221,18 +221,25 @@ export function PerformanceTrendSection({ trendData }: { trendData: TrendEntry[]
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={trendData} margin={{ top: 22, right: 8, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="adminTrendArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.24} />
+                      <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
                   <XAxis dataKey="period" tickLine={false} axisLine={false} tick={CHART_TICK} />
                   <YAxis yAxisId="left" domain={SCORE_DOMAIN} ticks={SCORE_TICKS} tickFormatter={frenchTick} tickLine={false} axisLine={false} width={34} tick={CHART_TICK} />
-                  <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} width={40} allowDecimals={false} tickFormatter={frenchTick} tick={CHART_TICK} />
+                  <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} width={34} allowDecimals={false} tickFormatter={frenchTick} tick={CHART_TICK} />
                   <Tooltip content={<ChartTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <ReferenceLine yAxisId="left" y={3.5} stroke={CHART_COLORS.secondary} strokeDasharray="4 4" />
-                  <Bar yAxisId="right" dataKey="count" fill={CHART_COLORS.tertiary} name="Évaluations" radius={[4, 4, 0, 0]} barSize={20}>
-                    <LabelList dataKey="count" position="top" fill={CHART_COLORS.tick} fontSize={10} formatter={(value: number) => formatChartNumber(value, 0)} />
+                  <ReferenceLine yAxisId="left" y={3.5} stroke="#94A3B8" strokeDasharray="4 4" />
+                  <Bar yAxisId="right" dataKey="count" fill="#CBD5E1" name="Volume" radius={[10, 10, 0, 0]} barSize={20}>
+                    <LabelList dataKey="count" position="top" fill="#64748B" fontSize={10} formatter={(value: number) => formatChartNumber(value, 0)} />
                   </Bar>
-                  <Line yAxisId="left" type="monotone" dataKey="score" stroke={CHART_COLORS.primary} strokeWidth={2} dot={{ r: 3, fill: CHART_COLORS.primary }} activeDot={{ r: 5 }} name="Score moyen">
-                    <LabelList dataKey="score" position="top" formatter={(value: number) => formatDecimal(value)} fill={CHART_COLORS.emphasis} fontSize={10} />
+                  <Area yAxisId="left" type="monotone" dataKey="score" fill="url(#adminTrendArea)" stroke="transparent" name="Tendance" />
+                  <Line yAxisId="left" type="monotone" dataKey="score" stroke={CHART_COLORS.primary} strokeWidth={3} dot={{ r: 4, fill: CHART_COLORS.primary }} activeDot={{ r: 6 }} name="Score moyen">
+                    <LabelList dataKey="score" position="top" formatter={(value: number) => formatDecimal(value)} fill="#C62828" fontSize={10} />
                   </Line>
                 </ComposedChart>
               </ResponsiveContainer>
@@ -251,7 +258,7 @@ export function StatusDistributionSection({ statusData }: { statusData: StatusEn
     <Card>
       <CardHeader>
         <CardTitle>Répartition des statuts</CardTitle>
-        <CardDescription>Statut actuel des évaluations.</CardDescription>
+        <CardDescription>Statut courant des évaluations administrées</CardDescription>
       </CardHeader>
       <CardContent>
         {statusData.length === 0 ? (
@@ -263,7 +270,7 @@ export function StatusDistributionSection({ statusData }: { statusData: StatusEn
                 <PieChart>
                   <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={58} outerRadius={84} paddingAngle={4}>
                     {statusData.map((status, index) => (
-                      <Cell key={status.name} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
+                      <Cell key={status.name} fill={status.color || STATUS_COLORS[index % STATUS_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip content={<ChartTooltip />} />
@@ -293,7 +300,7 @@ export function StatusDistributionSection({ statusData }: { statusData: StatusEn
                       className="h-full rounded-sm"
                       style={{
                         width: `${total > 0 ? (status.value / total) * 100 : 0}%`,
-                        backgroundColor: STATUS_COLORS[statusData.indexOf(status) % STATUS_COLORS.length],
+                        backgroundColor: status.color || STATUS_COLORS[statusData.indexOf(status) % STATUS_COLORS.length],
                       }}
                     />
                   </div>

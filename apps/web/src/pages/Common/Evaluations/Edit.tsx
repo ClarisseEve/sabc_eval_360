@@ -58,10 +58,16 @@ const EditEvaluation: React.FC = () => {
   const context = useMemo(() => buildEvaluationContext(evaluation), [evaluation]);
   const criteria = context.criteria;
   const evaluationId = evaluation?.id_evaluation ?? evaluation?.id;
+  const legacyComment = evaluation?.commentaire_global ?? evaluation?.commentaire_general ?? '';
+  const savedStrengths =
+    evaluation?.commentaire_points_forts ??
+    (evaluation?.commentaire_axes_amelioration == null ? legacyComment : '');
+  const savedImprovements = evaluation?.commentaire_axes_amelioration ?? '';
   const [notes, setNotes] = useState<EditableEvaluationNote[]>(() =>
     buildEditableEvaluationNotes(criteria),
   );
-  const [commentaireGeneral, setCommentaireGeneral] = useState(evaluation?.commentaire_general ?? '');
+  const [commentairePointsForts, setCommentairePointsForts] = useState(savedStrengths);
+  const [commentaireAxesAmelioration, setCommentaireAxesAmelioration] = useState(savedImprovements);
   const [lastAction, setLastAction] = useState<'draft' | 'submit' | null>(null);
   const [pendingAction, setPendingAction] = useState<'draft' | 'submit' | null>(null);
   const [savedLocallyOnly, setSavedLocallyOnly] = useState(false);
@@ -71,18 +77,19 @@ const EditEvaluation: React.FC = () => {
   const { saveDraft, getDraft, deleteDraft, syncAll, isOnline, pendingCount, isSyncing } = useOfflineSync();
   const draftRestoredRef = useRef(false);
   const onlineSyncAttemptedRef = useRef(false);
-  const latestDraftRef = useRef({ notes, commentaireGeneral });
+  const latestDraftRef = useRef({ notes, commentairePointsForts, commentaireAxesAmelioration });
 
   React.useEffect(() => {
-    latestDraftRef.current = { notes, commentaireGeneral };
-  }, [notes, commentaireGeneral]);
+    latestDraftRef.current = { notes, commentairePointsForts, commentaireAxesAmelioration };
+  }, [notes, commentairePointsForts, commentaireAxesAmelioration]);
 
   React.useEffect(() => {
     setNotes(buildEditableEvaluationNotes(criteria));
-    setCommentaireGeneral(evaluation?.commentaire_general ?? '');
+    setCommentairePointsForts(savedStrengths);
+    setCommentaireAxesAmelioration(savedImprovements);
     draftRestoredRef.current = false;
     setDraftRestorationComplete(false);
-  }, [criteria, evaluation?.commentaire_general]);
+  }, [criteria, savedStrengths, savedImprovements]);
 
   // Restore local draft once after evaluation data loads
   React.useEffect(() => {
@@ -91,7 +98,10 @@ const EditEvaluation: React.FC = () => {
     getDraft(id).then((draft) => {
       if (!draft || draft.saved_at < new Date(evaluation.updated_at ?? 0).getTime()) return;
       setNotes(buildEditableEvaluationNotes(criteria, draft.notes));
-      setCommentaireGeneral(draft.commentaire_general ?? '');
+      setCommentairePointsForts(
+        draft.commentaire_points_forts ?? draft.commentaire_general ?? savedStrengths,
+      );
+      setCommentaireAxesAmelioration(draft.commentaire_axes_amelioration ?? '');
     }).catch(() => {}).finally(() => setDraftRestorationComplete(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evaluation]);
@@ -120,7 +130,8 @@ const EditEvaluation: React.FC = () => {
       saveDraft(
         String(evaluationId),
         currentDraft.notes,
-        currentDraft.commentaireGeneral,
+        currentDraft.commentairePointsForts,
+        currentDraft.commentaireAxesAmelioration,
       ).catch(() => {});
     }, 30_000);
     return () => clearInterval(interval);
@@ -136,7 +147,8 @@ const EditEvaluation: React.FC = () => {
     mutationFn: async (submit: boolean) => {
       await evaluationsApi.update(String(evaluationId), {
         notes: serializeRatedEvaluationNotes(notes),
-        commentaire_general: commentaireGeneral,
+        commentaire_points_forts: commentairePointsForts,
+        commentaire_axes_amelioration: commentaireAxesAmelioration,
       });
       if (submit) {
         const response = await evaluationsApi.submit(String(evaluationId));
@@ -190,7 +202,12 @@ const EditEvaluation: React.FC = () => {
     setLocalSaveError(null);
 
     try {
-      await saveDraft(String(evaluationId), notes, commentaireGeneral);
+      await saveDraft(
+        String(evaluationId),
+        notes,
+        commentairePointsForts,
+        commentaireAxesAmelioration,
+      );
     } catch (error) {
       if (!isOnline) {
         setPendingAction(null);
@@ -246,7 +263,7 @@ const EditEvaluation: React.FC = () => {
               Éditer une évaluation
             </h1>
             <p className="mt-1 text-sm text-sabc-gray-600 dark:text-sabc-gray-300">
-              Notez chaque critère, justifiez les scores faibles, puis soumettez le formulaire complet.
+              Notez chaque critère et justifiez les scores inférieurs au niveau requis ou égaux à 5.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -262,46 +279,42 @@ const EditEvaluation: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-[320px_1fr]">
+        <div className="space-y-6">
           <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
             <CardHeader>
               <CardTitle className="text-base">Informations clés</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 text-sm text-sabc-gray-600 dark:text-sabc-gray-300">
-              <div>
-                <div className="text-xs uppercase text-sabc-gray-400">Template</div>
-                <div className="font-semibold text-sabc-gray-900 dark:text-white">
-                  {context.summary.name || 'Non défini'}
-                </div>
-                {context.rule.type_evaluation && (
-                  <Badge variant="secondary" className="mt-1 text-[10px] uppercase">
-                    {formatEvaluationType(context.rule.type_evaluation)}
-                  </Badge>
-                )}
-              </div>
-
-              <div className="h-px w-full bg-sabc-gray-200 dark:bg-sabc-gray-700" />
-
-              <div className="flex items-center gap-3">
-                <Avatar
-                  size="sm"
-                  name={formatDisplayName(evaluation?.evalue ?? {})}
-                  src={evaluation?.evalue?.avatar ?? undefined}
-                />
+            <CardContent className="space-y-5 text-sm text-sabc-gray-600 dark:text-sabc-gray-300">
+              <div className="grid gap-5 md:grid-cols-2">
                 <div>
-                  <div className="text-xs uppercase text-sabc-gray-400">Évalué</div>
-                  <div className="font-medium text-sabc-gray-900 dark:text-white">{formatDisplayName(evaluation?.evalue ?? {})}</div>
-                  <div className="text-xs text-sabc-gray-500">{formatRole(evaluation?.evalue ?? {})}</div>
+                  <div className="text-xs uppercase text-sabc-gray-400">Template</div>
+                  <div className="font-semibold text-sabc-gray-900 dark:text-white">
+                    {context.summary.name || 'Non défini'}
+                  </div>
+                  {context.rule.type_evaluation && (
+                    <Badge variant="secondary" className="mt-1 text-[10px] uppercase">
+                      {formatEvaluationType(context.rule.type_evaluation)}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 border-t border-sabc-gray-200 pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0 dark:border-sabc-gray-700">
+                  <Avatar
+                    size="sm"
+                    name={formatDisplayName(evaluation?.evalue ?? {})}
+                    src={evaluation?.evalue?.avatar ?? undefined}
+                  />
+                  <div>
+                    <div className="text-xs uppercase text-sabc-gray-400">Évalué</div>
+                    <div className="font-medium text-sabc-gray-900 dark:text-white">{formatDisplayName(evaluation?.evalue ?? {})}</div>
+                    <div className="text-xs text-sabc-gray-500">{formatRole(evaluation?.evalue ?? {})}</div>
+                  </div>
                 </div>
               </div>
 
-              <div className="h-px w-full bg-sabc-gray-200 dark:bg-sabc-gray-700" />
-
-              <div>
+              <div className="border-t border-sabc-gray-200 pt-4 dark:border-sabc-gray-700">
                 <div className="text-xs uppercase text-sabc-gray-400">Progression</div>
                 <div className="mt-2 flex items-baseline gap-2 text-2xl font-semibold text-sabc-gray-900 dark:text-white">
-                  {submissionState.completion}%
-                  <span className="text-xs text-sabc-gray-500">complété</span>
+                  {submissionState.completion}% <span className="text-xs text-sabc-gray-500">complété</span>
                 </div>
                 <div className="mt-1 text-xs text-sabc-gray-500">
                   {submissionState.ratedCount} critère(s) noté(s) sur {submissionState.totalCount}
@@ -312,43 +325,38 @@ const EditEvaluation: React.FC = () => {
                     style={{ width: `${submissionState.completion}%` }}
                   />
                 </div>
+
+                {!submissionState.canSubmit && (
+                  <Alert className="mt-4 border-sabc-warning bg-sabc-warning/10 text-xs text-sabc-warning">
+                    <AlertTitle>Avant de soumettre</AlertTitle>
+                    <AlertDescription className="space-y-1">
+                      {submissionState.missingRatings > 0 && (
+                        <div>Notez encore {submissionState.missingRatings} critère(s).</div>
+                      )}
+                      {requiresJustification && (
+                        <div>
+                          Ajoutez {submissionState.missingComments} commentaire(s) requis sous le niveau attendu ou pour une note maximale de 5.
+                        </div>
+                      )}
+                      {submissionState.invalidCriteria > 0 && (
+                        <div>Le cadre contient un critère invalide. Contactez l’administrateur.</div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {!isOnline && (
+                  <Alert className="mt-4 border-sabc-gray-300 bg-sabc-gray-50 text-xs text-sabc-gray-600">
+                    <AlertTitle>Soumission indisponible hors ligne</AlertTitle>
+                    <AlertDescription>
+                      Enregistrez le brouillon. Vous pourrez le soumettre après le retour de la connexion.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
-
-              {!submissionState.canSubmit && (
-                <Alert className="border-sabc-warning bg-sabc-warning/10 text-xs text-sabc-warning">
-                  <AlertTitle>Avant de soumettre</AlertTitle>
-                  <AlertDescription className="space-y-1">
-                    {submissionState.missingRatings > 0 && (
-                      <div>
-                        Notez encore {submissionState.missingRatings} critère(s).
-                      </div>
-                    )}
-                    {requiresJustification && (
-                      <div>
-                        Ajoutez {submissionState.missingComments} commentaire(s) obligatoire(s) sous le seuil défini.
-                      </div>
-                    )}
-                    {submissionState.invalidCriteria > 0 && (
-                      <div>
-                        Le cadre contient un critère invalide. Contactez l’administrateur.
-                      </div>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {!isOnline && (
-                <Alert className="border-sabc-gray-300 bg-sabc-gray-50 text-xs text-sabc-gray-600">
-                  <AlertTitle>Soumission indisponible hors ligne</AlertTitle>
-                  <AlertDescription>
-                    Enregistrez le brouillon. Vous pourrez le soumettre après le retour de la connexion.
-                  </AlertDescription>
-                </Alert>
-              )}
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
             <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -454,20 +462,27 @@ const EditEvaluation: React.FC = () => {
                         );
                       })}
                     </div>
-                    {(critere.commentaireRequisSiNoteLt ?? 0) > 0 && (
+                    {(critere.commentaireRequisSiNoteLt ?? 0) > 0 || critere.niveauRequis > 0 ? (
                       <div className="mt-2 flex items-center gap-1.5 text-xs text-sabc-gray-500">
                         <Info className="h-3.5 w-3.5 shrink-0" />
-                        <span>Un commentaire sera requis si votre note est inférieure à {formatScore(critere.commentaireRequisSiNoteLt)}</span>
+                        <span>
+                          Un commentaire est obligatoire sous {formatScore(Math.max(critere.niveauRequis, critere.commentaireRequisSiNoteLt ?? 0))}/5 ou pour justifier une note de 5/5.
+                        </span>
                       </div>
-                    )}
+                    ) : null}
 
                     <div className="mt-4 space-y-2">
                       <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sabc-gray-400">
                         <MessageSquare className="h-3.5 w-3.5" />
                         Commentaire
-                        {(notes[index]?.note != null && notes[index].note < (critere.commentaireRequisSiNoteLt ?? 3)) && (
+                        {isCriterionCommentRequired({
+                          note: notes[index]?.note,
+                          commentaire: notes[index]?.commentaire,
+                          commentaireRequisSiNoteLt: critere.commentaireRequisSiNoteLt,
+                          niveauRequis: critere.niveauRequis,
+                        }) && (
                           <span className="rounded bg-sabc-red-light px-1.5 py-0.5 text-[10px] text-sabc-red-primary">
-                            Obligatoire sous {critere.commentaireRequisSiNoteLt ?? 3}
+                            {notes[index]?.note === 5 ? 'À justifier' : 'Obligatoire'}
                           </span>
                         )}
                       </div>
@@ -476,12 +491,19 @@ const EditEvaluation: React.FC = () => {
                         value={notes[index]?.commentaire ?? ''}
                         onChange={(event) => handleCommentChange(index, event.target.value)}
                         placeholder="Partagez vos observations ou un plan d'action."
+                        aria-required={isCriterionCommentRequired({
+                          note: notes[index]?.note,
+                          commentaire: notes[index]?.commentaire,
+                          commentaireRequisSiNoteLt: critere.commentaireRequisSiNoteLt,
+                          niveauRequis: critere.niveauRequis,
+                        })}
                         className={cn(
                           'text-sm',
                           isCriterionCommentRequired({
                             note: notes[index]?.note,
                             commentaire: notes[index]?.commentaire,
                             commentaireRequisSiNoteLt: critere.commentaireRequisSiNoteLt,
+                            niveauRequis: critere.niveauRequis,
                           })
                             ? 'border-sabc-red-primary'
                             : ''
@@ -492,7 +514,6 @@ const EditEvaluation: React.FC = () => {
                 ))}
               </CardContent>
             </Card>
-          </div>
         </div>
 
         <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
@@ -503,13 +524,28 @@ const EditEvaluation: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Textarea
-              rows={4}
-              value={commentaireGeneral ?? ''}
-              onChange={(event) => setCommentaireGeneral(event.target.value)}
-              placeholder="Faites une synthèse des points forts et des axes d'amélioration."
-              className="text-sm"
-            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm font-medium text-sabc-gray-700 dark:text-sabc-gray-200">
+                Points forts
+                <Textarea
+                  rows={5}
+                  value={commentairePointsForts}
+                  onChange={(event) => setCommentairePointsForts(event.target.value)}
+                  placeholder="Décrivez les compétences acquises et les réussites observées."
+                  className="text-sm font-normal"
+                />
+              </label>
+              <label className="space-y-2 text-sm font-medium text-sabc-gray-700 dark:text-sabc-gray-200">
+                Compétences non acquises ou à améliorer
+                <Textarea
+                  rows={5}
+                  value={commentaireAxesAmelioration}
+                  onChange={(event) => setCommentaireAxesAmelioration(event.target.value)}
+                  placeholder="Précisez les compétences à développer et les pistes d'amélioration."
+                  className="text-sm font-normal"
+                />
+              </label>
+            </div>
             <Alert className="border-sabc-gray-200 bg-sabc-gray-50 text-xs text-sabc-gray-600 dark:border-sabc-gray-700 dark:bg-sabc-gray-800 dark:text-sabc-gray-300">
               <AlertTitle>Conseil</AlertTitle>
               <AlertDescription>

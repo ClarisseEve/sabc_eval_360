@@ -11,6 +11,9 @@ export type UpdateUserForm = {
     id_role: string;
     id_region: string;
     manager_matricule: string;
+    id_service: string;
+    id_district: string;
+    id_secteur: string;
     statut: string;
 };
 
@@ -27,6 +30,9 @@ export const initialUpdateUserForm: UpdateUserForm = {
     id_role: '',
     id_region: '',
     manager_matricule: '',
+    id_service: '',
+    id_district: '',
+    id_secteur: '',
     statut: '',
 };
 
@@ -51,6 +57,9 @@ export function buildUpdateUserForm(user: EditableUser, roles: RoleReference[]):
         id_role: user.id_role ?? matchingRole?.id_role ?? '',
         id_region: user.id_region ?? '',
         manager_matricule: user.manager_matricule ?? '',
+        id_service: user.id_service ?? '',
+        id_district: user.id_district ?? '',
+        id_secteur: user.id_secteur ?? '',
         statut: user.statut ?? '',
     };
 }
@@ -66,6 +75,9 @@ export function buildUpdateUserPayload(form: UpdateUserForm) {
         id_role: form.id_role.trim(),
         id_region: form.id_region.trim(),
         manager_matricule: nullable(form.manager_matricule),
+        id_service: nullable(form.id_service),
+        id_district: nullable(form.id_district),
+        id_secteur: nullable(form.id_secteur),
         ...(statut ? { statut } : {}),
     };
 }

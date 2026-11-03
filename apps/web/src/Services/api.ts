@@ -227,6 +227,7 @@ const api = {
   put: <T = any>(path: string, body?: any, config?: ApiRequestConfig) => request<T>('PUT', path, body, config),
   patch: <T = any>(path: string, body?: any, config?: ApiRequestConfig) => request<T>('PATCH', path, body, config),
   delete: <T = any>(path: string, config?: ApiRequestConfig) => request<T>('DELETE', path, undefined, config),
+  download: (path: string, config?: ApiRequestConfig) => requestBlob(path, config),
 };
 
 export default api;
@@ -259,7 +260,12 @@ export const evaluationsApi = {
   create: (data: { evaluateur_matricule: string; evalue_matricule: string; id_periode: string; id_regle: string }) =>
     api.post('/evaluations', data),
   get: (id: string) => api.get(`/evaluations/${id}`),
-  update: (id: string, data: { notes: any; commentaire_general?: string }) =>
+  update: (id: string, data: {
+    notes: any;
+    commentaire_general?: string;
+    commentaire_points_forts?: string;
+    commentaire_axes_amelioration?: string;
+  }) =>
     api.put(`/evaluations/${id}`, data),
   submit: (id: string) => api.post(`/evaluations/${id}/submit`),
   validate: (id: string, est_validee: boolean, commentaire?: string) =>
@@ -298,6 +304,9 @@ export const ratingSheetsApi = {
 export const periodesApi = {
   list: () => api.get('/periodes'),
   get: (id: string) => api.get(`/periodes/${id}`),
+  cadence: (year: number) => api.get(`/periodes/cadence/${year}`),
+  configureCadence: (year: number, cadence: 'trimestrielle' | 'semestrielle') =>
+    api.put(`/periodes/cadence/${year}`, { cadence }),
   create: (data: any) => api.post('/periodes', data),
   update: (id: string, data: any) => api.put(`/periodes/${id}`, data),
   delete: (id: string) => api.delete(`/periodes/${id}`),
@@ -369,9 +378,50 @@ export type AdminUserUpdatePayload = {
   statut?: 'Actif' | 'Inactif' | 'Suspendu';
 };
 
+export type ImportIssue = { row: number; message: string };
+export type ExcelImportPreview = {
+  total: number;
+  valid_count: number;
+  skipped_count: number;
+  errors: ImportIssue[];
+};
+export type ExcelImportResult = {
+  imported_count: number;
+  skipped_count: number;
+  errors: ImportIssue[];
+};
+
 export const adminApi = {
+  imports: {
+    usersTemplate: () => api.download('/admin/imports/users/template'),
+    templatesTemplate: () => api.download('/admin/imports/templates/template'),
+    previewUsers: (file: File, initialPassword: string) => {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('initial_password', initialPassword);
+      return api.post<ExcelImportPreview & { users: Array<{ row: number; matricule: string; nom: string; prenom: string; email: string; manager_matricule: string | null }> }>('/admin/imports/users/preview', body);
+    },
+    importUsers: (file: File, initialPassword: string) => {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('initial_password', initialPassword);
+      return api.post<ExcelImportResult>('/admin/imports/users', body);
+    },
+    previewTemplates: (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return api.post<ExcelImportPreview & { templates: Array<{ key: string; row: number; titre: string; categorie: string; competences: number }> }>('/admin/imports/templates/preview', body);
+    },
+    importTemplates: (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      return api.post<ExcelImportResult>('/admin/imports/templates', body);
+    },
+  },
   users: {
     list: (params?: any) => api.get('/admin/utilisateurs', { params }),
+    eligibleManagers: (idRole: string, idRegion: string) =>
+      api.get('/admin/utilisateurs/managers-eligibles', { params: { id_role: idRole, id_region: idRegion } }),
     get: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}`),
     historique: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}/historique`),
     chaine: (matricule: string) => api.get(`/admin/utilisateurs/${matricule}/chaine`),

@@ -10,6 +10,8 @@ export interface EvaluationDraft {
   owner_matricule: string;
   notes: Array<{ note: number | null; commentaire?: string; [key: string]: unknown }>;
   commentaire_general?: string;
+  commentaire_points_forts?: string;
+  commentaire_axes_amelioration?: string;
   saved_at: number; // Date.now()
   synced: boolean;
 }
@@ -18,7 +20,8 @@ export interface UseOfflineSyncReturn {
   saveDraft: (
     evaluationId: string,
     notes: EvaluationDraft['notes'],
-    commentaire?: string,
+    commentairePointsForts?: string,
+    commentaireAxesAmelioration?: string,
   ) => Promise<void>;
   getDraft: (evaluationId: string) => Promise<EvaluationDraft | null>;
   deleteDraft: (evaluationId: string) => Promise<void>;
@@ -152,7 +155,8 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     async (
       evaluationId: string,
       notes: EvaluationDraft['notes'],
-      commentaire?: string,
+      commentairePointsForts?: string,
+      commentaireAxesAmelioration?: string,
     ): Promise<void> => {
       if (!ownerMatricule) throw new Error('Utilisateur non identifié');
       const db = await getDb();
@@ -160,7 +164,8 @@ export function useOfflineSync(): UseOfflineSyncReturn {
         evaluation_id: evaluationId,
         owner_matricule: ownerMatricule,
         notes,
-        commentaire_general: commentaire,
+        commentaire_points_forts: commentairePointsForts,
+        commentaire_axes_amelioration: commentaireAxesAmelioration,
         saved_at: Date.now(),
         synced: false,
       };
@@ -240,7 +245,9 @@ export function useOfflineSync(): UseOfflineSyncReturn {
               (entry): entry is typeof entry & { note: number } =>
                 Number.isInteger(entry.note) && Number(entry.note) >= 1 && Number(entry.note) <= 5,
             ),
-            commentaire_general: draft.commentaire_general,
+            commentaire_points_forts:
+              draft.commentaire_points_forts ?? draft.commentaire_general ?? '',
+            commentaire_axes_amelioration: draft.commentaire_axes_amelioration ?? '',
           }),
         });
 

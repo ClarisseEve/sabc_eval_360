@@ -1,9 +1,10 @@
 import React from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Calendar, Edit3, Plus, Power, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '@/Components/UI/Button/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card/Card';
 import { Input } from '@/Components/UI/Input/Input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/UI/Select';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ type FormState = {
   date_debut: string;
   date_fin: string;
 };
+type EvaluationCadence = 'trimestrielle' | 'semestrielle';
 
 const EMPTY_FORM: FormState = {
   code_periode: '',
@@ -48,39 +50,40 @@ function toInputDate(date: Date) {
 
 /**
  * Construit une nomenclature de période pré-remplie (modifiable par l'admin).
- * - code_periode = P{AA}{SS} (AA = 2 derniers chiffres de l'année, SS = semestre '01' ou '02')
- * - nom_periode = "Cycle {AAAA} - Semestre {S}"
- * - dates par défaut : début = 1er jour du semestre suggéré, fin ≈ +90 jours
+ * Le numéro du cycle suit la cadence configurée pour l'année.
+ * La période est pré-remplie avec une durée d'environ 90 jours, modifiable par l'admin.
  * Si le code calculé existe déjà dans la liste, on incrémente vers le
- * semestre/année suivant disponible.
+ * cycle/année suivant disponible.
  */
-function buildSuggestedForm(periodes: any[]): FormState {
+function buildSuggestedForm(periodes: any[], cadence: EvaluationCadence): FormState {
   const existingCodes = new Set(
     periodes.map((p) => String(p?.code_periode || '').toUpperCase()).filter(Boolean),
   );
 
   const now = new Date();
   let year = now.getFullYear();
-  let semester = now.getMonth() < 6 ? 1 : 2; // mois 0-5 → S1, 6-11 → S2
+  const cyclesPerYear = cadence === 'trimestrielle' ? 4 : 2;
+  const monthsPerCycle = cadence === 'trimestrielle' ? 3 : 6;
+  let cycle = Math.floor(now.getMonth() / monthsPerCycle) + 1;
 
   // Cherche le premier (année, semestre) dont le code n'existe pas encore.
   // Borne de sécurité pour éviter toute boucle infinie.
   for (let guard = 0; guard < 24; guard += 1) {
-    const code = `P${String(year).slice(-2)}${String(semester).padStart(2, '0')}`;
+    const code = `P${String(year).slice(-2)}${String(cycle).padStart(2, '0')}`;
     if (!existingCodes.has(code)) break;
-    if (semester === 1) {
-      semester = 2;
+    if (cycle < cyclesPerYear) {
+      cycle += 1;
     } else {
-      semester = 1;
+      cycle = 1;
       year += 1;
     }
   }
 
-  const code = `P${String(year).slice(-2)}${String(semester).padStart(2, '0')}`;
-  const nom = `Cycle ${year} - Semestre ${semester}`;
+  const code = `P${String(year).slice(-2)}${String(cycle).padStart(2, '0')}`;
+  const cycleLabel = cadence === 'trimestrielle' ? 'Trimestre' : 'Semestre';
+  const nom = `Cycle ${year} - ${cycleLabel} ${cycle}`;
 
-  // 1er jour du semestre suggéré : janvier (S1) ou juillet (S2).
-  const startMonth = semester === 1 ? 0 : 6;
+  const startMonth = (cycle - 1) * monthsPerCycle;
   let start = new Date(year, startMonth, 1);
   // La règle métier exige une date de début dans le futur : si le 1er du
   // semestre est déjà passé, on décale au lendemain pour rester cohérent.
@@ -112,8 +115,19 @@ export default function AdminPeriodesPage() {
   const [form, setForm] = React.useState<FormState>(EMPTY_FORM);
   const [modalError, setModalError] = React.useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [cadenceYear, setCadenceYear] = React.useState(String(new Date().getFullYear()));
+  const [cadence, setCadence] = React.useState<EvaluationCadence | ''>('');
 
   const periodes = Array.isArray(data) ? data : [];
+  const selectedCadenceYear = Number(cadenceYear);
+  const cadenceQuery = useQuery({
+    queryKey: ['periodes', 'cadence', selectedCadenceYear],
+    queryFn: () => periodesApi.cadence(selectedCadenceYear).then((response) => response.data),
+    enabled: /^\d{4}$/.test(cadenceYear) && selectedCadenceYear >= 1900 && selectedCadenceYear <= 2200,
+  });
+  React.useEffect(() => {
+    setCadence(cadenceQuery.data?.cadence ?? '');
+  }, [cadenceQuery.data]);
 
   const refresh = React.useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['periodes'] });
@@ -173,6 +187,21 @@ export default function AdminPeriodesPage() {
     },
   });
 
+  const cadenceMutation = useMutation({
+    mutationFn: () => {
+      if (!cadence) throw new Error('Choisissez une cadence.');
+      return periodesApi.configureCadence(selectedCadenceYear, cadence);
+    },
+    onSuccess: async () => {
+      toastSuccess('Cadence annuelle enregistrée.');
+      await queryClient.invalidateQueries({ queryKey: ['periodes', 'cadence', selectedCadenceYear] });
+      await refresh();
+    },
+    onError: (mutationError: any) => {
+      toastError(mutationError?.response?.data?.message || mutationError?.message || 'Impossible d’enregistrer la cadence.');
+    },
+  });
+
   const filtered = React.useMemo(() => {
     return periodes.filter((periode: any) => {
       if (!search) return true;
@@ -194,10 +223,10 @@ export default function AdminPeriodesPage() {
 
   const openCreate = React.useCallback(() => {
     setEditingId(null);
-    setForm(buildSuggestedForm(periodes));
+    setForm(buildSuggestedForm(periodes, cadence || 'semestrielle'));
     setModalError(null);
     setIsModalOpen(true);
-  }, [periodes]);
+  }, [periodes, cadence]);
 
   const startEdit = React.useCallback((periode: any) => {
     setEditingId(periode.id_periode);
@@ -242,6 +271,63 @@ export default function AdminPeriodesPage() {
         <KpiCard label="Fermées" value={stats.fermees} />
         <KpiCard label="Planifiées" value={stats.planifiees} />
       </KpiGrid>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cadence annuelle</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-[140px_minmax(0,1fr)_auto] sm:items-end">
+            <div className="space-y-1">
+              <label htmlFor="cadence-year" className="text-sm font-medium">Année</label>
+              <Input
+                id="cadence-year"
+                type="number"
+                min={1900}
+                max={2200}
+                value={cadenceYear}
+                onChange={(event) => {
+                  setCadenceYear(event.target.value);
+                  setCadence('');
+                }}
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="evaluation-cadence" className="text-sm font-medium">Fréquence</label>
+              <Select value={cadence} onValueChange={(value: EvaluationCadence) => setCadence(value)}>
+                <SelectTrigger id="evaluation-cadence" disabled={cadenceQuery.isLoading || cadenceQuery.isError}>
+                  <SelectValue placeholder="Choisir une fréquence" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="semestrielle">Semestrielle · maximum 2 périodes</SelectItem>
+                  <SelectItem value="trimestrielle">Trimestrielle · maximum 4 périodes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => cadenceMutation.mutate()}
+              disabled={
+                !cadence ||
+                selectedCadenceYear < 1900 ||
+                selectedCadenceYear > 2200 ||
+                !/^\d{4}$/.test(cadenceYear) ||
+                cadenceMutation.isPending ||
+                cadenceQuery.isLoading ||
+                cadenceQuery.isError
+              }
+            >
+              {cadenceMutation.isPending ? 'Enregistrement…' : 'Enregistrer la cadence'}
+            </Button>
+          </div>
+          <p className={`text-sm ${cadenceQuery.isError ? 'text-red-700' : 'text-sabc-gray-500'}`}>
+            {cadenceQuery.isError
+              ? 'Impossible de charger la cadence de cette année.'
+              : cadenceQuery.data?.cadence
+                ? `Cadence actuelle : ${cadenceQuery.data.cadence}. Les périodes et leurs dates restent à créer manuellement.`
+                : 'Aucune cadence configurée. Les périodes existantes restent inchangées ; les nouvelles périodes seront limitées après configuration.'}
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

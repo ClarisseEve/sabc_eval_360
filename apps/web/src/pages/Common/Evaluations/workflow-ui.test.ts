@@ -9,8 +9,8 @@ import {
 } from './workflow-ui';
 
 const criteria = [
-  { id: 'c1', note: null, commentaire: '', commentaireRequisSiNoteLt: 3 },
-  { id: 'c2', note: 4, commentaire: 'Déjà renseigné', commentaireRequisSiNoteLt: 3 },
+  { id: 'c1', note: null, commentaire: '', commentaireRequisSiNoteLt: 3, niveauRequis: 3 },
+  { id: 'c2', note: 4, commentaire: 'Déjà renseigné', commentaireRequisSiNoteLt: 3, niveauRequis: 3 },
 ];
 
 describe("état de saisie d'une évaluation", () => {
@@ -57,24 +57,47 @@ describe("état de saisie d'une évaluation", () => {
     });
   });
 
-  it('exige les commentaires sous le seuil avant la soumission', () => {
+  it('exige les commentaires sous le seuil et pour une note maximale', () => {
     const incomplete = buildEditableEvaluationNotes(criteria, [
       { critere_id: 'c1', note: 2, commentaire: '   ' },
       { critere_id: 'c2', note: 5, commentaire: '' },
     ]);
     const complete = buildEditableEvaluationNotes(criteria, [
       { critere_id: 'c1', note: 2, commentaire: 'Objectif de progression défini' },
-      { critere_id: 'c2', note: 5, commentaire: '' },
+      { critere_id: 'c2', note: 5, commentaire: 'Justification du score maximal' },
     ]);
 
     expect(getEvaluationSubmissionState(incomplete, criteria)).toMatchObject({
       canSubmit: false,
       missingRatings: 0,
-      missingComments: 1,
+      missingComments: 2,
     });
     expect(getEvaluationSubmissionState(complete, criteria)).toMatchObject({
       canSubmit: true,
       completion: 100,
+      missingComments: 0,
+    });
+  });
+
+  it('demande une justification sous le niveau requis du template ou pour la note maximale', () => {
+    const thresholdCriteria = [
+      { id: 'required-level', niveauRequis: 4, commentaireRequisSiNoteLt: 3 },
+      { id: 'maximum-score', niveauRequis: 3, commentaireRequisSiNoteLt: 3 },
+    ];
+    const notes = buildEditableEvaluationNotes(thresholdCriteria, [
+      { critere_id: 'required-level', note: 3, commentaire: '' },
+      { critere_id: 'maximum-score', note: 5, commentaire: '' },
+    ]);
+
+    expect(getEvaluationSubmissionState(notes, thresholdCriteria)).toMatchObject({
+      canSubmit: false,
+      missingComments: 2,
+    });
+
+    notes[0].commentaire = 'Niveau inférieur au requis';
+    notes[1].commentaire = 'Résultats au niveau maximal';
+    expect(getEvaluationSubmissionState(notes, thresholdCriteria)).toMatchObject({
+      canSubmit: true,
       missingComments: 0,
     });
   });

@@ -6,38 +6,43 @@ import type { CSSProperties } from 'react';
  * conservent les couleurs.
  */
 export const CHART_COLORS = {
-  /** Série principale : rouge SABC. */
-  primary: '#D01A2C',
-  /** Série secondaire : gris acier. */
-  secondary: '#747474',
-  /** Série tertiaire : gris clair. */
-  tertiary: '#C9C9C6',
-  /** Mise en avant : rouge foncé. */
-  emphasis: '#A3121F',
-  /** Gris foncé pour une quatrième série éventuelle. */
-  dark: '#4F4F4F',
-  /** Remplissage d'accent ponctuel (jamais pour du texte). */
-  accent: '#FDC42D',
+  /** Palette historique des graphiques, antérieure à la refonte visuelle. */
+  primary: '#E53E3E',
+  secondary: '#3182CE',
+  tertiary: '#9E9E9E',
+  emphasis: '#FF9800',
+  dark: '#D69E2E',
+  accent: '#FF9800',
+  success: '#48BB78',
+  warning: '#D69E2E',
+  info: '#3182CE',
+  gray: '#9E9E9E',
   grid: '#E5E5E3',
   axis: '#C9C9C6',
   tick: '#4F4F4F',
   track: '#F0F0EE',
 } as const;
 
-/** Ordre des séries : rouge, gris acier, gris clair, rouge foncé, gris foncé. */
+/** Ordre historique des séries utilisé par les graphiques catégoriels. */
 export const CHART_SERIES: string[] = [
   CHART_COLORS.primary,
-  CHART_COLORS.secondary,
-  CHART_COLORS.tertiary,
-  CHART_COLORS.emphasis,
-  CHART_COLORS.dark,
+  CHART_COLORS.accent,
+  CHART_COLORS.success,
+  CHART_COLORS.info,
+  CHART_COLORS.warning,
+  '#9F7AEA',
+  '#ED64A6',
+  '#38B2AC',
+  '#DD6B20',
+  '#667EEA',
+  '#F56565',
 ];
 
 /** Couleurs de statut sémantique (réservées aux vrais statuts). */
 export const CHART_STATUS = {
-  success: '#2E7D32',
-  warning: '#B7791F',
-  danger: '#D01A2C',
+  success: '#48BB78',
+  warning: '#D69E2E',
+  danger: '#E53E3E',
 } as const;
 
 export const CHART_TICK = { fill: CHART_COLORS.tick, fontSize: 11 };

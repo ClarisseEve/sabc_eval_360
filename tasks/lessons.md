@@ -20,3 +20,15 @@ que l'on a soi-même modifiés.
 **Signal d'alerte.** Un `git diff --cached --stat` qui liste des fichiers hors
 du périmètre annoncé dans le message de commit : c'est le symptôme direct de ce
 problème.
+
+## Vérifier les colonnes projetées dans une CTE avant de blâmer le schéma
+
+**Contexte.** Une requête analytique référençait `criteres_snapshot_json` après
+un `FROM latest e`, alors que la CTE `latest` ne projetait pas cette colonne.
+La base et sa migration étaient correctes ; l'API renvoyait pourtant une 500,
+masquée côté écran comme un état vide.
+
+**Règle.** Pour une erreur SQL « colonne inexistante », vérifier la portée et
+les colonnes projetées par chaque CTE ainsi que le schéma de la base réellement
+utilisée par l'application. Rejouer la requête exacte, avec ses CTE, contre
+PostgreSQL avant de modifier ou réappliquer une migration.

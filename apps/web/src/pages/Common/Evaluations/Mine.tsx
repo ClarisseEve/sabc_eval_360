@@ -8,15 +8,22 @@ import EvaluationModal from '@/Components/Evaluation/EvaluationModal';
 import { useEvaluationWorkflowData } from '@/Hooks/queries';
 import { EvaluationPageLayout, formatDisplayName, formatRole } from './shared';
 import {
-  ActiveRulesCard,
   QuickActionsCard,
   formatDateLabel,
   formatEvaluationType,
   formatStatusLabel,
   getStatusBadgeVariant,
 } from '@/Components/Dashboard/RoleDashboardShared';
-import { PageHeader } from '@/Components/UI/Page/PageHeader';
-import { KpiCard, KpiGrid } from '@/Components/UI/KpiCard';
+import {
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  EyeOff,
+  Layers,
+  ListChecks,
+  UserRound,
+  Users,
+} from 'lucide-react';
 import { filterAdminApplicableRules, filterApplicableRules } from '@/utils/rules';
 import { useAuthContext } from '@/Contexts/AuthContext';
 import { paginateEligibleGroups } from './eligible-targets-data';
@@ -62,13 +69,38 @@ const Mine: React.FC = () => {
       <Head title="Mes évaluations" />
 
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <PageHeader
-          title="Mes évaluations"
-          description="Démarrez une évaluation pour un collaborateur éligible ou reprenez une évaluation en cours. Les grilles proposées dépendent de la période ouverte et du rôle de la personne évaluée."
-          meta={data.activePeriod
-            ? `Période active : ${data.activePeriod.nom_periode || data.activePeriod.code_periode}${data.activePeriod.date_fin ? ` (clôture le ${formatDateLabel(data.activePeriod.date_fin)})` : ''}`
-            : 'Aucune période ouverte : le démarrage d’une évaluation est impossible pour l’instant.'}
-        />
+        <section className="flex flex-col gap-6 rounded-lg border border-sabc-gray-200 bg-white p-5 shadow-md dark:border-sabc-gray-700 dark:bg-sabc-gray-900 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="min-w-0">
+            <Badge variant="secondary" className="mb-3 bg-sabc-red-light text-sabc-red-primary">
+              Workflow d’évaluation
+            </Badge>
+            <h1 className="text-2xl font-semibold text-sabc-gray-900 dark:text-white">
+              Démarrer ou reprendre vos évaluations
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-sabc-gray-600 dark:text-sabc-gray-400">
+              Le flux repose maintenant sur la période ouverte et les règles publiées compatibles avec la cible sélectionnée.
+            </p>
+          </div>
+          <div className="w-full shrink-0 rounded-md border border-sabc-gray-200 bg-sabc-gray-50 px-4 py-3 sm:w-56 dark:border-sabc-gray-700 dark:bg-sabc-gray-800">
+            <div className="text-xs font-medium uppercase tracking-wide text-sabc-gray-500 dark:text-sabc-gray-400">
+              Période active
+            </div>
+            {data.activePeriod ? (
+              <>
+                <div className="mt-1 font-semibold text-sabc-gray-900 dark:text-white">
+                  {data.activePeriod.nom_periode || data.activePeriod.code_periode}
+                </div>
+                <div className="mt-1 text-xs text-sabc-gray-500 dark:text-sabc-gray-400">
+                  Clôture le {data.activePeriod.date_fin ? formatDateLabel(data.activePeriod.date_fin) : 'date non renseignée'}
+                </div>
+              </>
+            ) : (
+              <div className="mt-1 text-sm text-sabc-gray-700 dark:text-sabc-gray-300">
+                Aucune période ouverte
+              </div>
+            )}
+          </div>
+        </section>
 
         {!data.activePeriod ? (
           <Alert>
@@ -89,40 +121,112 @@ const Mine: React.FC = () => {
           </Alert>
         ) : null}
 
-        <KpiGrid>
-          <KpiCard
-            label="Périodes ouvertes"
-            value={data.summary.activePeriods}
-            caption="Cycles actuellement disponibles"
-          />
-          <KpiCard
-            label="Cibles éligibles"
-            value={data.summary.eligibleTargets}
-            caption={isAdmin ? 'Collaborateurs actifs et disponibles' : 'Auto, pairs et subordonnés selon la hiérarchie'}
-          />
-          <KpiCard
-            label="Grilles actives"
-            value={data.summary.activeRules}
-            caption="Grilles d’évaluation publiées"
-          />
-          <KpiCard
-            label="Historique"
-            value={data.summary.historyEntries}
-            caption="Évaluations reçues ou données"
-          />
-        </KpiGrid>
-
-        <div className="grid gap-6">
-          <ActiveRulesCard
-            rules={data.rules}
-            description={isAdmin
-              ? 'Les règles compatibles sont filtrées selon le rôle de chaque collaborateur.'
-              : 'Les règles compatibles sont filtrées selon votre rôle et les cibles disponibles.'}
-            emptyMessage={isAdmin
-              ? 'Aucune règle active publiée pour les rôles des collaborateurs.'
-              : 'Aucune règle active publiée pour votre rôle.'}
-          />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              label: 'Périodes ouvertes',
+              value: data.summary.activePeriods,
+              caption: 'Cycles actuellement disponibles',
+              Icon: CalendarDays,
+            },
+            {
+              label: 'Cibles éligibles',
+              value: data.summary.eligibleTargets,
+              caption: 'Collaborateurs actifs et disponibles',
+              Icon: Users,
+            },
+            {
+              label: 'Règles actives',
+              value: data.summary.activeRules,
+              caption: 'Cadres publiés exploitables par le workflow',
+              Icon: Layers,
+            },
+            {
+              label: 'Historique',
+              value: data.summary.historyEntries,
+              caption: 'Évaluations reçues ou données déjà enregistrées',
+              Icon: CheckCircle2,
+            },
+          ].map(({ label, value, caption, Icon }) => (
+            <div
+              key={label}
+              className="flex min-h-36 items-center gap-4 rounded-lg border border-sabc-gray-200 bg-white p-5 dark:border-sabc-gray-700 dark:bg-sabc-gray-900"
+            >
+              <Icon className="h-7 w-7 shrink-0 text-sabc-red-primary" aria-hidden="true" />
+              <div className="min-w-0">
+                <div className="sabc-display text-2xl tabular-nums text-sabc-gray-900 dark:text-white">
+                  {value ?? 'n.d.'}
+                </div>
+                <div className="text-sm text-sabc-gray-500 dark:text-sabc-gray-400">{label}</div>
+                <div className="mt-1 text-xs text-sabc-gray-500 dark:text-sabc-gray-400">{caption}</div>
+              </div>
+            </div>
+          ))}
         </div>
+
+        <section className="rounded-lg border border-blue-300 bg-blue-100/70 p-4 dark:border-blue-900 dark:bg-blue-950/40 sm:p-5">
+          <div className="mb-4 flex items-center gap-3">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white">
+              <ClipboardList className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="font-semibold text-sabc-gray-900 dark:text-white">Cadre d’évaluation actif</h2>
+              <p className="text-xs text-sabc-gray-600 dark:text-sabc-gray-400">
+                Les règles compatibles sont filtrées selon le rôle de chaque collaborateur.
+              </p>
+            </div>
+          </div>
+          {data.rules.length === 0 ? (
+            <div className="rounded-md bg-white px-4 py-5 text-sm text-sabc-gray-500 dark:bg-sabc-gray-900 dark:text-sabc-gray-400">
+              {isAdmin
+                ? 'Aucune règle active publiée pour les rôles des collaborateurs.'
+                : 'Aucune règle active publiée pour votre rôle.'}
+            </div>
+          ) : (
+            <ul className="divide-y divide-sabc-gray-100 overflow-hidden rounded-lg border border-sabc-gray-100 bg-white dark:divide-sabc-gray-800 dark:border-sabc-gray-700 dark:bg-sabc-gray-900">
+              {data.rules.slice(0, 4).map((rule) => {
+                const domains = rule.sections.map((section) => section.titre).slice(0, 3);
+                const isDetailed = rule.visibility_policy.detail === 'detailed';
+
+                return (
+                  <li
+                    key={rule.id_regle}
+                    className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center"
+                  >
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
+                      <UserRound className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="truncate text-sm font-semibold text-sabc-gray-900 dark:text-white">
+                          {rule.nom_regle || formatEvaluationType(rule.type_evaluation)}
+                        </span>
+                        <span className="text-xs text-sabc-gray-500 dark:text-sabc-gray-400">
+                          {formatEvaluationType(rule.type_evaluation)}
+                        </span>
+                      </div>
+                      {domains.length > 0 ? (
+                        <p className="mt-1 truncate text-xs text-sabc-gray-500 dark:text-sabc-gray-400">
+                          {domains.join(' · ')}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                        <ListChecks className="h-3.5 w-3.5" aria-hidden="true" />
+                        {rule.criteres.length}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                        <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
+                        {isDetailed ? 'Détaillée' : 'Agrégée'}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
         <Card>
           <CardHeader>

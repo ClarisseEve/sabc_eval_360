@@ -11,12 +11,12 @@ import {
 export class CreateRemplacementDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(5)
+  @MaxLength(6)
   titulaire_matricule!: string;
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(5)
+  @MaxLength(6)
   remplacant_matricule!: string;
 
   @IsString()

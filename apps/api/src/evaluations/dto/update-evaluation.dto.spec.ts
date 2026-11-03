@@ -32,4 +32,18 @@ describe('UpdateEvaluationDto', () => {
 
     expect(errors).not.toEqual([]);
   });
+
+  it('accepte les commentaires finaux séparés', async () => {
+    const dto = plainToInstance(UpdateEvaluationDto, {
+      notes: [],
+      commentaire_points_forts: 'Bonne collaboration',
+      commentaire_axes_amelioration: 'Approfondir la planification',
+    });
+
+    const errors = await validate(dto, { whitelist: true });
+
+    expect(errors).toEqual([]);
+    expect(dto.commentaire_points_forts).toBe('Bonne collaboration');
+    expect(dto.commentaire_axes_amelioration).toBe('Approfondir la planification');
+  });
 });

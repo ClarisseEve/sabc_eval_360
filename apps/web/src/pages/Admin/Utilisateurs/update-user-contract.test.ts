@@ -33,6 +33,9 @@ describe('update user API contract', () => {
             id_role: 'R0003',
             id_region: 'RG001',
             manager_matricule: ' M0001 ',
+            id_service: ' S001 ',
+            id_district: ' D001 ',
+            id_secteur: ' T001 ',
             statut: 'Suspendu',
         });
 
@@ -44,6 +47,9 @@ describe('update user API contract', () => {
             id_role: 'R0003',
             id_region: 'RG001',
             manager_matricule: 'M0001',
+            id_service: 'S001',
+            id_district: 'D001',
+            id_secteur: 'T001',
             statut: 'Suspendu',
         });
         for (const field of ['role', 'role_nom', 'region_nom', 'type_region', 'id_branche', 'est_admin', 'est_actif']) {

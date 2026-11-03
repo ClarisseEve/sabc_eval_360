@@ -92,9 +92,19 @@ describe('AdminUsersService', () => {
             },
             role: {
               findUnique: jest.fn().mockResolvedValue(makeRole()),
+              findMany: jest.fn().mockResolvedValue([]),
             },
             region: {
               findUnique: jest.fn().mockResolvedValue(makeRegion()),
+            },
+            serviceCommercial: {
+              findUnique: jest.fn(),
+            },
+            district: {
+              findUnique: jest.fn(),
+            },
+            secteur: {
+              findUnique: jest.fn(),
             },
           },
         },
@@ -164,6 +174,36 @@ describe('AdminUsersService', () => {
       expect(result.data[0]).not.toHaveProperty('password');
     });
 
+    describe('getEligibleManagersForCandidate', () => {
+      it('returns active higher-level managers in the same branch or with cross-branch authority', async () => {
+        (prisma.role.findMany as jest.Mock).mockResolvedValue([{ nom_role: 'DR' }]);
+        (prisma.utilisateur.findMany as jest.Mock).mockResolvedValue([
+          makeDbUser({
+            matricule: 'DR001',
+            role: 'DR',
+            role_nom: 'Directeur Régional',
+            niveau_hierarchique: 1,
+          }),
+        ]);
+
+        const result = await service.getEligibleManagersForCandidate('R001', 'RG01');
+
+        expect(result).toHaveLength(1);
+        expect(prisma.utilisateur.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              id_region: 'RG01',
+              niveau_hierarchique: { lt: 3 },
+              OR: [
+                { id_branche: 'BR001' },
+                { role: { in: ['DR'] } },
+              ],
+            }),
+          }),
+        );
+      });
+    });
+
     it('keeps users without measurements last when sorting ascending', async () => {
       (prisma.utilisateur.findMany as jest.Mock).mockResolvedValue([
         makeDbUser({ matricule: 'NONE', nom: 'Sans', prenom: 'Note' }),
@@ -228,6 +268,59 @@ describe('AdminUsersService', () => {
       });
       expect(result).not.toHaveProperty('password');
       expect(result.matricule).toBe('U0001');
+    });
+
+    it('derives the service and district when a sector is assigned', async () => {
+      const dto = makeCreateDto({
+        id_secteur: 'SEC001',
+      });
+      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.utilisateur.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.serviceCommercial.findUnique as jest.Mock).mockResolvedValue({
+        id_service: 'SVC001',
+        id_region: 'RG01',
+      });
+      (prisma.district.findUnique as jest.Mock).mockResolvedValue({
+        id_district: 'DST001',
+        id_service: 'SVC001',
+      });
+      (prisma.secteur.findUnique as jest.Mock).mockResolvedValue({
+        id_secteur: 'SEC001',
+        id_service: 'SVC001',
+        id_district: 'DST001',
+      });
+      (prisma.utilisateur.create as jest.Mock).mockResolvedValue(
+        makeDbUser({
+          id_service: 'SVC001',
+          id_district: 'DST001',
+          id_secteur: 'SEC001',
+        }),
+      );
+
+      await service.createUser(dto, ADMIN_MATRICULE, ADMIN_IP);
+
+      expect(prisma.utilisateur.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          id_service: 'SVC001',
+          id_district: 'DST001',
+          id_secteur: 'SEC001',
+        }),
+      });
+    });
+
+    it('rejects a service outside the selected region', async () => {
+      const dto = makeCreateDto({ id_service: 'SVC001' });
+      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.utilisateur.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.serviceCommercial.findUnique as jest.Mock).mockResolvedValue({
+        id_service: 'SVC001',
+        id_region: 'RG02',
+      });
+
+      await expect(
+        service.createUser(dto, ADMIN_MATRICULE, ADMIN_IP),
+      ).rejects.toThrow('ne dépend pas de la région choisie');
+      expect(prisma.utilisateur.create).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when manager is in a different region', async () => {

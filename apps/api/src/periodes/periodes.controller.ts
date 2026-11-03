@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { PeriodesService } from './periodes.service';
+import type { EvaluationCadence } from './periodes.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/guards/roles.guard';
 import { CreatePeriodeDto } from './dto/create-periode.dto';
@@ -20,6 +21,13 @@ export class PeriodesController {
     return this.service.findActive();
   }
 
+  @Get('cadence/:annee')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  findCadence(@Param('annee') year: string) {
+    return this.service.findCadence(Number(year));
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findById(id);
@@ -30,6 +38,17 @@ export class PeriodesController {
   @Roles('ADMIN')
   create(@Body() dto: CreatePeriodeDto) {
     return this.service.create(dto);
+  }
+
+  @Put('cadence/:annee')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  configureCadence(
+    @Param('annee') year: string,
+    @Body('cadence') cadence?: EvaluationCadence,
+  ) {
+    if (!cadence) throw new BadRequestException('La cadence est obligatoire.');
+    return this.service.configureCadence(Number(year), cadence);
   }
 
   @Put(':id')

@@ -85,6 +85,8 @@ export function redactEvaluationForVisibility<T extends Record<string, any>>(
   if (!options.preserveDetails && policy.detail === 'aggregated') {
     result.notations_json = null;
     result.commentaire_global = null;
+    result.commentaire_points_forts = null;
+    result.commentaire_axes_amelioration = null;
     result.commentaire_general = null;
     result.commentaire_validation = null;
     result.motif_rejet = null;

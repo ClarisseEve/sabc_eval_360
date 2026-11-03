@@ -1,4 +1,5 @@
 import { AnalyticsService } from './analytics.service';
+import ExcelJS from 'exceljs';
 
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
@@ -76,6 +77,9 @@ describe('AnalyticsService', () => {
 
       expect(result.profils[0].types.auto).toEqual(expect.objectContaining({ score: 4.5, nb_evaluations: 2 }));
       expect(result.profils[0].types.descendante).toEqual(expect.objectContaining({ score: 3, nb_evaluations: 3 }));
+      expect(mockPg.query.mock.calls[1][0]).toMatch(
+        /e\.notations_json,\s+e\.criteres_snapshot_json/,
+      );
       for (const [sql] of mockPg.query.mock.calls) {
         expect(sql).toContain('ROW_NUMBER() OVER');
         expect(sql).toContain('PARTITION BY e.evalue_matricule, e.type_evaluation');
@@ -107,6 +111,9 @@ describe('AnalyticsService', () => {
 
       const result = await service.getAxesAmelioration('U001', 'admin');
 
+      expect(mockPg.query.mock.calls[0][0]).toContain(
+        'e.notations_json, e.criteres_snapshot_json',
+      );
       expect(result.axes_amelioration).toHaveLength(1);
       expect(result.axes_amelioration[0]).toMatchObject({
         critere: 'Négociation',
@@ -137,9 +144,10 @@ describe('AnalyticsService', () => {
           type_evaluation: 'auto',
           competence: 'Communication; relation client',
           score: '4',
+          niveau_requis: '3',
         },
-        { date_evaluation: '2026-09-13', statut: 'soumis', evalue_nom: 'A', evalue_matricule: 'U002', poste: 'CDS', branche: 'B01', region: 'Centre', evaluateur_nom: 'B', type_evaluation: 'pairs', competence: 'Leadership', score: '3' },
-        { date_evaluation: '2026-09-12', statut: 'rejete', evalue_nom: 'C', evalue_matricule: 'U003', poste: 'DR', branche: 'B02', region: 'Nord', evaluateur_nom: 'D', type_evaluation: 'descendante', competence: 'Pilotage', score: '2' },
+        { date_evaluation: '2026-09-13', statut: 'soumis', evalue_nom: 'A', evalue_matricule: 'U002', poste: 'CDS', branche: 'B01', region: 'Centre', evaluateur_nom: 'B', type_evaluation: 'pairs', competence: 'Leadership', score: '3', niveau_requis: '4' },
+        { date_evaluation: '2026-09-12', statut: 'rejete', evalue_nom: 'C', evalue_matricule: 'U003', poste: 'DR', branche: 'B02', region: 'Nord', evaluateur_nom: 'D', type_evaluation: 'descendante', competence: 'Pilotage', score: '2', niveau_requis: null },
       ]);
 
       const result = await service.exportEvaluations('csv', { start_date: '2026-01-01', end_date: '2026-12-31' });
@@ -147,8 +155,19 @@ describe('AnalyticsService', () => {
 
       expect(result.filename).toMatch(/\.csv$/);
       expect(csv.split('\r\n')[0]).toBe(
-        "Date d'évaluation;Statut de l'évaluation;Noms et prénoms de l'évalué;Matricule de l'évalué;Poste de l'évalué;Branche;Région de l'évalué;Nom de l'évaluateur;Type d'évaluation;Compétence;Note ou score de la compétence;Description",
+        "Date d'évaluation;Statut de l'évaluation;Noms et prénoms de l'évalué;Matricule de l'évalué;Poste de l'évalué;Branche;Région de l'évalué;Nom de l'évaluateur;Type d'évaluation;Compétence;Note obtenue;Niveau requis;Description",
       );
+      expect(csv).toContain('"Communication; relation client";4;3;Acquis');
+      expect(csv.split('\r\n')[2].split(';').slice(10, 13)).toEqual([
+        '3',
+        '4',
+        "En cours d'acquisition",
+      ]);
+      expect(csv.split('\r\n')[3].split(';').slice(10, 13)).toEqual([
+        '2',
+        '',
+        'Non acquis',
+      ]);
       expect(csv).toContain('Validée');
       expect(csv).toContain('Soumise');
       expect(csv).toContain('Rejetée');
@@ -157,14 +176,17 @@ describe('AnalyticsService', () => {
       expect(csv).toContain("En cours d'acquisition");
       expect(csv).toContain('Non acquis');
       expect(csv).toContain('"Communication; relation client"');
-      expect(mockPg.query).toHaveBeenCalledWith(expect.stringContaining('jsonb_array_elements'), ['2026-01-01', '2026-12-31']);
+      expect(mockPg.query).toHaveBeenCalledWith(
+        expect.stringContaining("NULLIF(critere->>'niveau_requis', '')::numeric AS niveau_requis"),
+        ['2026-01-01', '2026-12-31'],
+      );
     });
 
     it('conserve un lot dense dans le fichier Excel', async () => {
       mockPg.query.mockResolvedValue(Array.from({ length: 1000 }, (_, index) => ({
         date_evaluation: '2026-09-14', evalue_nom: `Agent ${index}`, evalue_matricule: `U${index}`, poste: 'TMO',
         statut: 'brouillon',
-        branche: 'B01', region: 'Littoral', evaluateur_nom: 'Admin', type_evaluation: 'manager', competence: 'Compétence', score: '4',
+        branche: 'B01', region: 'Littoral', evaluateur_nom: 'Admin', type_evaluation: 'manager', competence: 'Compétence', score: '4', niveau_requis: '3',
       })));
 
       const result = await service.exportEvaluations('xlsx');
@@ -173,6 +195,17 @@ describe('AnalyticsService', () => {
       expect(result.contentType).toContain('spreadsheetml');
       expect(result.buffer.subarray(0, 2).toString()).toBe('PK');
       expect(mockPg.query).toHaveBeenCalledTimes(1);
+
+      const workbook = new ExcelJS.Workbook();
+      const bytes = new Uint8Array(result.buffer.length);
+      bytes.set(result.buffer);
+      await workbook.xlsx.load(bytes.buffer);
+      const worksheet = workbook.getWorksheet('Evaluations');
+      expect(worksheet?.getRow(1).getCell(11).value).toBe('Note obtenue');
+      expect(worksheet?.getRow(1).getCell(12).value).toBe('Niveau requis');
+      expect(worksheet?.getRow(2).getCell(11).value).toBe(4);
+      expect(worksheet?.getRow(2).getCell(12).value).toBe(3);
+      expect(worksheet?.autoFilter).toBe('A1:M1001');
     });
   });
 

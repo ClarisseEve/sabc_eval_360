@@ -1,10 +1,11 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, GraduationCap, ShieldAlert, Table2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, GraduationCap, RefreshCw, ShieldAlert, Table2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, LabelList, Legend, Radar, RadarChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { adminApi, analyticsApi } from '@/Services/api';
 import { useAdminUsers } from '@/Hooks/queries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
+import { Button } from '@/Components/UI/Button';
 import { Input } from '@/Components/UI/Input';
 import { Badge } from '@/Components/UI/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/UI/Table';
@@ -54,7 +55,7 @@ function AggregatedScore({ entry }: { entry?: { score?: number | null; nb_evalua
 export default function UserGaps() {
   const chartsRef = useRef<HTMLDivElement>(null);
   const { data: usersData } = useAdminUsers({ limit: 1000 });
-  const { data: gapData, isLoading } = useQuery({
+  const { data: gapData, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin', 'evaluation-gaps'],
     queryFn: () => analyticsApi.evaluationGaps().then((response) => response.data),
   });
@@ -147,9 +148,9 @@ export default function UserGaps() {
       />
 
       <KpiGrid>
-        <KpiCard label="Profils analysés" value={profiles.length} />
-        <KpiCard label="Profils en anomalie" value={anomalyCount} />
-        <KpiCard label="Déficits de compétence" value={deficitCount} />
+        <KpiCard label="Profils analysés" value={isError ? null : profiles.length} />
+        <KpiCard label="Profils en anomalie" value={isError ? null : anomalyCount} />
+        <KpiCard label="Déficits de compétence" value={isError ? null : deficitCount} />
         <KpiCard label="Seuil de divergence" value={`${formatNumberFr(Number(gapData?.seuil_divergence ?? 1.5), 1)} pt`} />
       </KpiGrid>
 
@@ -187,9 +188,19 @@ export default function UserGaps() {
             </label>
           </div>
           {isLoading ? <div className="p-8 text-center text-sabc-gray-500">Analyse des évaluations…</div> : null}
-          {!isLoading && filteredProfiles.length === 0 ? <EmptyState title="Aucun écart d’évaluation" description="Aucune évaluation valide par compétence n’est disponible pour l’administration." /> : null}
-          {!isLoading && filteredProfiles.length > 0 ? (
+          {isError ? (
+            <EmptyState
+              icon={RefreshCw}
+              variant="error"
+              title="Impossible de charger les écarts d’évaluation"
+              description="Une erreur empêche le chargement des évaluations. Réessayez dans quelques instants."
+              action={<Button variant="outline" onClick={() => void refetch()}>Réessayer</Button>}
+            />
+          ) : null}
+          {!isLoading && !isError && filteredProfiles.length === 0 ? <EmptyState title="Aucun écart d’évaluation" description="Aucune évaluation valide par compétence n’est disponible pour l’administration." /> : null}
+          {!isLoading && !isError && filteredProfiles.length > 0 ? (
             <button type="button" className="block w-full cursor-pointer rounded-lg border border-sabc-gray-200 bg-white p-2 text-left transition hover:border-sabc-red-primary/60 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-sabc-red-primary/40" onClick={() => setTableOpen(true)} aria-label="Ouvrir le tableau détaillé des écarts">
+
               <div className="grid gap-4 xl:grid-cols-2">
                 <div>
                   <div className="px-3 pt-3 text-sm font-semibold text-sabc-gray-800">Écart de perception</div>

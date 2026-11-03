@@ -213,7 +213,7 @@ export default function Builder() {
                                 <>
                                     <div className="mb-8 h-2 rounded bg-sabc-red-primary" />
                                     <div className="flex min-h-[430px] flex-col items-center justify-center text-center">
-                                        <img src="/images/logos/sabc-logo.png" alt="Logo SABC" className="mb-5 h-20 w-auto object-contain" />
+                                        <img src="/images/logos/boissons-du-cameroun.png" alt="Logo Boissons du Cameroun" className="mb-5 h-20 w-auto object-contain" />
                                         <div className="text-2xl font-bold text-sabc-gray-900 dark:text-white">{reportTitle}</div>
                                         <div className="mt-3 text-sm text-sabc-gray-500">{reportSubtitle || 'Sous-titre à renseigner'}</div>
                                         <div className="mt-16 text-[10px] uppercase tracking-wide text-sabc-gray-400">Page de couverture</div>

@@ -1,4 +1,5 @@
 import { DashboardSkeleton } from '@/Components/Dashboard/DashboardSkeleton';
+import { ExcelImportDialog } from '@/Components/Admin/ExcelImportDialog';
 import { Badge } from '@/Components/UI/Badge';
 import { Button, buttonVariants } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
@@ -20,6 +21,7 @@ import {
     type CreateUserForm,
 } from './create-user-contract';
 import { AdminUsersLayout } from './shared';
+import { UserAssignmentFields } from './UserAssignmentFields';
 import {
     buildUpdateUserForm,
     buildUpdateUserPayload,
@@ -29,7 +31,6 @@ import {
     type RoleReference,
     type UpdateUserForm,
 } from './update-user-contract';
-import { formatScore } from '@/utils/helpers';
 import { PageHeader } from '@/Components/UI/Page/PageHeader';
 
 type BadgeVariant = 'success' | 'warning' | 'error' | 'secondary' | 'outline';
@@ -63,7 +64,7 @@ const createTextFields: Array<{
 ];
 
 const editTextFields: Array<{
-    key: 'nom' | 'prenom' | 'email' | 'telephone' | 'manager_matricule';
+    key: 'nom' | 'prenom' | 'email' | 'telephone';
     label: string;
     type?: string;
 }> = [
@@ -71,7 +72,6 @@ const editTextFields: Array<{
     { key: 'prenom', label: 'Prénom' },
     { key: 'email', label: 'Adresse e-mail', type: 'email' },
     { key: 'telephone', label: 'Téléphone', type: 'tel' },
-    { key: 'manager_matricule', label: 'Manager (matricule)' },
 ];
 
 function Pagination({
@@ -121,10 +121,8 @@ function UsersContent() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [searchDebounced, setSearchDebounced] = useState('');
-    const [sortBy, setSortBy] = useState<'name' | 'score'>('score');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-
     const [createOpen, setCreateOpen] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
     const [createForm, setCreateForm] = useState(initialCreateUserForm);
 
     const [editSource, setEditSource] = useState<(EditableUser & { matricule: string }) | null>(null);
@@ -142,8 +140,6 @@ function UsersContent() {
     const params = {
         page,
         limit: 15,
-        sort_by: sortBy,
-        sort_order: sortOrder,
         ...(searchDebounced ? { search: searchDebounced } : {}),
     };
     const { data: response } = useAdminUsers(params);
@@ -160,6 +156,18 @@ function UsersContent() {
         queryKey: ['admin', 'structure', 'branches'],
         queryFn: () => adminApi.structure.branches().then((response) => response.data),
     });
+    const { data: services = [] } = useQuery({
+        queryKey: ['admin', 'structure', 'services'],
+        queryFn: () => adminApi.structure.services().then((response) => response.data),
+    });
+    const { data: districts = [] } = useQuery({
+        queryKey: ['admin', 'structure', 'districts'],
+        queryFn: () => adminApi.structure.districts().then((response) => response.data),
+    });
+    const { data: secteurs = [] } = useQuery({
+        queryKey: ['admin', 'structure', 'secteurs'],
+        queryFn: () => adminApi.structure.secteurs().then((response) => response.data),
+    });
 
     const regionNames = new Map<string, string>(
         (Array.isArray(regions) ? regions : []).map((region: any) => [String(region.id_region), region.nom_region]),
@@ -167,10 +175,24 @@ function UsersContent() {
     const branchNames = new Map<string, string>(
         (Array.isArray(branches) ? branches : []).map((branche: any) => [String(branche.id_branche), branche.nom_branche]),
     );
+    const serviceNames = new Map<string, string>(
+        (Array.isArray(services) ? services : []).map((service: any) => [String(service.id_service), service.nom_service]),
+    );
+    const districtNames = new Map<string, string>(
+        (Array.isArray(districts) ? districts : []).map((district: any) => [String(district.id_district), district.nom_district]),
+    );
+    const secteurNames = new Map<string, string>(
+        (Array.isArray(secteurs) ? secteurs : []).map((secteur: any) => [String(secteur.id_secteur), secteur.nom_secteur]),
+    );
     const regionLabel = (user: any) =>
         user.region?.nom_region || (user.id_region ? regionNames.get(String(user.id_region)) : undefined) || 'n.d.';
     const branchLabel = (user: any) =>
         user.branche?.nom_branche || (user.id_branche ? branchNames.get(String(user.id_branche)) : undefined) || 'n.d.';
+    const structureLabel = (user: any) => [
+        user.id_service ? serviceNames.get(String(user.id_service)) : null,
+        user.id_district ? districtNames.get(String(user.id_district)) : null,
+        user.id_secteur ? secteurNames.get(String(user.id_secteur)) : null,
+    ].filter(Boolean).join(' · ') || 'n.d.';
 
     const users = response?.data ?? (Array.isArray(response) ? response : []);
     const meta = response?.meta ?? { total: users.length, page: 1, limit: 15, totalPages: 1 };
@@ -238,7 +260,10 @@ function UsersContent() {
                             Analyse des écarts
                         </Link>
                         {canCreateUser ? (
-                            <Button onClick={() => setCreateOpen(true)}>Nouvel utilisateur</Button>
+                            <>
+                                <Button variant="outline" onClick={() => setImportOpen(true)}>Importer Excel</Button>
+                                <Button onClick={() => setCreateOpen(true)}>Nouvel utilisateur</Button>
+                            </>
                         ) : referencesPending ? (
                             <Button disabled>Chargement…</Button>
                         ) : null}
@@ -278,7 +303,7 @@ function UsersContent() {
                     <CardTitle>Utilisateurs</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0_1fr)_210px_210px] lg:items-end">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0_1fr)] lg:items-end">
                         <div className="space-y-1">
                             <Label htmlFor="users-search">Rechercher</Label>
                             <Input
@@ -288,36 +313,17 @@ function UsersContent() {
                                 placeholder="Matricule, nom, e-mail, rôle…"
                             />
                         </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="users-sort-by">Trier par</Label>
-                            <Select value={sortBy} onValueChange={(value: 'name' | 'score') => { setSortBy(value); setPage(1); }}>
-                                <SelectTrigger id="users-sort-by"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="score">Score moyen</SelectItem>
-                                    <SelectItem value="name">Nom</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="users-sort-order">Ordre</Label>
-                            <Select value={sortOrder} onValueChange={(value: 'asc' | 'desc') => { setSortOrder(value); setPage(1); }}>
-                                <SelectTrigger id="users-sort-order"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="desc">{sortBy === 'score' ? 'Du plus élevé au plus faible' : 'Z à A'}</SelectItem>
-                                    <SelectItem value="asc">{sortBy === 'score' ? 'Du plus faible au plus élevé' : 'A à Z'}</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
                     </div>
 
-                    <Table className="min-w-[960px]">
+                    <Table className="min-w-[980px]">
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Matricule</TableHead>
                                 <TableHead>Nom</TableHead>
                                 <TableHead>Rôle</TableHead>
-                                <TableHead>Score moyen</TableHead>
                                 <TableHead>Région</TableHead>
+                                <TableHead>Service · District · Secteur</TableHead>
+                                <TableHead>Manager</TableHead>
                                 <TableHead>Branche</TableHead>
                                 <TableHead>Statut</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
@@ -326,7 +332,7 @@ function UsersContent() {
                         <TableBody>
                             {users.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-sabc-gray-500 py-8 text-center">
+                                    <TableCell colSpan={9} className="text-sabc-gray-500 py-8 text-center">
                                         {searchDebounced ? 'Aucun résultat pour cette recherche' : 'Aucun utilisateur'}
                                     </TableCell>
                                 </TableRow>
@@ -341,10 +347,11 @@ function UsersContent() {
                                     <TableCell>
                                         <Badge variant="outline">{user.role || 'n.d.'}</Badge>
                                     </TableCell>
-                                    <TableCell>
-                                        <span className="whitespace-nowrap tabular-nums">{formatScore(user.score_moyen, 2)}</span>
-                                    </TableCell>
                                     <TableCell>{regionLabel(user)}</TableCell>
+                                    <TableCell className="max-w-56 truncate" title={structureLabel(user)}>
+                                        {structureLabel(user)}
+                                    </TableCell>
+                                    <TableCell>{user.manager_matricule || 'n.d.'}</TableCell>
                                     <TableCell>{branchLabel(user)}</TableCell>
                                     <TableCell>
                                         {(() => {
@@ -391,7 +398,14 @@ function UsersContent() {
                                     value={createForm[key]}
                                     onChange={(e) => setCreateForm((prev) => ({ ...prev, [key]: e.target.value }))}
                                     minLength={key === 'password' ? 8 : undefined}
+                                    maxLength={key === 'matricule' ? 6 : undefined}
+                                    aria-describedby={key === 'matricule' ? 'create-matricule-hint' : undefined}
                                 />
+                                {key === 'matricule' ? (
+                                    <p id="create-matricule-hint" className="mt-1 text-xs text-sabc-gray-500">
+                                        Le matricule SABC comporte 6 caractères.
+                                    </p>
+                                ) : null}
                                 {key === 'matricule' && createValidationErrors.matricule ? (
                                     <p className="mt-1 text-xs text-red-700">{createValidationErrors.matricule}</p>
                                 ) : null}
@@ -404,7 +418,7 @@ function UsersContent() {
                         ))}
                         <div>
                             <Label>Rôle</Label>
-                            <Select value={createForm.id_role} onValueChange={(id_role) => setCreateForm((prev) => ({ ...prev, id_role }))}>
+                            <Select value={createForm.id_role} onValueChange={(id_role) => setCreateForm((prev) => ({ ...prev, id_role, manager_matricule: '' }))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Sélectionner un rôle" />
                                 </SelectTrigger>
@@ -420,7 +434,14 @@ function UsersContent() {
                         </div>
                         <div>
                             <Label>Région</Label>
-                            <Select value={createForm.id_region} onValueChange={(id_region) => setCreateForm((prev) => ({ ...prev, id_region }))}>
+                            <Select value={createForm.id_region} onValueChange={(id_region) => setCreateForm((prev) => ({
+                                ...prev,
+                                id_region,
+                                manager_matricule: '',
+                                id_service: '',
+                                id_district: '',
+                                id_secteur: '',
+                            }))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Sélectionner une région" />
                                 </SelectTrigger>
@@ -433,21 +454,14 @@ function UsersContent() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="md:col-span-2">
-                            <Label htmlFor="create-manager_matricule">Manager (matricule)</Label>
-                            <Input
-                                id="create-manager_matricule"
-                                value={createForm.manager_matricule}
-                                onChange={(e) =>
-                                    setCreateForm((prev) => ({
-                                        ...prev,
-                                        manager_matricule: e.target.value,
-                                    }))
-                                }
-                            />
-                            <p className={`mt-1 text-xs ${createValidationErrors.manager_matricule ? 'text-red-700' : 'text-sabc-gray-500'}`}>
-                                {createValidationErrors.manager_matricule || 'Facultatif · 5 caractères maximum.'}
+                        <div className="grid gap-4 border-t border-sabc-gray-200 pt-4 md:col-span-2 md:grid-cols-2">
+                            <p className="text-sm font-semibold text-sabc-gray-900 md:col-span-2">
+                                Périmètre de travail et hiérarchie
                             </p>
+                            <UserAssignmentFields
+                                values={createForm}
+                                onChange={(field, value) => setCreateForm((previous) => ({ ...previous, [field]: value }))}
+                            />
                         </div>
                         {createErrorMessage && <p className="text-sabc-red-primary text-sm md:col-span-2">{createErrorMessage}</p>}
                     </div>
@@ -476,7 +490,7 @@ function UsersContent() {
 
                     <div className="grid max-h-[60vh] gap-4 overflow-y-auto pr-1 md:grid-cols-2">
                         {editTextFields.map(({ key, label, type = 'text' }) => (
-                            <div key={key} className={key === 'manager_matricule' ? 'md:col-span-2' : undefined}>
+                            <div key={key}>
                                 <Label htmlFor={`edit-${key}`}>{label}</Label>
                                 <Input
                                     id={`edit-${key}`}
@@ -486,9 +500,18 @@ function UsersContent() {
                                 />
                             </div>
                         ))}
+                        <div className="grid gap-4 border-t border-sabc-gray-200 pt-4 md:col-span-2 md:grid-cols-2">
+                            <p className="text-sm font-semibold text-sabc-gray-900 md:col-span-2">
+                                Périmètre de travail et hiérarchie
+                            </p>
+                            <UserAssignmentFields
+                                values={editForm}
+                                onChange={(field, value) => setEditForm((previous) => ({ ...previous, [field]: value }))}
+                            />
+                        </div>
                         <div>
                             <Label>Rôle</Label>
-                            <Select value={editForm.id_role} onValueChange={(id_role) => setEditForm((prev) => ({ ...prev, id_role }))}>
+                            <Select value={editForm.id_role} onValueChange={(id_role) => setEditForm((prev) => ({ ...prev, id_role, manager_matricule: '' }))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Sélectionner un rôle" />
                                 </SelectTrigger>
@@ -504,7 +527,14 @@ function UsersContent() {
                         </div>
                         <div>
                             <Label>Région</Label>
-                            <Select value={editForm.id_region} onValueChange={(id_region) => setEditForm((prev) => ({ ...prev, id_region }))}>
+                            <Select value={editForm.id_region} onValueChange={(id_region) => setEditForm((prev) => ({
+                                ...prev,
+                                id_region,
+                                manager_matricule: '',
+                                id_service: '',
+                                id_district: '',
+                                id_secteur: '',
+                            }))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Sélectionner une région" />
                                 </SelectTrigger>
@@ -551,6 +581,7 @@ function UsersContent() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ExcelImportDialog kind="users" open={importOpen} onOpenChange={setImportOpen} />
         </AdminUsersLayout>
     );
 }

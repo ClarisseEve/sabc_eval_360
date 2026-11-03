@@ -26,6 +26,7 @@ import {
 } from './shared';
 import { ActiveRulesCard, formatDateLabel, formatEvaluationType } from '@/Components/Dashboard/RoleDashboardShared';
 import { getScoreTone } from '@/utils/adminUi';
+import { summarizeCompetencies } from './show-data';
 
 const STATUS_VARIANTS: Record<string, { label: string; variant: 'primary' | 'secondary' | 'destructive'; helper: string }> = {
   brouillon: {
@@ -82,13 +83,22 @@ const ShowEvaluation: React.FC = () => {
   const statusMeta = STATUS_VARIANTS[evaluation?.statut] ?? STATUS_VARIANTS.brouillon;
   const context = useMemo(() => buildEvaluationContext(evaluation), [evaluation]);
   const mergedCriteria = context.criteria;
+  const competencySummary = useMemo(() => summarizeCompetencies(mergedCriteria), [mergedCriteria]);
   const isEvaluator = evaluation?.evaluateur?.matricule && evaluation.evaluateur.matricule === rawUser?.matricule;
   const canEditDraft = isEvaluator && evaluation?.statut === 'brouillon';
   const canEditRejected = isEvaluator && evaluation?.statut === 'rejete';
   const canEdit = canEditDraft || canEditRejected;
   const evaluationId = evaluation?.id_evaluation ?? evaluation?.id;
   const overallScore = evaluation?.note_globale ? Number(evaluation.note_globale) : null;
-  const hasComments = Boolean(evaluation?.commentaire_general);
+  const legacyComment = evaluation?.commentaire_global ?? evaluation?.commentaire_general;
+  const hasSplitComments =
+    evaluation?.commentaire_points_forts != null ||
+    evaluation?.commentaire_axes_amelioration != null;
+  const hasComments = Boolean(
+    evaluation?.commentaire_points_forts ||
+    evaluation?.commentaire_axes_amelioration ||
+    legacyComment,
+  );
   const decisionDateLabel = evaluation?.statut === 'valide' ? 'Validée le' : 'Dernier retour le';
   const fallbackBackPath = isEvaluator && ['brouillon', 'rejete'].includes(String(evaluation?.statut))
     ? '/evaluations/pending'
@@ -104,7 +114,7 @@ const ShowEvaluation: React.FC = () => {
   return (
     <EvaluationPageLayout pageTitle="Détail de l'évaluation">
       <Head title="Détail de l'évaluation" />
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button asChild={false} variant="ghost" size="sm" className="text-sabc-gray-500 hover:text-sabc-gray-800" onClick={handleBack}>
             <span className="inline-flex items-center">
@@ -210,96 +220,91 @@ const ShowEvaluation: React.FC = () => {
           </Card>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-[340px_1fr]">
-          <div className="space-y-6">
-            <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
-              <CardContent className="p-0">
-                <div className="flex">
-                  {/* Score — gauche, large */}
-                  <div className="flex w-44 shrink-0 flex-col items-center justify-center border-r border-sabc-gray-200 py-6 dark:border-sabc-gray-700">
-                    <ShieldCheck className="mb-1.5 h-6 w-6 text-sabc-success" />
-                    <div className="text-[10px] font-semibold text-sabc-gray-400">Note globale</div>
-                    <div
-                      className={`mt-1 text-5xl font-extrabold leading-none ${
-                        overallScore != null && getScoreTone(overallScore) === 'success' ? 'text-sabc-success' : 'text-sabc-red-primary'
-                      }`}
-                    >
-                      {overallScore != null ? overallScore.toFixed(2) : '—'}
+        <div className="space-y-6">
+          <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
+            <CardContent className="p-0">
+              <div className="grid grid-cols-1 md:grid-cols-[180px_minmax(0,1fr)] xl:grid-cols-[180px_minmax(0,1fr)_190px]">
+                <div className="flex flex-col items-center justify-center border-b border-sabc-gray-200 px-6 py-6 text-center dark:border-sabc-gray-700 md:border-b-0 md:border-r">
+                  <ShieldCheck className="mb-1.5 h-6 w-6 text-sabc-success" />
+                  <div className="text-xs font-semibold text-sabc-gray-400">Note globale</div>
+                  <div
+                    className={`mt-1 text-5xl font-extrabold leading-none ${
+                      overallScore != null && getScoreTone(overallScore) === 'success' ? 'text-sabc-success' : 'text-sabc-red-primary'
+                    }`}
+                  >
+                    {overallScore != null ? overallScore.toFixed(2) : '—'}
+                  </div>
+                  <div className="mt-0.5 text-sm font-medium text-sabc-gray-400">/5</div>
+                  {overallScore != null && (
+                    <div className="mt-3 h-2 w-20 overflow-hidden rounded-full bg-sabc-gray-200 dark:bg-sabc-gray-700">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          getScoreTone(overallScore) === 'success' ? 'bg-sabc-success' : 'bg-sabc-red-primary'
+                        }`}
+                        style={{ width: `${Math.min((overallScore / 5) * 100, 100)}%` }}
+                      />
                     </div>
-                    <div className="mt-0.5 text-sm font-medium text-sabc-gray-400">/5</div>
-                    {overallScore != null && (
-                      <div className="mt-3 h-2 w-20 overflow-hidden rounded-full bg-sabc-gray-200 dark:bg-sabc-gray-700">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            getScoreTone(overallScore) === 'success' ? 'bg-sabc-success' : 'bg-sabc-red-primary'
-                          }`}
-                          style={{ width: `${Math.min((overallScore / 5) * 100, 100)}%` }}
-                        />
+                  )}
+                </div>
+
+                <div className="flex flex-col justify-center gap-5 p-5 sm:flex-row sm:items-center sm:gap-10">
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-sabc-gray-400">Cadre</span>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Badge variant="info">{context.criteriaCount} critères</Badge>
+                      <Badge variant="info">{context.sections.length} sections</Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-sabc-gray-400">Cycle</span>
+                    <div className="mt-2 font-semibold text-sabc-gray-800 dark:text-sabc-gray-200">{context.periodLabel}</div>
+                    {context.periodRange && (
+                      <div className="mt-1 text-sm text-sabc-gray-500">
+                        {`${formatDateLabel(context.periodRange.start)} — ${formatDateLabel(context.periodRange.end)}`}
                       </div>
                     )}
                   </div>
-
-                  {/* Centre — cadre, cycle, validation */}
-                  <div className="flex flex-1 flex-col justify-center space-y-3 p-4">
-                    <div className="flex flex-wrap items-start gap-x-6 gap-y-2 text-xs">
-                      <div>
-                        <span className="font-semibold uppercase text-sabc-gray-400">Cadre</span>
-                        <div className="mt-1 flex flex-wrap gap-1.5">
-                          <Badge variant="info">{context.criteriaCount} critères</Badge>
-                          <Badge variant="info">{context.sections.length} sections</Badge>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="font-semibold uppercase text-sabc-gray-400">Cycle</span>
-                        <div className="mt-1 font-medium text-sabc-gray-800 dark:text-sabc-gray-200">{context.periodLabel}</div>
-                        {context.periodRange && (
-                          <div className="text-sabc-gray-500">
-                            {`${formatDateLabel(context.periodRange.start)} — ${formatDateLabel(context.periodRange.end)}`}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {evaluation?.validateur && (
-                      <div className="flex items-start gap-2 border-t border-sabc-gray-100 pt-2 text-xs dark:border-sabc-gray-800">
-                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sabc-success" />
+                  {evaluation?.validateur && (
+                    <div className="min-w-0 border-t border-sabc-gray-100 pt-4 text-sm dark:border-sabc-gray-800 sm:border-l sm:border-t-0 sm:pl-8 sm:pt-0">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sabc-success" />
                         <div>
                           <span className="font-medium text-sabc-gray-800 dark:text-sabc-gray-200">{formatDisplayName(evaluation.validateur)}</span>
                           {evaluation.commentaire_validation && (
-                            <span className="ml-1 text-sabc-gray-500">— {evaluation.commentaire_validation}</span>
+                            <p className="mt-1 text-sabc-gray-500">{evaluation.commentaire_validation}</p>
                           )}
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                </div>
 
-                  {/* Droite — dates */}
-                  <div className="flex w-40 shrink-0 flex-col justify-center gap-2 border-l border-sabc-gray-100 px-4 py-4 text-[11px] dark:border-sabc-gray-800">
-                    <div>
-                      <div className="font-semibold uppercase text-sabc-gray-400">Créée</div>
-                      <div className="text-sabc-gray-600 dark:text-sabc-gray-300">{formatDate(evaluation?.created_at, true) ?? '—'}</div>
-                    </div>
-                    <div>
-                      <div className="font-semibold uppercase text-sabc-gray-400">Soumise</div>
-                      <div className="text-sabc-gray-600 dark:text-sabc-gray-300">{formatDate(evaluation?.date_soumission, true) ?? 'En attente'}</div>
-                    </div>
-                    <div>
-                      <div className="font-semibold uppercase text-sabc-gray-400">{decisionDateLabel}</div>
-                      <div className="text-sabc-gray-600 dark:text-sabc-gray-300">{formatDate(evaluation?.date_validation, true) ?? 'En cours'}</div>
-                    </div>
+                <div className="grid grid-cols-3 gap-3 border-t border-sabc-gray-100 px-5 py-4 text-xs dark:border-sabc-gray-800 md:col-span-2 xl:col-span-1 xl:grid-cols-1 xl:border-l xl:border-t-0">
+                  <div>
+                    <div className="font-semibold uppercase tracking-wide text-sabc-gray-400">Créée</div>
+                    <div className="mt-1 text-sabc-gray-600 dark:text-sabc-gray-300">{formatDate(evaluation?.created_at, true) ?? '—'}</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold uppercase tracking-wide text-sabc-gray-400">Soumise</div>
+                    <div className="mt-1 text-sabc-gray-600 dark:text-sabc-gray-300">{formatDate(evaluation?.date_soumission, true) ?? 'En attente'}</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold uppercase tracking-wide text-sabc-gray-400">{decisionDateLabel}</div>
+                    <div className="mt-1 text-sabc-gray-600 dark:text-sabc-gray-300">{formatDate(evaluation?.date_validation, true) ?? 'En cours'}</div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
 
-            <ActiveRulesCard
-              rules={evaluation?.regle ? [context.rule] : []}
-              maxItems={1}
-              description="Règle publiée qui a cadré la saisie et la visibilité de cette évaluation."
-            />
-          </div>
+          <ActiveRulesCard
+            rules={evaluation?.regle ? [context.rule] : []}
+            maxItems={1}
+            description="Règle publiée qui a cadré la saisie et la visibilité de cette évaluation."
+          />
+        </div>
 
-          <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
+        <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 Détail des critères évalués
@@ -314,7 +319,7 @@ const ShowEvaluation: React.FC = () => {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {mergedCriteria.map((critere, index) => {
                     const note = critere.note != null ? Number(critere.note) : null;
                     const noteColor =
@@ -354,18 +359,88 @@ const ShowEvaluation: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        </div>
+
+        <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
+          <CardHeader>
+            <CardTitle className="text-base">Synthèse des compétences</CardTitle>
+            <p className="text-sm text-sabc-gray-500">
+              Synthèse informative calculée à partir des notes et du niveau requis pour chaque critère.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-sabc-success/30 bg-sabc-success/5 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-semibold text-sabc-gray-900 dark:text-white">Compétences acquises</h3>
+                <Badge variant="success">{competencySummary.acquired.length}</Badge>
+              </div>
+              {competencySummary.acquired.length ? (
+                <ul className="mt-3 space-y-2 text-sm text-sabc-gray-700 dark:text-sabc-gray-200">
+                  {competencySummary.acquired.map((criterion) => (
+                    <li key={String(criterion.id)} className="flex justify-between gap-3">
+                      <span>{criterion.libelle}</span>
+                      <span className="shrink-0 font-medium text-sabc-success">
+                        {criterion.note}/5 · requis {criterion.niveauRequis}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-sm text-sabc-gray-500">Aucune compétence acquise selon les notes renseignées.</p>
+              )}
+            </div>
+            <div className="rounded-lg border border-sabc-red-primary/20 bg-sabc-red-light/20 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-semibold text-sabc-gray-900 dark:text-white">Compétences à renforcer</h3>
+                <Badge variant="destructive">{competencySummary.needsWork.length}</Badge>
+              </div>
+              {competencySummary.needsWork.length ? (
+                <ul className="mt-3 space-y-2 text-sm text-sabc-gray-700 dark:text-sabc-gray-200">
+                  {competencySummary.needsWork.map((criterion) => (
+                    <li key={String(criterion.id)} className="flex justify-between gap-3">
+                      <span>{criterion.libelle}</span>
+                      <span className="shrink-0 font-medium text-sabc-red-primary">
+                        {criterion.note}/5 · requis {criterion.niveauRequis}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-sm text-sabc-gray-500">Aucune compétence sous le niveau requis.</p>
+              )}
+            </div>
+            {competencySummary.notRated.length > 0 && (
+              <p className="text-xs text-sabc-gray-500 md:col-span-2">
+                {competencySummary.notRated.length} critère{competencySummary.notRated.length > 1 ? 's' : ''} sans note, exclu{competencySummary.notRated.length > 1 ? 's' : ''} de cette synthèse.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="border-sabc-gray-200 dark:border-sabc-gray-700">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <MessageSquare className="h-5 w-5 text-sabc-gray-500" />
-              Commentaire global
+              Commentaires de l'évaluateur
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {hasComments ? (
-              <p className="text-sm text-sabc-gray-700 dark:text-sabc-gray-200">{evaluation.commentaire_general}</p>
+            {hasSplitComments ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-sabc-gray-200 p-4 dark:border-sabc-gray-700">
+                  <h3 className="text-sm font-semibold text-sabc-gray-900 dark:text-white">Points forts</h3>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-sabc-gray-700 dark:text-sabc-gray-200">
+                    {evaluation.commentaire_points_forts || 'Aucun point fort renseigné.'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-sabc-gray-200 p-4 dark:border-sabc-gray-700">
+                  <h3 className="text-sm font-semibold text-sabc-gray-900 dark:text-white">Compétences non acquises ou à améliorer</h3>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-sabc-gray-700 dark:text-sabc-gray-200">
+                    {evaluation.commentaire_axes_amelioration || 'Aucun axe d’amélioration renseigné.'}
+                  </p>
+                </div>
+              </div>
+            ) : hasComments ? (
+              <p className="whitespace-pre-wrap text-sm text-sabc-gray-700 dark:text-sabc-gray-200">{legacyComment}</p>
             ) : (
               <div className="rounded-lg border border-dashed border-sabc-gray-200 p-4 text-sm text-sabc-gray-500 dark:border-sabc-gray-700 dark:text-sabc-gray-300">
                 Aucun commentaire général n'a été ajouté pour cette évaluation.

@@ -19,9 +19,49 @@ export interface PeriodeEvaluation {
   updated_at: Date;
 }
 
+export type EvaluationCadence = 'trimestrielle' | 'semestrielle';
+
 @Injectable()
 export class PeriodesService {
   constructor(private pg: DatabasePgService) {}
+
+  async findCadence(year: number) {
+    this.validateYear(year);
+    return this.pg.queryOne<{ annee: number; cadence: EvaluationCadence }>(
+      'SELECT annee, cadence FROM periodes_evaluation_cadences WHERE annee = $1',
+      [year],
+    );
+  }
+
+  async configureCadence(year: number, cadence: EvaluationCadence) {
+    this.validateYear(year);
+    if (!['trimestrielle', 'semestrielle'].includes(cadence)) {
+      throw new BadRequestException('La cadence doit être trimestrielle ou semestrielle.');
+    }
+
+    const maximumPeriods = cadence === 'trimestrielle' ? 4 : 2;
+    const existing = await this.pg.queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+       FROM periodes_evaluation
+       WHERE date_debut >= make_date($1, 1, 1)
+         AND date_debut < make_date($1 + 1, 1, 1)`,
+      [year],
+    );
+    if (Number(existing?.count ?? 0) > maximumPeriods) {
+      throw new BadRequestException(
+        `Cette année comporte déjà plus de ${maximumPeriods} périodes. Supprimez ou replanifiez des périodes avant de choisir cette cadence.`,
+      );
+    }
+
+    await this.pg.execute(
+      `INSERT INTO periodes_evaluation_cadences (annee, cadence, created_at, updated_at)
+       VALUES ($1, $2, NOW(), NOW())
+       ON CONFLICT (annee)
+       DO UPDATE SET cadence = EXCLUDED.cadence, updated_at = NOW()`,
+      [year, cadence],
+    );
+    return this.findCadence(year);
+  }
 
   async findAll(): Promise<PeriodeEvaluation[]> {
     return this.pg.query<PeriodeEvaluation>('SELECT * FROM periodes_evaluation ORDER BY date_debut DESC');
@@ -48,6 +88,7 @@ export class PeriodesService {
   async create(data: { code_periode: string; nom_periode: string; description?: string; date_debut: string; date_fin: string }): Promise<PeriodeEvaluation> {
     this.validateDates(new Date(data.date_debut), new Date(data.date_fin), true);
     await this.validateNoChevauchement(new Date(data.date_debut), new Date(data.date_fin));
+    await this.ensureWithinConfiguredCadence(data.date_debut);
 
     // PostgreSQL génère la clé UUID canonique, ensuite propagée telle quelle
     // aux évaluations, assignations, rapports et statistiques.
@@ -74,6 +115,10 @@ export class PeriodesService {
       const fin = new Date(data.date_fin ?? periode.date_fin);
       this.validateDates(debut, fin, false);
       await this.validateNoChevauchement(debut, fin, id);
+      await this.ensureWithinConfiguredCadence(
+        data.date_debut ?? String(periode.date_debut).slice(0, 10),
+        id,
+      );
     }
 
     // Whitelist of columns allowed in UPDATE to prevent SQL injection via key names
@@ -271,6 +316,34 @@ export class PeriodesService {
     const diffDays = Math.round((fin.getTime() - debut.getTime()) / 86400000);
     if (diffDays < 7) throw new BadRequestException('La période doit durer au moins 7 jours');
     if (diffDays > 180) throw new BadRequestException('La période ne peut pas dépasser 180 jours');
+  }
+
+  private validateYear(year: number): void {
+    if (!Number.isInteger(year) || year < 1900 || year > 2200) {
+      throw new BadRequestException('L’année doit être comprise entre 1900 et 2200.');
+    }
+  }
+
+  private async ensureWithinConfiguredCadence(date: string, excludeId?: string): Promise<void> {
+    const year = Number(date.slice(0, 4));
+    this.validateYear(year);
+    const configuration = await this.findCadence(year);
+    if (!configuration) return;
+
+    const maximumPeriods = configuration.cadence === 'trimestrielle' ? 4 : 2;
+    const count = await this.pg.queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+       FROM periodes_evaluation
+       WHERE date_debut >= make_date($1, 1, 1)
+         AND date_debut < make_date($1 + 1, 1, 1)
+         AND ($2::uuid IS NULL OR id_periode <> $2::uuid)`,
+      [year, excludeId ?? null],
+    );
+    if (Number(count?.count ?? 0) >= maximumPeriods) {
+      throw new BadRequestException(
+        `La cadence ${configuration.cadence} autorise au maximum ${maximumPeriods} périodes pour ${year}.`,
+      );
+    }
   }
 
   private async validateNoChevauchement(debut: Date, fin: Date, excludeId?: string): Promise<void> {

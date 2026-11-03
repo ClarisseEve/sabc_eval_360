@@ -51,4 +51,14 @@ export class UpdateEvaluationDto {
   @IsOptional()
   @MaxLength(10000)
   commentaire_general?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(10000)
+  commentaire_points_forts?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(10000)
+  commentaire_axes_amelioration?: string;
 }

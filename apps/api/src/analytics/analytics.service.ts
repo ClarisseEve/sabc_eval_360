@@ -263,6 +263,7 @@ export class AnalyticsService {
       type_evaluation: string;
       competence: string;
       score: number | string | null;
+      niveau_requis: number | string | null;
     }>(
       `SELECT
          ${EVALUATION_EFFECTIVE_DATE_E_SQL} AS date_evaluation,
@@ -275,7 +276,8 @@ export class AnalyticsService {
          CONCAT_WS(' ', evaluateur.prenom, evaluateur.nom) AS evaluateur_nom,
          e.type_evaluation,
          COALESCE(note->>'nom', note->>'critere', note->>'categorie', critere->>'nom', critere->>'libelle', note->>'critere_id', 'Compétence') AS competence,
-         NULLIF(note->>'note', '')::numeric AS score
+         NULLIF(note->>'note', '')::numeric AS score,
+         NULLIF(critere->>'niveau_requis', '')::numeric AS niveau_requis
        FROM evaluations e
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
        LEFT JOIN utilisateurs_ref evalue ON evalue.matricule = e.evalue_matricule
@@ -300,10 +302,11 @@ export class AnalyticsService {
     const headers = [
       "Date d'évaluation", "Statut de l'évaluation", "Noms et prénoms de l'évalué", "Matricule de l'évalué", "Poste de l'évalué",
       'Branche', "Région de l'évalué", "Nom de l'évaluateur", "Type d'évaluation", 'Compétence',
-      'Note ou score de la compétence', 'Description',
+      'Note obtenue', 'Niveau requis', 'Description',
     ];
     const data = rows.map((row) => {
       const score = row.score == null ? null : Number(row.score);
+      const requiredLevel = row.niveau_requis == null ? null : Number(row.niveau_requis);
       return [
         row.date_evaluation ? new Date(row.date_evaluation).toISOString().slice(0, 10) : '',
         this.formatEvaluationStatusForExport(row.statut),
@@ -316,6 +319,7 @@ export class AnalyticsService {
         this.formatEvaluationTypeForExport(row.type_evaluation),
         row.competence,
         score == null || Number.isNaN(score) ? '' : score,
+        requiredLevel == null || Number.isNaN(requiredLevel) ? '' : requiredLevel,
         this.describeScore(score),
       ];
     });
@@ -340,7 +344,7 @@ export class AnalyticsService {
     worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC62828' } };
     data.forEach((line) => worksheet.addRow(line));
-    worksheet.autoFilter = { from: 'A1', to: `L${Math.max(1, data.length + 1)}` };
+    worksheet.autoFilter = { from: 'A1', to: `${worksheet.getColumn(headers.length).letter}${Math.max(1, data.length + 1)}` };
     worksheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     return {

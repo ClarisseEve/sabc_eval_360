@@ -29,6 +29,45 @@ describe('PeriodesService', () => {
     });
   });
 
+  describe('cadence annuelle', () => {
+    it('rejette une année hors limites avant toute requête', async () => {
+      await expect(service.findCadence(2201)).rejects.toThrow(BadRequestException);
+      expect(mockPg.queryOne).not.toHaveBeenCalled();
+    });
+
+    it('enregistre une cadence lorsque le nombre de périodes existantes le permet', async () => {
+      mockPg.queryOne
+        .mockResolvedValueOnce({ count: '2' })
+        .mockResolvedValueOnce({ annee: 2027, cadence: 'trimestrielle' });
+
+      await expect(service.configureCadence(2027, 'trimestrielle')).resolves.toEqual({
+        annee: 2027,
+        cadence: 'trimestrielle',
+      });
+
+      expect(mockPg.execute).toHaveBeenCalledWith(
+        expect.stringContaining('ON CONFLICT (annee)'),
+        [2027, 'trimestrielle'],
+      );
+    });
+
+    it('refuse une cadence semestrielle si plus de deux périodes existent déjà', async () => {
+      mockPg.queryOne.mockResolvedValueOnce({ count: '3' });
+
+      await expect(service.configureCadence(2027, 'semestrielle')).rejects.toThrow(
+        'plus de 2 périodes',
+      );
+      expect(mockPg.execute).not.toHaveBeenCalled();
+    });
+
+    it('refuse les valeurs de cadence inconnues', async () => {
+      await expect(service.configureCadence(2027, 'annuelle' as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockPg.queryOne).not.toHaveBeenCalled();
+    });
+  });
+
   describe('create', () => {
     it('should reject dates where debut >= fin', async () => {
       await expect(
@@ -63,11 +102,30 @@ describe('PeriodesService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('applique la limite configurée avant de créer une période', async () => {
+      mockPg.queryOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ annee: 2027, cadence: 'trimestrielle' })
+        .mockResolvedValueOnce({ count: '4' });
+
+      await expect(
+        service.create({
+          code_periode: 'P2705',
+          nom_periode: 'Test',
+          date_debut: '2027-10-01',
+          date_fin: '2027-12-30',
+        }),
+      ).rejects.toThrow('au maximum 4 périodes');
+      expect(mockPg.queryOne).toHaveBeenCalledTimes(3);
+    });
+
     it('should let PostgreSQL assign the UUID and return the created row', async () => {
       // 1er queryOne : validateNoChevauchement (aucun chevauchement)
-      // 2e queryOne : INSERT ... RETURNING id_periode
-      // 3e queryOne : findById
+      // 2e queryOne : aucune cadence configurée
+      // 3e queryOne : INSERT ... RETURNING id_periode
+      // 4e queryOne : findById
       mockPg.queryOne
+        .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ id_periode: '11111111-1111-4111-8111-111111111111' })
         .mockResolvedValueOnce({ id_periode: '11111111-1111-4111-8111-111111111111', code_periode: 'P1', statut: 'planifiee' });
@@ -80,11 +138,11 @@ describe('PeriodesService', () => {
       });
 
       // L'INSERT ne doit PAS contenir id_periode dans les colonnes
-      const insertCall = mockPg.queryOne.mock.calls[1];
+      const insertCall = mockPg.queryOne.mock.calls[2];
       expect(insertCall[0]).toMatch(/INSERT INTO periodes_evaluation/);
       expect(insertCall[0]).not.toMatch(/\bid_periode\b\s*,/);
       expect(insertCall[0]).toMatch(/RETURNING id_periode/);
-      expect(mockPg.queryOne.mock.calls[2][1]).toEqual(['11111111-1111-4111-8111-111111111111']);
+      expect(mockPg.queryOne.mock.calls[3][1]).toEqual(['11111111-1111-4111-8111-111111111111']);
       expect(result).toEqual({
         id_periode: '11111111-1111-4111-8111-111111111111',
         code_periode: 'P1',

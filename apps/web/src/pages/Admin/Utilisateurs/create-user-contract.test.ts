@@ -31,6 +31,9 @@ describe('create user API contract', () => {
             id_region: 'RG001',
             telephone: null,
             manager_matricule: null,
+            id_service: null,
+            id_district: null,
+            id_secteur: null,
         });
         expect(payload).not.toHaveProperty('role');
         expect(payload).not.toHaveProperty('role_nom');
@@ -44,12 +47,19 @@ describe('create user API contract', () => {
                 ...validForm,
                 telephone: ' 690000000 ',
                 manager_matricule: ' M0001 ',
+                id_service: ' S001 ',
+                id_district: ' D001 ',
+                id_secteur: ' T001 ',
             }),
         ).toMatchObject({
             telephone: '690000000',
             manager_matricule: 'M0001',
+            id_service: 'S001',
+            id_district: 'D001',
+            id_secteur: 'T001',
         });
         expect(isCreateUserFormValid(validForm)).toBe(true);
+        expect(isCreateUserFormValid({ ...validForm, matricule: '114804' })).toBe(true);
         expect(isCreateUserFormValid({ ...validForm, id_role: '' })).toBe(false);
         expect(isCreateUserFormValid({ ...validForm, password: 'short' })).toBe(false);
     });
@@ -57,16 +67,16 @@ describe('create user API contract', () => {
     it('explains invalid identifier lengths and password requirements', () => {
         const invalidForm = {
             ...validForm,
-            matricule: 'EVE1234',
+            matricule: 'EVE12345',
             password: '123456',
             manager_matricule: 'A00010E',
         };
 
         expect(getCreateUserFormErrors(invalidForm)).toEqual({
-            matricule: 'Le matricule doit contenir 5 caractères maximum.',
+            matricule: 'Le matricule doit contenir 6 caractères maximum.',
             password: 'Le mot de passe doit contenir au moins 8 caractères.',
             manager_matricule:
-                'Le matricule du manager doit contenir 5 caractères maximum. Laissez ce champ vide si nécessaire.',
+                'Le matricule du manager doit contenir 6 caractères maximum. Laissez ce champ vide si nécessaire.',
         });
         expect(isCreateUserFormValid(invalidForm)).toBe(false);
     });

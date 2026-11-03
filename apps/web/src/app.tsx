@@ -17,11 +17,11 @@ import { BrandMark } from './Components/Brand/BrandMark';
 import { useInitRouter } from './lib/inertia-shim';
 
 // ─── Loading fallback ────────────────────────────────────────────────────────
-// La capsule de l'emblème tourne pendant le chargement (repère de marque).
+// Le logo officiel reste visible pendant le chargement de la page.
 const PageLoader = () => (
   <div className="flex h-screen items-center justify-center bg-sabc-gray-50 dark:bg-sabc-gray-900" role="status">
     <div className="flex flex-col items-center gap-4">
-      <BrandMark spin className="h-16 w-16 [&_.sabc-cap-spin]:[animation-duration:2.4s]" />
+      <BrandMark className="h-auto w-32" />
       <span className="text-sm text-sabc-gray-500">Chargement…</span>
     </div>
   </div>

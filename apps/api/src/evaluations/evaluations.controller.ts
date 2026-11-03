@@ -77,7 +77,14 @@ export class EvaluationsController {
 
   @Put(':id')
   async update(@Param('id') id: string, @Body() dto: UpdateEvaluationDto, @Request() req: any) {
-    await this.service.updateNotes(id, req.user, dto.notes, dto.commentaire_general);
+    await this.service.updateNotes(
+      id,
+      req.user,
+      dto.notes,
+      dto.commentaire_general,
+      dto.commentaire_points_forts,
+      dto.commentaire_axes_amelioration,
+    );
     return this.service.findById(id, req.user);
   }
 

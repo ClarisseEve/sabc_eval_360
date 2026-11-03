@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/guards/roles.guard';
@@ -37,6 +37,17 @@ export class AdminUsersController {
       sort_order,
       score_type,
     });
+  }
+
+  @Get('managers-eligibles')
+  getEligibleManagers(
+    @Query('id_role') idRole?: string,
+    @Query('id_region') idRegion?: string,
+  ) {
+    if (!idRole || !idRegion) {
+      throw new BadRequestException('Le rôle et la région sont requis pour rechercher les managers éligibles.');
+    }
+    return this.usersService.getEligibleManagersForCandidate(idRole, idRegion);
   }
 
   @Get(':matricule')

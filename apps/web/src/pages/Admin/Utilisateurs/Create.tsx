@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { buildCreateUserPayload, initialCreateUserForm, isCreateUserFormValid } from './create-user-contract';
 import { AdminUsersLayout } from './shared';
+import { UserAssignmentFields } from './UserAssignmentFields';
 
 export default function CreateUser() {
     const navigate = useNavigate();
@@ -56,12 +57,18 @@ export default function CreateUser() {
                     <CardTitle>Informations</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2">
-                    <FormField label="Matricule" htmlFor="matricule" required>
+                    <FormField
+                        label="Matricule"
+                        htmlFor="matricule"
+                        required
+                        hint="Le matricule doit comporter 6 caractères."
+                    >
                         <Input
                             id="matricule"
                             value={form.matricule}
                             onChange={(e) => setField('matricule', e.target.value)}
-                            placeholder="Ex. A0001"
+                            placeholder="Ex. 114804"
+                            maxLength={6}
                         />
                     </FormField>
                     <FormField label="Adresse e-mail" htmlFor="email" required>
@@ -87,7 +94,11 @@ export default function CreateUser() {
                     </FormField>
 
                     <FormField label="Rôle" required hint="Le niveau et la branche seront déterminés automatiquement.">
-                        <Select value={form.id_role} onValueChange={(value) => setField('id_role', value)}>
+                        <Select value={form.id_role} onValueChange={(id_role) => setForm((previous) => ({
+                            ...previous,
+                            id_role,
+                            manager_matricule: '',
+                        }))}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Sélectionner un rôle" />
                             </SelectTrigger>
@@ -102,7 +113,14 @@ export default function CreateUser() {
                     </FormField>
 
                     <FormField label="Région" required hint="Le type de région sera déterminé automatiquement.">
-                        <Select value={form.id_region} onValueChange={(value) => setField('id_region', value)}>
+                        <Select value={form.id_region} onValueChange={(id_region) => setForm((previous) => ({
+                            ...previous,
+                            id_region,
+                            manager_matricule: '',
+                            id_service: '',
+                            id_district: '',
+                            id_secteur: '',
+                        }))}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Sélectionner une région" />
                             </SelectTrigger>
@@ -116,19 +134,18 @@ export default function CreateUser() {
                         </Select>
                     </FormField>
 
-                    <FormField
-                        label="Manager (matricule)"
-                        htmlFor="manager_matricule"
-                        className="md:col-span-2"
-                        hint="Matricule du responsable hiérarchique (facultatif)."
-                    >
-                        <Input
-                            id="manager_matricule"
-                            value={form.manager_matricule}
-                            onChange={(e) => setField('manager_matricule', e.target.value)}
-                            placeholder="Ex. D1010"
-                        />
-                    </FormField>
+                    <div className="md:col-span-2">
+                        <h2 className="mb-1 text-sm font-semibold text-sabc-gray-900">Périmètre de travail et hiérarchie</h2>
+                        <p className="mb-3 text-xs text-sabc-gray-500">
+                            Le service, district et secteur sont facultatifs. Les secteurs disponibles dépendent du service et du district sélectionnés.
+                        </p>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <UserAssignmentFields
+                                values={form}
+                                onChange={(field, value) => setForm((previous) => ({ ...previous, [field]: value }))}
+                            />
+                        </div>
+                    </div>
 
                     <div className="flex justify-end gap-2 md:col-span-2">
                         <Link to="/admin/utilisateurs">

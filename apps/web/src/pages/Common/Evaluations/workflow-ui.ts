@@ -9,6 +9,7 @@ type CriterionInput = {
   note?: unknown;
   commentaire?: string | null;
   commentaireRequisSiNoteLt?: number | null;
+  niveauRequis?: number | null;
 };
 
 type DraftNoteInput = {
@@ -39,14 +40,17 @@ export function isRequiredCriterionCommentMissing({
   note,
   commentaire,
   threshold = 3,
+  requiredLevel = 3,
 }: {
   note: number | null | undefined;
   commentaire: string | null | undefined;
   threshold?: number | null;
+  requiredLevel?: number | null;
 }) {
   if (!isValidEvaluationScore(note)) return false;
-  const effectiveThreshold = threshold ?? 3;
-  return note < effectiveThreshold && (!commentaire || commentaire.trim().length === 0);
+  const effectiveThreshold = Math.max(threshold ?? 3, requiredLevel ?? 3);
+  const requiresComment = note === 5 || note < effectiveThreshold;
+  return requiresComment && (!commentaire || commentaire.trim().length === 0);
 }
 
 export function findNoteForCriterion<T extends DraftNoteInput>(
@@ -114,6 +118,7 @@ export function getEvaluationSubmissionState(
       note: notes[index]?.note,
       commentaire: notes[index]?.commentaire,
       threshold: criterion.commentaireRequisSiNoteLt,
+      requiredLevel: criterion.niveauRequis,
     }) ? 1 : 0)
   ), 0);
   const invalidCriteria = notes.slice(0, totalCount).filter((entry) => entry.critere_id.trim().length === 0).length;

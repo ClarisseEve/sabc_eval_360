@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AdminUsersLayout } from './shared';
+import { UserAssignmentFields } from './UserAssignmentFields';
 import {
     buildUpdateUserForm,
     buildUpdateUserPayload,
@@ -83,7 +84,11 @@ export default function EditUser() {
                         <Input id="telephone" type="tel" value={form.telephone} onChange={(e) => setField('telephone', e.target.value)} />
                     </FormField>
                     <FormField label="Rôle" required hint="Le niveau, la branche et les droits admin sont recalculés depuis le référentiel.">
-                        <Select value={form.id_role} onValueChange={(v) => setField('id_role', v)}>
+                        <Select value={form.id_role} onValueChange={(id_role) => setForm((previous) => ({
+                            ...previous,
+                            id_role,
+                            manager_matricule: '',
+                        }))}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Sélectionner un rôle" />
                             </SelectTrigger>
@@ -114,7 +119,14 @@ export default function EditUser() {
                         </Select>
                     </FormField>
                     <FormField label="Région">
-                        <Select value={form.id_region} onValueChange={(v) => setField('id_region', v)}>
+                        <Select value={form.id_region} onValueChange={(id_region) => setForm((previous) => ({
+                            ...previous,
+                            id_region,
+                            manager_matricule: '',
+                            id_service: '',
+                            id_district: '',
+                            id_secteur: '',
+                        }))}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Sélectionner une région" />
                             </SelectTrigger>
@@ -127,19 +139,18 @@ export default function EditUser() {
                             </SelectContent>
                         </Select>
                     </FormField>
-                    <FormField
-                        label="Manager (matricule)"
-                        htmlFor="manager_matricule"
-                        className="md:col-span-2"
-                        hint="Matricule du responsable hiérarchique (facultatif)."
-                    >
-                        <Input
-                            id="manager_matricule"
-                            value={form.manager_matricule}
-                            onChange={(e) => setField('manager_matricule', e.target.value)}
-                            placeholder="Ex. D1010"
-                        />
-                    </FormField>
+                    <div className="border-t border-sabc-gray-200 pt-4 md:col-span-2">
+                        <h2 className="mb-1 text-sm font-semibold text-sabc-gray-900">Périmètre de travail et hiérarchie</h2>
+                        <p className="mb-3 text-xs text-sabc-gray-500">
+                            Le rattachement structurel est facultatif. Les secteurs disponibles dépendent du service et du district sélectionnés.
+                        </p>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <UserAssignmentFields
+                                values={form}
+                                onChange={(field, value) => setForm((previous) => ({ ...previous, [field]: value }))}
+                            />
+                        </div>
+                    </div>
 
                     <div className="flex justify-end gap-2 md:col-span-2">
                         <Link to={`/admin/utilisateurs/${matricule}`}>

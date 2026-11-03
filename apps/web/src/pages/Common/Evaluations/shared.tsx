@@ -58,6 +58,7 @@ export type EvaluationCriterionView = {
   description: string | null;
   section: string;
   poids: number | null;
+  niveauRequis: number;
   niveaux: Array<{ niveau: number; description: string }>;
   commentaireRequisSiNoteLt: number | null;
   note: number | null;
@@ -88,6 +89,7 @@ export function buildEvaluationCriteria(evaluation: Record<string, any>): Evalua
       description: null,
       section: 'Compétences',
       poids: null,
+      niveauRequis: 3,
       niveaux: [],
       commentaireRequisSiNoteLt: 3,
       note: note.note ?? null,
@@ -104,6 +106,7 @@ export function buildEvaluationCriteria(evaluation: Record<string, any>): Evalua
       description: critere.description ?? null,
       section: critere.section_label ?? 'Compétences',
       poids: critere.poids ?? null,
+      niveauRequis: critere.niveau_requis ?? 3,
       niveaux: critere.niveaux ?? [],
       commentaireRequisSiNoteLt: critere.commentaire_requis_si_note_lt ?? 3,
       note: matched?.note ?? null,
@@ -138,12 +141,13 @@ export function buildEvaluationContext(evaluation: Record<string, any>) {
 }
 
 export function isCriterionCommentRequired(
-  criterion: Pick<EvaluationCriterionView, 'note' | 'commentaire' | 'commentaireRequisSiNoteLt'>,
+  criterion: Pick<EvaluationCriterionView, 'note' | 'commentaire' | 'commentaireRequisSiNoteLt' | 'niveauRequis'>,
 ) {
   return isRequiredCriterionCommentMissing({
     note: criterion.note,
     commentaire: criterion.commentaire,
     threshold: criterion.commentaireRequisSiNoteLt,
+    requiredLevel: criterion.niveauRequis,
   });
 }
 

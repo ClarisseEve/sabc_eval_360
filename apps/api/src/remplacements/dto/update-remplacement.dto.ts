@@ -12,13 +12,13 @@ export class UpdateRemplacementDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @MaxLength(5)
+  @MaxLength(6)
   titulaire_matricule?: string;
 
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @MaxLength(5)
+  @MaxLength(6)
   remplacant_matricule?: string;
 
   @IsOptional()

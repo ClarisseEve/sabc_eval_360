@@ -178,7 +178,7 @@ export class AdminUsersService {
     };
   }
 
-  async createUser(data: CreateUserDto, adminMatricule: string, ip: string) {
+  private async prepareUserCreation(data: CreateUserDto) {
     const existing = await this.prisma.utilisateur.findUnique({
       where: { matricule: data.matricule },
     });
@@ -203,6 +203,7 @@ export class AdminUsersService {
       );
     }
 
+    const structure = await this.validateStructureAssignment(data);
     const managerMatricule = this.normalizeOptionalString(
       data.manager_matricule,
     );
@@ -218,6 +219,133 @@ export class AdminUsersService {
       });
     }
 
+    return { role, region, managerMatricule, niveauHierarchique, structure };
+  }
+
+  private async validateStructureAssignment(data: {
+    id_region: string;
+    id_service?: string | null;
+    id_district?: string | null;
+    id_secteur?: string | null;
+  }) {
+    let idService = this.normalizeOptionalString(data.id_service);
+    let idDistrict = this.normalizeOptionalString(data.id_district);
+    const idSecteur = this.normalizeOptionalString(data.id_secteur);
+
+    const secteur = idSecteur
+      ? await this.prisma.secteur.findUnique({
+          where: { id_secteur: idSecteur },
+        })
+      : null;
+    if (idSecteur && !secteur) {
+      throw new BadRequestException('Secteur introuvable');
+    }
+
+    const district = idDistrict
+      ? await this.prisma.district.findUnique({
+          where: { id_district: idDistrict },
+        })
+      : null;
+    if (idDistrict && !district) {
+      throw new BadRequestException('District introuvable');
+    }
+
+    idService ??= district?.id_service ?? secteur?.id_service ?? null;
+    idDistrict ??= secteur?.id_district ?? null;
+
+    const service = idService
+      ? await this.prisma.serviceCommercial.findUnique({
+          where: { id_service: idService },
+        })
+      : null;
+    if (idService && !service) {
+      throw new BadRequestException('Service introuvable');
+    }
+    if (service && service.id_region !== data.id_region) {
+      throw new BadRequestException(
+        'Le service sélectionné ne dépend pas de la région choisie',
+      );
+    }
+    if (district && district.id_service !== idService) {
+      throw new BadRequestException(
+        'Le district sélectionné ne dépend pas du service choisi',
+      );
+    }
+    if (secteur && secteur.id_service !== idService) {
+      throw new BadRequestException(
+        'Le secteur sélectionné ne dépend pas du service choisi',
+      );
+    }
+    if (secteur?.id_district && secteur.id_district !== idDistrict) {
+      throw new BadRequestException(
+        'Le secteur sélectionné ne dépend pas du district choisi',
+      );
+    }
+
+    return {
+      id_service: idService,
+      id_district: idDistrict,
+      id_secteur: idSecteur,
+    };
+  }
+
+  async validateUserCreation(data: CreateUserDto) {
+    await this.prepareUserCreation(data);
+  }
+
+  async getEligibleManagersForCandidate(idRole: string, idRegion: string) {
+    const [role, region, crossBranchRoles] = await Promise.all([
+      this.prisma.role.findUnique({ where: { id_role: idRole } }),
+      this.prisma.region.findUnique({ where: { id_region: idRegion } }),
+      this.prisma.role.findMany({
+        where: { peut_cross_branch: true },
+        select: { nom_role: true },
+      }),
+    ]);
+
+    if (!role) throw new BadRequestException('Rôle introuvable');
+    if (!region) throw new BadRequestException('Région introuvable');
+
+    const niveauHierarchique = region.est_taniere
+      ? role.niveau_taniere
+      : role.niveau_non_taniere;
+    if (niveauHierarchique === null) {
+      throw new BadRequestException(
+        `Le rôle ${role.nom_role} n'est pas configuré pour ce type de région`,
+      );
+    }
+
+    const crossBranchRoleNames = crossBranchRoles.map((item) => item.nom_role);
+    const eligibleManagers = await this.prisma.utilisateur.findMany({
+      where: {
+        id_region: region.id_region,
+        est_actif: true,
+        statut: 'Actif',
+        niveau_hierarchique: { lt: niveauHierarchique },
+        OR: [
+          { id_branche: role.id_branche },
+          ...(crossBranchRoleNames.length > 0
+            ? [{ role: { in: crossBranchRoleNames } }]
+            : []),
+        ],
+      },
+      select: {
+        matricule: true,
+        nom: true,
+        prenom: true,
+        role: true,
+        role_nom: true,
+        niveau_hierarchique: true,
+      },
+      orderBy: [{ niveau_hierarchique: 'asc' }, { nom: 'asc' }, { prenom: 'asc' }],
+    });
+
+    return eligibleManagers;
+  }
+
+  async createUser(data: CreateUserDto, adminMatricule: string, ip: string) {
+    const { role, region, managerMatricule, niveauHierarchique, structure } =
+      await this.prepareUserCreation(data);
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
     const createData: Prisma.UtilisateurUncheckedCreateInput = {
@@ -236,9 +364,9 @@ export class AdminUsersService {
       niveau_hierarchique: niveauHierarchique,
       manager_matricule: managerMatricule,
       telephone: this.normalizeOptionalString(data.telephone),
-      id_service: this.normalizeOptionalString(data.id_service),
-      id_district: this.normalizeOptionalString(data.id_district),
-      id_secteur: this.normalizeOptionalString(data.id_secteur),
+      id_service: structure.id_service,
+      id_district: structure.id_district,
+      id_secteur: structure.id_secteur,
       sexe: this.normalizeOptionalString(data.sexe),
       est_admin: role.nom_role.toUpperCase() === 'ADMIN',
       statut: 'Actif',
@@ -368,6 +496,13 @@ export class AdminUsersService {
       );
     }
 
+    const structure = await this.validateStructureAssignment({
+      id_region: region.id_region,
+      id_service: data.id_service === undefined ? user.id_service : data.id_service,
+      id_district: data.id_district === undefined ? user.id_district : data.id_district,
+      id_secteur: data.id_secteur === undefined ? user.id_secteur : data.id_secteur,
+    });
+
     const managerMatricule =
       data.manager_matricule === undefined
         ? user.manager_matricule
@@ -411,15 +546,9 @@ export class AdminUsersService {
     if (data.telephone !== undefined) {
       updateData.telephone = this.normalizeOptionalString(data.telephone);
     }
-    if (data.id_service !== undefined) {
-      updateData.id_service = this.normalizeOptionalString(data.id_service);
-    }
-    if (data.id_district !== undefined) {
-      updateData.id_district = this.normalizeOptionalString(data.id_district);
-    }
-    if (data.id_secteur !== undefined) {
-      updateData.id_secteur = this.normalizeOptionalString(data.id_secteur);
-    }
+    updateData.id_service = structure.id_service;
+    updateData.id_district = structure.id_district;
+    updateData.id_secteur = structure.id_secteur;
 
     const updated = await this.prisma.utilisateur.update({
       where: { matricule },

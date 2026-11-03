@@ -2,6 +2,7 @@ import React from 'react';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Edit2, Eye, Plus, Power, Trash2 } from 'lucide-react';
+import { ExcelImportDialog } from '@/Components/Admin/ExcelImportDialog';
 import { templatesApi } from '@/Services/api';
 import { useConfirm } from '@/Contexts/ConfirmContext';
 import { useToast } from '@/Contexts/ToastContext';
@@ -28,6 +29,7 @@ export default function TemplatesIndexPage() {
   const confirm = useConfirm();
   const { success, error } = useToast();
   const [search, setSearch] = React.useState('');
+  const [importOpen, setImportOpen] = React.useState(false);
 
   const { data } = useSuspenseQuery({
     queryKey: ['templates'],
@@ -81,12 +83,17 @@ export default function TemplatesIndexPage() {
         title="Modèles d’évaluation"
         description="Formulaires réutilisables pour structurer les évaluations."
         breadcrumbs={[{ label: 'Administration' }, { label: 'Évaluations' }, { label: 'Modèles' }]}
-        actions={templates.length > 0 ? (
+        actions={(
+          <>
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            Importer Excel
+          </Button>
           <Button onClick={() => navigate('/admin/evaluations/templates/create')}>
             <Plus size={16} className="mr-2" />
             Nouveau modèle
           </Button>
-        ) : undefined}
+          </>
+        )}
       />
 
       <KpiGrid className="lg:grid-cols-3">
@@ -207,6 +214,7 @@ export default function TemplatesIndexPage() {
           )}
         </CardContent>
       </Card>
+      <ExcelImportDialog kind="templates" open={importOpen} onOpenChange={setImportOpen} />
     </AdminEvaluationsLayout>
   );
 }

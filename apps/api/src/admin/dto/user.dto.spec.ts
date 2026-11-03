@@ -13,6 +13,28 @@ const validPayload = {
 };
 
 describe('CreateUserDto', () => {
+  it('accepts six-character user and manager matricules', async () => {
+    const dto = plainToInstance(CreateUserDto, {
+      ...validPayload,
+      matricule: '114804',
+      manager_matricule: '205601',
+    });
+
+    expect(await validate(dto)).toHaveLength(0);
+  });
+
+  it('rejects matricules longer than six characters', async () => {
+    const dto = plainToInstance(CreateUserDto, {
+      ...validPayload,
+      matricule: '1148040',
+      manager_matricule: '2056010',
+    });
+
+    expect((await validate(dto)).map((error) => error.property)).toEqual(
+      expect.arrayContaining(['matricule', 'manager_matricule']),
+    );
+  });
+
   it('keeps only canonical role and region identifiers', async () => {
     const dto = plainToInstance(CreateUserDto, {
       ...validPayload,
