@@ -72,6 +72,7 @@ describe('AdminUsersService', () => {
   let service: AdminUsersService;
   let prisma: jest.Mocked<PrismaService>;
   let pg: jest.Mocked<DatabasePgService>;
+  let evaluationsService: jest.Mocked<EvaluationsService>;
   let hierarchyService: jest.Mocked<HierarchyService>;
   let auditLogService: jest.Mocked<AuditLogService>;
 
@@ -144,12 +145,61 @@ describe('AdminUsersService', () => {
     service = module.get<AdminUsersService>(AdminUsersService);
     prisma = module.get(PrismaService) as jest.Mocked<PrismaService>;
     pg = module.get(DatabasePgService) as jest.Mocked<DatabasePgService>;
+    evaluationsService = module.get(EvaluationsService) as jest.Mocked<EvaluationsService>;
     hierarchyService = module.get(
       HierarchyService,
     ) as jest.Mocked<HierarchyService>;
     auditLogService = module.get(
       AuditLogService,
     ) as jest.Mocked<AuditLogService>;
+  });
+
+  describe('getHistorique', () => {
+    it('loads the evaluated user’s submitted and visible evaluations for the admin profile', async () => {
+      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(makeDbUser());
+
+      await service.getHistorique('U0001');
+
+      expect(evaluationsService.getHistorique).toHaveBeenCalledWith(
+        'U0001',
+        { limit: 100 },
+      );
+    });
+
+    it('does not request evaluation history for a missing user', async () => {
+      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.getHistorique('MISSING')).rejects.toThrow(NotFoundException);
+      expect(evaluationsService.getHistorique).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getUserByMatricule', () => {
+    it('returns the manager name and matricule for the admin profile', async () => {
+      (prisma.utilisateur.findUnique as jest.Mock).mockResolvedValue(
+        makeDbUser({
+          manager_matricule: 'M0001',
+          manager: { matricule: 'M0001', nom: 'Martin', prenom: 'Marie' },
+        }),
+      );
+      (prisma.utilisateur.count as jest.Mock).mockResolvedValue(0);
+
+      const result = await service.getUserByMatricule('U0001');
+
+      expect(prisma.utilisateur.findUnique).toHaveBeenCalledWith({
+        where: { matricule: 'U0001' },
+        include: {
+          manager: {
+            select: { matricule: true, nom: true, prenom: true },
+          },
+        },
+      });
+      expect(result.manager).toEqual({
+        matricule: 'M0001',
+        nom: 'Martin',
+        prenom: 'Marie',
+      });
+    });
   });
 
   describe('getUsers', () => {

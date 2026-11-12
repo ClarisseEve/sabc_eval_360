@@ -77,7 +77,7 @@ export default function MyRatingSheetsPage() {
                                     </div>
                                     <Button
                                         variant="outline"
-                                        onClick={() => download(sheet.id_fiche, `fiche-notation-${sheet.code_periode || 'periode'}.pdf`)}
+                                        onClick={() => download(sheet.id_fiche, sheet.nom_fichier || `fiche-notation-${sheet.code_periode || 'periode'}.pdf`)}
                                     >
                                         <Download className="mr-2 h-4 w-4" />
                                         Télécharger le PDF

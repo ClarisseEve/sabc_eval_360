@@ -56,6 +56,13 @@ export class TemplatesController {
     return this.service.getTemplateById(id);
   }
 
+  @Post(':id/duplicate')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  duplicate(@Param('id') id: string) {
+    return this.service.duplicateTemplate(id);
+  }
+
   @Put(':id')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')

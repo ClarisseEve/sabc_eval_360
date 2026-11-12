@@ -1,5 +1,4 @@
 import { DashboardSkeleton } from '@/Components/Dashboard/DashboardSkeleton';
-import { ExcelImportDialog } from '@/Components/Admin/ExcelImportDialog';
 import { Badge } from '@/Components/UI/Badge';
 import { Button, buttonVariants } from '@/Components/UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/UI/Card';
@@ -13,15 +12,8 @@ import { adminApi } from '@/Services/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-    buildCreateUserPayload,
-    getCreateUserFormErrors,
-    initialCreateUserForm,
-    isCreateUserFormValid,
-    type CreateUserForm,
-} from './create-user-contract';
+import { buildCreateUserPayload, initialCreateUserForm, isCreateUserFormValid, type CreateUserForm } from './create-user-contract';
 import { AdminUsersLayout } from './shared';
-import { UserAssignmentFields } from './UserAssignmentFields';
 import {
     buildUpdateUserForm,
     buildUpdateUserPayload,
@@ -31,24 +23,6 @@ import {
     type RoleReference,
     type UpdateUserForm,
 } from './update-user-contract';
-import { PageHeader } from '@/Components/UI/Page/PageHeader';
-
-type BadgeVariant = 'success' | 'warning' | 'error' | 'secondary' | 'outline';
-
-/** Libellé et couleur dérivés du statut AFFICHÉ (et non de est_actif seul). */
-function getUserStatusPresentation(user: { statut?: string | null; est_actif?: boolean | null }): { label: string; variant: BadgeVariant } {
-    const raw = String(user?.statut ?? '').trim();
-    const key = raw
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '');
-    if (key === 'actif') return { label: 'Actif', variant: 'success' };
-    if (key === 'indisponible') return { label: 'Indisponible', variant: 'warning' };
-    if (key === 'suspendu') return { label: 'Suspendu', variant: 'error' };
-    if (key === 'inactif') return { label: 'Inactif', variant: 'secondary' };
-    if (raw) return { label: raw.charAt(0).toUpperCase() + raw.slice(1), variant: 'secondary' };
-    return user?.est_actif ? { label: 'Actif', variant: 'success' } : { label: 'Inactif', variant: 'secondary' };
-}
 
 const createTextFields: Array<{
     key: keyof CreateUserForm;
@@ -64,7 +38,7 @@ const createTextFields: Array<{
 ];
 
 const editTextFields: Array<{
-    key: 'nom' | 'prenom' | 'email' | 'telephone';
+    key: 'nom' | 'prenom' | 'email' | 'telephone' | 'manager_matricule';
     label: string;
     type?: string;
 }> = [
@@ -72,6 +46,7 @@ const editTextFields: Array<{
     { key: 'prenom', label: 'Prénom' },
     { key: 'email', label: 'Adresse e-mail', type: 'email' },
     { key: 'telephone', label: 'Téléphone', type: 'tel' },
+    { key: 'manager_matricule', label: 'Manager (matricule)' },
 ];
 
 function Pagination({
@@ -89,11 +64,11 @@ function Pagination({
     for (let i = start; i <= end; i++) pages.push(i);
 
     return (
-        <div className="border-sabc-gray-200 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="border-sabc-gray-200 flex items-center justify-between border-t pt-4">
             <p className="text-sabc-gray-600 text-sm">
                 {(meta.page - 1) * meta.limit + 1}–{Math.min(meta.page * meta.limit, meta.total)} sur {meta.total} utilisateurs
             </p>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex gap-1">
                 <Button variant="outline" size="sm" disabled={meta.page <= 1} onClick={() => onPageChange(meta.page - 1)}>
                     Précédent
                 </Button>
@@ -103,7 +78,7 @@ function Pagination({
                         variant={p === meta.page ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => onPageChange(p)}
-                        aria-current={p === meta.page ? 'page' : undefined}
+                        className={p === meta.page ? 'bg-sabc-red-primary text-white' : ''}
                     >
                         {p}
                     </Button>
@@ -121,8 +96,10 @@ function UsersContent() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [searchDebounced, setSearchDebounced] = useState('');
+    const [sortBy, setSortBy] = useState<'name' | 'score'>('score');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
     const [createOpen, setCreateOpen] = useState(false);
-    const [importOpen, setImportOpen] = useState(false);
     const [createForm, setCreateForm] = useState(initialCreateUserForm);
 
     const [editSource, setEditSource] = useState<(EditableUser & { matricule: string }) | null>(null);
@@ -140,6 +117,8 @@ function UsersContent() {
     const params = {
         page,
         limit: 15,
+        sort_by: sortBy,
+        sort_order: sortOrder,
         ...(searchDebounced ? { search: searchDebounced } : {}),
     };
     const { data: response } = useAdminUsers(params);
@@ -151,48 +130,6 @@ function UsersContent() {
         queryKey: ['admin', 'structure', 'regions'],
         queryFn: () => adminApi.structure.regions().then((response) => response.data),
     });
-
-    const { data: branches = [] } = useQuery({
-        queryKey: ['admin', 'structure', 'branches'],
-        queryFn: () => adminApi.structure.branches().then((response) => response.data),
-    });
-    const { data: services = [] } = useQuery({
-        queryKey: ['admin', 'structure', 'services'],
-        queryFn: () => adminApi.structure.services().then((response) => response.data),
-    });
-    const { data: districts = [] } = useQuery({
-        queryKey: ['admin', 'structure', 'districts'],
-        queryFn: () => adminApi.structure.districts().then((response) => response.data),
-    });
-    const { data: secteurs = [] } = useQuery({
-        queryKey: ['admin', 'structure', 'secteurs'],
-        queryFn: () => adminApi.structure.secteurs().then((response) => response.data),
-    });
-
-    const regionNames = new Map<string, string>(
-        (Array.isArray(regions) ? regions : []).map((region: any) => [String(region.id_region), region.nom_region]),
-    );
-    const branchNames = new Map<string, string>(
-        (Array.isArray(branches) ? branches : []).map((branche: any) => [String(branche.id_branche), branche.nom_branche]),
-    );
-    const serviceNames = new Map<string, string>(
-        (Array.isArray(services) ? services : []).map((service: any) => [String(service.id_service), service.nom_service]),
-    );
-    const districtNames = new Map<string, string>(
-        (Array.isArray(districts) ? districts : []).map((district: any) => [String(district.id_district), district.nom_district]),
-    );
-    const secteurNames = new Map<string, string>(
-        (Array.isArray(secteurs) ? secteurs : []).map((secteur: any) => [String(secteur.id_secteur), secteur.nom_secteur]),
-    );
-    const regionLabel = (user: any) =>
-        user.region?.nom_region || (user.id_region ? regionNames.get(String(user.id_region)) : undefined) || 'n.d.';
-    const branchLabel = (user: any) =>
-        user.branche?.nom_branche || (user.id_branche ? branchNames.get(String(user.id_branche)) : undefined) || 'n.d.';
-    const structureLabel = (user: any) => [
-        user.id_service ? serviceNames.get(String(user.id_service)) : null,
-        user.id_district ? districtNames.get(String(user.id_district)) : null,
-        user.id_secteur ? secteurNames.get(String(user.id_secteur)) : null,
-    ].filter(Boolean).join(' · ') || 'n.d.';
 
     const users = response?.data ?? (Array.isArray(response) ? response : []);
     const meta = response?.meta ?? { total: users.length, page: 1, limit: 15, totalPages: 1 };
@@ -244,32 +181,29 @@ function UsersContent() {
 
     const createError = (createMutation.error as any)?.response?.data?.message || (createMutation.error ? 'Une erreur est survenue.' : null);
     const updateError = (updateMutation.error as any)?.response?.data?.message || (updateMutation.error ? 'Une erreur est survenue.' : null);
-    const createValidationErrors = getCreateUserFormErrors(createForm);
-    const createErrorMessage = Array.isArray(createError) ? createError.join(' ') : createError;
 
     return (
         <AdminUsersLayout title="Gestion des utilisateurs">
-            <PageHeader
-                title="Gestion des utilisateurs"
-                description="Comptes, rôles et rattachements des collaborateurs évalués."
-                breadcrumbs={[{ label: 'Administration' }, { label: 'Utilisateurs' }]}
-                meta={`${meta.total} utilisateur${meta.total > 1 ? 's' : ''} au total`}
-                actions={(
-                    <>
-                        <Link to="/admin/utilisateurs/gaps" className={buttonVariants({ variant: 'outline' })}>
-                            Analyse des écarts
-                        </Link>
-                        {canCreateUser ? (
-                            <>
-                                <Button variant="outline" onClick={() => setImportOpen(true)}>Importer Excel</Button>
-                                <Button onClick={() => setCreateOpen(true)}>Nouvel utilisateur</Button>
-                            </>
-                        ) : referencesPending ? (
-                            <Button disabled>Chargement…</Button>
-                        ) : null}
-                    </>
-                )}
-            />
+            <div className="flex items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-sabc-gray-900 text-2xl font-bold">Gestion des utilisateurs</h1>
+                    <p className="text-sabc-gray-600 text-sm">
+                        {meta.total} utilisateur{meta.total > 1 ? 's' : ''} au total
+                    </p>
+                </div>
+                <div className="flex gap-2">
+                    <Link to="/admin/utilisateurs/gaps" className={buttonVariants({ variant: 'outline' })}>
+                        Analyse des gaps
+                    </Link>
+                    {canCreateUser ? (
+                        <Button className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white" onClick={() => setCreateOpen(true)}>
+                            Nouvel utilisateur
+                        </Button>
+                    ) : referencesPending ? (
+                        <Button disabled>Chargement…</Button>
+                    ) : null}
+                </div>
+            </div>
 
             {!referencesPending && !canCreateUser ? (
                 <div role="status" className="flex flex-col gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -303,27 +237,46 @@ function UsersContent() {
                     <CardTitle>Utilisateurs</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0_1fr)] lg:items-end">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_210px_210px] lg:items-end">
                         <div className="space-y-1">
                             <Label htmlFor="users-search">Rechercher</Label>
                             <Input
                                 id="users-search"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Matricule, nom, e-mail, rôle…"
+                                placeholder="Matricule, nom, e-mail, rôle..."
                             />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="users-sort-by">Trier par</Label>
+                            <Select value={sortBy} onValueChange={(value: 'name' | 'score') => { setSortBy(value); setPage(1); }}>
+                                <SelectTrigger id="users-sort-by"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="score">Score moyen</SelectItem>
+                                    <SelectItem value="name">Nom</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="users-sort-order">Ordre</Label>
+                            <Select value={sortOrder} onValueChange={(value: 'asc' | 'desc') => { setSortOrder(value); setPage(1); }}>
+                                <SelectTrigger id="users-sort-order"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="desc">{sortBy === 'score' ? 'Du plus élevé au plus faible' : 'Z à A'}</SelectItem>
+                                    <SelectItem value="asc">{sortBy === 'score' ? 'Du plus faible au plus élevé' : 'A à Z'}</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
 
-                    <Table className="min-w-[980px]">
+                    <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Matricule</TableHead>
                                 <TableHead>Nom</TableHead>
                                 <TableHead>Rôle</TableHead>
+                                <TableHead>Score moyen /5</TableHead>
                                 <TableHead>Région</TableHead>
-                                <TableHead>Service · District · Secteur</TableHead>
-                                <TableHead>Manager</TableHead>
                                 <TableHead>Branche</TableHead>
                                 <TableHead>Statut</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
@@ -332,7 +285,7 @@ function UsersContent() {
                         <TableBody>
                             {users.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="text-sabc-gray-500 py-8 text-center">
+                                    <TableCell colSpan={8} className="text-sabc-gray-500 py-8 text-center">
                                         {searchDebounced ? 'Aucun résultat pour cette recherche' : 'Aucun utilisateur'}
                                     </TableCell>
                                 </TableRow>
@@ -345,19 +298,21 @@ function UsersContent() {
                                         <div className="text-sabc-gray-500 text-xs">{user.email}</div>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant="outline">{user.role || 'n.d.'}</Badge>
+                                        <Badge variant="primary">{user.role}</Badge>
                                     </TableCell>
-                                    <TableCell>{regionLabel(user)}</TableCell>
-                                    <TableCell className="max-w-56 truncate" title={structureLabel(user)}>
-                                        {structureLabel(user)}
-                                    </TableCell>
-                                    <TableCell>{user.manager_matricule || 'n.d.'}</TableCell>
-                                    <TableCell>{branchLabel(user)}</TableCell>
                                     <TableCell>
-                                        {(() => {
-                                            const status = getUserStatusPresentation(user);
-                                            return <Badge variant={status.variant}>{status.label}</Badge>;
-                                        })()}
+                                        {user.score_moyen != null ? (
+                                            <span className={Number(user.score_moyen) < 3 ? 'font-medium text-sabc-error' : Number(user.score_moyen) > 3 ? 'font-medium text-sabc-success' : ''}>
+                                                {`${Number(user.score_moyen).toFixed(2)}/5`}
+                                            </span>
+                                        ) : 'Non évalué'}
+                                    </TableCell>
+                                    <TableCell>{user.region?.nom_region || user.id_region}</TableCell>
+                                    <TableCell>{user.branche?.nom_branche || user.id_branche}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={user.est_actif ? 'success' : 'secondary'}>
+                                            {user.statut || (user.est_actif ? 'Actif' : 'Inactif')}
+                                        </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
@@ -397,28 +352,12 @@ function UsersContent() {
                                     type={type}
                                     value={createForm[key]}
                                     onChange={(e) => setCreateForm((prev) => ({ ...prev, [key]: e.target.value }))}
-                                    minLength={key === 'password' ? 8 : undefined}
-                                    maxLength={key === 'matricule' ? 6 : undefined}
-                                    aria-describedby={key === 'matricule' ? 'create-matricule-hint' : undefined}
                                 />
-                                {key === 'matricule' ? (
-                                    <p id="create-matricule-hint" className="mt-1 text-xs text-sabc-gray-500">
-                                        Le matricule SABC comporte 6 caractères.
-                                    </p>
-                                ) : null}
-                                {key === 'matricule' && createValidationErrors.matricule ? (
-                                    <p className="mt-1 text-xs text-red-700">{createValidationErrors.matricule}</p>
-                                ) : null}
-                                {key === 'password' ? (
-                                    <p className={`mt-1 text-xs ${createValidationErrors.password ? 'text-red-700' : 'text-sabc-gray-500'}`}>
-                                        {createValidationErrors.password || '8 caractères minimum.'}
-                                    </p>
-                                ) : null}
                             </div>
                         ))}
                         <div>
                             <Label>Rôle</Label>
-                            <Select value={createForm.id_role} onValueChange={(id_role) => setCreateForm((prev) => ({ ...prev, id_role, manager_matricule: '' }))}>
+                            <Select value={createForm.id_role} onValueChange={(id_role) => setCreateForm((prev) => ({ ...prev, id_role }))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Sélectionner un rôle" />
                                 </SelectTrigger>
@@ -434,14 +373,7 @@ function UsersContent() {
                         </div>
                         <div>
                             <Label>Région</Label>
-                            <Select value={createForm.id_region} onValueChange={(id_region) => setCreateForm((prev) => ({
-                                ...prev,
-                                id_region,
-                                manager_matricule: '',
-                                id_service: '',
-                                id_district: '',
-                                id_secteur: '',
-                            }))}>
+                            <Select value={createForm.id_region} onValueChange={(id_region) => setCreateForm((prev) => ({ ...prev, id_region }))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Sélectionner une région" />
                                 </SelectTrigger>
@@ -454,16 +386,20 @@ function UsersContent() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="grid gap-4 border-t border-sabc-gray-200 pt-4 md:col-span-2 md:grid-cols-2">
-                            <p className="text-sm font-semibold text-sabc-gray-900 md:col-span-2">
-                                Périmètre de travail et hiérarchie
-                            </p>
-                            <UserAssignmentFields
-                                values={createForm}
-                                onChange={(field, value) => setCreateForm((previous) => ({ ...previous, [field]: value }))}
+                        <div className="md:col-span-2">
+                            <Label htmlFor="create-manager_matricule">Manager (matricule)</Label>
+                            <Input
+                                id="create-manager_matricule"
+                                value={createForm.manager_matricule}
+                                onChange={(e) =>
+                                    setCreateForm((prev) => ({
+                                        ...prev,
+                                        manager_matricule: e.target.value,
+                                    }))
+                                }
                             />
                         </div>
-                        {createErrorMessage && <p className="text-sabc-red-primary text-sm md:col-span-2">{createErrorMessage}</p>}
+                        {createError && <p className="text-sabc-red-primary text-sm md:col-span-2">{createError}</p>}
                     </div>
 
                     <DialogFooter>
@@ -471,10 +407,11 @@ function UsersContent() {
                             Annuler
                         </Button>
                         <Button
+                            className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white"
                             disabled={!canCreateUser || !isCreateUserFormValid(createForm) || createMutation.isPending}
                             onClick={() => createMutation.mutate()}
                         >
-                            {createMutation.isPending ? 'Création…' : 'Créer'}
+                            {createMutation.isPending ? 'Création...' : 'Créer'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -490,7 +427,7 @@ function UsersContent() {
 
                     <div className="grid max-h-[60vh] gap-4 overflow-y-auto pr-1 md:grid-cols-2">
                         {editTextFields.map(({ key, label, type = 'text' }) => (
-                            <div key={key}>
+                            <div key={key} className={key === 'manager_matricule' ? 'md:col-span-2' : undefined}>
                                 <Label htmlFor={`edit-${key}`}>{label}</Label>
                                 <Input
                                     id={`edit-${key}`}
@@ -500,18 +437,9 @@ function UsersContent() {
                                 />
                             </div>
                         ))}
-                        <div className="grid gap-4 border-t border-sabc-gray-200 pt-4 md:col-span-2 md:grid-cols-2">
-                            <p className="text-sm font-semibold text-sabc-gray-900 md:col-span-2">
-                                Périmètre de travail et hiérarchie
-                            </p>
-                            <UserAssignmentFields
-                                values={editForm}
-                                onChange={(field, value) => setEditForm((previous) => ({ ...previous, [field]: value }))}
-                            />
-                        </div>
                         <div>
                             <Label>Rôle</Label>
-                            <Select value={editForm.id_role} onValueChange={(id_role) => setEditForm((prev) => ({ ...prev, id_role, manager_matricule: '' }))}>
+                            <Select value={editForm.id_role} onValueChange={(id_role) => setEditForm((prev) => ({ ...prev, id_role }))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Sélectionner un rôle" />
                                 </SelectTrigger>
@@ -527,14 +455,7 @@ function UsersContent() {
                         </div>
                         <div>
                             <Label>Région</Label>
-                            <Select value={editForm.id_region} onValueChange={(id_region) => setEditForm((prev) => ({
-                                ...prev,
-                                id_region,
-                                manager_matricule: '',
-                                id_service: '',
-                                id_district: '',
-                                id_secteur: '',
-                            }))}>
+                            <Select value={editForm.id_region} onValueChange={(id_region) => setEditForm((prev) => ({ ...prev, id_region }))}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Sélectionner une région" />
                                 </SelectTrigger>
@@ -573,15 +494,15 @@ function UsersContent() {
                             Annuler
                         </Button>
                         <Button
+                            className="bg-sabc-red-primary hover:bg-sabc-red-dark text-white"
                             disabled={!isUpdateUserFormValid(editForm) || updateMutation.isPending}
                             onClick={() => updateMutation.mutate()}
                         >
-                            {updateMutation.isPending ? 'Enregistrement…' : 'Enregistrer'}
+                            {updateMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-            <ExcelImportDialog kind="users" open={importOpen} onOpenChange={setImportOpen} />
         </AdminUsersLayout>
     );
 }

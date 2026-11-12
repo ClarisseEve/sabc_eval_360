@@ -10,7 +10,6 @@ import {
 import { ValidationManagerService } from './validation-manager.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EligibilityService } from './eligibility.service';
-import { buildTemplateEvaluationCriteria } from '../templates/template-evaluation-criteria';
 import {
   EVALUATED_VISIBILITY_SQL,
   INTERNAL_RULE_ENVELOPE_FIELD,
@@ -33,10 +32,7 @@ export interface Evaluation {
   date_validation?: string | null;
   statut: string;
   notations_json: any;
-  criteres_snapshot_json?: unknown;
   commentaire_global: string | null;
-  commentaire_points_forts?: string | null;
-  commentaire_axes_amelioration?: string | null;
   commentaire_validation?: string | null;
   note_globale: number | null;
   type_evaluation: string;
@@ -202,15 +198,6 @@ export class EvaluationsService {
 
     const typeEvalCalcule = this.determinerType(evaluateur, evalue);
     let typeEval = typeEvalCalcule;
-    const targetRole = await this.prisma.role.findUnique({
-      where: { nom_role: evalue.role_nom ?? evalue.role },
-      select: { id_role: true },
-    });
-    const templateCriteria = await this.loadAssignedTemplateCriteria(
-      targetRole?.id_role,
-      idPeriode,
-    );
-    let criteriaSnapshot: unknown = templateCriteria;
 
     if (idRegle) {
       const regle = await this.pg.queryOne<any>(
@@ -251,12 +238,6 @@ export class EvaluationsService {
       }
 
       const envelope = parseRuleEnvelope(normalizedRule.criteres_evaluation_json);
-      if (templateCriteria) {
-        criteriaSnapshot = this.withRuleMetadata(
-          templateCriteria,
-          normalizedRule.criteres_evaluation_json,
-        );
-      }
       const constraints = (normalizedRule.criteres_evaluation_json as any)?.constraints ?? {};
 
       if (!isAdminEvaluator && constraints.meme_region_obligatoire && evaluateur.id_region !== evalue.id_region) {
@@ -273,7 +254,7 @@ export class EvaluationsService {
         throw new BadRequestException("Le type d'évaluation ne correspond pas au contexte hiérarchique");
       }
 
-      if (envelope.criteres.length === 0 && !templateCriteria) {
+      if (envelope.criteres.length === 0) {
         throw new BadRequestException("La règle sélectionnée ne contient aucun critère exploitable");
       }
     }
@@ -294,32 +275,11 @@ export class EvaluationsService {
       );
     }
 
-    const created = await this.pg.withTransaction(async (client) => {
-      await client.query(
-        'SELECT pg_advisory_xact_lock(hashtext($1))',
-        [JSON.stringify([evaluateurMatricule, evalueMatricule, idPeriode, typeEval])],
-      );
-      const existing = await client.query(
-        `SELECT id_evaluation
-         FROM evaluations
-         WHERE evaluateur_matricule = $1
-           AND evalue_matricule = $2
-           AND id_periode = $3
-           AND type_evaluation = $4
-         LIMIT 1`,
-        [evaluateurMatricule, evalueMatricule, idPeriode, typeEval],
-      );
-      if (existing.rows.length > 0) {
-        throw new BadRequestException(
-          "Une évaluation de ce type existe déjà pour cette personne pendant cette période.",
-        );
-      }
-
-      const result = await client.query(
-        `WITH periode_active AS (
+    const created = await this.pg.queryOne<Evaluation>(
+      `WITH periode_active AS (
          SELECT id_periode, code_periode
          FROM periodes_evaluation
-         WHERE id_periode = $7
+         WHERE id_periode = $6
            AND statut = 'ouverte'
            AND est_ouverte = true
            AND est_cloturee = false
@@ -328,24 +288,14 @@ export class EvaluationsService {
          FOR UPDATE
        )
        INSERT INTO evaluations (evaluateur_matricule, evalue_matricule, id_periode, id_regle,
-        date_creation, statut, notations_json, type_evaluation, periode_code, criteres_snapshot_json, created_at, updated_at)
+        date_creation, statut, notations_json, type_evaluation, periode_code, created_at, updated_at)
        SELECT $1, $2, $3, $4,
               (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Douala')::date,
-              'brouillon', '[]', $5, p.code_periode, $6::jsonb, NOW(), NOW()
+              'brouillon', '[]', $5, p.code_periode, NOW(), NOW()
        FROM periode_active AS p
        RETURNING *`,
-        [
-          evaluateurMatricule,
-          evalueMatricule,
-          idPeriode,
-          idRegle ?? null,
-          typeEval,
-          criteriaSnapshot ? JSON.stringify(criteriaSnapshot) : null,
-          idPeriode,
-        ],
-      );
-      return result.rows[0] as Evaluation | undefined;
-    });
+      [evaluateurMatricule, evalueMatricule, idPeriode, idRegle ?? null, typeEval, idPeriode],
+    );
     if (!created) {
       throw new BadRequestException("Impossible de créer l'évaluation");
     }
@@ -396,53 +346,16 @@ export class EvaluationsService {
       }
     }
 
-    const templateCriteria =
-      eval_.criteres_snapshot_json ??
-      (await this.loadAssignedTemplateCriteriaForEvaluation(eval_));
-    let criteriaSnapshot: unknown = templateCriteria;
-    if (templateCriteria && eval_.id_regle) {
-      const rule = await this.pg.queryOne<{ criteres_evaluation_json: unknown }>(
-        `SELECT criteres_evaluation_json FROM regles_evaluation WHERE id_regle = $1`,
-        [eval_.id_regle],
-      );
-      if (rule) {
-        criteriaSnapshot = this.withRuleMetadata(
-          templateCriteria,
-          rule.criteres_evaluation_json,
-        );
-      }
-    }
-    const hasSplitComments =
-      commentairePointsForts !== undefined ||
-      commentaireAxesAmelioration !== undefined;
-    const commentaireGlobal = hasSplitComments
-      ? [
-          commentairePointsForts?.trim()
-            ? `Points forts :\n${commentairePointsForts.trim()}`
-            : '',
-          commentaireAxesAmelioration?.trim()
-            ? `Compétences non acquises ou à améliorer :\n${commentaireAxesAmelioration.trim()}`
-            : '',
-        ]
-          .filter(Boolean)
-          .join('\n\n') || null
-      : commentaire ?? null;
-
     await this.pg.execute(
-      `UPDATE evaluations
-       SET notations_json = $1, commentaire_global = $2,
-           commentaire_points_forts = COALESCE($3, commentaire_points_forts),
-           commentaire_axes_amelioration = COALESCE($4, commentaire_axes_amelioration),
-           criteres_snapshot_json = COALESCE(criteres_snapshot_json, $6::jsonb),
-           updated_at = NOW()
+      `UPDATE evaluations SET notations_json = $1, commentaire_global = $2,
+       commentaire_points_forts = $3, commentaire_axes_amelioration = $4, updated_at = NOW()
        WHERE id_evaluation = $5`,
       [
         JSON.stringify(normalized.notes),
-        commentaireGlobal,
+        commentaire ?? null,
         commentairePointsForts ?? null,
         commentaireAxesAmelioration ?? null,
         id,
-        criteriaSnapshot ? JSON.stringify(criteriaSnapshot) : null,
       ],
     );
     return true;
@@ -508,10 +421,7 @@ export class EvaluationsService {
 
     const normalizedRule = normalizeRuleRow(regle);
     const envelope = parseRuleEnvelope(normalizedRule.criteres_evaluation_json);
-    const templateCriteria = eval_.criteres_snapshot_json;
-    const criteres = templateCriteria
-      ? parseRuleEnvelope(templateCriteria).criteres
-      : envelope.criteres;
+    const criteres = envelope.criteres;
     if (criteres.length === 0) {
       throw new BadRequestException(
         "La règle d'évaluation associée ne contient aucun critère exploitable",
@@ -526,7 +436,7 @@ export class EvaluationsService {
     const noteGlobale = this.validationNotation.calculerNoteGlobale(notes, criteres);
     if (noteGlobale === null) {
       throw new BadRequestException(
-        "La pondération des critères ne permet pas de calculer la note globale",
+        "La pondération de la règle ne permet pas de calculer la note globale",
       );
     }
 
@@ -548,13 +458,6 @@ export class EvaluationsService {
         };
       },
     );
-
-    if (templateCriteria && !eval_.criteres_snapshot_json) {
-      await this.pg.execute(
-        `UPDATE evaluations SET criteres_snapshot_json = $1::jsonb WHERE id_evaluation = $2`,
-        [JSON.stringify(templateCriteria), id],
-      );
-    }
 
     const updated = await this.pg.execute(
       `WITH periode_active AS (
@@ -910,22 +813,6 @@ export class EvaluationsService {
     const user = await this.prisma.utilisateur.findUnique({ where: { matricule } });
     if (!user) return [];
 
-    const isAdmin = Boolean(user.est_admin) ||
-      String(user.role_nom ?? user.role ?? '').toUpperCase() === 'ADMIN';
-    if (isAdmin) {
-      const collaborateurs = await this.prisma.utilisateur.findMany({
-        where: {
-          matricule: { not: matricule },
-          statut: 'Actif',
-          est_actif: true,
-          est_indisponible: false,
-        },
-        select: { matricule: true, nom: true, prenom: true, role: true, role_nom: true },
-      });
-
-      return { auto: null, collaborateurs, subordonnes: [], pairs: [] };
-    }
-
     const [subordinates, peers] = await Promise.all([
       this.prisma.utilisateur.findMany({
         where: { manager_matricule: matricule, statut: 'Actif' },
@@ -955,7 +842,7 @@ export class EvaluationsService {
     if (!periode) throw new NotFoundException('Période introuvable');
 
     const rawEvaluations = await this.pg.query<Evaluation & Record<string, unknown>>(
-      `SELECT e.*, COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json) AS ${INTERNAL_RULE_ENVELOPE_FIELD}
+      `SELECT e.*, r.criteres_evaluation_json AS ${INTERNAL_RULE_ENVELOPE_FIELD}
        FROM evaluations e
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
        WHERE e.id_periode = $1
@@ -1224,166 +1111,23 @@ export class EvaluationsService {
         : Promise.resolve([]),
     ]);
 
-    const usersByMatricule = new Map<
-      string,
-      (typeof users)[number] & { avatar: string | null }
-    >(
-      users.map((user) => [
-        user.matricule,
-        { ...user, avatar: user.photo_url },
-      ]),
-    );
+    const usersByMatricule = new Map(users.map((user: { matricule: string; photo_url: string | null; [key: string]: unknown }) => [user.matricule, { ...user, avatar: user.photo_url }]));
     const periodesByCode = new Map(periodes.map((periode: any) => [periode.code_periode, periode]));
     const reglesById = new Map(regles.map((regle: any) => [regle.id_regle, normalizeRuleRow(regle)]));
-    const draftEvaluations = evaluations.filter(
-      (evaluation) =>
-        ['brouillon', 'rejete'].includes(evaluation.statut) &&
-        !evaluation.criteres_snapshot_json,
-    );
-    const targetRoleNames = Array.from(
-      new Set(
-        draftEvaluations
-          .map((evaluation) => {
-            const user = usersByMatricule.get(evaluation.evalue_matricule);
-            return user?.role_nom ?? user?.role;
-          })
-          .filter((role): role is string => typeof role === 'string' && role.length > 0),
-      ),
-    );
-    const roles = targetRoleNames.length
-      ? await this.prisma.role.findMany({
-          where: { nom_role: { in: targetRoleNames } },
-          select: { id_role: true, nom_role: true },
-        })
-      : [];
-    const roleIdByName = new Map(
-      roles.map((role: { id_role: string; nom_role: string }) => [
-        role.nom_role,
-        role.id_role,
-      ]),
-    );
-    const targetRoleIds = Array.from(
-      new Set(
-        targetRoleNames
-          .map((roleName) => roleIdByName.get(roleName))
-          .filter((id): id is string => Boolean(id)),
-      ),
-    );
-    const draftPeriodIds = Array.from(
-      new Set(draftEvaluations.map((evaluation) => evaluation.id_periode)),
-    );
-    const assignedTemplates =
-      targetRoleIds.length && draftPeriodIds.length
-        ? await this.pg.query<any>(
-            `SELECT trp.id_role, trp.id_periode, t.meta_json
-             FROM templates_roles_periodes trp
-             JOIN templates t ON t.id_template = trp.id_template
-             WHERE trp.est_actif = true
-               AND t.statut = 'published'
-               AND trp.id_role = ANY($1::varchar[])
-               AND trp.id_periode = ANY($2::uuid[])`,
-            [targetRoleIds, draftPeriodIds],
-          )
-        : [];
-    const criteriaByRoleAndPeriod = new Map(
-      assignedTemplates.map((assignment: any) => [
-        `${assignment.id_role}:${assignment.id_periode}`,
-        buildTemplateEvaluationCriteria(assignment.meta_json),
-      ]),
-    );
 
-    return evaluations.map((evaluation) => {
-      const evalue = usersByMatricule.get(evaluation.evalue_matricule) ?? null;
-      const targetRoleName = evalue?.role_nom ?? evalue?.role;
-      const targetRoleId = typeof targetRoleName === 'string'
-        ? roleIdByName.get(targetRoleName)
-        : undefined;
-      const assignedTemplateCriteria =
-        evaluation.criteres_snapshot_json ??
-        (['brouillon', 'rejete'].includes(evaluation.statut) && targetRoleId
-          ? criteriaByRoleAndPeriod.get(
-              `${targetRoleId}:${evaluation.id_periode}`,
-            )
-          : null);
-      const regle = evaluation.id_regle
-        ? reglesById.get(evaluation.id_regle) ?? null
-        : null;
-      const normalizedSnapshot = assignedTemplateCriteria
-        ? parseRuleEnvelope(assignedTemplateCriteria)
-        : null;
-      const effectiveRule =
-        regle && normalizedSnapshot
-          ? {
-              ...regle,
-              criteres: normalizedSnapshot.criteres,
-              sections: normalizedSnapshot.sections,
-              nb_criteres: normalizedSnapshot.criteres.length,
-              criteres_evaluation_json: {
-                ...regle.criteres_evaluation_json,
-                sections: normalizedSnapshot.sections,
-                criteres: normalizedSnapshot.criteres,
-              },
-            }
-          : regle;
-
-      return {
-        ...evaluation,
-        evaluateur:
-          evaluation.type_evaluation === 'pairs'
-            ? null
-            : usersByMatricule.get(evaluation.evaluateur_matricule) ?? null,
-        evalue,
-        periode: evaluation.periode_code ? periodesByCode.get(evaluation.periode_code) ?? null : null,
-        regle: effectiveRule,
-        validateur: evaluation.validateur_matricule
-          ? usersByMatricule.get(evaluation.validateur_matricule) ?? null
-          : null,
-      };
-    });
-  }
-
-  private async loadAssignedTemplateCriteria(
-    idRole: string | null | undefined,
-    idPeriode: string,
-  ) {
-    if (!idRole) return null;
-    const template = await this.pg.queryOne<{ meta_json: unknown }>(
-      `SELECT t.meta_json
-       FROM templates_roles_periodes trp
-       JOIN templates t ON t.id_template = trp.id_template
-       WHERE trp.id_role = $1 AND trp.id_periode = $2
-         AND trp.est_actif = true AND t.statut = 'published'`,
-      [idRole, idPeriode],
-    );
-    return template ? buildTemplateEvaluationCriteria(template.meta_json) : null;
-  }
-
-  private async loadAssignedTemplateCriteriaForEvaluation(evaluation: Evaluation) {
-    if (!evaluation.id_periode) return null;
-    const target = await this.prisma.utilisateur.findUnique({
-      where: { matricule: evaluation.evalue_matricule },
-      select: { role_nom: true, role: true },
-    });
-    const roleName = target?.role_nom ?? target?.role;
-    if (!roleName) return null;
-    const role = await this.prisma.role.findUnique({
-      where: { nom_role: roleName },
-      select: { id_role: true },
-    });
-    return this.loadAssignedTemplateCriteria(
-      role?.id_role,
-      evaluation.id_periode,
-    );
-  }
-
-  private withRuleMetadata(templateCriteria: unknown, ruleCriteria: unknown) {
-    const templateEnvelope = parseRuleEnvelope(templateCriteria);
-    const ruleEnvelope = parseRuleEnvelope(ruleCriteria);
-    return {
-      ...templateEnvelope,
-      visibility_policy: ruleEnvelope.visibility_policy,
-      analytics_metadata: ruleEnvelope.analytics_metadata,
-    };
+    return evaluations.map((evaluation) => ({
+      ...evaluation,
+      evaluateur:
+        evaluation.type_evaluation === 'pairs'
+          ? null
+          : usersByMatricule.get(evaluation.evaluateur_matricule) ?? null,
+      evalue: usersByMatricule.get(evaluation.evalue_matricule) ?? null,
+      periode: evaluation.periode_code ? periodesByCode.get(evaluation.periode_code) ?? null : null,
+      regle: evaluation.id_regle ? reglesById.get(evaluation.id_regle) ?? null : null,
+      validateur: evaluation.validateur_matricule
+        ? usersByMatricule.get(evaluation.validateur_matricule) ?? null
+        : null,
+    }));
   }
 
   private async enrichEvaluation(evaluation: Evaluation): Promise<EnrichedEvaluation> {

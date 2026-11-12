@@ -108,6 +108,15 @@ describe('socle du client API', () => {
 });
 
 describe('contrats templates', () => {
+  it('duplique un modèle pour ouvrir une copie indépendante', async () => {
+    await templatesApi.duplicate(TEMPLATE_ID);
+
+    expect(requestAt()).toMatchObject({
+      url: `/api/templates/${TEMPLATE_ID}/duplicate`,
+      init: { method: 'POST' },
+    });
+  });
+
   it('assigne un template avec les trois identifiants attendus', async () => {
     const payload = {
       id_role: 'role-cdv',

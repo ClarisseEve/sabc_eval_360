@@ -117,7 +117,7 @@ describe('HierarchyService', () => {
     it('should return valid when same region, higher level, same branch', async () => {
       mockPrisma.utilisateur.findUnique
         .mockResolvedValueOnce({ matricule: 'U1', id_region: 'R1', niveau_hierarchique: 3, id_branche: 'B1' })
-        .mockResolvedValueOnce({ matricule: 'MGR1', id_region: 'R1', niveau_hierarchique: 1, id_branche: 'B1' })
+        .mockResolvedValueOnce({ matricule: 'MGR1', id_region: 'R1', niveau_hierarchique: 1, id_branche: 'B1', est_actif: true, statut: 'Actif' })
         // getChaineHierarchique calls findUnique too — no cycle, chain: MGR1 has no manager
         .mockResolvedValueOnce({ matricule: 'MGR1', nom: '', prenom: '', role: 'DR', role_nom: 'DR', manager_matricule: null, niveau_hierarchique: 1 })
         .mockResolvedValueOnce(null); // end of chain
@@ -129,7 +129,7 @@ describe('HierarchyService', () => {
     it('should return invalid when manager in different region', async () => {
       mockPrisma.utilisateur.findUnique
         .mockResolvedValueOnce({ matricule: 'U1', id_region: 'R1', niveau_hierarchique: 3, id_branche: 'B1' })
-        .mockResolvedValueOnce({ matricule: 'MGR1', id_region: 'R2', niveau_hierarchique: 1, id_branche: 'B1' })
+        .mockResolvedValueOnce({ matricule: 'MGR1', id_region: 'R2', niveau_hierarchique: 1, id_branche: 'B1', est_actif: true, statut: 'Actif' })
         .mockResolvedValueOnce({ matricule: 'MGR1', nom: '', prenom: '', role: 'DR', role_nom: 'DR', manager_matricule: null, niveau_hierarchique: 1 })
         .mockResolvedValueOnce(null);
       const result = await service.validerAssignationManager('U1', 'MGR1');
@@ -140,7 +140,7 @@ describe('HierarchyService', () => {
     it('should return invalid when manager level is not higher', async () => {
       mockPrisma.utilisateur.findUnique
         .mockResolvedValueOnce({ matricule: 'U1', id_region: 'R1', niveau_hierarchique: 2, id_branche: 'B1' })
-        .mockResolvedValueOnce({ matricule: 'MGR1', id_region: 'R1', niveau_hierarchique: 3, id_branche: 'B1' })
+        .mockResolvedValueOnce({ matricule: 'MGR1', id_region: 'R1', niveau_hierarchique: 3, id_branche: 'B1', est_actif: true, statut: 'Actif' })
         .mockResolvedValueOnce({ matricule: 'MGR1', nom: '', prenom: '', role: 'CDS', role_nom: 'CDS', manager_matricule: null, niveau_hierarchique: 3 })
         .mockResolvedValueOnce(null);
       const result = await service.validerAssignationManager('U1', 'MGR1');
@@ -151,7 +151,7 @@ describe('HierarchyService', () => {
     it('should allow cross-branch when manager role has peut_cross_branch=true', async () => {
       mockPrisma.utilisateur.findUnique
         .mockResolvedValueOnce({ matricule: 'U1', id_region: 'R1', niveau_hierarchique: 3, id_branche: 'B2' })
-        .mockResolvedValueOnce({ matricule: 'DR1', id_region: 'R1', niveau_hierarchique: 1, id_branche: 'B1', role: 'DR' })
+        .mockResolvedValueOnce({ matricule: 'DR1', id_region: 'R1', niveau_hierarchique: 1, id_branche: 'B1', role: 'DR', est_actif: true, statut: 'Actif' })
         .mockResolvedValueOnce({ matricule: 'DR1', nom: '', prenom: '', role: 'DR', role_nom: 'DR', manager_matricule: null, niveau_hierarchique: 1 })
         .mockResolvedValueOnce(null);
       mockPrisma.role.findUnique.mockResolvedValue({ id_role: 'DR', peut_cross_branch: true });
@@ -162,7 +162,7 @@ describe('HierarchyService', () => {
     it('should reject cross-branch when manager role has peut_cross_branch=false', async () => {
       mockPrisma.utilisateur.findUnique
         .mockResolvedValueOnce({ matricule: 'U1', id_region: 'R1', niveau_hierarchique: 3, id_branche: 'B2' })
-        .mockResolvedValueOnce({ matricule: 'CSC1', id_region: 'R1', niveau_hierarchique: 2, id_branche: 'B1', role: 'CSC' })
+        .mockResolvedValueOnce({ matricule: 'CSC1', id_region: 'R1', niveau_hierarchique: 2, id_branche: 'B1', role: 'CSC', est_actif: true, statut: 'Actif' })
         .mockResolvedValueOnce({ matricule: 'CSC1', nom: '', prenom: '', role: 'CSC', role_nom: 'CSC', manager_matricule: null, niveau_hierarchique: 2 })
         .mockResolvedValueOnce(null);
       mockPrisma.role.findUnique.mockResolvedValue({ id_role: 'CSC', peut_cross_branch: false });
@@ -171,11 +171,39 @@ describe('HierarchyService', () => {
       expect(result.erreurs).toContain("Seuls les rôles autorisés (peut_cross_branch) peuvent superviser des utilisateurs d'autres branches");
     });
 
+    it('should reject inactive managers', async () => {
+      mockPrisma.utilisateur.findUnique
+        .mockResolvedValueOnce({ matricule: 'U1', id_region: 'R1', niveau_hierarchique: 3, id_branche: 'B1' })
+        .mockResolvedValueOnce({
+          matricule: 'MGR1',
+          id_region: 'R1',
+          niveau_hierarchique: 1,
+          id_branche: 'B1',
+          est_actif: false,
+          statut: 'Inactif',
+        })
+        .mockResolvedValueOnce({
+          matricule: 'MGR1',
+          nom: '',
+          prenom: '',
+          role: 'DR',
+          role_nom: 'DR',
+          manager_matricule: null,
+          niveau_hierarchique: 1,
+        })
+        .mockResolvedValueOnce(null);
+
+      const result = await service.validerAssignationManager('U1', 'MGR1');
+
+      expect(result.valide).toBe(false);
+      expect(result.erreurs).toContain('Le manager doit être actif');
+    });
+
     it('should detect hierarchy cycle', async () => {
       // U1 tries to set MGR1 as manager, but MGR1 is already a subordinate of U1
       mockPrisma.utilisateur.findUnique
         .mockResolvedValueOnce({ matricule: 'U1', id_region: 'R1', niveau_hierarchique: 2, id_branche: 'B1' })
-        .mockResolvedValueOnce({ matricule: 'MGR1', id_region: 'R1', niveau_hierarchique: 1, id_branche: 'B1' })
+        .mockResolvedValueOnce({ matricule: 'MGR1', id_region: 'R1', niveau_hierarchique: 1, id_branche: 'B1', est_actif: true, statut: 'Actif' })
         // getChaineHierarchique for MGR1: MGR1 -> U1 (cycle!)
         .mockResolvedValueOnce({ matricule: 'MGR1', nom: '', prenom: '', role: 'DR', role_nom: 'DR', manager_matricule: 'U1', niveau_hierarchique: 1 })
         .mockResolvedValueOnce({ matricule: 'U1', nom: '', prenom: '', role: 'CSC', role_nom: 'CSC', manager_matricule: null, niveau_hierarchique: 2 })

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, Edit2, Eye, Plus, Power, Trash2 } from 'lucide-react';
+import { ClipboardList, Copy, Edit2, Eye, Plus, Power, Trash2 } from 'lucide-react';
 import { ExcelImportDialog } from '@/Components/Admin/ExcelImportDialog';
 import { templatesApi } from '@/Services/api';
 import { useConfirm } from '@/Contexts/ConfirmContext';
@@ -63,6 +63,19 @@ export default function TemplatesIndexPage() {
       success('Modèle supprimé.');
     },
     onError: () => error('Impossible de supprimer ce modèle (des assignations actives existent peut-être).'),
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: (id: string) => templatesApi.duplicate(id),
+    onSuccess: async (response) => {
+      const duplicate = response.data;
+      await queryClient.invalidateQueries({ queryKey: ['templates'] });
+      success('Modèle dupliqué en brouillon. Vous pouvez maintenant modifier ses compétences et leurs poids.');
+      navigate(`/admin/evaluations/templates/${duplicate.id ?? duplicate.id_template}/edit`);
+    },
+    onError: (cause: any) => error(
+      cause?.response?.data?.message || cause?.message || 'Impossible de dupliquer ce modèle.',
+    ),
   });
 
   const filtered = templates.filter((t: any) =>
@@ -180,6 +193,13 @@ export default function TemplatesIndexPage() {
                               <DropdownMenuItem onClick={() => navigate(`/admin/evaluations/templates/${id}/edit`)}>
                                 <Edit2 size={14} className="mr-2" />
                                 Modifier
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={duplicateMutation.isPending}
+                                onClick={() => duplicateMutation.mutate(id)}
+                              >
+                                <Copy size={14} className="mr-2" />
+                                Dupliquer
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => isPublished ? unpublishMutation.mutate(id) : publishMutation.mutate(id)}

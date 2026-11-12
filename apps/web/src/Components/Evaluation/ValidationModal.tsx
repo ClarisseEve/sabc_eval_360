@@ -100,6 +100,17 @@ export default function ValidationModal({ evaluation, open, onClose }: Props) {
         setSubmitting(false);
         onClose();
         queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+        if (evaluation.evalue.matricule) {
+          queryClient.invalidateQueries({
+            queryKey: ['admin', 'users', evaluation.evalue.matricule, 'historique'],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ['analytics', 'scores', evaluation.evalue.matricule],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ['analytics', 'evaluation-gaps', evaluation.evalue.matricule],
+          });
+        }
       })
       .catch((err: any) => {
         setSubmitting(false);

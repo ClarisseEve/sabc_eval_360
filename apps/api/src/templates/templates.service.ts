@@ -94,6 +94,22 @@ export class TemplatesService {
     return this.getTemplateById(id);
   }
 
+  async duplicateTemplate(id: string) {
+    const source = await this.getTemplateById(id);
+    const duplicateId = randomUUID();
+    const title = `Copie de ${source.titre}`.slice(0, 150);
+    const metaJson = JSON.stringify(source.meta_json ?? {});
+
+    await this.pg.execute(
+      `INSERT INTO templates
+       (id_template, nom, description, evaluated_role, version, statut, meta_json, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 1, 'draft', $5::json, NOW(), NOW())`,
+      [duplicateId, title, source.description ?? null, source.evaluated_role, metaJson],
+    );
+
+    return this.getTemplateById(duplicateId);
+  }
+
   async updateTemplate(id: string, dto: UpdateTemplateDto) {
     await this.getTemplateById(id);
 

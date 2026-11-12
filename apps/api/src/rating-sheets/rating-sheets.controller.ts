@@ -98,7 +98,7 @@ export class RatingSheetsController {
     const file = await this.service.getPdf(id, request.user.matricule, isAdmin);
     response.setHeader(
       'Content-Disposition',
-      `attachment; filename="fiche-notation-${file.matricule}.pdf"`,
+      `attachment; filename="${file.filename}"`,
     );
     return new StreamableFile(file.buffer, { type: 'application/pdf' });
   }

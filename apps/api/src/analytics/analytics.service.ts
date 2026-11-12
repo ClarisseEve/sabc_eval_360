@@ -1466,6 +1466,7 @@ export class AnalyticsService {
       nom_periode: string;
       date_debut: string;
       critere_id: string;
+      critere_label: string | null;
       moyenne: string | null;
     }>(
       // Les périodes sont bornées puis les moyennes calculées dessus: une
@@ -1488,11 +1489,27 @@ export class AnalyticsService {
               pr.nom_periode,
               pr.date_debut::text AS date_debut,
               n->>'critere_id' AS critere_id,
+              MAX(COALESCE(
+                NULLIF(criterion.value->>'libelle', ''),
+                NULLIF(criterion.value->>'nom', ''),
+                NULLIF(n->>'critere_nom', ''),
+                NULLIF(n->>'nom', ''),
+                NULLIF(n->>'critere', '')
+              )) AS critere_label,
               ROUND(AVG((n->>'note')::numeric), 2) AS moyenne
        FROM periodes_retenues pr
        JOIN evaluations e ON e.id_periode = pr.id_periode
        LEFT JOIN regles_evaluation r ON r.id_regle = e.id_regle
        CROSS JOIN LATERAL jsonb_array_elements(e.notations_json) AS n
+       LEFT JOIN LATERAL jsonb_array_elements(
+         CASE
+           WHEN jsonb_typeof(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)) = 'object'
+             THEN COALESCE(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)->'criteres', '[]'::jsonb)
+           WHEN jsonb_typeof(COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)) = 'array'
+             THEN COALESCE(e.criteres_snapshot_json, r.criteres_evaluation_json)
+           ELSE '[]'::jsonb
+         END
+       ) AS criterion(value) ON criterion.value->>'id' = n->>'critere_id'
        WHERE e.evalue_matricule = $1
          AND e.statut = 'valide'
          AND e.notations_json IS NOT NULL
@@ -1506,6 +1523,12 @@ export class AnalyticsService {
 
     const criteres = [...new Set(rows.map((row) => row.critere_id))].sort((a, b) =>
       a.localeCompare(b),
+    );
+    const libellesCriteres = Object.fromEntries(
+      criteres.map((critereId) => {
+        const label = rows.find((row) => row.critere_id === critereId)?.critere_label?.trim();
+        return [critereId, label || `Critère ${critereId}`];
+      }),
     );
 
     const parPeriode = new Map<
@@ -1534,7 +1557,13 @@ export class AnalyticsService {
       ) as Record<string, number | null>,
     }));
 
-    return { matricule, criteres, periodes, generated_at: new Date().toISOString() };
+    return {
+      matricule,
+      criteres,
+      libelles_criteres: libellesCriteres,
+      periodes,
+      generated_at: new Date().toISOString(),
+    };
   }
 
   // ─── Heatmap d'équipe ────────────────────────────────────────────────────

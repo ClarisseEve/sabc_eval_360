@@ -165,6 +165,12 @@ const EditEvaluation: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['evaluations'] });
       await queryClient.invalidateQueries({ queryKey: ['evaluations', String(evaluationId)] });
       if (submit) {
+        const evaluatedMatricule = String(evaluation?.evalue_matricule ?? '');
+        if (evaluatedMatricule) {
+          await queryClient.invalidateQueries({
+            queryKey: ['admin', 'users', evaluatedMatricule, 'historique'],
+          });
+        }
         setTimeout(() => {
           navigate(`/evaluations/${evaluationId}`);
         }, 1200);

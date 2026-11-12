@@ -32,7 +32,7 @@ const COULEURS = ['#C62828', '#1565C0', '#F9A825', '#2E7D32', '#6A1B9A'];
 export function EvolutionCard({
   data,
   title = 'Évolution de vos compétences',
-  description = 'Progression par critère au fil des périodes d’évaluation.',
+  description = 'Chaque couleur correspond à une compétence indiquée dans la légende. Les notes sont sur 5 ; les périodes sont affichées de gauche à droite.',
   emptyMessage = "Au moins une période évaluée est nécessaire pour tracer une évolution.",
   isLoading = false,
 }: Readonly<EvolutionCardProps>) {
@@ -57,12 +57,17 @@ export function EvolutionCard({
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={points} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--sabc-gray-200)" />
-                  <XAxis dataKey="periode" tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }} />
+                  <XAxis
+                    dataKey="periode"
+                    tick={{ fill: 'var(--sabc-gray-600)', fontSize: 11 }}
+                    label={{ value: 'Période d’évaluation', position: 'insideBottom', offset: -4 }}
+                  />
                   {/* Échelle bornée à 1-5 comme la grille de notation. */}
                   <YAxis
                     domain={[0, 5]}
                     tickCount={6}
                     tick={{ fill: 'var(--sabc-gray-400)', fontSize: 10 }}
+                    label={{ value: 'Note / 5', angle: -90, position: 'insideLeft' }}
                   />
                   <Tooltip
                     formatter={(value) =>
@@ -75,7 +80,7 @@ export function EvolutionCard({
                       key={critere}
                       type="monotone"
                       dataKey={critere}
-                      name={critere}
+                      name={data?.libelles_criteres?.[critere] || `Critère ${critere}`}
                       stroke={COULEURS[index % COULEURS.length]}
                       strokeWidth={2}
                       dot={{ r: 3 }}

@@ -31,16 +31,22 @@ describe('buildEvolutionView', () => {
 
   it('signale une progression sur le critère qui gagne le plus entre la première et la dernière période', () => {
     const view = buildEvolutionView(
-      reponse(
-        ['execution', 'leadership'],
-        [
-          { code_periode: 'P1', nom_periode: 'S1', notes: { execution: 4, leadership: 2 } },
-          { code_periode: 'P2', nom_periode: 'S2', notes: { execution: 4.2, leadership: 4 } },
-        ],
-      ),
+      {
+        ...reponse(
+          ['execution', 'leadership'],
+          [
+            { code_periode: 'P1', nom_periode: 'S1', notes: { execution: 4, leadership: 2 } },
+            { code_periode: 'P2', nom_periode: 'S2', notes: { execution: 4.2, leadership: 4 } },
+          ],
+        ),
+        libelles_criteres: {
+          execution: 'Exécution opérationnelle',
+          leadership: 'Leadership d’équipe',
+        },
+      },
     );
 
-    expect(view.progression).toEqual({ critere: 'leadership', delta: 2 });
+    expect(view.progression).toEqual({ critere: 'Leadership d’équipe', delta: 2 });
   });
 
   it('signale un point d’attention sur le critère qui recule le plus', () => {
@@ -54,7 +60,7 @@ describe('buildEvolutionView', () => {
       ),
     );
 
-    expect(view.pointDAttention).toEqual({ critere: 'execution', delta: -1.5 });
+    expect(view.pointDAttention).toEqual({ critere: 'Critère execution', delta: -1.5 });
   });
 
   it('n’infère aucune tendance à partir d’une seule période', () => {

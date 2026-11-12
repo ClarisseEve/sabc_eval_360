@@ -145,6 +145,53 @@ describe('TemplatesService', () => {
     });
   });
 
+  describe('duplicateTemplate', () => {
+    it('copies template contents and weights into a new unpublished version', async () => {
+      const source = {
+        ...mockTemplate,
+        meta_json: {
+          categorie: 'CSC',
+          sections: [{
+            titre: 'Compétences',
+            competences: [{ libelle: 'Analyse', poids: 65 }, { libelle: 'Conseil', poids: 35 }],
+          }],
+        },
+      };
+      mockPg.queryOne
+        .mockResolvedValueOnce(source)
+        .mockResolvedValueOnce({
+          ...source,
+          id_template: 'uuid-copy',
+          nom: 'Copie de Template Test',
+          version: 1,
+          statut: 'draft',
+        });
+
+      const duplicate = await service.duplicateTemplate('uuid-1');
+
+      const [insertSql, params] = mockPg.execute.mock.calls[0];
+      expect(insertSql).toContain('INSERT INTO templates');
+      expect(params[0]).not.toBe('uuid-1');
+      expect(params.slice(1, 4)).toEqual(['Copie de Template Test', 'Desc', 'CSC']);
+      expect(JSON.parse(String(params[4]))).toEqual(source.meta_json);
+      expect(duplicate).toMatchObject({
+        id: 'uuid-copy',
+        titre: 'Copie de Template Test',
+        version: '1',
+        statut: 'draft',
+        est_actif: false,
+        sections: source.meta_json.sections,
+      });
+    });
+
+    it('rejects duplication when the source template does not exist', async () => {
+      mockPg.queryOne.mockResolvedValue(null);
+
+      await expect(service.duplicateTemplate('missing')).rejects.toThrow(NotFoundException);
+      expect(mockPg.execute).not.toHaveBeenCalled();
+    });
+  });
+
   // ─── updateTemplate ───────────────────────────────────────────────────────
 
   describe('updateTemplate', () => {

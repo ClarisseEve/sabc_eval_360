@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { Badge } from '@/Components/UI/Badge';
@@ -15,8 +15,11 @@ import { AdminUsersLayout } from './shared';
 import { scoreOnTwenty } from './evaluation-score';
 import { buildEvaluationCriteria } from '@/pages/Common/Evaluations/shared';
 import {
-  getAdminUserSelfEvaluations,
-  getLatestSubmittedSelfEvaluation,
+  filterAdminUserEvaluations,
+  getAdminUserEvaluations,
+  getAdminUserEvaluationPeriods,
+  getEvaluationGapSummary,
+  getLatestSubmittedEvaluation,
 } from './evaluation-history-data';
 import { formatDateFr, formatScore } from '@/utils/helpers';
 import { KpiCard } from '@/Components/UI/KpiCard';
@@ -26,6 +29,7 @@ const TYPE_LABELS: Record<string, string> = {
   pairs: 'Pairs',
   descendante: 'Manager',
   ascendante: 'Ascendante',
+  '360': 'Évaluation 360°',
 };
 
 /** Note sur 20 au format français (« 14,80 / 20 »). Absente : « n.d. ». */
@@ -53,6 +57,8 @@ function userStatusVariant(label: string | null): 'success' | 'warning' | 'error
 export default function ShowUser() {
   const { matricule = '' } = useParams();
   const { data } = useAdminUser(matricule);
+  const [evaluationTypeFilter, setEvaluationTypeFilter] = useState('all');
+  const [evaluationPeriodFilter, setEvaluationPeriodFilter] = useState('latest');
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const { success, error } = useToast();
@@ -68,11 +74,6 @@ export default function ShowUser() {
   const { data: gapData, isLoading: gapsLoading } = useQuery({
     queryKey: ['analytics', 'evaluation-gaps', matricule],
     queryFn: () => analyticsApi.evaluationGaps(matricule).then((response) => response.data),
-    enabled: Boolean(matricule),
-  });
-  const { data: axesData } = useQuery({
-    queryKey: ['analytics', 'axes', matricule],
-    queryFn: () => analyticsApi.axesAmelioration(matricule).then((response) => response.data),
     enabled: Boolean(matricule),
   });
   const { data: recommendationsData } = useQuery({
@@ -110,24 +111,34 @@ export default function ShowUser() {
   const stats = user?.stats || {};
   const subs = Array.isArray(subordinates) ? subordinates : [];
   const profileGap = Array.isArray(gapData?.profils) ? gapData.profils[0] : null;
-  const selfEvaluations = getAdminUserSelfEvaluations(historyData?.data);
-  const pendingSelfEvaluation = getLatestSubmittedSelfEvaluation(selfEvaluations);
-  const pendingSelfScore = pendingSelfEvaluation?.note_globale ?? null;
+  const profileEvaluations = getAdminUserEvaluations(historyData?.data, matricule);
+  const evaluationPeriods = getAdminUserEvaluationPeriods(profileEvaluations);
+  const selectedPeriodId = evaluationPeriodFilter === 'latest'
+    ? evaluationPeriods[0]?.id ?? ''
+    : evaluationPeriodFilter === 'all' ? '' : evaluationPeriodFilter;
+  const detailedEvaluations = filterAdminUserEvaluations(profileEvaluations, {
+    type: evaluationTypeFilter,
+    periodId: selectedPeriodId,
+  });
+  const filteredCompetences = getEvaluationGapSummary(detailedEvaluations);
+  const criticalCompetences = filteredCompetences.filter(
+    (competence) => competence.moyenne < competence.niveau_requis,
+  );
+  const improvementAxes = criticalCompetences;
+  const selectedPeriodLabel = evaluationPeriods.find((period) => period.id === selectedPeriodId)?.label;
+  const pendingEvaluation = (type: string) => getLatestSubmittedEvaluation(profileEvaluations, type);
   const typeScore = (type: string) => profileGap?.types?.[type]?.score
     ?? scoreData?.par_type?.find((entry: any) => entry.type === type)?.moyenne
-    ?? (type === 'auto' ? pendingSelfScore : null);
+    ?? pendingEvaluation(type)?.note_globale
+    ?? null;
   const typeEvaluationCount = (type: string) => Number(
     profileGap?.types?.[type]?.nb_evaluations
       ?? scoreData?.par_type?.find((entry: any) => entry.type === type)?.nb_evaluations
-      ?? (type === 'auto' && pendingSelfEvaluation ? 1 : 0),
+      ?? (pendingEvaluation(type) ? 1 : 0),
   );
-  const axes = Array.isArray(axesData?.axes_amelioration) ? axesData.axes_amelioration : [];
   const recommendations = Array.isArray(recommendationsData?.recommandations)
     ? recommendationsData.recommandations
     : Array.isArray(recommendationsData) ? recommendationsData : [];
-  const criticalCompetences = Array.isArray(profileGap?.competences)
-    ? profileGap.competences.filter((competence: any) => Array.isArray(competence.gap_types) && competence.gap_types.length > 0)
-    : [];
   const totalEvaluations = ['auto', 'pairs', 'descendante'].reduce((sum, type) => sum + typeEvaluationCount(type), 0);
   const maxGap = Number(profileGap?.divergence ?? 0);
   const profileScoreOnTwenty = scoreOnTwenty(stats.score_moyen);
@@ -178,7 +189,9 @@ export default function ShowUser() {
                   label={label}
                   value={formatOnTwenty(scoreOnTwenty(typeScore(type)))}
                   caption={
-                    type === 'auto' && pendingSelfEvaluation && !profileGap?.types?.auto && !scoreData?.par_type?.some((entry: any) => entry.type === 'auto')
+                    pendingEvaluation(type) &&
+                    !profileGap?.types?.[type] &&
+                    !scoreData?.par_type?.some((entry: any) => entry.type === type)
                       ? 'Soumise, en attente de validation'
                       : `Sur 5 : ${formatScore(typeScore(type), 2)} · ${typeEvaluationCount(type)} évaluation(s)`
                   }
@@ -196,14 +209,47 @@ export default function ShowUser() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Notes de l’auto-évaluation</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Notes des évaluations</CardTitle></CardHeader>
         <CardContent className="space-y-5">
+          <div className="grid gap-3 rounded-lg bg-sabc-gray-50 p-4 sm:grid-cols-2">
+            <label className="space-y-1 text-sm font-medium text-sabc-gray-700">
+              Type d’évaluation
+              <select
+                className="block w-full rounded-md border border-sabc-gray-300 bg-white px-3 py-2 font-normal"
+                value={evaluationTypeFilter}
+                onChange={(event) => setEvaluationTypeFilter(event.target.value)}
+              >
+                <option value="all">Tous les types</option>
+                {Object.entries(TYPE_LABELS).map(([type, label]) => (
+                  <option key={type} value={type}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1 text-sm font-medium text-sabc-gray-700">
+              Trimestre / période
+              <select
+                className="block w-full rounded-md border border-sabc-gray-300 bg-white px-3 py-2 font-normal"
+                value={evaluationPeriodFilter}
+                onChange={(event) => setEvaluationPeriodFilter(event.target.value)}
+              >
+                <option value="latest">Période la plus récente</option>
+                <option value="all">Toutes les périodes</option>
+                {evaluationPeriods.map((period) => (
+                  <option key={period.id} value={period.id}>{period.label}</option>
+                ))}
+              </select>
+            </label>
+            <p className="text-xs text-sabc-gray-500 sm:col-span-2">
+              Les compétences ci-dessous utilisent les notes des évaluations soumises ou validées
+              {selectedPeriodLabel ? ` pour ${selectedPeriodLabel}` : ''}.
+            </p>
+          </div>
           {historyLoading ? (
             <div className="p-4 text-center text-sm text-sabc-gray-500">Chargement des notes…</div>
-          ) : selfEvaluations.length === 0 ? (
-            <p className="text-sm text-sabc-gray-500">Aucune auto-évaluation soumise ou validée avec des notes.</p>
+          ) : detailedEvaluations.length === 0 ? (
+            <p className="text-sm text-sabc-gray-500">Aucune évaluation ne correspond aux filtres sélectionnés.</p>
           ) : (
-            selfEvaluations.map((evaluation, evaluationIndex) => {
+            detailedEvaluations.map((evaluation, evaluationIndex) => {
               const criteria = buildEvaluationCriteria(evaluation);
               const evaluationId = evaluation.id_evaluation ?? evaluationIndex;
               const periodLabel =
@@ -216,10 +262,12 @@ export default function ShowUser() {
                 <section key={evaluationId} className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h3 className="font-semibold text-sabc-gray-900">{periodLabel}</h3>
-                      {evaluation.date_soumission ? (
+                      <h3 className="font-semibold text-sabc-gray-900">
+                        {TYPE_LABELS[evaluation.type_evaluation] ?? evaluation.type_evaluation} · {periodLabel}
+                      </h3>
+                      {evaluation.date_soumission ?? evaluation.created_at ? (
                         <p className="text-xs text-sabc-gray-500">
-                          Soumise le {formatDateFr(evaluation.date_soumission)}
+                          Soumise le {formatDateFr(evaluation.date_soumission ?? evaluation.created_at)}
                         </p>
                       ) : null}
                     </div>
@@ -227,8 +275,13 @@ export default function ShowUser() {
                       {evaluation.statut === 'valide' ? 'Validée' : 'En attente de validation'}
                     </Badge>
                   </div>
+                  {evaluation.note_globale != null && Number.isFinite(Number(evaluation.note_globale)) ? (
+                    <p className="text-sm font-medium text-sabc-gray-700">
+                      Note globale : {formatScore(Number(evaluation.note_globale), 2)} / 5
+                    </p>
+                  ) : null}
                   {criteria.length === 0 ? (
-                    <p className="text-sm text-sabc-gray-500">Les notes de cette auto-évaluation ne sont pas disponibles.</p>
+                    <p className="text-sm text-sabc-gray-500">Les notes de cette évaluation ne sont pas disponibles.</p>
                   ) : (
                     <Table className="min-w-[560px]">
                       <TableHeader>
@@ -264,14 +317,17 @@ export default function ShowUser() {
           <CardHeader><CardTitle>Compétences sous le niveau requis</CardTitle></CardHeader>
           <CardContent>
             {criticalCompetences.length === 0 ? <p className="text-sm text-sabc-gray-500">Aucune compétence sous le niveau requis détectée.</p> : (
-              <div className="space-y-3">{criticalCompetences.map((competence: any) => (
-                <div key={competence.critere_id} className="rounded-lg border border-sabc-gray-200 p-3">
+              <div className="space-y-3">{criticalCompetences.map((competence) => (
+                <div key={competence.id} className="rounded-lg border border-sabc-gray-200 p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium text-sabc-gray-900">{competence.critere_id}</span>
+                    <span className="font-medium text-sabc-gray-900">{competence.critere}</span>
                     <Badge variant="warning">À renforcer</Badge>
                   </div>
                   <div className="mt-1 text-xs text-sabc-gray-600">Niveau requis : {formatScore(competence.niveau_requis, 2)}</div>
-                  <div className="mt-2 text-xs text-sabc-gray-700">{competence.gap_types.map((gap: any) => `${TYPE_LABELS[String(gap.type).toLowerCase()] ?? gap.type} : ${formatScore(gap.score, 2)}`).join(' · ')}</div>
+                  <div className="mt-2 text-xs text-sabc-gray-700">
+                    Note : {formatScore(competence.moyenne, 2)} · écart : {formatScore(competence.moyenne - competence.niveau_requis, 2)}
+                    {' · '}{competence.nb_evaluations} évaluation(s)
+                  </div>
                 </div>
               ))}</div>
             )}
@@ -280,33 +336,35 @@ export default function ShowUser() {
         <Card>
           <CardHeader><CardTitle>Axes d’amélioration et recommandations</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            {axes.slice(0, 5).map((axis: any, index: number) => (
-              <div key={`${axis.critere ?? 'axe'}-${index}`} className="rounded-lg border border-sabc-gray-200 p-3">
+            {improvementAxes.slice(0, 5).map((axis, index) => (
+              <div key={`${axis.id}-${index}`} className="rounded-lg border border-sabc-gray-200 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-medium">{axis.critere}</div>
-                  <Badge variant={axis.priorite === 'haute' ? 'warning' : 'secondary'}>
-                    {axis.priorite === 'haute' ? 'Priorité haute' : 'À renforcer'}
-                  </Badge>
+                  <Badge variant={axis.moyenne < 2 ? 'warning' : 'secondary'}>À renforcer</Badge>
                 </div>
                 <div className="mt-1 text-sm text-sabc-gray-600">
-                  Score : {formatScore(axis.score_actuel ?? axis.moyenne, 2)} · niveau requis : {formatScore(axis.niveau_requis, 2)} · écart : {axis.ecart != null ? `${Number(axis.ecart).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} pt(s)` : 'n.d.'}
+                  Note moyenne : {formatScore(axis.moyenne, 2)} · niveau requis : {formatScore(axis.niveau_requis, 2)} · écart : {formatScore(axis.moyenne - axis.niveau_requis, 2)}
                 </div>
-                <p className="mt-2 text-sm">{axis.suggestion}</p>
-                {axis.objectif_smart ? <p className="mt-1 text-xs text-sabc-gray-500">{axis.objectif_smart}</p> : null}
-                {Array.isArray(axis.commentaires_evaluateurs) && axis.commentaires_evaluateurs.length > 0 ? (
+                <p className="mt-2 text-sm">Cette compétence est sous le niveau requis dans les évaluations sélectionnées.</p>
+                {axis.commentaires.length > 0 ? (
                   <div className="mt-2 border-t border-sabc-gray-200 pt-2 text-xs text-sabc-gray-600">
                     <span className="font-medium">Commentaires des évaluateurs : </span>
-                    {axis.commentaires_evaluateurs.join(' · ')}
+                    {axis.commentaires.join(' · ')}
                   </div>
                 ) : null}
               </div>
             ))}
-            {recommendations.slice(0, 5).map((recommendation: any, index: number) => (
-              <div key={recommendation.id ?? `${recommendation.titre ?? 'reco'}-${index}`} className="rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-3 text-sm">
-                {recommendation.titre ?? recommendation.description ?? recommendation.suggestion ?? 'Recommandation de développement'}
+            {improvementAxes.length === 0 ? <p className="text-sm text-sabc-gray-500">Aucun axe d’amélioration dans les évaluations sélectionnées.</p> : null}
+            {recommendations.length > 0 ? (
+              <div className="border-t border-sabc-gray-200 pt-3">
+                <h3 className="mb-2 text-sm font-semibold">Recommandations générales (toutes périodes)</h3>
+                {recommendations.slice(0, 5).map((recommendation: any, index: number) => (
+                  <div key={recommendation.id ?? `${recommendation.titre ?? 'reco'}-${index}`} className="mb-2 rounded-lg border border-sabc-gray-200 bg-sabc-gray-50 p-3 text-sm">
+                    {recommendation.titre ?? recommendation.description ?? recommendation.suggestion ?? 'Recommandation de développement'}
+                  </div>
+                ))}
               </div>
-            ))}
-            {axes.length === 0 && recommendations.length === 0 ? <p className="text-sm text-sabc-gray-500">Aucune recommandation disponible.</p> : null}
+            ) : null}
           </CardContent>
         </Card>
       </div>
@@ -319,7 +377,12 @@ export default function ShowUser() {
             <div><span className="font-medium">Téléphone :</span> {user?.telephone || 'n.d.'}</div>
             <div><span className="font-medium">Région :</span> {user?.region?.nom_region || 'n.d.'}</div>
             <div><span className="font-medium">Branche :</span> {user?.branche?.nom_branche || 'n.d.'}</div>
-            <div><span className="font-medium">Manager :</span> {user?.manager_matricule || 'n.d.'}</div>
+            <div>
+              <span className="font-medium">Manager :</span>{' '}
+              {user?.manager
+                ? `${[user.manager.prenom, user.manager.nom].filter(Boolean).join(' ')} (${user.manager.matricule})`
+                : user?.manager_matricule || 'n.d.'}
+            </div>
             <div className="flex gap-2 pt-2">
               <Badge variant={userStatusVariant(statusLabel)}>{statusLabel ?? 'Statut non renseigné'}</Badge>
               <Badge variant="outline">{user?.est_admin ? 'Administrateur' : 'Utilisateur standard'}</Badge>

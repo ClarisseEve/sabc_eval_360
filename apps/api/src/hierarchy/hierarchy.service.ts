@@ -144,6 +144,9 @@ export class HierarchyService {
     ]);
 
     if (!user || !manager) return { valide: false, erreurs: ['Utilisateur ou manager introuvable'] };
+    if (!manager.est_actif || manager.statut !== 'Actif') {
+      erreurs.push('Le manager doit être actif');
+    }
     if (user.id_region !== manager.id_region) erreurs.push("Le manager doit être dans la même région");
     if (manager.niveau_hierarchique >= user.niveau_hierarchique) erreurs.push("Le manager doit être à un niveau supérieur");
     if (user.id_branche !== manager.id_branche) {

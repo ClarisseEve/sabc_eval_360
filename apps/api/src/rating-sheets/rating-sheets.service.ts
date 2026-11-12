@@ -23,6 +23,7 @@ import type {
 } from './rating-sheet-calculation';
 import { RatingSheetPdfService } from './rating-sheet-pdf.service';
 import { RatingSheetEmailService } from './rating-sheet-email.service';
+import { buildRatingSheetFilename } from './rating-sheet-filename';
 
 interface RatingSheetUser {
   matricule: string;
@@ -30,8 +31,14 @@ interface RatingSheetUser {
   prenom: string;
   email: string;
   role_nom: string;
+  region_nom: string;
   id_service?: string | null;
   id_branche?: string | null;
+  serviceCommerciale?: {
+    nom_service: string;
+    region: { nom_region: string };
+  } | null;
+  district?: { nom_district: string } | null;
 }
 
 export interface RatingSheetPeriodRow {
@@ -82,6 +89,7 @@ export interface RatingSheetListRow extends RatingSheetDocumentRow {
   email_statut: string;
   nom_periode: string;
   code_periode: string;
+  nom_fichier: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -134,9 +142,17 @@ export class RatingSheetsService {
         prenom: true,
         email: true,
         role_nom: true,
+        region_nom: true,
         est_actif: true,
         id_service: true,
         id_branche: true,
+        serviceCommerciale: {
+          select: {
+            nom_service: true,
+            region: { select: { nom_region: true } },
+          },
+        },
+        district: { select: { nom_district: true } },
       },
       orderBy: [{ role_nom: 'asc' }, { nom: 'asc' }, { prenom: 'asc' }],
     });
@@ -228,7 +244,16 @@ export class RatingSheetsService {
             };
           }
           const snapshot = buildRatingSheet(
-            { ...user, service: user.id_service, branche: user.id_branche },
+            {
+              ...user,
+              service: user.serviceCommerciale?.nom_service ?? null,
+              branche: user.id_branche,
+              district: user.district?.nom_district ?? null,
+              region:
+                user.serviceCommerciale?.region.nom_region ??
+                user.region_nom ??
+                null,
+            },
             period,
             configuration,
             evaluationsByMatricule.get(user.matricule) ?? [],
@@ -304,7 +329,7 @@ export class RatingSheetsService {
   }
 
   async getMySheets(matricule: string) {
-    return this.pg.query<RatingSheetListRow>(
+    const sheets = await this.pg.query<Omit<RatingSheetListRow, 'nom_fichier'>>(
       `SELECT s.id_fiche, s.id_periode, s.role_evalue, s.contenu_json,
               s.publie_le, s.email_statut, p.nom_periode, p.code_periode
        FROM rating_sheets s
@@ -312,6 +337,16 @@ export class RatingSheetsService {
        WHERE s.matricule = $1 ORDER BY s.publie_le DESC`,
       [matricule],
     );
+    return sheets.map((sheet) => ({
+      ...sheet,
+      nom_fichier: buildRatingSheetFilename(
+        sheet.contenu_json.periode.nom || sheet.nom_periode,
+        sheet.contenu_json.periode.code || sheet.code_periode,
+        sheet.contenu_json.personne.role || sheet.role_evalue,
+        sheet.contenu_json.personne.prenom,
+        sheet.contenu_json.personne.nom,
+      ),
+    }));
   }
 
   async publishForRole(
@@ -346,8 +381,16 @@ export class RatingSheetsService {
         prenom: true,
         email: true,
         role_nom: true,
+        region_nom: true,
         id_service: true,
         id_branche: true,
+        serviceCommerciale: {
+          select: {
+            nom_service: true,
+            region: { select: { nom_region: true } },
+          },
+        },
+        district: { select: { nom_district: true } },
       },
     });
 
@@ -426,7 +469,16 @@ export class RatingSheetsService {
     for (const user of users) {
       try {
         const snapshot = buildRatingSheet(
-          { ...user, service: user.id_service, branche: user.id_branche },
+          {
+            ...user,
+            service: user.serviceCommerciale?.nom_service ?? null,
+            branche: user.id_branche,
+            district: user.district?.nom_district ?? null,
+            region:
+              user.serviceCommerciale?.region.nom_region ??
+              user.region_nom ??
+              null,
+          },
           period,
           configuration,
           evaluationsByMatricule.get(user.matricule) ?? [],
@@ -484,7 +536,13 @@ export class RatingSheetsService {
             user.email,
             `${user.prenom} ${user.nom}`,
             pdf,
-            `fiche-notation-${user.matricule}-${period.code_periode}.pdf`,
+            buildRatingSheetFilename(
+              period.nom_periode,
+              period.code_periode,
+              role,
+              user.prenom,
+              user.nom,
+            ),
           );
         } catch (error) {
           emailStatus = 'echec';
@@ -501,7 +559,7 @@ export class RatingSheetsService {
         await this.pg.execute(
           `UPDATE rating_sheets SET notification_statut = $1, notification_erreur = $2,
              email_statut = $3, email_erreur = $4,
-             email_envoye_le = CASE WHEN $3 = 'envoye' THEN NOW() ELSE NULL END,
+             email_envoye_le = CASE WHEN $3::varchar = 'envoye' THEN NOW() ELSE NULL END,
              updated_at = NOW() WHERE id_fiche = $5`,
           [
             notificationStatus,
@@ -525,7 +583,7 @@ export class RatingSheetsService {
             ? error.message
             : 'Erreur inconnue lors de la publication.';
         this.logger.error(
-          `Publication de fiche échouée pour ${user.matricule}`,
+          `Publication de fiche échouée pour ${user.matricule} : ${message}`,
           error instanceof Error ? error.stack : undefined,
         );
         output.push({
@@ -558,9 +616,53 @@ export class RatingSheetsService {
     if (!isAdmin && sheet.matricule !== matricule) {
       throw new NotFoundException('Fiche de notation introuvable.');
     }
+    let snapshot = sheet.contenu_json;
+    const employee = await this.prisma.utilisateur.findUnique({
+      where: { matricule: sheet.matricule },
+      select: {
+        id_service: true,
+        region_nom: true,
+        serviceCommerciale: {
+          select: {
+            nom_service: true,
+            region: { select: { nom_region: true } },
+          },
+        },
+        district: { select: { nom_district: true } },
+      },
+    });
+    if (employee) {
+      snapshot = {
+        ...snapshot,
+        personne: {
+          ...snapshot.personne,
+          service:
+            snapshot.personne.service === employee.id_service ||
+            !snapshot.personne.service
+              ? (employee.serviceCommerciale?.nom_service ?? null)
+              : snapshot.personne.service,
+          district:
+            snapshot.personne.district ??
+            employee.district?.nom_district ??
+            null,
+          region:
+            snapshot.personne.region ??
+            employee.serviceCommerciale?.region.nom_region ??
+            employee.region_nom ??
+            null,
+        },
+      };
+    }
     return {
-      buffer: await this.pdf.create(sheet.contenu_json),
+      buffer: await this.pdf.create(snapshot),
       matricule: sheet.matricule,
+      filename: buildRatingSheetFilename(
+        snapshot.periode.nom,
+        snapshot.periode.code,
+        snapshot.personne.role,
+        snapshot.personne.prenom,
+        snapshot.personne.nom,
+      ),
     };
   }
 

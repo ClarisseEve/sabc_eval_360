@@ -29,14 +29,9 @@ describe('EvaluationsService', () => {
       query: jest.fn().mockResolvedValue([]),
       queryOne: jest.fn(),
       execute: jest.fn(),
-      withTransaction: jest.fn(),
     };
     mockPrisma = {
       utilisateur: {
-        findUnique: jest.fn(),
-        findMany: jest.fn().mockResolvedValue([]),
-      },
-      role: {
         findUnique: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
@@ -101,36 +96,6 @@ describe('EvaluationsService', () => {
     );
   });
 
-  describe('getEligibles', () => {
-    it('returns active and available colleagues for an admin, excluding the admin', async () => {
-      const admin = {
-        matricule: 'ADM1',
-        role: 'ADMIN',
-        role_nom: 'ADMIN',
-        est_admin: true,
-        statut: 'Actif',
-        est_actif: true,
-        est_indisponible: false,
-      };
-      const colleagues = [{ matricule: 'M2', nom: 'Cible', prenom: 'Cam', role: 'CDS', role_nom: 'CDS' }];
-      mockPrisma.utilisateur.findUnique.mockResolvedValue(admin);
-      mockPrisma.utilisateur.findMany.mockResolvedValueOnce(colleagues);
-
-      const result = await service.getEligibles('ADM1');
-
-      expect(result).toEqual({ auto: null, collaborateurs: colleagues, subordonnes: [], pairs: [] });
-      expect(mockPrisma.utilisateur.findMany).toHaveBeenCalledWith({
-        where: {
-          matricule: { not: 'ADM1' },
-          statut: 'Actif',
-          est_actif: true,
-          est_indisponible: false,
-        },
-        select: { matricule: true, nom: true, prenom: true, role: true, role_nom: true },
-      });
-    });
-  });
-
   describe('findById', () => {
     it('should return evaluation when found', async () => {
       const eval_ = { id_evaluation: 'uuid-1', statut: 'brouillon', evaluateur_matricule: 'M1', evalue_matricule: 'M2' };
@@ -141,66 +106,6 @@ describe('EvaluationsService', () => {
 
       const result = await service.findById('uuid-1', evaluatorActor);
       expect(result.id_evaluation).toBe('uuid-1');
-    });
-
-    it('serves the saved position-template criteria instead of the generic rule criteria', async () => {
-      const snapshot = {
-        sections: [{ titre: 'Vente', description: 'Terrain', ordre: 1, competences: [] }],
-        criteres: [
-          {
-            id: 'prospection',
-            libelle: 'Prospection client',
-            description: 'Développe le portefeuille.',
-            poids: 100,
-            section_label: 'Vente',
-            section_order: 1,
-            niveaux: [{ niveau: 1, description: 'Ne prospecte pas.' }],
-          },
-        ],
-      };
-      mockPg.queryOne
-        .mockResolvedValueOnce({
-          id_evaluation: 'uuid-1',
-          statut: 'brouillon',
-          evaluateur_matricule: 'M1',
-          evalue_matricule: 'M2',
-          id_regle: 'rule-1',
-          criteres_snapshot_json: snapshot,
-        })
-        .mockResolvedValueOnce({ criteres_evaluation_json: visibilityEnvelope() });
-      mockPrisma.utilisateur.findMany.mockResolvedValue([
-        { matricule: 'M1', role: 'CDS', role_nom: 'CDS' },
-        { matricule: 'M2', role: 'CSC', role_nom: 'CSC' },
-      ]);
-      mockPg.query.mockResolvedValueOnce([
-        {
-          id_regle: 'rule-1',
-          nom_regle: 'Règle CSC',
-          criteres_evaluation_json: {
-            criteres: [{ id: 'generic', libelle: 'Critère générique', poids: 100 }],
-          },
-          est_active: true,
-        },
-      ]);
-
-      const result = await service.findById('uuid-1', evaluatorActor);
-
-      expect(result.regle?.criteres).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: 'prospection',
-            libelle: 'Prospection client',
-            niveaux: expect.arrayContaining([
-              { niveau: 1, description: 'Ne prospecte pas.' },
-            ]),
-          }),
-        ]),
-      );
-      expect(result.regle?.criteres).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: 'generic' }),
-        ]),
-      );
     });
 
     it('should throw NotFoundException when not found', async () => {
@@ -472,38 +377,12 @@ describe('EvaluationsService', () => {
       expect(result).toBe(true);
       expect(mockPg.execute).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE evaluations'),
-        [JSON.stringify([{ critere_id: 'c1', note: 4 }]), null, null, null, 'uuid-1', null],
-      );
-    });
-
-    it('sauvegarde séparément les points forts et les compétences à améliorer', async () => {
-      mockPg.queryOne.mockResolvedValue({
-        id_evaluation: 'uuid-1',
-        statut: 'brouillon',
-        evaluateur_matricule: 'M1',
-        evalue_matricule: 'M2',
-      });
-      mockPg.query.mockResolvedValue([]);
-      mockPg.execute.mockResolvedValue(1);
-
-      await service.updateNotes(
-        'uuid-1',
-        evaluatorActor,
-        [{ critere_id: 'c1', note: 4 }],
-        undefined,
-        'Bonne collaboration',
-        'Améliorer la planification',
-      );
-
-      expect(mockPg.execute).toHaveBeenCalledWith(
-        expect.stringContaining('commentaire_points_forts'),
         [
           JSON.stringify([{ critere_id: 'c1', note: 4 }]),
-          'Points forts :\nBonne collaboration\n\nCompétences non acquises ou à améliorer :\nAméliorer la planification',
-          'Bonne collaboration',
-          'Améliorer la planification',
-          'uuid-1',
           null,
+          null,
+          null,
+          'uuid-1',
         ],
       );
     });
@@ -819,53 +698,32 @@ describe('EvaluationsService', () => {
       mockPg.execute.mockResolvedValue(1);
     });
 
-    const configureCreateTransaction = (created: any, existing: any[] = []) => {
-      const client = {
-        query: jest.fn().mockImplementation((sql: string) => {
-          if (sql.includes('SELECT id_evaluation')) return Promise.resolve({ rows: existing });
-          if (sql.includes('INSERT INTO evaluations')) {
-            return Promise.resolve({ rows: created ? [created] : [] });
-          }
-          return Promise.resolve({ rows: [] });
-        }),
-      };
-      mockPg.lastTransactionClient = client;
-      mockPg.withTransaction.mockImplementation((callback: (client: any) => Promise<any>) =>
-        callback(client),
-      );
-      return client;
-    };
-
     it('applique l’éligibilité et conserve l’UUID canonique de période', async () => {
       const created = { id_evaluation: 'E1', id_periode: 'periode-uuid' };
-      configureCreateTransaction(created);
-      mockPg.queryOne.mockResolvedValueOnce({
-        id_periode: 'periode-uuid',
-        code_periode: 'P1',
-        statut: 'ouverte',
-        est_ouverte: true,
-      });
+      mockPg.queryOne
+        .mockResolvedValueOnce({
+          id_periode: 'periode-uuid',
+          code_periode: 'P1',
+          statut: 'ouverte',
+          est_ouverte: true,
+        })
+        .mockResolvedValueOnce(created);
 
       const result = await service.create('M1', 'M2', 'periode-uuid');
 
       expect(result).toEqual(created);
       expect(mockEligibility.canEvaluate).toHaveBeenCalledWith('M1', 'M2', 'subordonnes');
-      const transactionClient = mockPg.lastTransactionClient;
-      const insertCall = (transactionClient?.query?.mock?.calls ?? []).find((call: any[]) =>
+      const insertCall = mockPg.queryOne.mock.calls.find((call: any[]) =>
         String(call[0]).includes('INSERT INTO evaluations'),
       );
       expect(insertCall?.[1][2]).toBe('periode-uuid');
-      expect(insertCall?.[1][5]).toBeNull();
-      expect(insertCall?.[1][6]).toBe('periode-uuid');
+      expect(insertCall?.[1][5]).toBe('periode-uuid');
       expect(insertCall?.[0]).toContain('WITH periode_active AS');
-      expect(insertCall?.[0]).toContain('WHERE id_periode = $7');
       expect(insertCall?.[0]).toContain("statut = 'ouverte'");
       expect(insertCall?.[0]).toContain('est_ouverte = true');
       expect(insertCall?.[0]).toContain('est_cloturee = false');
       expect(insertCall?.[0]).toContain("AT TIME ZONE 'Africa/Douala'");
       expect(insertCall?.[0]).toContain('FOR UPDATE');
-      expect(transactionClient.query.mock.calls[0][0]).toContain('pg_advisory_xact_lock');
-      expect(transactionClient.query.mock.calls[1][0]).toContain('FROM evaluations');
 
       const periodCheckSql = String(mockPg.queryOne.mock.calls[0][0]);
       expect(periodCheckSql).toContain("statut = 'ouverte'");
@@ -874,64 +732,10 @@ describe('EvaluationsService', () => {
       expect(periodCheckSql).toContain("AT TIME ZONE 'Africa/Douala'");
     });
 
-    it('uses the assigned position template as the evaluation criteria snapshot', async () => {
-      const created = { id_evaluation: 'E1', id_periode: 'periode-uuid' };
-      configureCreateTransaction(created);
-      mockPrisma.role.findUnique.mockResolvedValue({ id_role: 'role-csc' });
-      mockPg.queryOne
-        .mockResolvedValueOnce({
-          id_periode: 'periode-uuid',
-          code_periode: 'P1',
-          statut: 'ouverte',
-          est_ouverte: true,
-        })
-        .mockResolvedValueOnce({
-          meta_json: {
-            sections: [
-              {
-                titre: 'Vente',
-                ordre: 1,
-                competences: [
-                  {
-                    id: 'prospection',
-                    libelle: 'Prospection client',
-                    description: 'Développe le portefeuille.',
-                    poids: 100,
-                    niveaux: [
-                      { niveau: 1, description: 'Ne prospecte pas.' },
-                      { niveau: 5, description: 'Développe activement le portefeuille.' },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-        });
-
-      await service.create('M1', 'M2', 'periode-uuid');
-
-      const transactionClient = mockPg.lastTransactionClient;
-      const insertCall = transactionClient.query.mock.calls.find((call: any[]) =>
-        String(call[0]).includes('INSERT INTO evaluations'),
-      );
-      const snapshot = JSON.parse(insertCall?.[1][5]);
-      expect(snapshot.criteres).toHaveLength(1);
-      expect(snapshot.criteres[0]).toMatchObject({
-        id: 'prospection',
-        libelle: 'Prospection client',
-        section_label: 'Vente',
-        niveaux: expect.arrayContaining([
-          { niveau: 1, description: 'Ne prospecte pas.' },
-          { niveau: 5, description: 'Développe activement le portefeuille.' },
-        ]),
-      });
-    });
-
     it('autorise ADMIN à évaluer un utilisateur avec la règle de son rôle sans contrôle hiérarchique', async () => {
       const admin = { ...evaluateur, matricule: 'ADM1', role: 'ADMIN', role_nom: 'ADMIN', est_admin: true };
       const distantTarget = { ...evalue, id_region: 'R2', id_branche: 'B2' };
       const created = { id_evaluation: 'E-ADMIN', id_periode: 'periode-uuid' };
-      configureCreateTransaction(created);
       mockPrisma.utilisateur.findUnique.mockImplementation(({ where }: any) =>
         Promise.resolve(where.matricule === 'ADM1' ? admin : distantTarget),
       );
@@ -953,33 +757,36 @@ describe('EvaluationsService', () => {
           role_evaluateur: 'CDS',
           role_evalue: 'CSC',
           type_evaluation: 'descendante',
-        });
+        })
+        .mockResolvedValueOnce(created);
 
       const result = await service.create('ADM1', 'M2', 'periode-uuid', 'R1');
 
       expect(result).toEqual(created);
       expect(mockEligibility.canEvaluate).not.toHaveBeenCalled();
-      const transactionClient = mockPg.lastTransactionClient;
-      const insertCall = transactionClient.query.mock.calls.find((call: any[]) =>
+      const insertCall = mockPg.queryOne.mock.calls.find((call: any[]) =>
         String(call[0]).includes('INSERT INTO evaluations'),
       );
       expect(insertCall?.[1][4]).toBe('descendante');
     });
 
-    it('bloque une seconde évaluation du même type par le même évaluateur pendant la période', async () => {
-      const client = configureCreateTransaction(null, [{ id_evaluation: 'E1' }]);
-      mockPg.queryOne.mockResolvedValueOnce({
-        id_periode: 'periode-uuid',
-        code_periode: 'P1',
-        statut: 'ouverte',
-        est_ouverte: true,
-      });
+    it('creates a new evaluation instead of reusing an earlier attempt', async () => {
+      const newAttempt = { id_evaluation: 'E2', id_periode: 'periode-uuid' };
+      mockPg.queryOne
+        .mockResolvedValueOnce({
+          id_periode: 'periode-uuid',
+          code_periode: 'P1',
+          statut: 'ouverte',
+          est_ouverte: true,
+        })
+        .mockResolvedValueOnce(newAttempt);
 
-      await expect(service.create('M1', 'M2', 'periode-uuid')).rejects.toThrow(
-        'Une évaluation de ce type existe déjà',
-      );
-      expect(client.query).toHaveBeenCalledTimes(2);
-      expect(client.query.mock.calls[1][1]).toEqual(['M1', 'M2', 'periode-uuid', 'descendante']);
+      const result = await service.create('M1', 'M2', 'periode-uuid');
+
+      expect(result).toEqual(newAttempt);
+      expect(mockPg.queryOne).toHaveBeenCalledTimes(2);
+      expect(mockPg.queryOne.mock.calls[1][0]).toContain('INSERT INTO evaluations');
+      expect(mockPg.queryOne.mock.calls[1][0]).not.toContain('SELECT * FROM evaluations');
     });
 
     it('bloque la création si la période ne satisfait plus tous les invariants actifs', async () => {

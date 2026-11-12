@@ -144,6 +144,11 @@ export class AdminUsersService {
   async getUserByMatricule(matricule: string) {
     const user = await this.prisma.utilisateur.findUnique({
       where: { matricule },
+      include: {
+        manager: {
+          select: { matricule: true, nom: true, prenom: true },
+        },
+      },
     });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
@@ -651,7 +656,7 @@ export class AdminUsersService {
 
   async getHistorique(matricule: string) {
     await this.ensureUserExists(matricule);
-    return this.evaluationsService.getHistorique(matricule);
+    return this.evaluationsService.getHistorique(matricule, { limit: 100 });
   }
 
   async getChaine(matricule: string) {

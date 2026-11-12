@@ -788,14 +788,18 @@ describe('AnalyticsService', () => {
     // progression d'un agent période après période, critère par critère.
     it('assemble les périodes en ordre chronologique avec une série par critère', async () => {
       mockPg.query.mockResolvedValue([
-        { code_periode: 'P2025-S1', nom_periode: 'Semestre 1', date_debut: '2025-01-01', critere_id: 'leadership', moyenne: '3.00' },
-        { code_periode: 'P2025-S1', nom_periode: 'Semestre 1', date_debut: '2025-01-01', critere_id: 'execution', moyenne: '4.00' },
-        { code_periode: 'P2025-S2', nom_periode: 'Semestre 2', date_debut: '2025-07-01', critere_id: 'leadership', moyenne: '4.00' },
+        { code_periode: 'P2025-S1', nom_periode: 'Semestre 1', date_debut: '2025-01-01', critere_id: 'leadership', critere_label: 'Leadership', moyenne: '3.00' },
+        { code_periode: 'P2025-S1', nom_periode: 'Semestre 1', date_debut: '2025-01-01', critere_id: 'execution', critere_label: 'Exécution opérationnelle', moyenne: '4.00' },
+        { code_periode: 'P2025-S2', nom_periode: 'Semestre 2', date_debut: '2025-07-01', critere_id: 'leadership', critere_label: 'Leadership', moyenne: '4.00' },
       ]);
 
       const result = await service.getEvolutionCriteres('M001');
 
       expect(result.criteres).toEqual(['execution', 'leadership']);
+      expect(result.libelles_criteres).toEqual({
+        execution: 'Exécution opérationnelle',
+        leadership: 'Leadership',
+      });
       expect(result.periodes).toEqual([
         {
           code_periode: 'P2025-S1',
@@ -820,6 +824,8 @@ describe('AnalyticsService', () => {
       expect(mockPg.query).toHaveBeenCalledTimes(1);
       const [sql, params] = mockPg.query.mock.calls[0];
       expect(sql).toContain('jsonb_array_elements');
+      expect(sql).toContain("criterion.value->>'libelle'");
+      expect(sql).toContain('AS critere_label');
       expect(sql).toContain('GROUP BY');
       expect(sql).toContain('LIMIT');
       expect(params).toContain('M001');

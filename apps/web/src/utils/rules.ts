@@ -74,7 +74,12 @@ export function normalizeRuleCriterion(raw: any, index: number): RuleCriterion {
     section_label: sectionLabel,
     section_order: toNumberValue(raw?.section_order ?? raw?.sectionOrder, 1),
     niveau_requis: toNumberValue(raw?.niveau_requis, 3),
-    niveaux: normalizeCompetenceLevels(raw?.niveaux),
+    niveaux: [1, 2, 3, 4, 5].map((niveau) => {
+      const level = Array.isArray(raw?.niveaux)
+        ? raw.niveaux.find((entry: any) => Number(entry?.niveau) === niveau)
+        : null;
+      return { niveau, description: toStringValue(level?.description) };
+    }),
     improvement_axis_code: toStringValue(raw?.improvement_axis_code) || null,
     recommendation_tags: toTags(raw?.recommendation_tags),
     recommendation_text: toStringValue(raw?.recommendation_text) || null,

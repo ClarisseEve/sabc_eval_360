@@ -77,6 +77,8 @@ export interface RatingSheetSnapshot {
     role: string;
     service: string | null;
     branche: string | null;
+    district?: string | null;
+    region?: string | null;
   };
   periode: {
     id_periode: string;
@@ -247,6 +249,8 @@ export function buildRatingSheet(
     role_nom: string;
     service?: string | null;
     branche?: string | null;
+    district?: string | null;
+    region?: string | null;
   },
   period: {
     id_periode: string;
@@ -424,6 +428,8 @@ export function buildRatingSheet(
       role: user.role_nom,
       service: user.service ?? null,
       branche: user.branche ?? null,
+      district: user.district ?? null,
+      region: user.region ?? null,
     },
     periode: {
       id_periode: period.id_periode,

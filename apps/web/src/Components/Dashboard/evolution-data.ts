@@ -7,6 +7,7 @@ export type EvolutionPeriode = {
 
 export type EvolutionResponse = {
   criteres: string[];
+  libelles_criteres?: Record<string, string>;
   periodes: EvolutionPeriode[];
 };
 
@@ -39,6 +40,7 @@ const round2 = (value: number) => Math.round(value * 100) / 100;
  */
 export function buildEvolutionView(reponse: EvolutionResponse): EvolutionView {
   const series = reponse?.criteres ?? [];
+  const libelles = reponse?.libelles_criteres ?? {};
   const periodes = reponse?.periodes ?? [];
 
   const points: EvolutionPoint[] = periodes.map((periode) => {
@@ -61,7 +63,7 @@ export function buildEvolutionView(reponse: EvolutionResponse): EvolutionView {
       const depart = premiere.notes?.[critere];
       const arrivee = derniere.notes?.[critere];
       if (typeof depart !== 'number' || typeof arrivee !== 'number') return null;
-      return { critere, delta: round2(arrivee - depart) };
+      return { critere: libelles[critere] || `Critère ${critere}`, delta: round2(arrivee - depart) };
     })
     .filter((entree): entree is EvolutionTendance => entree !== null);
 

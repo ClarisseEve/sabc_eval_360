@@ -30,6 +30,7 @@ export type BenchmarksResponse = {
 export type EvolutionApiResponse = {
   matricule: string;
   criteres: string[];
+  libelles_criteres: Record<string, string>;
   periodes: Array<{
     code_periode: string;
     nom_periode: string;
@@ -343,6 +344,7 @@ export const templatesApi = {
   list: () => api.get('/templates'),
   get: (id: string) => api.get(`/templates/${id}`),
   create: (data: any) => api.post('/templates', data),
+  duplicate: (id: string) => api.post(`/templates/${id}/duplicate`),
   update: (id: string, data: any) => api.put(`/templates/${id}`, data),
   delete: (id: string) => api.delete(`/templates/${id}`),
   publish: (id: string) => api.post(`/templates/${id}/publish`),
